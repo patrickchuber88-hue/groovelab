@@ -1,0 +1,6 @@
+-- Add teacher profile fields to users table
+ALTER TABLE users ADD COLUMN IF NOT EXISTS instrument TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS bands TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS gear TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS projects TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS listening TEXT;

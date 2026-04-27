@@ -1,0 +1,5 @@
+-- Song Library Schema Update
+
+ALTER TABLE songs 
+ADD COLUMN IF NOT EXISTS level INTEGER DEFAULT 1,
+ADD COLUMN IF NOT EXISTS media_link TEXT;
