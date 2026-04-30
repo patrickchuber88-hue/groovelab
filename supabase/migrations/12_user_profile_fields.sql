@@ -1,0 +1,9 @@
+-- Add profile columns for teachers and students
+ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS bands JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS projects JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS listening TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS gear TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS musical_styles JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS equipment_list JSONB DEFAULT '[]'::jsonb;

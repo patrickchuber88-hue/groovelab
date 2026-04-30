@@ -1,0 +1,66 @@
+[
+  {
+    "table": "schools",
+    "status": "ok"
+  },
+  {
+    "table": "users",
+    "status": "ok"
+  },
+  {
+    "table": "rooms",
+    "status": "ok"
+  },
+  {
+    "table": "stations",
+    "status": "ok"
+  },
+  {
+    "table": "sessions",
+    "status": "ok"
+  },
+  {
+    "table": "songs",
+    "status": "ok"
+  },
+  {
+    "table": "user_song_skills",
+    "status": "ok"
+  },
+  {
+    "table": "user_availability",
+    "status": "ok"
+  },
+  {
+    "table": "jam_requests",
+    "status": "ok"
+  },
+  {
+    "table": "friendships",
+    "status": "ok"
+  },
+  {
+    "table": "bands",
+    "status": "ok"
+  },
+  {
+    "table": "band_members",
+    "status": "ok"
+  },
+  {
+    "table": "band_gigs",
+    "status": "ok"
+  },
+  {
+    "table": "band_media",
+    "status": "ok"
+  },
+  {
+    "table": "band_song_proposals",
+    "status": "ok"
+  },
+  {
+    "table": "band_proposal_votes",
+    "status": "ok"
+  }
+]

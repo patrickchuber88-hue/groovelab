@@ -19,30 +19,53 @@ export function DeviceSetupScreen() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const { data: school } = await supabase.from('schools').select('id').limit(1).single();
-      if (!school) return;
-
-      const { data: roomsData } = await supabase.from('rooms').select('*').eq('school_id', school.id);
-      if (roomsData) {
-        setRooms(roomsData);
-        if (roomsData.length > 0) setSelectedRoomId(roomsData[0].id);
+      setError(null);
+      
+      const { data: school, error: schoolError } = await supabase.from('schools').select('id').limit(1).single();
+      if (schoolError) {
+        console.error('Error fetching school:', schoolError);
+        setError(`Schule konnte nicht geladen werden: ${schoolError.message}`);
+        return;
+      }
+      if (!school) {
+        setError('Keine Schule in der Datenbank gefunden.');
+        return;
       }
 
-      const { data: stationsData } = await supabase.from('stations').select('*');
-      if (stationsData) setStations(stationsData);
+      const { data: roomsData, error: roomsError } = await supabase.from('rooms').select('*').eq('school_id', school.id);
+      if (roomsError) {
+        console.error('Error fetching rooms:', roomsError);
+        setError(`Räume konnten nicht geladen werden: ${roomsError.message}`);
+      } else if (roomsData) {
+        setRooms(roomsData);
+        if (roomsData.length > 0) setSelectedRoomId(roomsData[0].id);
+        else setError('Keine Räume für diese Schule gefunden.');
+      }
 
-      const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
-      const { data: activeSessions } = await supabase
+      const { data: stationsData, error: stationsError } = await supabase.from('stations').select('*');
+      if (stationsError) {
+        console.error('Error fetching stations:', stationsError);
+      } else if (stationsData) {
+        setStations(stationsData);
+      }
+
+      const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      const { data: activeSessions, error: sessionError } = await supabase
         .from('sessions')
-        .select('station_id, user_id, users(first_name, last_name)')
+        .select('id, station_id, user_id, last_seen, users(first_name, last_name)')
         .is('check_out_time', null)
-        .gt('check_in_time', fourHoursAgo);
-      if (activeSessions) setActiveStationIds(activeSessions.map(s => s.station_id));
-      setBusySessions(activeSessions || []);
+        .gt('last_seen', tenMinsAgo);
+      
+      if (sessionError) {
+        console.error('Error fetching sessions:', sessionError);
+      } else if (activeSessions) {
+        setActiveStationIds(activeSessions.map(s => s.station_id));
+        setBusySessions(activeSessions);
+      }
 
     } catch (err: any) {
-      console.error(err);
-      setError(err.message);
+      console.error('Unexpected setup error:', err);
+      setError(`Ein unerwarteter Fehler ist aufgetreten: ${err.message}`);
     } finally {
       setLoading(false);
     }

@@ -10,19 +10,20 @@ export const TeacherDetailModal: React.FC<TeacherDetailModalProps> = ({ teacher,
   const brandColor = 'var(--primary-color)';
   const INSTRUMENT_ICONS: Record<string, string> = { Guitar: '🎸', Bass: '🎸', Drums: '🥁', Keys: '🎹', Vocals: '🎤' };
   const INSTRUMENT_COLORS: Record<string, string> = {
-    Guitar: '#f59e0b', // Amber
-    Bass: '#8b5cf6',   // Violet
+    Guitar: '#ef4444', // Red
+    Bass: '#eab308',   // Yellow
     Drums: '#3b82f6',  // Blue
-    Keys: '#ec4899',   // Pink
-    Vocals: '#10b981'  // Emerald
+    Keys: '#a855f7',   // Purple
+    Vocals: '#000000'  // Black
   };
 
-  // Mock data for extended fields if not in DB
-  const bio = teacher.bio || "Musik ist meine Leidenschaft. Seit über 15 Jahren bin ich als Multi-Instrumentalist und Produzent unterwegs und liebe es, mein Wissen bei Groovelab weiterzugeben.";
-  const bands = teacher.bands || ["Lunar Echoes", "Groove Syndicate"];
-  const projects = teacher.projects || ["Sound Design for Indie Games", "Annual Winter Jazz Workshop"];
-  const listeningTo = teacher.listening_to || "Snarky Puppy, Vulfpeck, Jacob Collier";
-  const gear = teacher.favorite_gear || "Fender Stratocaster 1964, Moog Matriarch, Roland V-Drums";
+  // Use actual data from DB, no fantasy placeholders
+  const bio = teacher.bio || "";
+  const bands = Array.isArray(teacher.bands) ? teacher.bands : [];
+  const projects = Array.isArray(teacher.projects) ? teacher.projects : [];
+  const listeningTo = teacher.listening || "";
+  const gear = teacher.gear || "";
+
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
@@ -54,7 +55,7 @@ export const TeacherDetailModal: React.FC<TeacherDetailModalProps> = ({ teacher,
             />
             <span style={{ fontSize: '2.5rem', fontWeight: 800, color: brandColor, zIndex: 1 }}>{teacher.first_name?.[0]}</span>
           </div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, color: '#1e293b' }}>{teacher.first_name} {teacher.last_name}</h2>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, color: '#1e293b' }}>{teacher.first_name} {teacher.last_name?.[0]}.</h2>
           <div style={{ fontSize: '0.9rem', color: brandColor, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '4px' }}>
             {teacher.role === 'admin' ? 'Academy Director' : 'Groovelab Coach'}
           </div>
@@ -66,24 +67,21 @@ export const TeacherDetailModal: React.FC<TeacherDetailModalProps> = ({ teacher,
             <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: '#94a3b8', marginBottom: '10px' }}>
               <Radio size={14} /> Musical Journey
             </h4>
-            <p style={{ fontSize: '0.95rem', lineHeight: 1.6, color: '#475569', margin: 0 }}>{bio}</p>
+            <p style={{ fontSize: '0.95rem', lineHeight: 1.6, color: '#475569', margin: 0, fontWeight: 500 }}>{bio || ""}</p>
           </section>
 
-          {/* Instruments */}
+          {/* Expertise / Musical Styles */}
           <section>
             <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: '#94a3b8', marginBottom: '12px' }}>
               <Guitar size={14} /> Expertise
             </h4>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {teacher.equipment_list?.map((e: any, idx: number) => {
-                const instr = e.category.replace('E-', '');
-                return (
-                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '8px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '1.2rem', color: INSTRUMENT_COLORS[instr] || brandColor }}>{INSTRUMENT_ICONS[instr] || '🎵'}</span>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b' }}>{instr}</span>
-                  </div>
-                );
-              })}
+              {(teacher.musical_styles || []).map((style: string, idx: number) => (
+                <div key={idx} style={{ background: '#f8fafc', padding: '8px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '0.85rem', fontWeight: 700, color: '#1e293b' }}>
+                  {style}
+                </div>
+              ))}
+              {(!teacher.musical_styles || teacher.musical_styles.length === 0) && <div style={{ fontSize: '0.85rem', color: '#cbd5e1', fontStyle: 'italic' }}>Keine Expertise eingetragen</div>}
             </div>
           </section>
 
@@ -95,6 +93,7 @@ export const TeacherDetailModal: React.FC<TeacherDetailModalProps> = ({ teacher,
               </h4>
               <ul style={{ padding: 0, margin: 0, listStyle: 'none', fontSize: '0.85rem', color: '#475569' }}>
                 {bands.map((b: string) => <li key={b} style={{ marginBottom: '4px', fontWeight: 600 }}>• {b}</li>)}
+                {bands.length === 0 && <li style={{ fontSize: '0.85rem', color: '#cbd5e1', fontStyle: 'italic' }}>Keine Bands</li>}
               </ul>
             </section>
             <section>
@@ -103,6 +102,7 @@ export const TeacherDetailModal: React.FC<TeacherDetailModalProps> = ({ teacher,
               </h4>
               <ul style={{ padding: 0, margin: 0, listStyle: 'none', fontSize: '0.85rem', color: '#475569' }}>
                 {projects.map((p: string) => <li key={p} style={{ marginBottom: '4px', fontWeight: 600 }}>• {p}</li>)}
+                {projects.length === 0 && <li style={{ fontSize: '0.85rem', color: '#cbd5e1', fontStyle: 'italic' }}>Keine Projekte</li>}
               </ul>
             </section>
           </div>

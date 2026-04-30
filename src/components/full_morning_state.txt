@@ -1,0 +1,1 @@
+\"      <aside style={{\\n        width: sidebarCollapsed ? '0' : '280px', position: 'fixed', left: 0, top: hideHeader ? 0 : '80px', bottom: 0, background: 'white',\\n        borderRight: sidebarCollapsed ? 'none' : '1px solid #f1f5f9', zIndex: 150, transitio\n<truncated 11613 bytes>

@@ -34,6 +34,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [setupRoomId, setSetupRoomId] = useState('');
   const [setupStations, setSetupStations] = useState<any[]>([]);
   const [activeStationIds, setActiveStationIds] = useState<string[]>([]);
+  const [showCoachConfirm, setShowCoachConfirm] = useState<{ user: any; stationId: string; isWithinAnyRoom: boolean } | null>(null);
 
 
   const handleRealScan = async (qrToken: string) => {
@@ -126,21 +127,42 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         .is('check_out_time', null);
         
       // 5. Neue Session starten
-      await supabase
-        .from('sessions')
-        .insert({
-          user_id: user.id,
-          station_id: isWithinAnyRoom ? stationId : null,
-          check_in_time: new Date().toISOString()
-        });
+      // Wenn wir eine feste Station ID haben (Kiosk/Terminal), nutzen wir diese IMMER, 
+      // um sicherzustellen dass der Schüler auf der Karte erscheint.
+      // REGEL: Coaches werden gefragt, ob sie an einem iPad einchecken wollen.
+      if ((user.role === 'teacher' || user.role === 'admin') && stationId) {
+        setShowCoachConfirm({ user, stationId, isWithinAnyRoom });
+        setLoading(false);
+        return;
+      }
 
-      // 6. Erfolgreicher Login
-      onLogin(user.id, !isWithinAnyRoom);
+      await finalizeLogin(user, stationId, isWithinAnyRoom);
       
     } catch (err: any) {
       setError(err.message);
       setLoading(false);
       setHasScanned(false);
+    }
+  };
+
+  const finalizeLogin = async (user: any, stationId: string | null, isWithinAnyRoom: boolean, skipSession: boolean = false) => {
+    try {
+      if (!skipSession) {
+        await supabase
+          .from('sessions')
+          .insert({
+            user_id: user.id,
+            station_id: stationId || (isWithinAnyRoom ? null : null), // stationId hat Vorrang
+            check_in_time: new Date().toISOString()
+          });
+      }
+
+      // 6. Erfolgreicher Login
+      const isHome = stationId ? false : !isWithinAnyRoom;
+      onLogin(user.id, isHome);
+    } catch (err: any) {
+      setError(err.message);
+      setLoading(false);
     }
   };
 
@@ -188,13 +210,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       const { data: stations } = await supabase.from('stations').select('*').in('room_id', rooms.map(r => r.id));
       setSetupStations(stations || []);
 
-      // Lade aktive Sessions (nur die letzten 4 Stunden), um zu sehen welche iPads "besetzt" sind
-      const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+      // Lade aktive Sessions (nur die letzten 2 Minuten Heartbeat), um zu sehen welche iPads "besetzt" sind
+      const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
       const { data: activeSessions } = await supabase
         .from('sessions')
-        .select('id, station_id, user_id, users(first_name, last_name)')
+        .select('id, station_id, user_id, last_seen, users(first_name, last_name)')
         .is('check_out_time', null)
-        .gt('check_in_time', fourHoursAgo);
+        .gt('last_seen', tenMinsAgo);
       setActiveStationIds(activeSessions?.map(s => s.station_id) || []);
       setBusySessions(activeSessions || []);
 
@@ -219,7 +241,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       <div className="glass-panel" style={{ width: '100%', maxWidth: '340px', padding: '16px', background: 'white', display: 'flex', flexDirection: 'column', gap: '16px' }}>
         
         {/* Scanner Bereich */}
-        <div style={{ width: '100%', aspectRatio: '1/1', borderRadius: '12px', overflow: 'hidden', background: '#000', position: 'relative' }}>
+        <div style={{ width: '100%', aspectRatio: '1/1', borderRadius: '24px', overflow: 'hidden', background: '#000', position: 'relative', border: '1px solid #f1f5f9' }}>
           {!hasScanned && (
             <Scanner 
               onScan={(result: any) => {
@@ -233,8 +255,22 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               }}
             />
           )}
+          
+          {/* Animated Scan Line */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '2px',
+            background: `linear-gradient(to right, transparent, var(--primary-color), transparent)`,
+            boxShadow: `0 0 15px var(--primary-color)`,
+            animation: 'scanLine 3s infinite linear',
+            zIndex: 10
+          }} />
+
           {(loading || hasScanned) && (
-            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600 }}>
+            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600, zIndex: 20 }}>
               Verifiziere GPS & Code...
             </div>
           )}
@@ -243,24 +279,27 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         {error && <div style={{ color: '#ef4444', fontSize: '0.875rem', padding: '8px', background: '#fef2f2', borderRadius: '8px' }}>{error}</div>}
         
         {isHomeMode && (
-          <div style={{ background: '#eff6ff', color: '#1e40af', padding: '12px', borderRadius: '12px', fontSize: '0.85rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #bfdbfe' }}>
+          <div style={{ background: '#fef3c7', color: '#b45309', padding: '12px', borderRadius: '12px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #fde68a' }}>
             <MapPin size={16} /> <strong>Home-Mode:</strong> Du bist nicht im Labor. Übung wird als Heimarbeit gewertet.
           </div>
         )}
         
-        {!kioskStationId && !showQuickSetup && (
-          <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-            <button onClick={simulateTeacherLogin} disabled={loading} style={{ flex: 1, background: 'transparent', color: 'var(--text-muted)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-              <Users size={16} /> Lehrer
-            </button>
-            <button onClick={simulateAdminLogin} disabled={loading} style={{ flex: 1, background: 'transparent', color: 'var(--text-muted)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-              <Users size={16} /> Admin
-            </button>
-          </div>
-        )}
-
-        {!kioskStationId && !showQuickSetup && (
-          <button onClick={startQuickSetup} disabled={loading} style={{ marginTop: '8px', background: 'var(--primary-color)', color: 'white', border: 'none', padding: '12px', borderRadius: '12px', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}>
+        {!showQuickSetup && !localStorage.getItem('groovelab_station_id') && (
+          <button 
+            onClick={startQuickSetup}
+            style={{ 
+              width: '100%', 
+              background: 'white', 
+              border: '1px solid #e2e8f0', 
+              padding: '16px', 
+              borderRadius: '16px', 
+              fontWeight: 800, 
+              color: '#94a3b8', 
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              marginTop: '16px'
+            }}
+          >
             iPad als Terminal einrichten
           </button>
         )}
@@ -349,6 +388,35 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 window.location.reload();
               }
             }} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.75rem' }}>Beenden</button>
+          </div>
+        )}
+
+        {showCoachConfirm && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <div className="glass-panel animation-slide-up" style={{ width: '100%', maxWidth: '400px', background: 'white', padding: '32px', borderRadius: '32px', textAlign: 'center' }}>
+              <div style={{ width: '64px', height: '64px', borderRadius: '20px', background: '#fffbeb', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+                 <Tablet size={32} />
+              </div>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 1000, marginBottom: '12px', color: '#1e293b' }}>Check-in Modus</h2>
+              <p style={{ fontSize: '0.95rem', color: '#64748b', marginBottom: '32px', lineHeight: 1.6 }}>
+                Du bist als Coach erkannt. Möchtest du an diesem iPad einchecken oder nur als "Coach vor Ort" erscheinen?
+              </p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <button 
+                  onClick={() => finalizeLogin(showCoachConfirm.user, showCoachConfirm.stationId, showCoachConfirm.isWithinAnyRoom, false)}
+                  style={{ width: '100%', padding: '16px', borderRadius: '16px', background: '#eab308', color: 'white', border: 'none', fontWeight: 900, fontSize: '1rem', cursor: 'pointer', boxShadow: '0 8px 20px rgba(234, 179, 8, 0.3)' }}
+                >
+                  Am iPad einchecken
+                </button>
+                <button 
+                  onClick={() => finalizeLogin(showCoachConfirm.user, showCoachConfirm.stationId, showCoachConfirm.isWithinAnyRoom, true)}
+                  style={{ width: '100%', padding: '16px', borderRadius: '16px', background: '#f1f5f9', color: '#64748b', border: 'none', fontWeight: 800, fontSize: '1rem', cursor: 'pointer' }}
+                >
+                  Nur Erscheinen
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

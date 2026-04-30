@@ -559,45 +559,176 @@ export function AdminDashboard({ userId, onLogout }: AdminDashboardProps) {
   if (!admin) return <div className="app-container flex-center">Lade Dashboard...</div>;
   const brandColor = 'var(--primary-color)';
 
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  if (!admin) return <div className="app-container flex-center">Lade Dashboard...</div>;
+  const brandColor = 'var(--primary-color)';
+
+  const sidebarItems = [
+    { id: 'live', label: 'Live Lab', icon: Monitor },
+    { id: 'students', label: 'Schüler', icon: Users },
+    { id: 'team', label: 'Team', icon: Shield },
+    { id: 'rooms', label: 'Räume', icon: Box },
+    { id: 'songs', label: 'Songs', icon: Music2 },
+    { id: 'stats', label: 'Statistik', icon: LucideBarChart },
+    { id: 'gallery', label: 'ID Galerie', icon: QrCode },
+    { id: 'setup', label: 'Setup', icon: Settings },
+  ];
+
   return (
-    <div className="app-container" style={{ background: '#f9fafb' }}>
-      <header className="header" style={{ background: 'white', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-        <div className="school-brand">
-          <div className="school-logo" style={{ color: brandColor, background: 'white', border: '1px solid rgba(0,0,0,0.05)' }}>
+    <div style={{ display: 'flex', height: '100vh', background: '#f8fafc', overflow: 'hidden' }}>
+      {/* Vertical Sidebar */}
+      <aside style={{ 
+        width: isSidebarCollapsed ? '80px' : '260px', 
+        background: 'white', 
+        borderRight: '1px solid #e2e8f0',
+        display: 'flex',
+        flexDirection: 'column',
+        transition: 'all 0.3s ease',
+        zIndex: 100
+      }}>
+        <div style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid #f1f5f9' }}>
+          <div style={{ 
+            width: '40px', 
+            height: '40px', 
+            borderRadius: '12px', 
+            background: brandColor, 
+            color: 'white', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            boxShadow: `0 8px 16px ${brandColor}33`
+          }}>
             <Music size={24} />
           </div>
-          <div className="school-name">Admin: {admin.first_name}</div>
+          {!isSidebarCollapsed && (
+            <span style={{ fontWeight: 900, fontSize: '1.25rem', letterSpacing: '-0.02em', color: '#1e293b' }}>Groovelab</span>
+          )}
         </div>
-        <button onClick={onLogout} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
-          <LogOut size={20} />
-        </button>
-      </header>
 
-      <div style={{ padding: '0 20px', display: 'flex', gap: '8px', marginTop: '16px' }}>
-        <button onClick={() => setActiveTab('live')} style={{ flex: 1, padding: '12px 4px', borderRadius: '12px', border: 'none', fontWeight: 600, cursor: 'pointer', background: activeTab === 'live' ? brandColor : 'white', color: activeTab === 'live' ? 'white' : 'var(--text-muted)', boxShadow: activeTab === 'live' ? '0 4px 12px rgba(0,0,0,0.1)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '0.75rem' }}>
-          <Monitor size={14} /> Live
-        </button>
-        <button onClick={() => setActiveTab('students')} style={{ flex: 1, padding: '12px 4px', borderRadius: '12px', border: 'none', fontWeight: 600, cursor: 'pointer', background: activeTab === 'students' ? brandColor : 'white', color: activeTab === 'students' ? 'white' : 'var(--text-muted)', boxShadow: activeTab === 'students' ? '0 4px 12px rgba(0,0,0,0.1)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '0.75rem' }}>
-          <Users size={14} /> Schüler
-        </button>
-        <button onClick={() => setActiveTab('team')} style={{ flex: 1, padding: '12px 4px', borderRadius: '12px', border: 'none', fontWeight: 600, cursor: 'pointer', background: activeTab === 'team' ? brandColor : 'white', color: activeTab === 'team' ? 'white' : 'var(--text-muted)', boxShadow: activeTab === 'team' ? '0 4px 12px rgba(0,0,0,0.1)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '0.75rem' }}>
-          <Shield size={14} /> Team
-        </button>
-        <button onClick={() => setActiveTab('rooms')} style={{ flex: 1, padding: '12px 4px', borderRadius: '12px', border: 'none', fontWeight: 600, cursor: 'pointer', background: activeTab === 'rooms' ? brandColor : 'white', color: activeTab === 'rooms' ? 'white' : 'var(--text-muted)', boxShadow: activeTab === 'rooms' ? '0 4px 12px rgba(0,0,0,0.1)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '0.75rem' }}>
-          <Box size={14} /> Räume
-        </button>
-        <button onClick={() => setActiveTab('songs')} style={{ flex: 1, padding: '12px 4px', borderRadius: '12px', border: 'none', fontWeight: 600, cursor: 'pointer', background: activeTab === 'songs' ? brandColor : 'white', color: activeTab === 'songs' ? 'white' : 'var(--text-muted)', boxShadow: activeTab === 'songs' ? '0 4px 12px rgba(0,0,0,0.1)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '0.75rem' }}>
-          <Library size={14} /> Songs
-        </button>
-        <button onClick={() => setActiveTab('stats')} style={{ flex: 1, padding: '12px 4px', borderRadius: '12px', border: 'none', fontWeight: 600, cursor: 'pointer', background: activeTab === 'stats' ? brandColor : 'white', color: activeTab === 'stats' ? 'white' : 'var(--text-muted)', boxShadow: activeTab === 'stats' ? '0 4px 12px rgba(0,0,0,0.1)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '0.75rem' }}>
-          <LucideBarChart size={14} /> Statistik
-        </button>
-      </div>
+        <nav style={{ flex: 1, padding: '20px 12px', display: 'flex', flexDirection: 'column', gap: '4px', overflowY: 'auto' }}>
+          {sidebarItems.map(item => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '12px 16px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: isActive ? `${brandColor}10` : 'transparent',
+                  color: isActive ? brandColor : '#64748b',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  width: '100%',
+                  textAlign: 'left'
+                }}
+              >
+                <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                {!isSidebarCollapsed && <span style={{ fontWeight: isActive ? 700 : 600, fontSize: '0.9rem' }}>{item.label}</span>}
+                {isActive && !isSidebarCollapsed && (
+                  <div style={{ marginLeft: 'auto', width: '6px', height: '6px', borderRadius: '50%', background: brandColor }}></div>
+                )}
+              </button>
+            );
+          })}
+        </nav>
 
-      {activeTab === 'live' && <TeacherDashboard userId={userId} hideHeader={true} />}
+        <div style={{ padding: '20px 12px', borderTop: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <button
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '12px 16px',
+              borderRadius: '12px',
+              border: 'none',
+              background: 'transparent',
+              color: '#64748b',
+              cursor: 'pointer',
+              width: '100%',
+              textAlign: 'left'
+            }}
+          >
+            <User size={20} />
+            {!isSidebarCollapsed && <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Mein Profil</span>}
+          </button>
+          <button
+            onClick={onLogout}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '12px 16px',
+              borderRadius: '12px',
+              border: 'none',
+              background: 'transparent',
+              color: '#ef4444',
+              cursor: 'pointer',
+              width: '100%',
+              textAlign: 'left'
+            }}
+          >
+            <LogOut size={20} />
+            {!isSidebarCollapsed && <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Abmelden</span>}
+          </button>
+        </div>
+      </aside>
 
-      {activeTab === 'stats' && stats && (
-        <main className="main-content" style={{ marginTop: '24px', paddingBottom: '40px' }}>
+      {/* Main Content Area */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <header style={{ 
+          height: '72px', 
+          background: 'white', 
+          borderBottom: '1px solid #e2e8f0', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between', 
+          padding: '0 32px',
+          flexShrink: 0
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+             <h1 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b' }}>
+               {sidebarItems.find(i => i.id === activeTab)?.label || 'Dashboard'}
+             </h1>
+          </div>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+            <div style={{ position: 'relative' }}>
+               <input 
+                 type="text" 
+                 placeholder="Suchen..." 
+                 style={{ padding: '10px 16px 10px 40px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '0.875rem', width: '240px' }}
+               />
+               <Search size={18} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+            </div>
+            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', cursor: 'pointer', border: '1px solid #e2e8f0' }}>
+              <Bell size={20} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '6px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+              <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: brandColor, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem' }}>
+                {admin.first_name?.[0]}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', paddingRight: '8px' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e293b' }}>{admin.first_name}</span>
+                <span style={{ fontSize: '0.65rem', fontWeight: 600, color: brandColor, textTransform: 'uppercase' }}>Admin</span>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <main style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
+          {activeTab === 'live' && <TeacherDashboard userId={userId} hideHeader={true} />}
+          {activeTab === 'gallery' && <IDGallery brandColor={brandColor} />}
+          {activeTab === 'setup' && <DeviceSetupScreen brandColor={brandColor} />}
+          
+          {activeTab === 'stats' && stats && (
+            <div style={{ paddingBottom: '40px' }}>
           <div className="print-header" style={{ display: 'none', marginBottom: '24px' }}>
             <h2>Statistik-Bericht: {(admin as any)?.schools?.name}</h2>
             <p>Stand: {new Date().toLocaleDateString()}</p>
@@ -744,11 +875,10 @@ export function AdminDashboard({ userId, onLogout }: AdminDashboardProps) {
               </ResponsiveContainer>
             </div>
           </div>
-        </main>
-      )}
+          )}
 
-      {activeTab === 'students' && (
-        <main className="main-content" style={{ marginTop: '24px' }}>
+          {activeTab === 'students' && (
+            <div style={{ marginTop: '24px' }}>
           <div className="glass-panel" style={{ padding: '20px', background: brandColor, color: 'white', marginBottom: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
@@ -834,12 +964,10 @@ export function AdminDashboard({ userId, onLogout }: AdminDashboardProps) {
                 </div>
               ))}
             </div>
-          </div>
-        </main>
-      )}
+          )}
 
-      {activeTab === 'team' && (
-        <main className="main-content" style={{ marginTop: '24px' }}>
+          {activeTab === 'team' && (
+            <div style={{ marginTop: '24px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div className="flex-between">
               <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px' }}><Shield size={20} color={brandColor} /> Kollegium</h2>
@@ -1010,11 +1138,10 @@ export function AdminDashboard({ userId, onLogout }: AdminDashboardProps) {
               ))}
             </div>
           </div>
-        </main>
-      )}
+          )}
 
-      {activeTab === 'rooms' && (
-        <main className="main-content" style={{ marginTop: '24px' }}>
+          {activeTab === 'rooms' && (
+            <div style={{ marginTop: '24px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div className="flex-between">
               <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px' }}><Box size={20} color={brandColor} /> Räume & iPads</h2>
@@ -1135,11 +1262,10 @@ export function AdminDashboard({ userId, onLogout }: AdminDashboardProps) {
               ))}
             </div>
           </div>
-        </main>
-      )}
+          )}
 
-      {activeTab === 'songs' && (
-        <main className="main-content" style={{ marginTop: '24px' }}>
+          {activeTab === 'songs' && (
+            <div style={{ marginTop: '24px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div className="flex-between">
               <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px' }}><Library size={20} color={brandColor} /> Songbibliothek</h2>
@@ -1251,8 +1377,7 @@ export function AdminDashboard({ userId, onLogout }: AdminDashboardProps) {
               {songs.length === 0 && <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>Noch keine Songs in der Bibliothek.</p>}
             </div>
           </div>
-        </main>
-      )}
+          )}
 
       {/* Student Profile Modal */}
       {selectedStudent && (
@@ -1497,8 +1622,61 @@ export function AdminDashboard({ userId, onLogout }: AdminDashboardProps) {
         </div>
       )}
 
-      {/* QR Code Modal */}
-      {selectedQRUser && <QRCodeModal user={selectedQRUser} onClose={() => setSelectedQRUser(null)} />}
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function IDGallery({ brandColor }: { brandColor: string }) {
+  return (
+    <div style={{ marginTop: '24px' }}>
+      <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+        <div style={{ width: '64px', height: '64px', borderRadius: '16px', background: `${brandColor}15`, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px auto' }}>
+          <QrCode size={32} />
+        </div>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b', marginBottom: '8px' }}>ID Galerie</h2>
+        <p style={{ color: '#64748b', maxWidth: '400px', margin: '0 auto 32px auto' }}>Verwalte hier die digitalen Identitäten deiner Schüler und generiere QR-Codes für den schnellen Login.</p>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '20px' }}>
+          <div style={{ padding: '20px', borderRadius: '16px', border: '1px dashed #cbd5e1', color: '#94a3b8', fontSize: '0.875rem' }}>
+            Platzhalter für Galerie-Grid
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DeviceSetupScreen({ brandColor }: { brandColor: string }) {
+  return (
+    <div style={{ marginTop: '24px' }}>
+      <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
+          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#f8fafc', color: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e2e8f0' }}>
+            <Box size={24} />
+          </div>
+          <div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b' }}>System Setup</h2>
+            <p style={{ fontSize: '0.875rem', color: '#64748b' }}>Konfiguriere deine Räume und Hardware-Komponenten.</p>
+          </div>
+        </div>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+          <div style={{ padding: '24px', borderRadius: '20px', border: '1px solid #f1f5f9', background: '#f8fafc' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '12px' }}>Netzwerk-Status</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981', fontSize: '0.875rem', fontWeight: 600 }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }}></div>
+              Alle Systeme online
+            </div>
+          </div>
+          <div style={{ padding: '24px', borderRadius: '20px', border: '1px solid #f1f5f9', background: '#f8fafc' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '12px' }}>iPad OS Update</h3>
+            <div style={{ fontSize: '0.875rem', color: '#64748b' }}>Version 4.2.0 ist aktuell auf allen Geräten.</div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

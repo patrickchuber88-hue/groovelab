@@ -40,18 +40,24 @@ export function QRCodeModal({ user, onClose }: QRCodeModalProps) {
   };
   
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.85)',
-      backdropFilter: 'blur(12px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 9000,
-      padding: '20px'
-    }}>
-      <div style={{ maxWidth: '360px', width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div 
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        backdropFilter: 'blur(12px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9000,
+        padding: '20px'
+      }}
+    >
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: '360px', width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}
+      >
         <div ref={cardRef} className="glass-panel" style={{
           padding: '40px 32px',
           display: 'flex',
