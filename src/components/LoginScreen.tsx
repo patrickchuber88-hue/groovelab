@@ -166,6 +166,44 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     }
   };
 
+  const handleCoachAppearOnly = async () => {
+    if (!showCoachConfirm) return;
+    try {
+      setLoading(true);
+      const user = showCoachConfirm.user;
+      
+      // Suche nach einer Lehrer-Station in dieser Schule
+      const { data: rooms } = await supabase.from('rooms').select('id').eq('school_id', user.school_id);
+      if (rooms && rooms.length > 0) {
+        const { data: teacherStations } = await supabase
+          .from('stations')
+          .select('id')
+          .in('room_id', rooms.map((r: any) => r.id))
+          .ilike('name', '%lehrer%')
+          .limit(1);
+          
+        if (teacherStations && teacherStations.length > 0) {
+          // Lehrer-Station gefunden, Session erstellen!
+          await supabase.from('sessions').insert({
+            user_id: user.id,
+            station_id: teacherStations[0].id,
+            check_in_time: new Date().toISOString()
+          });
+          onLogin(user.id, false);
+          setShowCoachConfirm(null);
+          return;
+        }
+      }
+      
+      // Fallback: Keine Lehrer-Station vorhanden, dann wie bisher ohne Session fortfahren
+      await finalizeLogin(user, showCoachConfirm.stationId, showCoachConfirm.isWithinAnyRoom, true);
+      setShowCoachConfirm(null);
+    } catch (err: any) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
   const simulateAdminLogin = async () => {
     try {
       setLoading(true);
@@ -334,7 +372,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                       onClick={async () => {
                         if (isActive) {
                           const busy = busySessions.find(bs => bs.station_id === s.id);
-                          const confirm = window.confirm(`Dieses iPad ist besetzt durch ${busy?.users?.first_name || 'jemanden'}. Möchtest du die alte Sitzung beenden und dieses iPad übernehmen?`);
+                          const confirm = window.confirm(`Dieses iPad ist besetzt. Möchtest du die alte Sitzung beenden und dieses iPad übernehmen?`);
                           if (!confirm) return;
                           await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('id', busy?.id);
                         }
@@ -360,7 +398,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                       <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1e293b' }}>{s.name}</div>
                       {isActive && (
                         <div style={{ fontSize: '0.55rem', color: '#ef4444', fontWeight: 800, textAlign: 'center' }}>
-                          BESETZT DURCH<br/>{busySessions.find(bs => bs.station_id === s.id)?.users?.first_name?.toUpperCase() || 'JEMANDEN'}
+                          BESETZT
                         </div>
                       )}
                       {isTeacherStation && !isActive && <div style={{ fontSize: '0.5rem', color: '#b45309', fontWeight: 800 }}>LEHRER</div>}
@@ -404,13 +442,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <button 
-                  onClick={() => finalizeLogin(showCoachConfirm.user, showCoachConfirm.stationId, showCoachConfirm.isWithinAnyRoom, false)}
+                  onClick={() => { finalizeLogin(showCoachConfirm.user, showCoachConfirm.stationId, showCoachConfirm.isWithinAnyRoom, false); setShowCoachConfirm(null); }}
                   style={{ width: '100%', padding: '16px', borderRadius: '16px', background: '#eab308', color: 'white', border: 'none', fontWeight: 900, fontSize: '1rem', cursor: 'pointer', boxShadow: '0 8px 20px rgba(234, 179, 8, 0.3)' }}
                 >
                   Am iPad einchecken
                 </button>
                 <button 
-                  onClick={() => finalizeLogin(showCoachConfirm.user, showCoachConfirm.stationId, showCoachConfirm.isWithinAnyRoom, true)}
+                  onClick={handleCoachAppearOnly}
                   style={{ width: '100%', padding: '16px', borderRadius: '16px', background: '#f1f5f9', color: '#64748b', border: 'none', fontWeight: 800, fontSize: '1rem', cursor: 'pointer' }}
                 >
                   Nur Erscheinen

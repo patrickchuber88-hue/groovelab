@@ -75,7 +75,7 @@ export function DeviceSetupScreen() {
     if (loading) return;
     const busySession = busySessions.find(s => s.station_id === stationId);
     if (busySession) {
-      const confirm = window.confirm(`Dieses iPad ist besetzt durch ${busySession.users?.first_name || 'jemanden'}. Möchtest du die alte Sitzung beenden und dieses iPad übernehmen?`);
+      const confirm = window.confirm(`Dieses iPad ist besetzt. Möchtest du die alte Sitzung beenden und dieses iPad übernehmen?`);
       if (!confirm) return;
       
       // Alte Sitzung beenden
@@ -146,7 +146,7 @@ export function DeviceSetupScreen() {
                   <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1e293b' }}>{s.name}</div>
                   {isActive && (
                     <div style={{ fontSize: '0.55rem', color: '#ef4444', fontWeight: 800, textAlign: 'center' }}>
-                      BESETZT DURCH<br/>{busySessions.find(bs => bs.station_id === s.id)?.users?.first_name?.toUpperCase() || 'JEMANDEN'}
+                      BESETZT
                     </div>
                   )}
                   {isTeacherStation && !isActive && <div style={{ fontSize: '0.5rem', color: '#b45309', fontWeight: 800 }}>LEHRER</div>}
