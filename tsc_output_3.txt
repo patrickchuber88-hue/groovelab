@@ -1,0 +1,3 @@
+src/components/BandProfileContent.tsx(891,5): error TS1005: ')' expected.
+src/components/BandProfileContent.tsx(891,11): error TS1109: Expression expected.
+src/components/BandProfileContent.tsx(892,1): error TS1128: Declaration or statement expected.

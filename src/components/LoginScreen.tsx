@@ -1,463 +1,464 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Users, MapPin, Monitor, Tablet } from 'lucide-react';
+import { Music, Tablet } from 'lucide-react';
 import { Scanner } from '@yudiel/react-qr-scanner';
+import { getDistanceFromLatLonInM } from '../utils/geo';
 
 interface LoginScreenProps {
   onLogin: (userId: string, isHome?: boolean) => void;
   kioskStationId?: string | null;
 }
 
-// Haversine Formel zur Distanzberechnung in Metern
-function getDistanceFromLatLonInM(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371e3; // Radius der Erde in Metern
-  const dLat = (lat2 - lat1) * (Math.PI / 180);
-  const dLon = (lon2 - lon1) * (Math.PI / 180);
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2); 
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-  return R * c;
-}
+
+
+const isWithinOpeningHours = (openingHours: any) => {
+  if (!openingHours) return true;
+  try {
+    const now = new Date();
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const currentDay = dayNames[now.getDay()];
+    const dayConfig = openingHours[currentDay];
+
+    if (!dayConfig || !dayConfig.active) return false;
+
+    const [startH, startM] = dayConfig.start.split(':').map(Number);
+    const [endH, endM] = dayConfig.end.split(':').map(Number);
+    
+    const startTime = new Date();
+    startTime.setHours(startH, startM, 0, 0);
+    
+    const endTime = new Date();
+    endTime.setHours(endH, endM, 0, 0);
+    
+    return now >= startTime && now <= endTime;
+  } catch (e) {
+    console.error("Error checking opening hours:", e);
+    return true;
+  }
+};
 
 export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isHomeMode, setIsHomeMode] = useState(false);
+  
+  let effectiveStationId = kioskStationId || localStorage.getItem('groovelab_station_id');
+  if (effectiveStationId === 'skip') effectiveStationId = null;
 
-  const [busySessions, setBusySessions] = useState<any[]>([]);
-
-  const [hasScanned, setHasScanned] = useState(false);
-  const [showQuickSetup, setShowQuickSetup] = useState(false);
-  const [setupRooms, setSetupRooms] = useState<any[]>([]);
-  const [setupRoomId, setSetupRoomId] = useState('');
-  const [setupStations, setSetupStations] = useState<any[]>([]);
-  const [activeStationIds, setActiveStationIds] = useState<string[]>([]);
-  const [showCoachConfirm, setShowCoachConfirm] = useState<{ user: any; stationId: string; isWithinAnyRoom: boolean } | null>(null);
-
-
-  const handleRealScan = async (qrToken: string) => {
-    if (loading || hasScanned) return;
+  const finalizeLogin = async (user: any, stationId: string | null, isWithinAnyRoom: boolean) => {
     try {
-      setHasScanned(true);
       setLoading(true);
-      setError(null);
-
-      // 1. User via QR Token suchen
-      const { data: user, error: userError } = await supabase
-        .from('users')
-        .select('id, school_id, role')
-        .eq('qr_token', qrToken)
-        .limit(1)
-        .single();
-        
-      if (userError || !user) {
-        throw new Error('Ungültiger QR-Code. Schüler nicht gefunden.');
-      }
-
-      // 2. Alle Räume der Schule laden
-      const { data: rooms } = await supabase
-        .from('rooms')
-        .select('id, latitude, longitude, geofence_points')
-        .eq('school_id', user.school_id);
-
-      if (!rooms || rooms.length === 0) {
-        // Falls gar keine Räume da sind, lassen wir den Login zu (oder Fehlermeldung?)
-        // User will Geofencing, also ist ein fehlender Raum ein Konfigurationsfehler
-        return;
-      }
-
-      // 3. Geofencing prüfen gegen ALLE Räume
-      let isWithinAnyRoom = false;
-      let minDistance = Infinity;
-
-      // Optimierung: GPS nur EINMAL abfragen statt in der Schleife
-      const userPos = await new Promise<{lat: number, lng: number} | null>((resolve) => {
-        if (!navigator.geolocation) return resolve(null);
-        navigator.geolocation.getCurrentPosition(
-          (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-          () => resolve(null),
-          { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-        );
-      });
-
-      if (userPos) {
-        for (const room of rooms) {
-          // Check legacy single point
-          if (room.latitude && room.longitude) {
-            const dist = getDistanceFromLatLonInM(userPos.lat, userPos.lng, room.latitude, room.longitude);
-            if (dist < 20) isWithinAnyRoom = true;
-            if (dist < minDistance) minDistance = dist;
-          }
-
-          // Check multi-points
-          const points = Array.isArray(room.geofence_points) ? room.geofence_points : [];
-          for (const pt of points) {
-            const dist = getDistanceFromLatLonInM(userPos.lat, userPos.lng, pt.lat, pt.lng);
-            if (dist < 20) isWithinAnyRoom = true;
-            if (dist < minDistance) minDistance = dist;
-          }
-        }
-      }
-
-      if (!isWithinAnyRoom) {
-        setIsHomeMode(true);
-      } else {
-        setIsHomeMode(false);
-      }
-
-      // 3. Login Validierung (Lehrer iPad Check)
-      const stationId = localStorage.getItem('groovelab_station_id');
-      if (stationId) {
-        const { data: currentStation } = await supabase.from('stations').select('name').eq('id', stationId).single();
-        if (currentStation?.name?.toLowerCase().includes('lehrer')) {
-          if (user.role !== 'teacher' && user.role !== 'admin') {
-            throw new Error('Dieses iPad ist nur für Lehrer reserviert.');
-          }
-        }
-      }
-
-      // 4. Radikaler Cleanup: Alle offenen Sessions dieses Users SOFORT schließen
-      // Wir setzen die check_out_time auf jetzt, falls sie noch null ist
-      await supabase
-        .from('sessions')
-        .update({ check_out_time: new Date().toISOString() })
-        .eq('user_id', user.id)
-        .is('check_out_time', null);
-        
-      // 5. Neue Session starten
-      // Wenn wir eine feste Station ID haben (Kiosk/Terminal), nutzen wir diese IMMER, 
-      // um sicherzustellen dass der Schüler auf der Karte erscheint.
-      // REGEL: Coaches werden gefragt, ob sie an einem iPad einchecken wollen.
-      if ((user.role === 'teacher' || user.role === 'admin') && stationId) {
-        setShowCoachConfirm({ user, stationId, isWithinAnyRoom });
-        setLoading(false);
-        return;
-      }
-
-      await finalizeLogin(user, stationId, isWithinAnyRoom);
+      const now = new Date().toISOString();
+      const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
       
-    } catch (err: any) {
-      setError(err.message);
-      setLoading(false);
-      setHasScanned(false);
-    }
-  };
+      let finalStationId = null;
+      let isHome = false;
 
-  const finalizeLogin = async (user: any, stationId: string | null, isWithinAnyRoom: boolean, skipSession: boolean = false) => {
-    try {
-      if (!skipSession) {
-        await supabase
+      // 1. Determine finalStationId and lookup teacher station if needed
+      if (isTeacher) {
+        const { data: tStation } = await supabase.from('stations').select('id').eq('name', 'Lehrer iPad').maybeSingle();
+        finalStationId = tStation?.id || null;
+      } else {
+        finalStationId = stationId;
+      }
+
+      // Geofence check
+      if (!isWithinAnyRoom) {
+        console.log(`[Login] Outside geofence. Forcing Home mode.`);
+        isHome = true;
+        finalStationId = null;
+      }
+
+      // 1.5 Check opening hours for sessions (Students only)
+      const schoolData = Array.isArray((user as any).schools) ? (user as any).schools[0] : (user as any).schools;
+      const openingHours = schoolData?.opening_hours;
+      const withinHours = isWithinOpeningHours(openingHours);
+      const enforceHours = openingHours?.enforce_hours !== false; // Default to true if not set
+      
+      if (!isTeacher && enforceHours && !withinHours) {
+        console.log(`[Login] Outside opening hours (STRICT). Forcing Home mode.`);
+        isHome = true;
+        finalStationId = null;
+      } else if (!isTeacher && !withinHours) {
+        console.log(`[Login] Outside opening hours but in FLEXIBLE mode. Lab login allowed if geofence matches.`);
+      }
+
+
+      console.log(`[Login] Final Station ID: ${finalStationId}, isHome: ${isHome}, withinHours: ${withinHours}`);
+
+      // 2. Session Management (Only for Academy/Lab sessions)
+      // 2. Global Cleanup: Always terminate any existing active sessions for THIS USER
+      await supabase.from('sessions').update({ check_out_time: now }).eq('user_id', user.id).is('check_out_time', null);
+
+      if (!isHome) {
+        // 3. Station Cleanup: If using a station, ensure it's free
+        if (finalStationId) {
+          await supabase.from('sessions').update({ check_out_time: now }).eq('station_id', finalStationId).is('check_out_time', null);
+        }
+        
+        const { data: sess, error: sessErr } = await supabase
           .from('sessions')
           .insert({
             user_id: user.id,
-            station_id: stationId || (isWithinAnyRoom ? null : null), // stationId hat Vorrang
-            check_in_time: new Date().toISOString()
-          });
+            station_id: finalStationId,
+            gps_verified: true,
+            check_in_time: now
+          })
+          .select()
+          .single();
+
+        if (sessErr) {
+          console.error('[Login] Error creating session:', sessErr);
+          alert('Fehler beim Erstellen der Sitzung: ' + sessErr.message);
+        } else {
+          console.log('[Login] Session created successfully:', sess.id);
+        }
+      } else {
+        console.log(`[Login] Home mode detected. No new session created.`);
       }
 
-      // 6. Erfolgreicher Login
-      const isHome = stationId ? false : !isWithinAnyRoom;
+      localStorage.setItem('groovelab_user_id', user.id);
+      setLoading(false);
+      
       onLogin(user.id, isHome);
     } catch (err: any) {
+      console.error('[Login] Finalize error:', err.message);
       setError(err.message);
       setLoading(false);
     }
   };
 
-  const handleCoachAppearOnly = async () => {
-    if (!showCoachConfirm) return;
-    try {
-      setLoading(true);
-      const user = showCoachConfirm.user;
-      
-      // Suche nach einer Lehrer-Station in dieser Schule
-      const { data: rooms } = await supabase.from('rooms').select('id').eq('school_id', user.school_id);
-      if (rooms && rooms.length > 0) {
-        const { data: teacherStations } = await supabase
+  const [prefetchedRooms, setPrefetchedRooms] = useState<any[] | null>(null);
+
+  // Pre-fetch rooms for the current station's school to save time during scan
+  useEffect(() => {
+    async function prefetch() {
+      if (!effectiveStationId) return;
+      try {
+        // Find the school_id for this station
+        const { data: stationData } = await supabase
           .from('stations')
-          .select('id')
-          .in('room_id', rooms.map((r: any) => r.id))
-          .ilike('name', '%lehrer%')
-          .limit(1);
-          
-        if (teacherStations && teacherStations.length > 0) {
-          // Lehrer-Station gefunden, Session erstellen!
-          await supabase.from('sessions').insert({
-            user_id: user.id,
-            station_id: teacherStations[0].id,
-            check_in_time: new Date().toISOString()
-          });
-          onLogin(user.id, false);
-          setShowCoachConfirm(null);
-          return;
+          .select('rooms(school_id)')
+          .eq('id', effectiveStationId)
+          .single();
+        
+        const schoolId = (stationData?.rooms as any)?.school_id;
+        if (schoolId) {
+          const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', schoolId);
+          setPrefetchedRooms(rooms);
+          console.log(`[Login] Pre-fetched ${rooms?.length} rooms for school: ${schoolId}`);
         }
+      } catch (e) {
+        console.warn('[Login] Pre-fetch failed', e);
       }
-      
-      // Fallback: Keine Lehrer-Station vorhanden, dann wie bisher ohne Session fortfahren
-      await finalizeLogin(user, showCoachConfirm.stationId, showCoachConfirm.isWithinAnyRoom, true);
-      setShowCoachConfirm(null);
-    } catch (err: any) {
-      setError(err.message);
-      setLoading(false);
     }
-  };
+    prefetch();
+  }, [effectiveStationId]);
 
-  const simulateAdminLogin = async () => {
+  const handleScan = async (qrToken: string) => {
+    if (loading) return;
+    setLoading(true);
+    setError(null);
+
     try {
-      setLoading(true);
-      setError(null);
-      const { data, error } = await supabase.from('users').select('id').eq('role', 'admin').limit(1).single();
-      if (error || !data) throw new Error('Kein Admin in der Datenbank gefunden.');
-      onLogin(data.id);
-    } catch (err: any) {
-      setError(err.message);
-      setLoading(false);
-    }
-  };
+      console.log('[Login] Starting scan for token:', qrToken);
 
-  const simulateTeacherLogin = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const { data, error } = await supabase.from('users').select('id').eq('role', 'teacher').limit(1).single();
-      if (error || !data) throw new Error('Kein Lehrer in der Datenbank gefunden.');
-      onLogin(data.id);
-    } catch (err: any) {
-      setError(err.message);
-      setLoading(false);
-    }
-  };
+      // 1. User finden
+      const { data: user, error: userErr } = await supabase
+        .from('users')
+        .select('*, schools(*)')
+        .eq('qr_token', qrToken)
+        .single();
 
-  const startQuickSetup = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      // Fetch the first school available
-      const { data: school } = await supabase.from('schools').select('id').limit(1).single();
-      if (!school) throw new Error('Keine Schule gefunden.');
+      if (userErr || !user) throw new Error('Nutzer nicht gefunden.');
+
+      const schoolData = Array.isArray(user.schools) ? user.schools[0] : user.schools;
+
+      // 2. Geofence Check (Simpel & Stabil)
+      let isWithinAnyRoom = false;
+      let userPos: {lat: number, lng: number} | null = null;
       
-      const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', school.id);
-      if (!rooms || rooms.length === 0) throw new Error('Bitte erstelle zuerst einen Raum im Admin-Dashboard!');
+      try {
+        userPos = await new Promise<{lat: number, lng: number} | null>((resolve) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+            () => resolve(null),
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+          );
+        });
+
+        if (userPos) {
+          console.log(`[Geofence] User position: ${userPos.lat}, ${userPos.lng}`);
+          // 1. Check Rooms (Multi-Point)
+          const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', user.school_id);
+          if (rooms) {
+            for (const room of rooms) {
+              const points = Array.isArray(room.geofence_points) ? room.geofence_points : [];
+              const allCoords = [...points];
+              if (room.latitude && room.longitude) allCoords.push({ lat: room.latitude, lng: room.longitude });
+              
+              for (const pt of allCoords) {
+                if (pt && pt.lat && pt.lng) {
+                  const dist = getDistanceFromLatLonInM(userPos.lat, userPos.lng, Number(pt.lat), Number(pt.lng));
+                  console.log(`[Geofence] Room "${room.name}" Point: ${Math.round(dist)}m away`);
+                  if (dist < 100) { 
+                    isWithinAnyRoom = true;
+                    break;
+                  }
+                }
+              }
+              if (isWithinAnyRoom) break;
+            }
+          }
+
+          // 2. School Fallback (Single Point + Radius)
+
+          if (!isWithinAnyRoom && schoolData?.latitude && schoolData?.longitude) {
+            const distToSchool = getDistanceFromLatLonInM(
+              userPos.lat, userPos.lng, 
+              Number(schoolData.latitude), Number(schoolData.longitude)
+            );
+            const radius = schoolData.geofence_radius_meters || 100;
+            console.log(`[Geofence] School fallback: ${Math.round(distToSchool)}m away (Radius: ${radius}m)`);
+            if (distToSchool < radius) {
+              isWithinAnyRoom = true;
+            }
+          }
+        } else {
+          console.warn('[Geofence] No user position available (Permission denied or timeout)');
+        }
+      } catch (geoErr) {
+        console.warn('[Login] Geolocation failed.', geoErr);
+      }
+
+      console.log(`[Login] Scan successful. Geofence match: ${isWithinAnyRoom}`);
       
-      setSetupRooms(rooms);
-      setSetupRoomId(rooms[0].id);
-
-      // Lade alle existierenden Stationen
-      const { data: stations } = await supabase.from('stations').select('*').in('room_id', rooms.map(r => r.id));
-      setSetupStations(stations || []);
-
-      // Lade aktive Sessions (nur die letzten 2 Minuten Heartbeat), um zu sehen welche iPads "besetzt" sind
-      const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-      const { data: activeSessions } = await supabase
-        .from('sessions')
-        .select('id, station_id, user_id, last_seen, users(first_name, last_name)')
-        .is('check_out_time', null)
-        .gt('last_seen', tenMinsAgo);
-      setActiveStationIds(activeSessions?.map(s => s.station_id) || []);
-      setBusySessions(activeSessions || []);
-
-      setShowQuickSetup(true);
+      // Automatically finalize based on geofence detection
+      await finalizeLogin(user, effectiveStationId, isWithinAnyRoom);
     } catch (err: any) {
+      console.error('[Login] Scan error:', err.message);
       setError(err.message);
-    } finally {
       setLoading(false);
     }
   };
+
+  const [geoDebug, setGeoDebug] = useState<any>(null);
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
 
   return (
-    <div className="app-container flex-center" style={{ flexDirection: 'column', padding: '40px 20px', textAlign: 'center', background: '#f9fafb' }}>
-      <div className="school-logo" style={{ width: 80, height: 80, borderRadius: 20, marginBottom: 24, boxShadow: '0 8px 24px rgba(234, 179, 8, 0.2)' }}>
-        <Music size={40} />
+    <div style={{ 
+      position: 'fixed',
+      inset: 0,
+      backgroundColor: '#ffffff', 
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '20px',
+      fontFamily: 'Inter, system-ui, sans-serif',
+      zIndex: 9999
+    }}>
+      
+      <div className="loading-pulse" style={{
+        width: '80px',
+        height: '80px',
+        background: '#f8fafc',
+        borderRadius: '24px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: '24px',
+        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.05)',
+        border: '1px solid #e2e8f0'
+      }}>
+        <Music size={40} color="#eab308" />
       </div>
-      <h1 style={{ fontSize: '1.5rem', marginBottom: '8px' }}>Groovelab</h1>
-      <p style={{ color: 'var(--text-muted)', marginBottom: '32px', fontSize: '0.875rem', maxWidth: '280px' }}>
-        Halte deinen Studentenausweis vor die iPad-Kamera, um dich an diesem Platz einzuchecken.
+
+      <h1 style={{ fontSize: '32px', fontWeight: 1000, color: '#0f172a', marginBottom: '8px', margin: 0, letterSpacing: '-0.02em' }}>GrooveLab</h1>
+      <p style={{ color: '#64748b', textAlign: 'center', fontSize: '14px', marginBottom: '48px', maxWidth: '300px', lineHeight: '1.5', fontWeight: 600 }}>
+        Halte deinen Ausweis vor die Kamera,<br/>um dich einzuloggen.
       </p>
 
-      <div className="glass-panel" style={{ width: '100%', maxWidth: '340px', padding: '16px', background: 'white', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        
-        {/* Scanner Bereich */}
-        <div style={{ width: '100%', aspectRatio: '1/1', borderRadius: '24px', overflow: 'hidden', background: '#000', position: 'relative', border: '1px solid #f1f5f9' }}>
-          {!hasScanned && (
-            <Scanner 
-              onScan={(result: any) => {
-                const code = Array.isArray(result) ? result[0]?.rawValue : result;
-                if (code) handleRealScan(code);
-              }} 
-              components={{
-                zoom: false,
-                torch: false,
-                finder: true
-              }}
-            />
-          )}
-          
-          {/* Animated Scan Line */}
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '2px',
-            background: `linear-gradient(to right, transparent, var(--primary-color), transparent)`,
-            boxShadow: `0 0 15px var(--primary-color)`,
-            animation: 'scanLine 3s infinite linear',
-            zIndex: 10
-          }} />
-
-          {(loading || hasScanned) && (
-            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600, zIndex: 20 }}>
-              Verifiziere GPS & Code...
+      <div style={{
+        width: '100%',
+        maxWidth: '400px',
+        background: '#ffffff',
+        borderRadius: '56px',
+        padding: '32px',
+        boxShadow: '0 40px 100px rgba(15, 23, 42, 0.08)',
+        border: '1px solid #f1f5f9',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        position: 'relative'
+      }}>
+        <div style={{
+          width: '100%',
+          aspectRatio: '1/1',
+          borderRadius: '40px',
+          overflow: 'hidden',
+          background: '#000',
+          position: 'relative',
+          boxShadow: '0 0 0 4px rgba(0,0,0,0.02)'
+        }}>
+          <Scanner
+            key="groovelab-final-scanner"
+            onScan={(result) => {
+              const val = result?.[0]?.rawValue;
+              if (val) handleScan(val);
+            }}
+            components={{ finder: true }}
+            styles={{
+              container: { width: '100%', height: '100%' },
+              video: { width: '100%', height: '100%', objectFit: 'cover' }
+            }}
+            constraints={{ facingMode: 'user' }}
+          />
+          {loading && (
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'rgba(255,255,255,0.8)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10,
+              backdropFilter: 'blur(10px)'
+            }}>
+              <div style={{ width: '40px', height: '40px', border: '4px solid #eab308', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
             </div>
           )}
         </div>
 
-        {error && <div style={{ color: '#ef4444', fontSize: '0.875rem', padding: '8px', background: '#fef2f2', borderRadius: '8px' }}>{error}</div>}
-        
-        {isHomeMode && (
-          <div style={{ background: '#fef3c7', color: '#b45309', padding: '12px', borderRadius: '12px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #fde68a' }}>
-            <MapPin size={16} /> <strong>Home-Mode:</strong> Du bist nicht im Labor. Übung wird als Heimarbeit gewertet.
+        {error && (
+          <div style={{ marginTop: '24px', background: '#fef2f2', border: '1px solid #fee2e2', color: '#ef4444', padding: '16px', borderRadius: '20px', fontSize: '13px', fontWeight: 800, textAlign: 'center', width: '100%' }}>
+            {error}
           </div>
         )}
-        
-        {!showQuickSetup && !localStorage.getItem('groovelab_station_id') && (
+
+
+      </div>
+
+      {/* Geofence Diagnostic Panel (Localhost only) */}
+      {isLocalhost && geoDebug && (
+        <div style={{ 
+          marginTop: '24px', 
+          padding: '24px', 
+          background: 'rgba(15, 23, 42, 0.95)', 
+          color: 'white', 
+          borderRadius: '32px', 
+          fontSize: '13px', 
+          width: '100%',
+          maxWidth: '400px',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          boxShadow: '0 20px 50px rgba(0,0,0,0.1)'
+        }}>
+          <div style={{ fontWeight: 900, marginBottom: '16px', color: '#eab308', display: 'flex', justifyContent: 'space-between', letterSpacing: '0.05em' }}>
+            <span>DIAGNOSE: GEOFENCING</span>
+            <span style={{ color: geoDebug.isWithinAnyRoom ? '#10b981' : '#ef4444' }}>{geoDebug.isWithinAnyRoom ? 'ERFOLGREICH' : 'FEHLGESCHLAGEN'}</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.8 }}>
+              <span>Deine Position:</span>
+              <span style={{ fontWeight: 700 }}>{geoDebug.userPos ? `${geoDebug.userPos.lat.toFixed(4)}, ${geoDebug.userPos.lng.toFixed(4)}` : 'Wird gesucht...'}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.8 }}>
+              <span>Ziel (Akademie):</span>
+              <span style={{ fontWeight: 700 }}>{geoDebug.schoolCoords ? `${geoDebug.schoolCoords.lat.toFixed(4)}, ${geoDebug.schoolCoords.lng.toFixed(4)}` : 'Nicht gesetzt'}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '8px' }}>
+              <span>Berechnete Distanz:</span>
+              <span style={{ fontWeight: 900, color: '#eab308' }}>{geoDebug.distToSchool !== null ? `${geoDebug.distToSchool}m` : '?'}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '8px' }}>
+              <span>Status Öffnungszeiten:</span>
+              <span style={{ fontWeight: 900, color: geoDebug.withinHours ? '#10b981' : '#ef4444' }}>{geoDebug.withinHours ? 'GEÖFFNET' : 'GESCHLOSSEN'}</span>
+            </div>
+          </div>
+          
+          {(!geoDebug.isWithinAnyRoom || !geoDebug.withinHours) && (
+            <button 
+              onClick={() => {
+                const uid = localStorage.getItem('groovelab_user_id');
+                if (uid) {
+                   supabase.from('users').select('*, schools(*)').eq('id', uid).single().then(({data}) => {
+                     if (data) finalizeLogin(data, effectiveStationId, true);
+                   });
+                } else {
+                  alert('Bitte erst einmal scannen, damit ich weiß, wer du bist!');
+                }
+              }}
+              style={{ 
+                width: '100%', 
+                padding: '14px', 
+                background: '#eab308', 
+                color: '#0f172a', 
+                border: 'none', 
+                borderRadius: '16px', 
+                fontWeight: 900, 
+                fontSize: '12px',
+                cursor: 'pointer',
+                transition: 'transform 0.2s'
+              }}
+            >
+              ENTWICKLER-OVERRIDE: LABOR-MODUS ERZWINGEN
+            </button>
+          )}
+        </div>
+      )}
+
+      <div style={{ marginTop: '24px', width: '100%', maxWidth: '360px', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '0 10px' }}>
+        {effectiveStationId ? (
+          <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#94a3b8', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <Tablet size={14} />
+              Kiosk Modus aktiv
+            </div>
+            <button 
+              onClick={() => {
+                if (window.confirm('Kiosk Modus beenden?')) {
+                  localStorage.removeItem('groovelab_station_id');
+                  window.location.reload();
+                }
+              }}
+              style={{ background: 'none', border: 'none', color: '#f87171', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', cursor: 'pointer' }}
+            >
+              Beenden
+            </button>
+          </div>
+        ) : (
           <button 
-            onClick={startQuickSetup}
+            onClick={() => {
+              localStorage.removeItem('groovelab_station_id');
+              window.location.reload();
+            }}
             style={{ 
-              width: '100%', 
-              background: 'white', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '12px', 
+              background: '#ffffff', 
               border: '1px solid #e2e8f0', 
-              padding: '16px', 
-              borderRadius: '16px', 
+              padding: '12px 24px', 
+              borderRadius: '20px', 
+              color: '#64748b', 
+              fontSize: '12px', 
               fontWeight: 800, 
-              color: '#94a3b8', 
-              fontSize: '0.85rem',
+              textTransform: 'uppercase', 
               cursor: 'pointer',
-              marginTop: '16px'
+              boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s'
             }}
           >
-            iPad als Terminal einrichten
+            <Tablet size={16} />
+            Kiosk Modus aktivieren
           </button>
         )}
-
-        {showQuickSetup && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-            <div className="glass-panel animation-slide-up" style={{ width: '100%', maxWidth: '400px', background: 'white', padding: '24px', borderRadius: '32px', textAlign: 'left' }}>
-              <h2 style={{ fontSize: '1.25rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Monitor size={24} color="var(--primary-color)" /> Schnell-Setup
-              </h2>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '24px' }}>Wähle den Raum und das entsprechende iPad aus.</p>
-              
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Raum auswählen</label>
-                <select 
-                  value={setupRoomId} 
-                  onChange={(e) => setSetupRoomId(e.target.value)}
-                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '1rem' }}
-                >
-                  {setupRooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                </select>
-              </div>
-
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '12px', display: 'block' }}>iPad auswählen</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '8px', maxHeight: '240px', overflowY: 'auto', padding: '4px', marginBottom: '24px' }}>
-                {setupStations.filter(s => s.room_id === setupRoomId).sort((a,b) => a.name.localeCompare(b.name, undefined, {numeric: true})).map(s => {
-                  const isTeacherStation = s.name.toLowerCase().includes('lehrer');
-                  const isActive = !isTeacherStation && activeStationIds.includes(s.id);
-                  return (
-                    <button
-                      key={s.id}
-                      onClick={async () => {
-                        if (isActive) {
-                          const busy = busySessions.find(bs => bs.station_id === s.id);
-                          const confirm = window.confirm(`Dieses iPad ist besetzt. Möchtest du die alte Sitzung beenden und dieses iPad übernehmen?`);
-                          if (!confirm) return;
-                          await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('id', busy?.id);
-                        }
-                        localStorage.setItem('groovelab_station_id', s.id);
-                        window.location.reload();
-                      }}
-                      style={{
-                        padding: '12px 6px',
-                        borderRadius: '16px',
-                        border: '2px solid',
-                        borderColor: isActive ? '#ef4444' : '#e2e8f0',
-                        background: isActive ? '#fef2f2' : (isTeacherStation ? '#fffbeb' : 'white'),
-                        cursor: 'pointer',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s ease',
-                        opacity: 1
-                      }}
-                    >
-                      <Tablet size={20} color={isActive ? '#ef4444' : (isTeacherStation ? '#b45309' : 'var(--primary-color)')} />
-                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1e293b' }}>{s.name}</div>
-                      {isActive && (
-                        <div style={{ fontSize: '0.55rem', color: '#ef4444', fontWeight: 800, textAlign: 'center' }}>
-                          BESETZT
-                        </div>
-                      )}
-                      {isTeacherStation && !isActive && <div style={{ fontSize: '0.5rem', color: '#b45309', fontWeight: 800 }}>LEHRER</div>}
-                    </button>
-                  );
-                })}
-                {setupStations.filter(s => s.room_id === setupRoomId).length === 0 && (
-                  <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.875rem' }}>Keine iPads in diesem Raum gefunden.</div>
-                )}
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button onClick={() => setShowQuickSetup(false)} style={{ flex: 1, padding: '14px', borderRadius: '16px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 700, cursor: 'pointer' }}>Abbrechen</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {kioskStationId && (
-          <div style={{ marginTop: '16px', fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
-            <span>Kiosk Modus aktiv</span>
-            <button onClick={() => {
-              if (window.confirm('Kiosk Modus wirklich beenden?')) {
-                localStorage.removeItem('groovelab_station_id');
-                window.location.reload();
-              }
-            }} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.75rem' }}>Beenden</button>
-          </div>
-        )}
-
-        {showCoachConfirm && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-            <div className="glass-panel animation-slide-up" style={{ width: '100%', maxWidth: '400px', background: 'white', padding: '32px', borderRadius: '32px', textAlign: 'center' }}>
-              <div style={{ width: '64px', height: '64px', borderRadius: '20px', background: '#fffbeb', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
-                 <Tablet size={32} />
-              </div>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 1000, marginBottom: '12px', color: '#1e293b' }}>Check-in Modus</h2>
-              <p style={{ fontSize: '0.95rem', color: '#64748b', marginBottom: '32px', lineHeight: 1.6 }}>
-                Du bist als Coach erkannt. Möchtest du an diesem iPad einchecken oder nur als "Coach vor Ort" erscheinen?
-              </p>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <button 
-                  onClick={() => { finalizeLogin(showCoachConfirm.user, showCoachConfirm.stationId, showCoachConfirm.isWithinAnyRoom, false); setShowCoachConfirm(null); }}
-                  style={{ width: '100%', padding: '16px', borderRadius: '16px', background: '#eab308', color: 'white', border: 'none', fontWeight: 900, fontSize: '1rem', cursor: 'pointer', boxShadow: '0 8px 20px rgba(234, 179, 8, 0.3)' }}
-                >
-                  Am iPad einchecken
-                </button>
-                <button 
-                  onClick={handleCoachAppearOnly}
-                  style={{ width: '100%', padding: '16px', borderRadius: '16px', background: '#f1f5f9', color: '#64748b', border: 'none', fontWeight: 800, fontSize: '1rem', cursor: 'pointer' }}
-                >
-                  Nur Erscheinen
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }

@@ -1,0 +1,287 @@
+162:          <div style={{ fontSize: '4rem', marginBottom: '24px' }}>🎸</div>
+186:        </div>
+290:            </div>
+292:        </div>
+294:          <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{songGroup.artist}</div>
+295:          <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e293b', marginTop: '2px', marginBottom: '8px' }}>{songGroup.title}</div>
+321:          </div>
+322:        </div>
+323:      </div>
+346:              </div>
+349:              </div>
+350:            </div>
+353:      </div>
+360:              <div style={{ background: 'rgba(255,255,255,0.2)', padding: '8px', borderRadius: '12px' }}><Clock size={24} /></div>
+362:                <div style={{ fontSize: '1.1rem', marginBottom: '2px' }}>Challenge eingereicht.</div>
+363:                <div style={{ fontSize: '0.8rem', opacity: 0.9, fontWeight: 700 }}>Mach dich bereit für die Abnahme!</div>
+364:              </div>
+365:            </div>
+368:              <div style={{ background: 'rgba(255,255,255,0.2)', padding: '8px', borderRadius: '12px' }}><Award size={24} /></div>
+370:                <div style={{ fontSize: '1.1rem', marginBottom: '2px' }}>100 % erreicht - Starke Leistung!</div>
+371:                <div style={{ fontSize: '0.8rem', opacity: 0.9, fontWeight: 700 }}>Du bist bereit für eine Band.</div>
+372:              </div>
+373:            </div>
+380:                </div>
+388:                      </div>
+389:                    </div>
+394:                    <div style={{ width: `${activeSkill.progress}%`, height: '100%', background: INSTRUMENT_COLORS[activeSkill.instrument] || brandColor, borderRadius: '4px', transition: 'width 0.1s linear' }}></div>
+395:                  </div>
+430:                </div>
+431:              </div>
+485:            </div>
+487:        </div>
+488:      </div>
+506:      </div>
+508:    </div>
+670:                    </div>
+689:                  </div>
+695:                     </div>
+728:                        </div>
+729:                     </div>
+730:                  </div>
+731:               </div>
+732:            </div>
+754:                     </div>
+768:                              return <div style={{ color: 'rgba(255,255,255,0.2)', fontStyle: 'italic', padding: '20px', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>Noch keine Songs im Repertoire.</div>;
+779:                                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'white' }}>{song.title}</div>
+780:                                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>{song.artist}</div>
+781:                                 </div>
+786:                                 </div>
+787:                              </div>
+790:                     </div>
+793:               </div>
+809:                                     <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.8rem', fontWeight: 900 }}>{m.external_name?.[0]}</div>
+811:                                </div>
+812:                                <div style={{ flex: 1, fontSize: '0.95rem', fontWeight: 800, color: 'white' }}>{m.user_id ? u?.first_name : m.external_name}</div>
+813:                                <div style={{ fontSize: '0.7rem', fontWeight: 900, color: brandColor, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{m.instrument}</div>
+814:                             </div>
+817:                     </div>
+818:                  </div>
+834:                        </div>
+848:                        </div>
+850:                  </div>
+859:                                <div style={{ fontWeight: 800, color: 'white', fontSize: '0.9rem' }}>{app.title}</div>
+862:                                </div>
+863:                             </div>
+866:                           <div style={{ color: 'rgba(255,255,255,0.2)', fontStyle: 'italic', fontSize: '0.85rem' }}>Keine Termine geplant.</div>
+868:                     </div>
+869:                  </div>
+871:            </div>
+1794:        </div>
+1801:    return <div className="app-container flex-center">Lade Daten aus Supabase...</div>;
+1878:          </div>
+1884:          }}>GrooveLab</div>
+1885:        </div>
+1961:                  </div>
+1962:                  {session && <div style={{ position: 'absolute', bottom: -2, right: -2, width: '10px', height: '10px', background: '#ef4444', borderRadius: '50%', border: '2px solid white' }}></div>}
+1963:                </div>
+1965:                  <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b' }}>{user.first_name}</div>
+1966:                  <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>{user.instrument || 'Musiker'}</div>
+1967:                </div>
+1968:             </div>
+1969:          </div>
+1983:        </div>
+1999:                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: getRoleColor(user?.role, session?.stations?.name) }}></div>
+2003:              </div>
+2011:                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }}></div>
+2013:              </div>
+2014:            </div>
+2027:                <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '1rem' }}>Hallo {user.first_name}</div>
+2028:                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>{user.instrument || 'Groovelab Academy'}</div>
+2029:              </div>
+2032:              </div>
+2033:            </div>
+2034:          </div>
+2045:            </div>
+2065:                    </div>
+2067:                </div>
+2073:                  </div>
+2085:                </div>
+2086:              </div>
+2094:                        <div style={{ color: '#f59e0b' }}><LucideBarChart size={24} /></div>
+2109:                      </div>
+2110:                    </div>
+2115:                        <div style={{ color: '#f59e0b' }}><Clock size={24} /></div>
+2137:                            return <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8', fontSize: '0.8rem' }}>Keine Öffnungszeiten im Setup hinterlegt.</div>;
+2153:                              <div style={{ textAlign: 'center', fontSize: '0.8rem', fontWeight: 800, color: '#cbd5e1' }}></div>
+2155:                                <div key={d.id} style={{ textAlign: 'center', fontSize: '0.8rem', fontWeight: 800, color: '#64748b' }}>{d.id}</div>
+2164:                                      <div style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '8px' }}>{time}</div>
+2207:                            </div>
+2210:                    </div>
+2211:                  </div>
+2218:                        <div style={{ color: brandColor }}><Music size={24} /></div>
+2244:                            return <div style={{ textAlign: 'center', padding: '40px 0', color: '#cbd5e1', fontSize: '0.9rem' }}>Noch keine aktiven Songs im Repertoire (&gt;0%).</div>;
+2266:                              </div>
+2269:                                <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{group.artist}</div>
+2270:                                <div style={{ fontWeight: 900, fontSize: '1.25rem', color: '#1e293b', marginTop: '2px' }}>{group.title}</div>
+2271:                              </div>
+2292:                                    </div>
+2294:                              </div>
+2295:                            </div>
+2298:                      </div>
+2299:                    </div>
+2304:                        <div style={{ color: '#ec4899' }}><Users size={24} /></div>
+2309:                          <div style={{ textAlign: 'center', padding: '40px 0', color: '#cbd5e1' }}>Du bist noch in keiner Band. Übe fleißig für dein erstes Stage Ready!</div>
+2315:                              </div>
+2317:                                <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b' }}>{b.name}</div>
+2320:                                </div>
+2321:                              </div>
+2345:                                        </div>
+2348:                                  </div>
+2351:                                </div>
+2352:                              </div>
+2353:                            </div>
+2356:                      </div>
+2357:                    </div>
+2358:                  </div>
+2361:            </div>
+2407:                      </div>
+2411:                        </div>
+2412:                      </div>
+2414:                        <div style={{ width: `${avgProgress}%`, height: '100%', background: INSTRUMENT_COLORS[inst] || brandColor }}></div>
+2415:                      </div>
+2416:                    </div>
+2419:              </div>
+2423:                  <div style={{ fontSize: '3rem', marginBottom: '20px' }}>🎸</div>
+2426:                </div>
+2438:                  </div>
+2440:              </div>
+2451:                  <div style={{ color: '#10b981' }}><Award size={32} /></div>
+2455:              </div>
+2460:                    <div style={{ fontSize: '3.5rem', marginBottom: '24px' }}>🏆</div>
+2463:                  </div>
+2469:                          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>{group.artist}</div>
+2470:                          <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b' }}>{group.title}</div>
+2471:                        </div>
+2474:                        </div>
+2475:                      </div>
+2481:                          </div>
+2483:                      </div>
+2485:                      <div style={{ background: '#10b981', height: '8px', borderRadius: '4px', width: '100%', marginBottom: '12px' }}></div>
+2488:                      </div>
+2489:                    </div>
+2492:              </div>
+2504:                  <div style={{ color: '#f59e0b' }}><Users size={32} /></div>
+2508:              </div>
+2512:                  <div style={{ fontSize: '3.5rem', marginBottom: '24px' }}>⏳</div>
+2515:                </div>
+2545:                          </div>
+2547:                            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{song.artist}</div>
+2549:                          </div>
+2550:                        </div>
+2554:                          </div>
+2557:                          </div>
+2558:                        </div>
+2559:                      </div>
+2585:                                </div>
+2597:                              </div>
+2618:                                      </div>
+2621:                                      </div>
+2622:                                    </div>
+2625:                              </div>
+2636:                            </div>
+2655:                      </div>
+2656:                        </div>
+2658:                    </div>
+2661:              </div>
+2673:                  <div style={{ color: '#3b82f6' }}><Box size={32} /></div>
+2676:              </div>
+2696:                    </div>
+2709:                        </div>
+2726:                        </div>
+2727:                      </div>
+2743:                              <div style={{ fontSize: '3rem', marginBottom: '20px' }}>🎸</div>
+2750:                            </div>
+2768:                              </div>
+2775:                                  </div>
+2776:                              </div>
+2777:                            </div>
+2788:                                    </div>
+2790:                              </div>
+2793:                              </div>
+2794:                            </div>
+2795:                          </div>
+2798:                    </div>
+2799:                  </div>
+2806:                    </div>
+2809:                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8' }}>Sänger gesucht für diese Sessions</div>
+2810:                      </div>
+2811:                    </div>
+2833:                              <div style={{ fontSize: '2rem', marginBottom: '12px' }}>🔇</div>
+2834:                              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#64748b' }}>Aktuell keine instrumental vollständigen Bands</div>
+2835:                            </div>
+2849:                                </div>
+2852:                                </div>
+2855:                                </div>
+2856:                              </div>
+2868:                                          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1' }}><Plus size={12} /></div>
+2870:                                      </div>
+2873:                                </div>
+2877:                              </div>
+2882:                                </div>
+2904:                            </div>
+2908:                </div>
+2909:              </div>
+2910:            </div>
+2920:                    <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{song.artist}</div>
+2921:                    <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>{song.title}</div>
+2929:                    </div>
+2930:                  </div>
+2934:                    </div>
+2946:                </div>
+2965:                      </div>
+2966:                      <div style={{ fontWeight: 800 }}>{t.first_name} {t.last_name}</div>
+2967:                      <div style={{ fontSize: '0.7rem', color: brandColor, fontWeight: 700 }}>{t.role === 'admin' ? 'Schulleitung' : 'Lehrkraft'}</div>
+2968:                    </div>
+2970:                </div>
+2971:              </div>
+2972:            </div>
+2991:          </div>
+2992:        </div>
+3007:      </div>
+3034:              <div style={{ width: '60px', height: '60px', borderRadius: '50%', border: '2px solid black' }}></div>
+3036:          </div>
+3037:        </div>
+3039:      </div>
+3086:            </div>
+3093:                </div>
+3097:                </div>
+3098:              </div>
+3123:                    </div>
+3125:                </div>
+3126:              </div>
+3146:                </div>
+3147:              </div>
+3152:              </div>
+3153:            </div>
+3155:        </div>
+3163:            </div>
+3183:              </div>
+3193:            </div>
+3203:            </div>
+3204:          </div>
+3205:        </div>
+3210:        </div>
+3242:            </div>
+3248:              </div>
+3253:              </div>
+3258:              </div>
+3297:                           </div>
+3298:                        </div>
+3303:                     </div>
+3309:                </div>
+3310:              </div>
+3342:                    </div>
+3349:              </div>
+3381:                    </div>
+3388:              </div>
+3395:              </div>
+3396:            </div>
+3398:        </div>
+3408:                 </div>
+3412:              </div>
+3445:                  </div>
+3447:              </div>
+3448:           </div>
+3449:        </div>
+3451:    </div>

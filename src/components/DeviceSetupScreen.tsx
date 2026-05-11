@@ -82,6 +82,7 @@ export function DeviceSetupScreen() {
       await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('id', busySession.id);
     }
 
+    sessionStorage.removeItem('groovelab_user_id');
     localStorage.setItem('groovelab_station_id', stationId);
     window.location.reload();
   };
@@ -122,6 +123,24 @@ export function DeviceSetupScreen() {
             {stations.filter(s => s.room_id === selectedRoomId).sort((a,b) => a.name.localeCompare(b.name, undefined, {numeric: true})).map(s => {
               const isTeacherStation = s.name.toLowerCase().includes('lehrer');
               const isActive = !isTeacherStation && activeStationIds.includes(s.id);
+              
+              // New Color Logic
+              const getStationColor = (name: string | null | undefined) => {
+                if (!name) return '#64748b';
+                const lowerName = name.toLowerCase();
+                if (lowerName.includes('lehrer')) return '#22c55e'; // Green
+                const match = name.match(/\d+/);
+                if (!match) return '#64748b';
+                const num = parseInt(match[0]);
+                if (num === 1 || num === 2) return '#ef4444'; // Red
+                if (num === 3 || num === 4) return '#a855f7'; // Purple
+                if (num === 5 || num === 6) return '#3b82f6'; // Blue
+                if (num === 7 || num === 8) return '#eab308'; // Yellow
+                return '#64748b';
+              };
+              
+              const sColor = getStationColor(s.name);
+
               return (
                 <button
                   key={s.id}
@@ -130,8 +149,8 @@ export function DeviceSetupScreen() {
                     padding: '12px 6px',
                     borderRadius: '16px',
                     border: '2px solid',
-                    borderColor: isActive ? '#ef4444' : '#e2e8f0',
-                    background: isActive ? '#fef2f2' : (isTeacherStation ? '#fffbeb' : 'white'),
+                    borderColor: isActive ? '#ef4444' : (sColor + '40'),
+                    background: isActive ? '#fef2f2' : (isTeacherStation ? '#f0fdf4' : 'white'),
                     cursor: 'pointer',
                     display: 'flex',
                     flexDirection: 'column',
@@ -141,15 +160,15 @@ export function DeviceSetupScreen() {
                     opacity: 1
                   }}
                 >
-                  <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: s.color || '#e5e7eb', marginBottom: '4px', border: '1px solid rgba(0,0,0,0.1)' }}></div>
-                  <Tablet size={20} color={isActive ? '#ef4444' : (isTeacherStation ? '#b45309' : 'var(--primary-color)')} />
+                  <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: sColor, marginBottom: '4px', border: '1px solid rgba(0,0,0,0.1)' }}></div>
+                  <Tablet size={20} color={isActive ? '#ef4444' : sColor} />
                   <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1e293b' }}>{s.name}</div>
                   {isActive && (
                     <div style={{ fontSize: '0.55rem', color: '#ef4444', fontWeight: 800, textAlign: 'center' }}>
                       BESETZT
                     </div>
                   )}
-                  {isTeacherStation && !isActive && <div style={{ fontSize: '0.5rem', color: '#b45309', fontWeight: 800 }}>LEHRER</div>}
+                  {isTeacherStation && !isActive && <div style={{ fontSize: '0.5rem', color: '#22c55e', fontWeight: 800 }}>LEHRER</div>}
                 </button>
               );
             })}

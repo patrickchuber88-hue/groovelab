@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer } from 'lucide-react';
+import { Music, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic } from 'lucide-react';
 import { 
   ResponsiveContainer,
   BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell,
@@ -8,18 +8,25 @@ import {
 } from 'recharts';
 
 const INSTRUMENT_COLORS: Record<string, string> = {
-  Guitar: '#f59e0b', // Amber
-  Bass: '#8b5cf6',   // Violet
-  Drums: '#3b82f6',  // Blue
-  Keys: '#ec4899',   // Pink
-  Vocals: '#10b981'  // Emerald
+  "Guitar": "#ef4444", "E-Gitarre": "#ef4444",
+  "Bass": "#eab308", "E-Bass": "#eab308", 
+  "Drums": "#3b82f6", "E-Drums": "#3b82f6", 
+  "Vocals": "#22c55e", 
+  "Piano": "#a855f7", "E-Piano": "#a855f7", "Keys": "#a855f7" 
 };
+const ADMIN_INSTRUMENT_ICONS: Record<string, string> = { 
+  "Gitarre": "🎸", "Guitar": "🎸", "E-Gitarre": "🎸",
+  "Bass": "🎸", "E-Bass": "🎸", 
+  "Drums": "🥁", "E-Drums": "🥁", 
+  "Vocals": "🎤", "Gesang": "🎤",
+  "Piano / Keys": "🎹", "Piano": "🎹", "E-Piano": "🎹", "Keys": "🎹"
+};
+const brandColor = "#eab308";
 // Removed unused import
 import { TeacherDashboard } from './TeacherDashboard';
 import { ElegantBirthdayPicker } from './ElegantBirthdayPicker';
 import QRCode from 'react-qr-code';
 
-const INSTRUMENT_ICONS: Record<string, string> = { Guitar: '🎸', Bass: '🎸', Drums: '🥁', Keys: '🎹', Vocals: '🎤' };
 
 const TEACHER_AVATARS = [
   { id: 't_male', url: '/avatar_teacher_male.jpg', label: 'Academy Coach M' },
@@ -42,31 +49,62 @@ const STUDENT_AVATARS = [
   { id: 'g_bass', url: '/avatar_girl_bass.jpg', label: 'Girl Bass' },
   { id: 'g_drums', url: '/avatar_girl_drums.jpg', label: 'Girl Drums' },
   { id: 'g_guitar', url: '/avatar_girl_guitar.jpg', label: 'Girl Guitar' },
-  { id: 'g_piano', url: '/avatar_girl_piano.jpg', label: 'Girl Piano' }
+  { id: 'g_piano', url: '/avatar_girl_piano.jpg', label: 'Girl Piano' },
+  { id: 'voc_m', url: '/vocalist_male.png', label: 'Vocalist M' },
+  { id: 'voc_f', url: '/vocalist_female.png', label: 'Vocalist F' }
 ];
+
+const getStationColor = (name: string | null | undefined) => {
+  if (!name) return '#64748b';
+  if (name.toLowerCase().includes('lehrer')) return '#22c55e'; // Green
+  const match = name.match(/\d+/);
+  if (!match) return '#64748b';
+  const num = parseInt(match[0]);
+  if (num === 1 || num === 2) return '#ef4444'; // Red
+  if (num === 3 || num === 4) return '#a855f7'; // Purple
+  if (num === 5 || num === 6) return '#3b82f6'; // Blue
+  if (num === 7 || num === 8) return '#eab308'; // Yellow
+  return '#64748b';
+};
 
 interface AdminDashboardProps {
   userId: string;
   onLogout: () => void;
   forceTab?: string;
   onTabChange?: (tab: string) => void;
+  onOpenBandProfile?: (band: any) => void;
 }
 
-export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: AdminDashboardProps) {
+export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpenBandProfile }: AdminDashboardProps) {
   const [admin, setAdmin] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
   const [stations, setStations] = useState<any[]>([]);
   const [songs, setSongs] = useState<any[]>([]);
+  const [allBands, setAllBands] = useState<any[]>([]);
   const [galleryStudents, setGalleryStudents] = useState<any[]>([]);
   const [setupRooms, setSetupRooms] = useState<any[]>([]);
   const [setupStations, setSetupStations] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<string>(() => localStorage.getItem('groovelab_active_tab') || forceTab || 'live');
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
   
+  const [bandSearch, setBandSearch] = useState('');
+  const [bandLetter, setBandLetter] = useState<string | null>(null);
+  const [editingBand, setEditingBand] = useState<any>(null);
+  const [showAddMember, setShowAddMember] = useState<string | null>(null);
+  const [memberSearch, setMemberSearch] = useState('');
+  const [externalName, setExternalName] = useState('');
+  const [externalInstrument, setExternalInstrument] = useState('Vocals');
+  
   const [showAddStudent, setShowAddStudent] = useState(false);
-  const [newStudent, setNewStudent] = useState({ firstName: '', lastName: '', birthDate: '', photoUrl: '' });
+  const [newStudent, setNewStudent] = useState({ firstName: '', lastName: '', birthDate: '', photoUrl: '', isExternalVocalist: false });
+  const [vocalistOnlyMode, setVocalistOnlyMode] = useState(false);
+  
+  const [showAddBand, setShowAddBand] = useState(false);
+  const [newBand, setNewBand] = useState({ name: '', song_id: '', coach_id: userId, photo_url: '' });
+  const [selectedMembers, setSelectedMembers] = useState<{user_id: string, instrument: string}[]>([]);
+  const [memberToSearch, setMemberToSearch] = useState('');
   
   const [showAddTeacher, setShowAddTeacher] = useState(false);
   const [newTeacher, setNewTeacher] = useState({ firstName: '', lastName: '', isAdmin: false, instrument: '', photoUrl: '' });
@@ -81,7 +119,11 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
   const [newStationColor, setNewStationColor] = useState('#e5e7eb');
   
   const [showAddSong, setShowAddSong] = useState(false);
-  const [newSong, setNewSong] = useState({ artist: '', title: '', level: 1, media_link: '', tomplay_url: '', instrumentation: { Guitar: 1, Bass: 1, Drums: 1, Keys: 0, Vocals: 1 } });
+  const [newSong, setNewSong] = useState({ artist: '', title: '', level: 1, media_link: '', tomplay_url: '', instrumentation: { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 } as Record<string, number> });
+  
+  const [songSearch, setSongSearch] = useState('');
+  const [songSearchType, setSongSearchType] = useState<'title' | 'artist'>('title');
+  const [songAlphaFilter, setSongAlphaFilter] = useState<string | null>(null);
   
   const [selectedQRUser, setSelectedQRUser] = useState<any>(null);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
@@ -89,12 +131,20 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
   const [studentLabMins, setStudentLabMins] = useState(0);
   const [studentHomeMins, setStudentHomeMins] = useState(0);
   const [editingStudent, setEditingStudent] = useState<any>(null);
+  const [studentSearch, setStudentSearch] = useState('');
+  const [studentSessions, setStudentSessions] = useState<any[]>([]);
   const [studentRejections, setStudentRejections] = useState<any[]>([]);
+  const qrCardRef = React.useRef<HTMLDivElement>(null);
   const [editingTeacher, setEditingTeacher] = useState<any>(null);
   const [editingSong, setEditingSong] = useState<any>(null);
   const [stats, setStats] = useState<any>(null);
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  const [manualCoords, setManualCoords] = useState<Record<string, string>>({});
+  const [showManualInput, setShowManualInput] = useState<string | null>(null);
+
+  const brandColor = admin?.schools?.brand_color || '#eab308';
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(Date.now()), 60000);
@@ -105,6 +155,113 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
     if (!window.confirm('Schüler wirklich ausloggen?')) return;
     await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('id', sessionId);
     fetchData();
+  };
+
+  const handleRemoveMember = async (memberId: string) => {
+    if (!window.confirm('Mitglied aus der Band entfernen?')) return;
+    try {
+      const { error } = await supabase.from('band_members').delete().eq('id', memberId);
+      if (error) throw error;
+      
+      // Recalculate coach if not manual
+      const { data: member } = await supabase.from('band_members').select('band_id').eq('id', memberId).single();
+      if (member) await updateBandCoach(member.band_id);
+      
+      fetchData();
+    } catch (err: any) {
+      alert('Fehler: ' + err.message);
+    }
+  };
+
+  const handleAddMember = async (bandId: string, userId: string | null, instrument: string, extName?: string) => {
+    try {
+      const { error } = await supabase.from('band_members').insert({
+        band_id: bandId,
+        user_id: userId,
+        instrument: instrument,
+        external_name: extName,
+        confetti_seen: true
+      });
+      if (error) throw error;
+      
+      const { data: bandSongs } = await supabase.from('band_songs').select('id').eq('band_id', bandId);
+      if (bandSongs && bandSongs.length > 0) {
+         const slotsToInsert = bandSongs.map((bs: any) => ({
+            band_song_id: bs.id,
+            user_id: userId,
+            instrument: instrument,
+            status: 'joined',
+            external_name: extName || null
+         }));
+         await supabase.from('band_song_slots').insert(slotsToInsert);
+      }
+      
+      // Recalculate coach if not manual
+      await updateBandCoach(bandId);
+      
+      setShowAddMember(null);
+      setMemberSearch('');
+      setExternalName('');
+      fetchData();
+    } catch (err: any) {
+      alert('Fehler beim Hinzufügen: ' + err.message);
+    }
+  };
+
+  const updateBandCoach = async (bandId: string) => {
+    try {
+      const { data: band } = await supabase.from('bands').select('coach_is_manual, song_id').eq('id', bandId).single();
+      if (!band || band.coach_is_manual) return;
+
+      const { data: members } = await supabase
+        .from('band_members')
+        .select(`
+          user_id,
+          users!inner(user_song_skills:user_song_skills!user_song_skills_user_id_fkey(*))
+        `)
+        .eq('band_id', bandId);
+
+      if (!members) return;
+
+      const counts: Record<string, number> = {};
+      members.forEach((m: any) => {
+        const verifierId = m.users?.user_song_skills?.find((s: any) => s.song_id === band.song_id && s.is_stage_ready)?.verified_by_id;
+        if (verifierId) counts[verifierId] = (counts[verifierId] || 0) + 1;
+      });
+
+      let topTid = null;
+      let max = 0;
+      for (const [tid, c] of Object.entries(counts)) {
+        if (c > max) {
+          max = c;
+          topTid = tid;
+        }
+      }
+
+      if (topTid) {
+        await supabase.from('bands').update({ coach_id: topTid }).eq('id', bandId);
+      }
+    } catch (err) {
+      console.error('Coach update failed:', err);
+    }
+  };
+
+  const handleSaveBandEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const { error } = await supabase.from('bands').update({
+        name: editingBand.name,
+        bio: editingBand.bio,
+        genre: editingBand.genre,
+        coach_id: editingBand.coach_id,
+        coach_is_manual: editingBand.coach_is_manual
+      }).eq('id', editingBand.id);
+      if (error) throw error;
+      setEditingBand(null);
+      fetchData();
+    } catch (err: any) {
+      alert('Fehler beim Speichern: ' + err.message);
+    }
   };
 
   const handleLogout = () => {
@@ -182,6 +339,32 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
           .eq('school_id', adminData.school_id)
           .order('artist');
         if (songsData) setSongs(songsData);
+      } else if (activeTab === 'bands') {
+        const { data: bandsData } = await supabase
+          .from('bands')
+          .select('*, songs(title, artist, instrumentation), band_members(*, users(*))')
+          .eq('school_id', adminData.school_id)
+          .order('name');
+        if (bandsData) {
+          setAllBands(bandsData); 
+        }
+        // Also fetch students for the search function in band edit
+        const { data: studentsData } = await supabase
+          .from('users')
+          .select('*')
+          .eq('school_id', adminData.school_id)
+          .eq('role', 'student')
+          .order('first_name');
+        if (studentsData) setStudents(studentsData);
+        
+        // Also fetch teachers for coach selection
+        const { data: teachersData } = await supabase
+          .from('users')
+          .select('*')
+          .eq('school_id', adminData.school_id)
+          .in('role', ['teacher', 'admin'])
+          .order('first_name');
+        if (teachersData) setTeachers(teachersData);
       } else if (activeTab === 'stats') {
         fetchStats(adminData.school_id);
       } else if (activeTab === 'gallery') {
@@ -311,17 +494,19 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
       school_id: admin.school_id, 
       role: 'student', 
       first_name: newStudent.firstName, 
-      last_name: newStudent.lastName, 
-      birth_date: newStudent.birthDate || null,
+      last_name: newStudent.lastName.length > 1 ? newStudent.lastName.charAt(0) + '.' : newStudent.lastName, 
+      birth_date: null,
       photo_url: newStudent.photoUrl || null,
-      qr_token: qrToken
+      qr_token: qrToken,
+      is_external_vocalist: newStudent.isExternalVocalist,
+      instrument: newStudent.isExternalVocalist ? 'Vocals' : 'Musiker'
     }).select().single();
     
     if (error) alert('Fehler: ' + error.message);
     else if (data) { 
       setStudents([...students, data]); 
       setShowAddStudent(false); 
-      setNewStudent({ firstName: '', lastName: '', birthDate: '' }); 
+      setNewStudent({ firstName: '', lastName: '', birthDate: '', photoUrl: '', isExternalVocalist: false }); 
     }
   };
 
@@ -343,10 +528,127 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
 
   const handleDeleteStudent = async (id: string) => {
     if (window.confirm('Möchtest du diesen Schüler wirklich löschen? Alle Fortschritte gehen verloren.')) {
-      const { error } = await supabase.from('users').delete().eq('id', id);
-      if (error) alert(error.message);
-      else setStudents(students.filter(s => s.id !== id));
+      try {
+        // Cleanup related data to avoid FK constraint errors and orphaned entries
+        await supabase.from('user_song_skills').delete().eq('user_id', id);
+        await supabase.from('band_members').delete().eq('user_id', id);
+        await supabase.from('sessions').delete().eq('user_id', id);
+        await supabase.from('band_songs').update({ suggested_by: null }).eq('suggested_by', id);
+        await supabase.from('lab_planning').delete().eq('user_id', id);
+        await supabase.from('band_shoutbox').delete().eq('user_id', id);
+        await supabase.from('band_song_slots').delete().eq('user_id', id);
+        await supabase.from('help_requests').delete().eq('user_id', id);
+        
+        const { error } = await supabase.from('users').delete().eq('id', id);
+        if (error) throw error;
+        
+        setStudents(students.filter(s => s.id !== id));
+      } catch (err: any) {
+        alert('Fehler beim Löschen: ' + err.message);
+      }
     }
+  };
+
+  const handleCleanupPlanning = async () => {
+    if (!window.confirm('Möchtest du verwaiste Einträge im Wochenplan bereinigen? (Einträge von gelöschten Schülern werden entfernt)')) return;
+    
+    try {
+      // 1. Hole alle Planungs-Einträge
+      const { data: planning } = await supabase.from('lab_planning').select('id, user_id').eq('school_id', admin.school_id);
+      // 2. Hole alle aktuellen Schüler/Lehrer
+      const { data: currentUsers } = await supabase.from('users').select('id').eq('school_id', admin.school_id);
+      
+      if (!planning || !currentUsers) return;
+      
+      const userIds = new Set(currentUsers.map(u => u.id));
+      const orphaned = planning.filter(p => !userIds.has(p.user_id));
+      
+      if (orphaned.length === 0) {
+        alert('Keine verwaisten Einträge gefunden. Deine Datenbank ist sauber! ✨');
+        return;
+      }
+      
+      const { error } = await supabase.from('lab_planning').delete().in('id', orphaned.map(o => o.id));
+      if (error) throw error;
+      
+      alert(`${orphaned.length} verwaiste Einträge erfolgreich entfernt! ✅`);
+      fetchData();
+    } catch (err: any) {
+      alert('Fehler bei der Bereinigung: ' + err.message);
+    }
+  };
+
+  const handleResetAllPlanning = async () => {
+    if (!admin?.school_id) return;
+    if (!window.confirm("Bist du sicher? Dies löscht alle aktuellen Planungen für die gesamte Akademie!")) return;
+    const { error } = await supabase.from('weekly_planning').delete().eq('school_id', admin.school_id);
+    if (error) alert("Fehler beim Zurücksetzen: " + error.message);
+    else fetchData();
+  };
+
+  const handleCreateBandManually = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newBand.name || !admin?.school_id) return;
+
+    // 1. Create Band
+    const { data: band, error: bErr } = await supabase.from('bands').insert({
+      name: newBand.name,
+      coach_id: newBand.coach_id || userId,
+      school_id: admin.school_id,
+      status: 'active',
+      photo_url: newBand.photo_url || null
+    }).select().single();
+
+    if (bErr || !band) {
+      alert("Fehler beim Erstellen der Band: " + bErr?.message);
+      return;
+    }
+
+    // 2. Add Song (if selected)
+    if (newBand.song_id) {
+       const { data: bs, error: bsErr } = await supabase.from('band_songs').insert({
+         band_id: band.id,
+         song_id: newBand.song_id,
+         status: 'ready'
+       }).select().single();
+       
+       if (bs) {
+          // Add Slots for members
+          for (const m of selectedMembers) {
+             await supabase.from('band_song_slots').insert({
+               band_song_id: bs.id,
+               user_id: m.user_id,
+               instrument: m.instrument,
+               status: 'joined'
+             });
+          }
+       } else {
+         console.error("Fehler beim Verknüpfen des Songs:", bsErr);
+       }
+    }
+
+    // 3. Add Members
+    // First, the coach
+    await supabase.from('band_members').insert({ 
+      band_id: band.id, 
+      user_id: newBand.coach_id || userId, 
+      role: 'coach',
+      instrument: 'Coach'
+    });
+    
+    for (const m of selectedMembers) {
+       await supabase.from('band_members').insert({
+         band_id: band.id,
+         user_id: m.user_id,
+         role: 'member',
+         instrument: m.instrument
+       });
+    }
+
+    setShowAddBand(false);
+    setNewBand({ name: '', song_id: '', coach_id: userId, photo_url: '' });
+    setSelectedMembers([]);
+    fetchData();
   };
 
   const handleAddTeacher = async (e: React.FormEvent) => {
@@ -368,9 +670,23 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
   const handleDeleteTeacher = async (id: string) => {
     if (id === userId) return alert('Du kannst dich nicht selbst löschen!');
     if (window.confirm('Möchtest du diesen Lehrer wirklich löschen?')) {
-      const { error } = await supabase.from('users').delete().eq('id', id);
-      if (error) alert(error.message);
-      else setTeachers(teachers.filter(t => t.id !== id));
+      try {
+        // Cleanup related data
+        await supabase.from('sessions').delete().eq('user_id', id);
+        await supabase.from('band_members').delete().eq('user_id', id);
+        await supabase.from('band_songs').update({ suggested_by: null }).eq('suggested_by', id);
+        await supabase.from('lab_planning').delete().eq('user_id', id);
+        await supabase.from('band_shoutbox').delete().eq('user_id', id);
+        await supabase.from('band_song_slots').delete().eq('user_id', id);
+        await supabase.from('help_requests').delete().eq('user_id', id);
+        
+        const { error } = await supabase.from('users').delete().eq('id', id);
+        if (error) throw error;
+        
+        setTeachers(teachers.filter(t => t.id !== id));
+      } catch (err: any) {
+        alert('Fehler beim Löschen: ' + err.message);
+      }
     }
   };
 
@@ -383,8 +699,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
       role: editingTeacher.role,
       instrument: editingTeacher.instrument,
       photo_url: editingTeacher.photo_url,
+      bio: editingTeacher.bio,
+      expertise: editingTeacher.expertise,
       bands: editingTeacher.bands,
-      projects: editingTeacher.projects,
       gear: editingTeacher.gear,
       listening: editingTeacher.listening
     }).eq('id', editingTeacher.id);
@@ -496,29 +813,123 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
     }
   };
 
-  const handleAddGeofencePoint = async (roomId: string) => {
-    if (!window.confirm('Aktuellen Standort als weiteren Kalibrierungs-Punkt für diesen Raum hinzufügen? (Radius: 20m)')) return;
+  const handleAddGeofencePoint = async (roomId: string, manualLat?: number, manualLng?: number) => {
+    if (!manualLat && !window.confirm('Aktuellen Standort als weiteren Kalibrierungs-Punkt für diesen Raum hinzufügen? (Radius: 20m)')) return;
     
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
+    const updatePoint = async (lat: number, lng: number) => {
+      console.log(`[Admin] Punkt hinzufügen: ${lat}, ${lng}`);
       
-      const room = rooms.find(r => r.id === roomId);
-      const points = Array.isArray(room?.geofence_points) ? [...room.geofence_points] : [];
-      points.push({ lat, lng });
+      const { data: latestRoom, error: fetchError } = await supabase
+        .from('rooms')
+        .select('geofence_points')
+        .eq('id', roomId)
+        .single();
 
-      const { error } = await supabase.from('rooms').update({
-        geofence_points: points,
+      if (fetchError || !latestRoom) return;
+
+      let currentPoints = Array.isArray(latestRoom.geofence_points) ? [...latestRoom.geofence_points] : [];
+      const newPoint = { lat, lng, timestamp: new Date().toISOString() };
+      currentPoints.push(newPoint);
+
+      await supabase.from('rooms').update({ 
+        geofence_points: currentPoints,
         latitude: lat,
         longitude: lng
       }).eq('id', roomId);
       
-      if (error) alert(error.message);
-      else {
-        alert('Punkt hinzugefügt! ✅');
-        fetchData();
-      }
-    }, (err) => alert('Fehler: ' + err.message), { enableHighAccuracy: true });
+      fetchData();
+    };
+
+    if (manualLat && manualLng) {
+      updatePoint(manualLat, manualLng);
+      return;
+    }
+    
+    const tryScan = (highAccuracy: boolean) => {
+      const geoOptions = {
+        enableHighAccuracy: highAccuracy,
+        timeout: highAccuracy ? 5000 : 10000,
+        maximumAge: 0 
+      };
+
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        
+        console.log(`[Admin] Scan erfolgreich: ${lat}, ${lng}`);
+
+        // 1. Frischesten Stand des Raumes direkt aus der DB holen (verhindert Race Conditions)
+        const { data: latestRoom, error: fetchError } = await supabase
+          .from('rooms')
+          .select('name, geofence_points')
+          .eq('id', roomId)
+          .single();
+
+        if (fetchError || !latestRoom) {
+          alert('Fehler beim Abrufen der aktuellen Raumdaten: ' + (fetchError?.message || 'Nicht gefunden'));
+          return;
+        }
+
+        // 2. Punkte sicher zusammenführen
+        let currentPoints: Array<{ lat: number, lng: number, timestamp: string }> = [];
+        if (latestRoom.geofence_points && Array.isArray(latestRoom.geofence_points)) {
+          currentPoints = [...latestRoom.geofence_points];
+        }
+
+        const newPoint = { 
+          lat: Number(lat.toFixed(8)), 
+          lng: Number(lng.toFixed(8)), 
+          timestamp: new Date().toISOString() 
+        };
+        
+        currentPoints.push(newPoint);
+
+        // 3. Update an Supabase senden
+        const { error: updateError } = await supabase.from('rooms').update({
+          geofence_points: currentPoints,
+          latitude: Number(lat.toFixed(8)),
+          longitude: Number(lng.toFixed(8))
+        }).eq('id', roomId);
+        
+        if (updateError) {
+          console.error('[Admin] DB Fehler:', updateError);
+          alert('Datenbank-Fehler beim Speichern: ' + updateError.message);
+        } else {
+          alert(`Punkt ${currentPoints.length} erfolgreich für "${latestRoom.name}" hinzugefügt! ✅`);
+          await fetchData(); 
+        }
+      }, (err) => {
+        if (highAccuracy) {
+          console.log('[Admin] High Accuracy failed, trying normal...');
+          tryScan(false);
+        } else {
+          alert('Standort-Fehler: ' + err.message);
+        }
+      }, geoOptions);
+    };
+
+    tryScan(true);
+  };
+
+  const handleDeleteGeofencePoint = async (roomId: string, index: number) => {
+    if (!window.confirm('Diesen Geofence-Punkt wirklich löschen?')) return;
+    const room = rooms.find(r => r.id === roomId);
+    if (!room) return;
+    
+    const points: any[] = Array.isArray(room.geofence_points) ? [...room.geofence_points] : [];
+    points.splice(index, 1);
+    
+    // Update lat/lng to the last remaining point or null
+    const lastPoint = points.length > 0 ? points[points.length - 1] : null;
+
+    const { error } = await supabase.from('rooms').update({
+      geofence_points: points,
+      latitude: lastPoint?.lat || null,
+      longitude: lastPoint?.lng || null
+    }).eq('id', roomId);
+    
+    if (error) alert(error.message);
+    else fetchData();
   };
 
   const handleClearGeofencePoints = async (roomId: string) => {
@@ -548,7 +959,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
     else if (data) { 
       setSongs([...songs, data]); 
       setShowAddSong(false); 
-      setNewSong({ artist: '', title: '', level: 1, media_link: '', tomplay_url: '', instrumentation: { Guitar: 1, Bass: 1, Drums: 1, Keys: 0, Vocals: 1 } }); 
+      setNewSong({ artist: '', title: '', level: 1, media_link: '', tomplay_url: '', instrumentation: { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 } }); 
     }
   };
 
@@ -573,11 +984,56 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
   };
 
   const handleDeleteSong = async (songId: string) => {
-    if (!window.confirm('Song wirklich aus der Bibliothek löschen?')) return;
-    const { error } = await supabase.from('songs').delete().eq('id', songId);
-    if (error) alert(error.message);
-    else setSongs(songs.filter(s => s.id !== songId));
+    if (!window.confirm('Song wirklich aus der Bibliothek löschen? Damit wird er auch aus allen Schüler-Boards, der Rejection-History und sämtlichen Bands entfernt.')) return;
+    try {
+      console.log('[Admin] Starting deep delete for song:', songId);
+      
+      // 1. Cleanup all dependencies
+      // Delete rejection history for this song
+      await supabase.from('rejection_history').delete().eq('song_id', songId);
+      
+      // Handle Bands and their dependencies
+      const { data: bandsToDelete } = await supabase.from('bands').select('id').eq('song_id', songId);
+      if (bandsToDelete && bandsToDelete.length > 0) {
+        const bandIds = bandsToDelete.map(b => b.id);
+        
+        // Cleanup band members and shoutbox
+        await supabase.from('band_members').delete().in('band_id', bandIds);
+        await supabase.from('band_shoutbox').delete().in('band_id', bandIds);
+        
+        // Cleanup band song slots
+        const { data: bandSongs } = await supabase.from('band_songs').select('id').in('band_id', bandIds);
+        if (bandSongs && bandSongs.length > 0) {
+          await supabase.from('band_song_slots').delete().in('band_song_id', bandSongs.map(bs => bs.id));
+        }
+        
+        // Delete the bands themselves
+        await supabase.from('bands').delete().in('id', bandIds);
+      }
+
+      // Cleanup ALL band_song_slots for this song (including proposals without bands)
+      const { data: allBS } = await supabase.from('band_songs').select('id').eq('song_id', songId);
+      if (allBS && allBS.length > 0) {
+        await supabase.from('band_song_slots').delete().in('band_song_id', allBS.map(bs => bs.id));
+      }
+
+      // Cleanup remaining student skills and song mappings
+      await supabase.from('user_song_skills').delete().eq('song_id', songId);
+      await supabase.from('band_songs').delete().eq('song_id', songId);
+      
+      // 2. Finally delete the song record
+      const { error } = await supabase.from('songs').delete().eq('id', songId);
+      if (error) throw error;
+      
+      console.log('[Admin] Delete successful');
+      setSongs(prev => prev.filter(s => s.id !== songId));
+      alert('Song wurde inklusive aller Verknüpfungen erfolgreich gelöscht. 🗑️');
+    } catch (err: any) {
+      console.error('[Admin] Global Delete error:', err);
+      alert('Fehler beim Löschen: ' + err.message + '\n\nDetails: Prüfe die Konsole für mehr Infos.');
+    }
   };
+
 
   const fetchStudentProfile = async (student: any) => {
     setSelectedStudent(student);
@@ -601,6 +1057,21 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
       .eq('user_id', student.id);
     
     if (allSessions) {
+      const openingHours = admin?.schools?.opening_hours;
+      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      
+      // Filter for "Logbuch" (must be at station AND on active day)
+      const logSessions = allSessions.filter(s => {
+        if (!s.station_id) return false;
+        if (openingHours) {
+          const d = new Date(s.check_in_time);
+          const dayConfig = openingHours[dayNames[d.getDay()]];
+          if (!dayConfig || !dayConfig.active) return false;
+        }
+        return true;
+      });
+
+      setStudentSessions([...logSessions].sort((a: any, b: any) => new Date(b.check_in_time).getTime() - new Date(a.check_in_time).getTime()));
       let labMins = 0;
       let homeMins = 0;
 
@@ -610,9 +1081,12 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
         const duration = Math.floor((end.getTime() - start.getTime()) / 60000);
         const mins = Math.max(0, duration);
         
-        if (s.station_id) {
+        // Only count as lab mins if it's a valid log session (at station and during opening hours)
+        const isValidLog = logSessions.some(ls => ls.check_in_time === s.check_in_time && ls.station_id === s.station_id);
+        
+        if (s.station_id && isValidLog) {
           labMins += mins;
-        } else {
+        } else if (!s.station_id) {
           homeMins += mins;
         }
       });
@@ -663,11 +1137,12 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
 
   if (!admin) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b', fontWeight: 600 }}>Lädt...</div>;
 
-  const brandColor = admin.schools?.brand_color || '#eab308';
+
   
   const sidebarItems = [
     { id: 'live', label: 'Live Lab', icon: Monitor },
     { id: 'students', label: 'Schüler', icon: Users },
+    { id: 'bands', label: 'Bands', icon: Award },
     { id: 'team', label: 'Team', icon: Shield },
     { id: 'rooms', label: 'Räume', icon: Box },
     { id: 'songs', label: 'Songs', icon: Music },
@@ -687,51 +1162,483 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
     </div>
   );
 
+  const renderBandsTab = () => {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+    
+    const filteredBands = allBands.filter(band => {
+      const matchesSearch = band.name.toLowerCase().includes(bandSearch.toLowerCase());
+      const matchesLetter = !bandLetter || band.name.toUpperCase().startsWith(bandLetter);
+      return matchesSearch && matchesLetter;
+    });
+
+    return (
+      <div style={{ marginTop: '24px' }}>
+        <div style={{ display: 'flex', gap: '32px' }}>
+          {/* Main Column: Band Management */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <h2 style={{ fontSize: '1.75rem', fontWeight: 950, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '14px', margin: 0 }}>
+              <div style={{ background: `${brandColor}15`, color: brandColor, padding: '10px', borderRadius: '14px', display: 'flex', alignItems: 'center' }}>
+                <Award size={24} />
+              </div>
+              Band-Verwaltung
+            </h2>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <div style={{ position: 'relative', width: '240px' }}>
+                <Search size={16} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <input 
+                  type="text" 
+                  placeholder="Band suchen..." 
+                  value={bandSearch}
+                  onChange={(e) => setBandSearch(e.target.value)}
+                  style={{ width: '100%', padding: '10px 16px 10px 42px', borderRadius: '14px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600, outline: 'none' }}
+                />
+              </div>
+              <button 
+                onClick={() => setShowAddBand(!showAddBand)} 
+                style={{ 
+                  background: `linear-gradient(135deg, ${brandColor}, ${brandColor}ee)`, 
+                  color: 'white', 
+                  border: 'none', 
+                  padding: '12px 24px', 
+                  borderRadius: '16px', 
+                  cursor: 'pointer', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '10px', 
+                  fontSize: '0.9rem', 
+                  fontWeight: 900,
+                  boxShadow: `0 8px 20px -6px ${brandColor}60`
+                }}
+              >
+                <Plus size={20} strokeWidth={3} /> Band erstellen
+              </button>
+            </div>
+          </div>
+
+          {showAddBand && (
+            <form onSubmit={handleCreateBandManually} className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px', background: 'white', borderRadius: '24px', border: `1px solid ${brandColor}20`, boxShadow: '0 20px 50px rgba(0,0,0,0.05)' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Neue Band manuell zusammenstellen</h3>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Band Name</label>
+                  <input required placeholder="z.B. The Rockstars" value={newBand.name} onChange={e => setNewBand({...newBand, name: e.target.value})} style={{ padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Song (Optional)</label>
+                  <select value={newBand.song_id} onChange={e => setNewBand({...newBand, song_id: e.target.value})} style={{ padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700 }}>
+                    <option value="">-- Kein Song --</option>
+                    {songs.map(s => <option key={s.id} value={s.id}>{s.artist} - {s.title}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Coach / Leitung</label>
+                  <select value={newBand.coach_id} onChange={e => setNewBand({...newBand, coach_id: e.target.value})} style={{ padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700 }}>
+                    {teachers.map(t => <option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>)}
+                  </select>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Avatar URL (Optional)</label>
+                  <input placeholder="https://..." value={newBand.photo_url} onChange={e => setNewBand({...newBand, photo_url: e.target.value})} style={{ padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                </div>
+              </div>
+
+              <div style={{ padding: '24px', background: '#f8fafc', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '16px', display: 'block' }}>Mitglieder hinzufügen</label>
+                
+                <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+                  <div style={{ flex: 1, position: 'relative' }}>
+                    <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                    <input 
+                      placeholder="Schüler suchen..." 
+                      value={memberToSearch} 
+                      onChange={e => setMemberToSearch(e.target.value)} 
+                      style={{ width: '100%', padding: '10px 12px 10px 36px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem' }} 
+                    />
+                    {memberToSearch && (
+                      <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', zIndex: 10, maxHeight: '200px', overflowY: 'auto', marginTop: '4px' }}>
+                        {students.filter(s => `${s.first_name} ${s.last_name}`.toLowerCase().includes(memberToSearch.toLowerCase())).map(s => (
+                          <div 
+                            key={s.id} 
+                            onClick={() => {
+                              if (!selectedMembers.find(m => m.user_id === s.id)) {
+                                setSelectedMembers([...selectedMembers, { user_id: s.id, instrument: 'E-Gitarre' }]);
+                              }
+                              setMemberToSearch('');
+                            }}
+                            style={{ padding: '10px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.85rem', fontWeight: 600, borderBottom: '1px solid #f1f5f9' }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                          >
+                            <img src={s.photo_url || '/avatar_ghost.jpg'} style={{ width: '24px', height: '24px', borderRadius: '50%' }} />
+                            {s.first_name} {s.last_name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {selectedMembers.map((m, idx) => {
+                    const student = students.find(s => s.id === m.user_id);
+                    return (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: 'white', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <img src={student?.photo_url || '/avatar_ghost.jpg'} style={{ width: '24px', height: '24px', borderRadius: '50%' }} />
+                          <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{student?.first_name}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <select 
+                            value={m.instrument} 
+                            onChange={e => {
+                              const next = [...selectedMembers];
+                              next[idx].instrument = e.target.value;
+                              setSelectedMembers(next);
+                            }}
+                            style={{ padding: '4px 8px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.75rem', fontWeight: 700 }}
+                          >
+                            {Object.keys(ADMIN_INSTRUMENT_ICONS).map(inst => <option key={inst} value={inst}>{inst}</option>)}
+                          </select>
+                          <button 
+                            type="button" 
+                            onClick={() => setSelectedMembers(selectedMembers.filter((_, i) => i !== idx))} 
+                            style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0 }}
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {selectedMembers.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '12px', color: '#94a3b8', fontSize: '0.8rem', border: '1px dashed #cbd5e1', borderRadius: '12px' }}>Noch keine Mitglieder hinzugefügt.</div>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '16px', borderRadius: '16px', fontWeight: 900, cursor: 'pointer', boxShadow: `0 8px 20px -6px ${brandColor}40` }}>Band erstellen & Aktivieren</button>
+                <button type="button" onClick={() => setShowAddBand(false)} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '16px', borderRadius: '16px', fontWeight: 800, cursor: 'pointer' }}>Abbrechen</button>
+              </div>
+            </form>
+          )}
+
+          {/* Alphabet Bar */}
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', padding: '8px', background: 'white', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
+            <button 
+              onClick={() => setBandLetter(null)}
+              style={{ padding: '6px 12px', borderRadius: '10px', border: 'none', background: !bandLetter ? brandColor : 'transparent', color: !bandLetter ? 'white' : '#64748b', fontWeight: 800, cursor: 'pointer', fontSize: '0.75rem' }}
+            >
+              ALL
+            </button>
+            {alphabet.map(l => (
+              <button 
+                key={l}
+                onClick={() => setBandLetter(bandLetter === l ? null : l)}
+                style={{ 
+                  width: '32px', height: '32px', borderRadius: '10px', border: 'none', 
+                  background: bandLetter === l ? brandColor : 'transparent', 
+                  color: bandLetter === l ? 'white' : '#64748b', 
+                  fontWeight: 800, cursor: 'pointer', fontSize: '0.75rem' 
+                }}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {filteredBands.map((band: any) => (
+              <div key={band.id} className="glass-panel" 
+                onClick={() => onOpenBandProfile?.(band)}
+                style={{ 
+                  background: 'white', borderRadius: '24px', padding: '20px 24px', border: '1px solid #f1f5f9', boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
+                  display: 'grid', gridTemplateColumns: 'auto 1fr auto auto', alignItems: 'center', gap: '24px', cursor: 'pointer', transition: 'all 0.2s'
+                }}
+                onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+              >
+                <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                  {band.photo_url ? (
+                    <img src={band.photo_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                  ) : (
+                    <Music size={24} color="white" />
+                  )}
+                </div>
+
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', margin: '0 0 4px 0' }}>{band.name}</h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: brandColor, textTransform: 'uppercase' }}>{band.genre || 'Bandprojekt'}</span>
+                    <span style={{ color: '#cbd5e1' }}>•</span>
+                    <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>{band.band_members?.length || 0} Mitglieder</span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  {(band.band_members || []).slice(0, 5).map((m: any, i: number) => {
+                    const u = Array.isArray(m.users) ? m.users[0] : m.users;
+                    return (
+                      <div key={i} style={{ width: '32px', height: '32px', borderRadius: '10px', overflow: 'hidden', border: '2px solid white', marginLeft: i === 0 ? 0 : '-12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', background: 'white' }} title={`${u?.first_name} (${m.instrument})`}>
+                        <img src={u?.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                      </div>
+                    );
+                  })}
+                  {(band.band_members || []).length > 5 && (
+                    <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: '#f1f5f9', border: '2px solid white', marginLeft: '-12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 800, color: '#64748b' }}>
+                      +{(band.band_members || []).length - 5}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px' }} onClick={e => e.stopPropagation()}>
+                  <button onClick={() => setEditingBand(band)} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '12px', cursor: 'pointer', color: '#64748b' }}><Monitor size={18} /></button>
+                  <button 
+                    onClick={async () => {
+                      if(window.confirm(`Band "${band.name}" wirklich komplett auflösen?`)) {
+                        await supabase.from('bands').delete().eq('id', band.id);
+                        fetchData();
+                      }
+                    }}
+                    style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#ef4444', padding: '10px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#fef2f2'}
+                    title="Band auflösen"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              </div>
+            ))}
+            {filteredBands.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '80px', background: 'white', borderRadius: '32px', border: '2px dashed #e2e8f0' }}>
+                  <div style={{ fontSize: '3rem', margin: '0 auto 20px auto', width: '80px', height: '80px', background: '#f8fafc', borderRadius: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🔍</div>
+                  <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e293b' }}>Keine Bands gefunden</h3>
+                  <p style={{ color: '#64748b' }}>Probiere einen anderen Suchbegriff oder Buchstaben.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Column: Teacher Vocal Finder Widget */}
+        <div style={{ width: '350px', background: '#f8fafc', borderRadius: '32px', padding: '24px', alignSelf: 'start', position: 'sticky', top: '24px', border: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+              <Mic size={20} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Vocal Finder</h3>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8' }}>Manuelle Sänger-Zuweisung</div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {allBands.filter(band => {
+              const members = band.band_members || [];
+              const vocalists = members.filter((m: any) => (m.instrument || '').toLowerCase().includes('vocal') || (m.instrument || '').toLowerCase().includes('gesang'));
+              return vocalists.length < 2;
+            }).slice(0, 5).map(band => (
+              <div key={band.id} style={{ background: 'white', padding: '20px', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b' }}>{band.name}</div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>{band.songs?.title || 'No Song'}</div>
+                </div>
+
+                <div style={{ position: 'relative' }}>
+                  <button 
+                    onClick={() => setShowAddMember(showAddMember === band.id ? null : band.id)}
+                    style={{ width: '100%', padding: '10px', borderRadius: '12px', border: `1px solid ${brandColor}30`, background: `${brandColor}05`, color: brandColor, fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                  >
+                    <Plus size={14} /> Sänger hinzufügen
+                  </button>
+
+                  {showAddMember === band.id && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'white', borderRadius: '16px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)', border: '1px solid #f1f5f9', padding: '12px', zIndex: 100, marginTop: '8px', maxHeight: '250px', overflowY: 'auto' }}>
+                      <input 
+                        autoFocus
+                        placeholder="Musiker oder Externe suchen..." 
+                        value={memberSearch}
+                        onChange={e => setMemberSearch(e.target.value)}
+                        style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.8rem', marginBottom: '8px' }}
+                      />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {students.filter(s => `${s.first_name} ${s.last_name}`.toLowerCase().includes(memberSearch.toLowerCase())).map(s => (
+                          <button 
+                            key={s.id}
+                            onClick={async () => {
+                              await supabase.from('band_members').insert({ band_id: band.id, user_id: s.id, instrument: 'Vocals', role: 'member' });
+                              const activeProject = (band.band_songs || []).find((bs: any) => bs.status === 'ready' || bs.status === 'proposal');
+                              if (activeProject) {
+                                await supabase.from('band_song_slots').insert({ band_song_id: activeProject.id, user_id: s.id, instrument: 'Vocals', status: 'joined' });
+                              }
+                              setShowAddMember(null);
+                              setMemberSearch('');
+                              fetchData();
+                            }}
+                            style={{ width: '100%', padding: '8px', borderRadius: '8px', border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', textAlign: 'left' }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                          >
+                            <div style={{ width: '28px', height: '28px', borderRadius: '50%', overflow: 'hidden' }}>
+                              <img src={s.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            </div>
+                            <div>
+                              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b' }}>{s.first_name} {s.last_name}</div>
+                              {s.is_external_vocalist && <div style={{ fontSize: '0.6rem', color: brandColor, fontWeight: 700 }}>Externer Gesang</div>}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+            {allBands.filter(band => {
+              const vocalists = (band.band_members || []).filter((m: any) => (m.instrument || '').toLowerCase().includes('vocal'));
+              return vocalists.length < 2;
+            }).length === 0 && (
+              <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8', fontSize: '0.8rem' }}>Alle Bands sind stimmlich besetzt! 🎉</div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+    );
+  };
+
+
   const renderStudentsTab = () => (
     <div style={{ marginTop: '24px' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div className="flex-between">
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Users size={24} color={brandColor} /> Schülerverwaltung
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 950, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '14px', margin: 0 }}>
+            <div style={{ background: `${brandColor}15`, color: brandColor, padding: '10px', borderRadius: '14px', display: 'flex', alignItems: 'center' }}>
+              <Users size={24} />
+            </div>
+            Schülerverwaltung
           </h2>
-          <button onClick={() => setShowAddStudent(!showAddStudent)} style={{ background: brandColor, color: 'white', border: 'none', padding: '10px 20px', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem', fontWeight: 700 }}>
-            <Plus size={18} /> Neu anlegen
-          </button>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            {/* Filter Switch */}
+            <div style={{ background: '#f1f5f9', padding: '4px', borderRadius: '16px', display: 'flex', gap: '4px', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)' }}>
+              <button 
+                onClick={() => setVocalistOnlyMode(false)}
+                style={{ 
+                  padding: '8px 20px', 
+                  borderRadius: '12px', 
+                  border: 'none', 
+                  background: !vocalistOnlyMode ? 'white' : 'transparent',
+                  color: !vocalistOnlyMode ? '#1e293b' : '#94a3b8',
+                  fontWeight: 900,
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  boxShadow: !vocalistOnlyMode ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Musiker
+              </button>
+              <button 
+                onClick={() => setVocalistOnlyMode(true)}
+                style={{ 
+                  padding: '8px 20px', 
+                  borderRadius: '12px', 
+                  border: 'none', 
+                  background: vocalistOnlyMode ? 'white' : 'transparent',
+                  color: vocalistOnlyMode ? '#1e293b' : '#94a3b8',
+                  fontWeight: 900,
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  boxShadow: vocalistOnlyMode ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Gesangsschüler
+              </button>
+            </div>
+
+            <button 
+              onClick={() => setShowAddStudent(!showAddStudent)} 
+              style={{ 
+                background: `linear-gradient(135deg, ${brandColor}, ${brandColor}ee)`, 
+                color: 'white', 
+                border: 'none', 
+                padding: '12px 24px', 
+                borderRadius: '16px', 
+                cursor: 'pointer', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '10px', 
+                fontSize: '0.9rem', 
+                fontWeight: 900,
+                boxShadow: `0 8px 20px -6px ${brandColor}60`,
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <Plus size={20} strokeWidth={3} /> Neu anlegen
+            </button>
+          </div>
         </div>
 
         {showAddStudent && (
           <form onSubmit={handleAddStudent} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: 'white', borderRadius: '20px', border: `1px solid ${brandColor}20` }}>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e293b' }}>Neuen Schüler anlegen</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <input required placeholder="Vorname" value={newStudent.firstName} onChange={e => setNewStudent({...newStudent, firstName: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc' }} />
-              <input required placeholder="Nachname" value={newStudent.lastName} onChange={e => setNewStudent({...newStudent, lastName: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname</label>
+                <input required placeholder="Vorname" value={newStudent.firstName} onChange={e => setNewStudent({...newStudent, firstName: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Nachname (Initial)</label>
+                <input required placeholder="Nachname" value={newStudent.lastName} onChange={e => setNewStudent({...newStudent, lastName: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+              </div>
             </div>
-            <ElegantBirthdayPicker 
-              label="Geburtsdatum"
-              value={newStudent.birthDate || '2010-01-01'}
-              onChange={newVal => setNewStudent({...newStudent, birthDate: newVal})}
-            />
 
+            {/* External Vocalist Toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
+               <div 
+                 onClick={() => setNewStudent({...newStudent, isExternalVocalist: !newStudent.isExternalVocalist, photoUrl: !newStudent.isExternalVocalist ? STUDENT_AVATARS.find(a => a.id === 'voc_f')?.url || '' : ''})}
+                 style={{ 
+                   width: '44px', height: '24px', borderRadius: '20px', 
+                   background: newStudent.isExternalVocalist ? brandColor : '#cbd5e1', 
+                   position: 'relative', cursor: 'pointer', transition: 'all 0.2s' 
+                 }}
+               >
+                 <div style={{ 
+                   position: 'absolute', top: '2px', left: newStudent.isExternalVocalist ? '22px' : '2px', 
+                   width: '20px', height: '20px', background: 'white', borderRadius: '50%', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', transition: 'all 0.2s' 
+                 }}></div>
+               </div>
+               <div>
+                 <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b' }}>Gesangsschüler (Extern)</div>
+                 <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Kein Profilzugriff, Platzhalter für Band-Gesang</div>
+               </div>
+            </div>
+
+            {/* Avatar Picker for new student */}
             <div>
               <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '12px', display: 'block' }}>Avatar wählen:</label>
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                {STUDENT_AVATARS.map(av => (
+                {STUDENT_AVATARS.filter(a => {
+                  if (newStudent.isExternalVocalist) return a.id.startsWith('voc_');
+                  return !a.id.startsWith('voc_');
+                }).map(av => (
                   <div 
                     key={av.id}
                     onClick={() => setNewStudent({...newStudent, photoUrl: av.url})}
                     style={{ 
-                      width: '56px', 
-                      height: '56px', 
-                      borderRadius: '16px', 
-                      overflow: 'hidden', 
-                      border: `3px solid ${newStudent.photoUrl === av.url ? brandColor : 'white'}`,
-                      boxShadow: newStudent.photoUrl === av.url ? `0 0 0 2px ${brandColor}30` : '0 2px 8px rgba(0,0,0,0.06)',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      background: '#f1f5f9'
+                      width: '64px', height: '64px', borderRadius: '16px', overflow: 'hidden', cursor: 'pointer',
+                      border: newStudent.photoUrl === av.url ? `3px solid ${brandColor}` : '3px solid transparent',
+                      boxShadow: newStudent.photoUrl === av.url ? `0 8px 20px ${brandColor}40` : 'none',
+                      transition: 'all 0.2s'
                     }}
                   >
-                    <img src={av.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={av.label} />
+                    <img src={av.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </div>
                 ))}
               </div>
@@ -762,8 +1669,24 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
           </form>
         )}
 
+        <div style={{ position: 'relative', marginBottom: '8px' }}>
+          <Search size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+          <input 
+            type="text" 
+            placeholder="Schüler suchen..." 
+            value={studentSearch}
+            onChange={e => setStudentSearch(e.target.value)}
+            style={{ width: '100%', padding: '14px 14px 14px 48px', borderRadius: '16px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600, fontSize: '0.95rem', outline: 'none', transition: 'all 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
+          />
+        </div>
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '16px' }}>
-          {students.map(s => (
+          {students.filter(s => {
+            const fullName = `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase();
+            const matchesSearch = fullName.includes(studentSearch.toLowerCase());
+            const matchesType = vocalistOnlyMode ? s.is_external_vocalist : !s.is_external_vocalist;
+            return matchesSearch && matchesType;
+          }).map(s => (
             <div key={s.id} className="glass-panel" style={{ padding: '16px', background: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '20px', border: '1px solid #f1f5f9', transition: 'transform 0.2s', cursor: 'default' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                 <div style={{ 
@@ -809,12 +1732,32 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
   const renderTeachersTab = () => (
     <div style={{ marginTop: '24px' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div className="flex-between">
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Shield size={24} color={brandColor} /> Kollegium & Team
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 950, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '14px', margin: 0 }}>
+            <div style={{ background: `${brandColor}15`, color: brandColor, padding: '10px', borderRadius: '14px', display: 'flex', alignItems: 'center' }}>
+              <Shield size={24} />
+            </div>
+            Kollegium & Team
           </h2>
-          <button onClick={() => setShowAddTeacher(!showAddTeacher)} style={{ background: brandColor, color: 'white', border: 'none', padding: '10px 20px', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem', fontWeight: 700 }}>
-            <Plus size={18} /> Team-Mitglied
+          <button 
+            onClick={() => setShowAddTeacher(!showAddTeacher)} 
+            style={{ 
+              background: `linear-gradient(135deg, ${brandColor}, ${brandColor}ee)`, 
+              color: 'white', 
+              border: 'none', 
+              padding: '12px 24px', 
+              borderRadius: '16px', 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '10px', 
+              fontSize: '0.9rem', 
+              fontWeight: 900,
+              boxShadow: `0 8px 20px -6px ${brandColor}60`,
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <Plus size={20} strokeWidth={3} /> Team-Mitglied
           </button>
         </div>
 
@@ -858,7 +1801,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
             <div>
               <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '12px', display: 'block' }}>Instrumente / Schwerpunkte:</label>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                {Object.keys(INSTRUMENT_ICONS).map(inst => {
+                {["Gitarre", "Bass", "Drums", "Vocals", "Piano / Keys"].map(inst => {
                   const isSelected = (newTeacher.instrument || '').includes(inst);
                   return (
                     <button
@@ -876,7 +1819,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
                         fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s'
                       }}
                     >
-                      <span>{INSTRUMENT_ICONS[inst]}</span> {inst}
+                      <span>{ADMIN_INSTRUMENT_ICONS[inst]}</span> {inst}
                     </button>
                   );
                 })}
@@ -891,35 +1834,93 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
         )}
 
         {editingTeacher && (
-          <form onSubmit={handleUpdateTeacher} className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '24px' }}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0369a1' }}>Profil bearbeiten</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <input required placeholder="Vorname" value={editingTeacher.first_name} onChange={e => setEditingTeacher({...editingTeacher, first_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
-              <input required placeholder="Nachname" value={editingTeacher.last_name} onChange={e => setEditingTeacher({...editingTeacher, last_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
+          <form onSubmit={handleUpdateTeacher} className="glass-panel" style={{ padding: '40px', display: 'flex', flexDirection: 'column', gap: '32px', background: '#f8fafc', border: `2px solid ${brandColor}20`, borderRadius: '32px', boxShadow: '0 20px 50px rgba(0,0,0,0.05)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Profil bearbeiten</h3>
+              <div style={{ padding: '8px 16px', background: 'white', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 800, color: brandColor, border: '1px solid #e2e8f0' }}>
+                ID: {editingTeacher.id.slice(0,8)}...
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname</label>
+                <input required placeholder="Vorname" value={editingTeacher.first_name} onChange={e => setEditingTeacher({...editingTeacher, first_name: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600 }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Nachname</label>
+                <input required placeholder="Nachname" value={editingTeacher.last_name} onChange={e => setEditingTeacher({...editingTeacher, last_name: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600 }} />
+              </div>
             </div>
             
-            <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '12px', display: 'block' }}>Status & Rolle:</label>
-              <select value={editingTeacher.role} onChange={e => setEditingTeacher({...editingTeacher, role: e.target.value})} style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 700 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Status & Rolle</label>
+              <select value={editingTeacher.role} onChange={e => setEditingTeacher({...editingTeacher, role: e.target.value})} style={{ width: '100%', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 700, fontSize: '1rem' }}>
                 <option value="teacher">Lehrkraft / Coach</option>
-                <option value="admin">Master-Lehrkraft (Admin)</option>
+                <option value="admin">Lehrer (Admin-Zugriff)</option>
               </select>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>BANDS / PROJEKTE</label>
-                <textarea value={editingTeacher.bands || ''} onChange={e => setEditingTeacher({...editingTeacher, bands: e.target.value})} style={{ padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', minHeight: '80px', fontSize: '0.9rem' }} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>EQUIPMENT / GEAR</label>
-                <textarea value={editingTeacher.gear || ''} onChange={e => setEditingTeacher({...editingTeacher, gear: e.target.value})} style={{ padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', minHeight: '80px', fontSize: '0.9rem' }} />
+            <div>
+              <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '12px', display: 'block' }}>Instrumente (Icons anklicken):</label>
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                {["Gitarre", "Bass", "Drums", "Vocals", "Piano / Keys"].map(inst => {
+                  const isSelected = (editingTeacher.instrument || '').includes(inst);
+                  return (
+                    <button
+                      key={inst}
+                      type="button"
+                      onClick={() => {
+                        const current = (editingTeacher.instrument || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+                        const next = current.includes(inst) ? current.filter((s: string) => s !== inst) : [...current, inst];
+                        setEditingTeacher({...editingTeacher, instrument: next.join(', ')});
+                      }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 20px', borderRadius: '16px', 
+                        border: `2px solid ${isSelected ? brandColor : '#e2e8f0'}`,
+                        background: isSelected ? `${brandColor}10` : 'white',
+                        color: isSelected ? '#1e293b' : '#64748b',
+                        fontSize: '0.9rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s',
+                        boxShadow: isSelected ? `0 4px 12px ${brandColor}20` : 'none'
+                      }}
+                    >
+                      <span style={{ fontSize: '1.25rem' }}>{ADMIN_INSTRUMENT_ICONS[inst]}</span> {inst}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button type="submit" style={{ flex: 1, background: brandColor, color: 'white', border: 'none', padding: '16px', borderRadius: '14px', fontWeight: 800, cursor: 'pointer' }}>Änderungen speichern</button>
-              <button type="button" onClick={() => setEditingTeacher(null)} style={{ flex: 1, background: 'white', color: '#64748b', border: '1px solid #e2e8f0', padding: '16px', borderRadius: '14px', fontWeight: 700, cursor: 'pointer' }}>Abbrechen</button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Musikalischer Werdegang (Bio)</label>
+              <textarea placeholder="Erzähle etwas über deinen Werdegang..." value={editingTeacher.bio || ''} onChange={e => setEditingTeacher({...editingTeacher, bio: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', minHeight: '120px', fontSize: '1rem', fontWeight: 500, lineHeight: 1.5 }} />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Expertise & Stile</label>
+                <input placeholder="z.B. Jazz, Rock, Metal, Theorie..." value={editingTeacher.expertise || ''} onChange={e => setEditingTeacher({...editingTeacher, expertise: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600 }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Bands & Projekte</label>
+                <input placeholder="Aktuelle oder ehemalige Bands..." value={editingTeacher.bands || ''} onChange={e => setEditingTeacher({...editingTeacher, bands: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600 }} />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Equipment / Gear</label>
+                <input placeholder="Welches Gear nutzt du?" value={editingTeacher.gear || ''} onChange={e => setEditingTeacher({...editingTeacher, gear: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600 }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Aktuell im Ohr (Listening)</label>
+                <input placeholder="Was hörst du gerade?" value={editingTeacher.listening || ''} onChange={e => setEditingTeacher({...editingTeacher, listening: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600 }} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '16px', marginTop: '12px' }}>
+              <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '20px', borderRadius: '20px', fontWeight: 900, fontSize: '1.1rem', cursor: 'pointer', boxShadow: `0 10px 30px ${brandColor}30`, transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>Änderungen speichern</button>
+              <button type="button" onClick={() => setEditingTeacher(null)} style={{ flex: 1, background: 'white', color: '#64748b', border: '1px solid #e2e8f0', padding: '20px', borderRadius: '20px', fontWeight: 800, cursor: 'pointer' }}>Abbrechen</button>
             </div>
           </form>
         )}
@@ -956,12 +1957,12 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
                   {t.role === 'admin' && <Shield size={16} color="#f59e0b" />}
                 </div>
                 <div style={{ fontSize: '0.875rem', fontWeight: 800, color: t.role === 'admin' ? '#f59e0b' : brandColor, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>
-                  {t.role === 'admin' ? 'Master Coach' : 'Academy Coach'}
+                  Lehrer
                 </div>
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                   {t.instrument?.split(',').map((inst: string) => (
                     <span key={inst} style={{ padding: '6px 12px', background: '#f1f5f9', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
-                      {INSTRUMENT_ICONS[inst.trim()] || '🎸'} {inst.trim()}
+                      {ADMIN_INSTRUMENT_ICONS[inst.trim()] || '🎸'} {inst.trim()}
                     </span>
                   ))}
                 </div>
@@ -981,12 +1982,32 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
   const renderRoomsTab = () => (
     <div style={{ marginTop: '24px' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div className="flex-between">
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Box size={24} color={brandColor} /> Räume & Übeplätze
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 950, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '14px', margin: 0 }}>
+            <div style={{ background: `${brandColor}15`, color: brandColor, padding: '10px', borderRadius: '14px', display: 'flex', alignItems: 'center' }}>
+              <Box size={24} />
+            </div>
+            Räume & Übeplätze
           </h2>
-          <button onClick={() => setShowAddRoom(!showAddRoom)} style={{ background: brandColor, color: 'white', border: 'none', padding: '10px 20px', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem', fontWeight: 700 }}>
-            <Plus size={18} /> Neuer Raum
+          <button 
+            onClick={() => setShowAddRoom(!showAddRoom)} 
+            style={{ 
+              background: `linear-gradient(135deg, ${brandColor}, ${brandColor}ee)`, 
+              color: 'white', 
+              border: 'none', 
+              padding: '12px 24px', 
+              borderRadius: '16px', 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '10px', 
+              fontSize: '0.9rem', 
+              fontWeight: 900,
+              boxShadow: `0 8px 20px -6px ${brandColor}60`,
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <Plus size={20} strokeWidth={3} /> Neuer Raum
           </button>
         </div>
 
@@ -1011,33 +2032,102 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
                   </div>
                   <div>
                     <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>{room.name}</h3>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
+                      {(room.geofence_points || []).map((pt: any, idx: number) => (
+                        <div key={idx} style={{ 
+                          background: '#f0fdf4', 
+                          border: '1px solid #bbf7d0', 
+                          borderRadius: '8px', 
+                          padding: '6px 10px', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '8px',
+                          fontSize: '0.7rem',
+                          color: '#166534',
+                          fontWeight: 700
+                        }}>
+                          <MapPin size={10} /> Punkt {idx + 1}
+                          <button 
+                            onClick={() => handleDeleteGeofencePoint(room.id, idx)}
+                            style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
+                            title="Punkt löschen"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                      
                       <button 
                         onClick={() => handleAddGeofencePoint(room.id)}
                         style={{ 
-                          padding: '4px 8px', 
-                          borderRadius: '6px', 
-                          background: room.latitude ? '#f0fdf4' : '#fff7ed', 
-                          border: `1px solid ${room.latitude ? '#bbf7d0' : '#ffedd5'}`, 
-                          color: room.latitude ? '#166534' : '#9a3412',
-                          fontSize: '0.65rem',
-                          fontWeight: 800,
+                          background: '#fffbeb', 
+                          border: '1px dashed #fcd34d', 
+                          borderRadius: '8px', 
+                          padding: '6px 10px', 
+                          color: '#92400e', 
+                          fontSize: '0.7rem', 
+                          fontWeight: 800, 
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                        title="Aktuellen Standort scannen"
+                      >
+                        <MapPin size={12} /> Scan
+                      </button>
+
+                      <button 
+                        onClick={() => setShowManualInput(showManualInput === room.id ? null : room.id)}
+                        style={{ 
+                          background: '#f8fafc', 
+                          border: '1px dashed #cbd5e1', 
+                          borderRadius: '8px', 
+                          padding: '6px 10px', 
+                          color: '#64748b', 
+                          fontSize: '0.7rem', 
+                          fontWeight: 800, 
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
                           gap: '4px'
                         }}
                       >
-                        <MapPin size={12} />
-                        {room.latitude ? 'Geofence aktiv' : 'Kein Geofence'} • Scan
+                        <Plus size={12} /> Manuell
                       </button>
-                      {room.latitude && (
+
+                      {showManualInput === room.id && (
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', animation: 'fadeIn 0.2s' }}>
+                          <input 
+                            placeholder="Lat, Lng" 
+                            value={manualCoords[room.id] || ''} 
+                            onChange={e => setManualCoords({...manualCoords, [room.id]: e.target.value})}
+                            style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.7rem', width: '140px' }} 
+                          />
+                          <button 
+                            onClick={() => {
+                              const parts = manualCoords[room.id]?.split(',').map(s => s.trim());
+                              if (parts?.length === 2 && !isNaN(Number(parts[0])) && !isNaN(Number(parts[1]))) {
+                                handleAddGeofencePoint(room.id, Number(parts[0]), Number(parts[1]));
+                                setManualCoords({...manualCoords, [room.id]: ''});
+                                setShowManualInput(null);
+                              } else {
+                                alert('Format: 47.123, 7.456');
+                              }
+                            }}
+                            style={{ background: brandColor, color: 'white', border: 'none', borderRadius: '8px', padding: '6px 10px', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            Set
+                          </button>
+                        </div>
+                      )}
+
+                      {(room.geofence_points?.length > 0 || room.latitude) && (
                         <button 
                           onClick={() => handleClearGeofencePoints(room.id)}
-                          style={{ padding: '4px', color: '#94a3b8', background: 'transparent', border: 'none', cursor: 'pointer' }}
-                          title="Löschen"
+                          style={{ background: 'transparent', border: 'none', color: '#cbd5e1', fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer', padding: '6px' }}
                         >
-                          <X size={12} />
+                          Alle löschen
                         </button>
                       )}
                     </div>
@@ -1064,7 +2154,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
                 {stations.filter(s => s.room_id === room.id).map(station => (
                   <div key={station.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #f1f5f9', transition: 'all 0.2s' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 700, color: '#475569' }}>
-                      <Tablet size={16} color="#94a3b8" /> {station.name}
+                      <Tablet size={16} color={getStationColor(station.name)} /> {station.name}
                     </div>
                     <button onClick={() => handleDeleteStation(station.id)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }} onMouseEnter={e => e.currentTarget.style.color = '#ef4444'} onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}>
                       <Trash2 size={14} />
@@ -1085,52 +2175,254 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
   const renderSongsTab = () => (
     <div style={{ marginTop: '24px' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div className="flex-between">
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Library size={24} color={brandColor} /> Songbibliothek
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 950, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '14px', margin: 0 }}>
+            <div style={{ background: `${brandColor}15`, color: brandColor, padding: '10px', borderRadius: '14px', display: 'flex', alignItems: 'center' }}>
+              <Library size={24} />
+            </div>
+            Songbibliothek
           </h2>
-          <button onClick={() => setShowAddSong(!showAddSong)} style={{ background: brandColor, color: 'white', border: 'none', padding: '10px 20px', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem', fontWeight: 700 }}>
-            <Plus size={18} /> Song hinzufügen
+          <button 
+            onClick={() => setShowAddSong(!showAddSong)} 
+            style={{ 
+              background: `linear-gradient(135deg, ${brandColor}, ${brandColor}ee)`, 
+              color: 'white', 
+              border: 'none', 
+              padding: '12px 24px', 
+              borderRadius: '16px', 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '10px', 
+              fontSize: '0.9rem', 
+              fontWeight: 900,
+              boxShadow: `0 8px 20px -6px ${brandColor}60`,
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <Plus size={20} strokeWidth={3} /> Song hinzufügen
           </button>
         </div>
+
+        {/* Song Search & Filters */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', background: 'white', padding: '24px', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 4px 15px rgba(0,0,0,0.02)', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '300px', position: 'relative' }}>
+              <Search size={20} color="#94a3b8" style={{ position: 'absolute', left: '20px', top: '50%', transform: 'translateY(-50%)' }} />
+              <input 
+                placeholder={`Suche nach ${songSearchType === 'title' ? 'Songtitel' : 'Interpret'}...`}
+                value={songSearch}
+                onChange={e => setSongSearch(e.target.value)}
+                style={{ width: '100%', padding: '16px 20px 16px 54px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '1rem', fontWeight: 600, boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}
+              />
+            </div>
+            <div style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '14px' }}>
+              <button 
+                onClick={() => setSongSearchType('title')}
+                style={{ padding: '10px 20px', borderRadius: '10px', border: 'none', background: songSearchType === 'title' ? 'white' : 'transparent', color: songSearchType === 'title' ? brandColor : '#64748b', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', boxShadow: songSearchType === 'title' ? '0 2px 8px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s' }}
+              >
+                Song
+              </button>
+              <button 
+                onClick={() => setSongSearchType('artist')}
+                style={{ padding: '10px 20px', borderRadius: '10px', border: 'none', background: songSearchType === 'artist' ? 'white' : 'transparent', color: songSearchType === 'artist' ? brandColor : '#64748b', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', boxShadow: songSearchType === 'artist' ? '0 2px 8px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s' }}
+              >
+                Interpret
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', paddingTop: '16px', borderTop: '1px solid #f1f5f9' }}>
+            <button 
+              onClick={() => setSongAlphaFilter(null)}
+              style={{ 
+                padding: '8px 16px', minWidth: '54px', borderRadius: '10px', border: 'none', fontSize: '0.75rem', fontWeight: 900,
+                background: songAlphaFilter === null ? brandColor : '#f8fafc',
+                color: songAlphaFilter === null ? 'white' : '#64748b',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              ALLE
+            </button>
+            {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(char => (
+              <button 
+                key={char}
+                onClick={() => setSongAlphaFilter(char)}
+                style={{ 
+                  width: '32px', height: '32px', borderRadius: '8px', border: 'none', fontSize: '0.75rem', fontWeight: 800,
+                  background: songAlphaFilter === char ? brandColor : 'transparent',
+                  color: songAlphaFilter === char ? 'white' : '#94a3b8',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {char}
+              </button>
+            ))}
+          </div>
+        </div>
+
+
         
         {showAddSong && (
-          <form onSubmit={handleAddSong} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: 'white', borderRadius: '20px', border: `1px solid ${brandColor}20` }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <input required placeholder="Interpret / Band" value={newSong.artist} onChange={e => setNewSong({...newSong, artist: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc' }} />
-              <input required placeholder="Songtitel" value={newSong.title} onChange={e => setNewSong({...newSong, title: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc' }} />
+          <form onSubmit={handleAddSong} className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px', background: 'white', borderRadius: '24px', border: `1px solid ${brandColor}20`, boxShadow: '0 20px 50px rgba(0,0,0,0.05)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Interpret / Band</label>
+                <input required placeholder="z.B. Nirvana" value={newSong.artist} onChange={e => setNewSong({...newSong, artist: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '1rem', fontWeight: 600 }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Songtitel</label>
+                <input required placeholder="z.B. Smells Like Teenspirit" value={newSong.title} onChange={e => setNewSong({...newSong, title: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '1rem', fontWeight: 600 }} />
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button type="submit" style={{ flex: 1, background: brandColor, color: 'white', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 800 }}>Song speichern</button>
-              <button type="button" onClick={() => setShowAddSong(false)} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 700 }}>Abbrechen</button>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Cloud Link (Noten / Material)</label>
+              <div style={{ position: 'relative' }}>
+                <Box size={20} color="#94a3b8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input placeholder="https://cloud.folder.link..." value={newSong.media_link} onChange={e => setNewSong({...newSong, media_link: e.target.value})} style={{ width: '100%', padding: '14px 14px 14px 48px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '1rem', fontWeight: 600 }} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Arrangement / Instrumente</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
+                {['E-Gitarre', 'E-Drums', 'E-Piano', 'E-Bass'].map(inst => (
+                  <div key={inst} style={{ padding: '16px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ fontSize: '1.5rem' }}>{ADMIN_INSTRUMENT_ICONS[inst] || '🎵'}</div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>{inst}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <button type="button" onClick={() => setNewSong({...newSong, instrumentation: {...newSong.instrumentation, [inst]: Math.max(0, (newSong.instrumentation[inst] || 0) - 1)}})} style={{ width: '28px', height: '28px', borderRadius: '8px', border: 'none', background: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', cursor: 'pointer', fontWeight: 900 }}>-</button>
+                      <span style={{ fontWeight: 900, fontSize: '1.1rem', minWidth: '20px', textAlign: 'center' }}>{newSong.instrumentation[inst] || 0}</span>
+                      <button type="button" onClick={() => setNewSong({...newSong, instrumentation: {...newSong.instrumentation, [inst]: (newSong.instrumentation[inst] || 0) + 1}})} style={{ width: '28px', height: '28px', borderRadius: '8px', border: 'none', background: brandColor, color: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', cursor: 'pointer', fontWeight: 900 }}>+</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+              <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '18px', borderRadius: '16px', fontWeight: 900, fontSize: '1rem', cursor: 'pointer', boxShadow: `0 10px 20px ${brandColor}30` }}>Song in Bibliothek speichern</button>
+              <button type="button" onClick={() => setShowAddSong(false)} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '18px', borderRadius: '16px', fontWeight: 800, cursor: 'pointer' }}>Abbrechen</button>
             </div>
           </form>
         )}
 
         {editingSong && (
-          <form onSubmit={handleUpdateSong} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '20px' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0369a1' }}>Song bearbeiten</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <input required placeholder="Interpret" value={editingSong.artist} onChange={e => setEditingSong({...editingSong, artist: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
-              <input required placeholder="Titel" value={editingSong.title} onChange={e => setEditingSong({...editingSong, title: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
+          <form onSubmit={handleUpdateSong} className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.05)' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0369a1', margin: 0 }}>Song bearbeiten</h3>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Interpret</label>
+                <input required placeholder="Interpret" value={editingSong.artist} onChange={e => setEditingSong({...editingSong, artist: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '1rem', fontWeight: 600 }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Titel</label>
+                <input required placeholder="Titel" value={editingSong.title} onChange={e => setEditingSong({...editingSong, title: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '1rem', fontWeight: 600 }} />
+              </div>
             </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Cloud Link (Noten / Material)</label>
+              <div style={{ position: 'relative' }}>
+                <Box size={20} color="#94a3b8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input placeholder="https://cloud.folder.link..." value={editingSong.media_link} onChange={e => setEditingSong({...editingSong, media_link: e.target.value})} style={{ width: '100%', padding: '14px 14px 14px 48px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '1rem', fontWeight: 600 }} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Arrangement / Instrumente</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
+                {['E-Gitarre', 'E-Drums', 'E-Piano', 'E-Bass'].map(inst => (
+                  <div key={inst} style={{ padding: '16px', borderRadius: '16px', background: 'white', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ fontSize: '1.5rem' }}>{ADMIN_INSTRUMENT_ICONS[inst] || '🎵'}</div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>{inst}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <button type="button" onClick={() => setEditingSong({...editingSong, instrumentation: {...(editingSong.instrumentation || {}), [inst]: Math.max(0, ((editingSong.instrumentation || {})[inst] || 0) - 1)}})} style={{ width: '28px', height: '28px', borderRadius: '8px', border: 'none', background: '#f1f5f9', cursor: 'pointer', fontWeight: 900 }}>-</button>
+                      <span style={{ fontWeight: 900, fontSize: '1.1rem', minWidth: '20px', textAlign: 'center' }}>{(editingSong.instrumentation || {})[inst] || 0}</span>
+                      <button type="button" onClick={() => setEditingSong({...editingSong, instrumentation: {...(editingSong.instrumentation || {}), [inst]: ((editingSong.instrumentation || {})[inst] || 0) + 1}})} style={{ width: '28px', height: '28px', borderRadius: '8px', border: 'none', background: brandColor, color: 'white', cursor: 'pointer', fontWeight: 900 }}>+</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div style={{ display: 'flex', gap: '12px' }}>
-              <button type="submit" style={{ flex: 1, background: brandColor, color: 'white', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 800 }}>Aktualisieren</button>
-              <button type="button" onClick={() => setEditingSong(null)} style={{ flex: 1, background: 'white', color: '#64748b', border: '1px solid #e2e8f0', padding: '14px', borderRadius: '12px', fontWeight: 700 }}>Abbrechen</button>
+              <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '18px', borderRadius: '16px', fontWeight: 900, fontSize: '1rem', cursor: 'pointer' }}>Aktualisieren</button>
+              <button type="button" onClick={() => setEditingSong(null)} style={{ flex: 1, background: 'white', color: '#64748b', border: '1px solid #e2e8f0', padding: '18px', borderRadius: '16px', fontWeight: 800, cursor: 'pointer' }}>Abbrechen</button>
             </div>
           </form>
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '16px' }}>
-          {songs.map(song => (
-            <div key={song.id} className="glass-panel" style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', borderRadius: '20px', border: '1px solid #f1f5f9', borderLeft: `6px solid ${brandColor}` }}>
-              <div>
-                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>{song.artist}</div>
-                <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '1.1rem' }}>{song.title}</div>
+          {songs.filter(song => {
+            const matchesSearch = songSearch === '' || 
+              (songSearchType === 'title' ? song.title : song.artist)?.toLowerCase().includes(songSearch.toLowerCase());
+            
+            const matchesAlpha = !songAlphaFilter || 
+              (songSearchType === 'title' ? song.title : song.artist)?.toUpperCase().startsWith(songAlphaFilter);
+            
+            return matchesSearch && matchesAlpha;
+          }).map(song => (
+
+            <div key={song.id} className="glass-panel" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', borderLeft: `6px solid ${brandColor}`, boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{song.artist}</div>
+                  <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '1.15rem', letterSpacing: '-0.01em' }}>{song.title}</div>
+                </div>
+                
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {(() => {
+                    const inst = song.instrumentation || {};
+                    const norm: Record<string, number> = {};
+                    Object.entries(inst).forEach(([k, v]) => {
+                      const lower = k.toLowerCase();
+                      let key = k;
+                      if (lower === 'guitar' || lower === 'e-gitarre') key = 'E-Gitarre';
+                      else if (lower === 'bass' || lower === 'e-bass') key = 'E-Bass';
+                      else if (lower === 'drums' || lower === 'e-drums') key = 'E-Drums';
+                      else if (lower === 'piano' || lower === 'keys' || lower === 'e-piano') key = 'E-Piano';
+                      else if (lower === 'vocals' || lower === 'gesang') key = 'Vocals';
+                      norm[key] = Math.max(norm[key] || 0, v as number);
+                    });
+                    
+                    return Object.entries(norm).map(([inst, count]) => (
+                      count > 0 && (
+                        <div key={inst} style={{ padding: '4px 10px', borderRadius: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '0.9rem' }}>{ADMIN_INSTRUMENT_ICONS[inst]}</span>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>{count}</span>
+                        </div>
+                      )
+                    ));
+                  })()}
+                  {song.media_link && (
+                    <div style={{ padding: '4px 10px', borderRadius: '8px', background: `${brandColor}10`, border: `1px solid ${brandColor}20`, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Box size={12} color={brandColor} />
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: brandColor }}>Cloud</span>
+                    </div>
+                  )}
+                </div>
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button onClick={() => setEditingSong(song)} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '10px', cursor: 'pointer', color: '#64748b' }}><Pencil size={18} /></button>
-                <button onClick={() => handleDeleteSong(song.id)} style={{ background: '#fff1f2', border: '1px solid #fecaca', padding: '10px', borderRadius: '10px', cursor: 'pointer', color: '#ef4444' }}><Trash2 size={18} /></button>
+                <button onClick={() => {
+                  const inst = song.instrumentation || {};
+                  const norm: any = { 'E-Gitarre': 0, 'E-Bass': 0, 'E-Drums': 0, 'E-Piano': 0 };
+                  Object.entries(inst).forEach(([k, v]) => {
+                    const lower = k.toLowerCase();
+                    if (lower === 'guitar' || lower === 'e-gitarre') norm['E-Gitarre'] = v;
+                    else if (lower === 'bass' || lower === 'e-bass') norm['E-Bass'] = v;
+                    else if (lower === 'drums' || lower === 'e-drums') norm['E-Drums'] = v;
+                    else if (lower === 'piano' || lower === 'keys' || lower === 'e-piano') norm['E-Piano'] = v;
+                    else if (lower === 'vocals' || lower === 'gesang') norm['Vocals'] = v;
+                    else norm[k] = v;
+                  });
+                  setEditingSong({...song, instrumentation: norm});
+                }} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '12px', borderRadius: '12px', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'} onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}><Pencil size={20} /></button>
+                <button onClick={() => handleDeleteSong(song.id)} style={{ background: '#fff1f2', border: '1px solid #fecaca', padding: '12px', borderRadius: '12px', cursor: 'pointer', color: '#ef4444', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = '#ffe4e6'} onMouseLeave={e => e.currentTarget.style.background = '#fff1f2'}><Trash2 size={20} /></button>
               </div>
             </div>
           ))}
@@ -1169,7 +2461,13 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
 
   const renderSetupTab = () => (
     <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
-      <AcademySetup school={admin?.schools} brandColor={brandColor} onUpdate={() => fetchData()} />
+      <AcademySetup 
+        school={admin?.schools} 
+        brandColor={brandColor} 
+        onUpdate={() => fetchData()} 
+        onCleanupPlanning={handleCleanupPlanning}
+        onResetPlanning={handleResetAllPlanning}
+      />
       <DeviceSetupScreen rooms={rooms} stations={stations} brandColor={brandColor} />
     </div>
   );
@@ -1216,9 +2514,199 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
                     <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Registriert seit: {new Date(selectedStudent.created_at).toLocaleDateString()}</div>
                   </div>
                 </div>
-             </div>
+              </div>
 
-             <div style={{ textAlign: 'center' }}>
+              <div style={{ padding: '24px', background: '#f8fafc', borderRadius: '24px', border: '1px solid #f1f5f9', marginBottom: '32px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Anwesenheit / Logbuch</div>
+                  {studentSessions && studentSessions.length > 0 && (
+                    <button 
+                      onClick={() => {
+                        const getW = (d: Date) => {
+                          const date = new Date(d.getTime());
+                          date.setHours(0, 0, 0, 0);
+                          date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
+                          const week1 = new Date(date.getFullYear(), 0, 4);
+                          return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+                        };
+                        
+                        const groups: Record<string, any[]> = {};
+                        studentSessions.forEach(s => {
+                          const d = new Date(s.check_in_time);
+                          const kw = getW(d);
+                          const key = `${d.getFullYear()}-W${kw}`;
+                          if (!groups[key]) groups[key] = [];
+                          groups[key].push(s);
+                        });
+
+                        let text = `LOGBUCH: ${selectedStudent.first_name} ${selectedStudent.last_name}\n`;
+                        text += `Stand: ${new Date().toLocaleDateString()}\n\n`;
+
+                        Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0])).forEach(([key, sessions]) => {
+                          const kw = key.split('-W')[1];
+                          let line = `KW${kw}: `;
+                          
+                          // Group by day within the week
+                          const dayGroups: Record<string, any[]> = {};
+                          sessions.forEach(s => {
+                            const date = new Date(s.check_in_time).toISOString().split('T')[0];
+                            if (!dayGroups[date]) dayGroups[date] = [];
+                            dayGroups[date].push(s);
+                          });
+
+                          const openingHours = admin?.schools?.opening_hours;
+
+                          Object.entries(dayGroups).sort((a, b) => a[0].localeCompare(b[0])).forEach(([date, daySessions], idx) => {
+                            const sorted = daySessions.sort((a,b) => new Date(a.check_in_time).getTime() - new Date(b.check_in_time).getTime());
+                            const first = sorted[0];
+                            const last = sorted[sorted.length - 1];
+                            
+                            const d = new Date(first.check_in_time);
+                            const dayName = ['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA'][d.getDay()];
+                            const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                            
+                            const sessionStart = new Date(first.check_in_time);
+                            const sessionEnd = last.check_out_time ? new Date(last.check_out_time) : new Date();
+
+                            // Opening Hours Intersection
+                            let minutes = 0;
+                            let displayStart = sessionStart;
+                            const dayKey = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][sessionStart.getDay()];
+                            const config = openingHours?.[dayKey];
+
+                            if (config && config.active) {
+                              const [sH, sM] = config.start.split(':').map(Number);
+                              const [eH, eM] = config.end.split(':').map(Number);
+                              const oStart = new Date(sessionStart); oStart.setHours(sH, sM, 0, 0);
+                              const oEnd = new Date(sessionStart); oEnd.setHours(eH, eM, 0, 0);
+                              
+                              const finalS = new Date(Math.max(sessionStart.getTime(), oStart.getTime()));
+                              const finalE = new Date(Math.min(sessionEnd.getTime(), oEnd.getTime()));
+                              
+                              if (finalS < finalE) {
+                                minutes = Math.floor((finalE.getTime() - finalS.getTime()) / 60000);
+                                displayStart = finalS;
+                              } else {
+                                return; // Don't show if no overlap
+                              }
+                            }
+                            
+                            const displayTime = displayStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                            const dur = minutes >= 60 ? `${Math.floor(minutes/60)}h ${minutes%60}m` : `${minutes}m`;
+                            line += `${idx > 0 ? ' | ' : ''}${dayName} ${displayTime} Uhr (${dur})`;
+                          });
+                          text += line + '\n';
+                        });
+
+                        const blob = new Blob([text], { type: 'text/plain' });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = `Anwesenheit_${selectedStudent.first_name}_${selectedStudent.last_name}.txt`;
+                        link.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                      style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px 12px', fontSize: '0.65rem', fontWeight: 800, color: brandColor, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <Download size={12} /> EXPORT (.txt)
+                    </button>
+                  )}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {(() => {
+                    if (!studentSessions || studentSessions.length === 0) {
+                      return <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>Noch keine Sessions aufgezeichnet.</div>;
+                    }
+
+                    const getWeekNum = (d: Date) => {
+                      const date = new Date(d.getTime());
+                      date.setHours(0, 0, 0, 0);
+                      date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
+                      const week1 = new Date(date.getFullYear(), 0, 4);
+                      return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+                    };
+
+                    const groups: Record<string, any[]> = {};
+                    studentSessions.forEach(s => {
+                      const d = new Date(s.check_in_time);
+                      const kw = getWeekNum(d);
+                      const year = d.getFullYear();
+                      const key = `${year}-W${kw}`;
+                      if (!groups[key]) groups[key] = [];
+                      groups[key].push(s);
+                    });
+
+                    return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0])).map(([key, sessions]) => {
+                      const kw = key.split('-W')[1];
+                      return (
+                        <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', fontSize: '0.85rem', color: '#475569' }}>
+                          <span style={{ fontWeight: 800, color: brandColor, minWidth: '45px', marginTop: '4px' }}>KW{kw}</span>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', rowGap: '8px' }}>
+                            {(() => {
+                              const dayGroups: Record<string, any[]> = {};
+                              sessions.forEach(s => {
+                                const dStr = new Date(s.check_in_time).toISOString().split('T')[0];
+                                if (!dayGroups[dStr]) dayGroups[dStr] = [];
+                                dayGroups[dStr].push(s);
+                              });
+
+                              return Object.entries(dayGroups).sort((a, b) => a[0].localeCompare(b[0])).map(([date, daySessions], idx) => {
+                                const sorted = daySessions.sort((a,b) => new Date(a.check_in_time).getTime() - new Date(b.check_in_time).getTime());
+                                const first = sorted[0];
+                                const last = sorted[sorted.length - 1];
+                                
+                                const d = new Date(first.check_in_time);
+                                const day = ['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA'][d.getDay()];
+                                const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                
+                                const sessionStart = new Date(first.check_in_time);
+                                const sessionEnd = last.check_out_time ? new Date(last.check_out_time) : new Date();
+
+                                // Opening Hours Intersection
+                                let minutes = 0;
+                                let displayStart = sessionStart;
+                                const openingHours = admin?.schools?.opening_hours;
+                                const dayKey = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][sessionStart.getDay()];
+                                const config = openingHours?.[dayKey];
+
+                                if (config && config.active) {
+                                  const [sH, sM] = config.start.split(':').map(Number);
+                                  const [eH, eM] = config.end.split(':').map(Number);
+                                  const oStart = new Date(sessionStart); oStart.setHours(sH, sM, 0, 0);
+                                  const oEnd = new Date(sessionStart); oEnd.setHours(eH, eM, 0, 0);
+                                  
+                                  const finalS = new Date(Math.max(sessionStart.getTime(), oStart.getTime()));
+                                  const finalE = new Date(Math.min(sessionEnd.getTime(), oEnd.getTime()));
+                                  
+                                  if (finalS < finalE) {
+                                    minutes = Math.floor((finalE.getTime() - finalS.getTime()) / 60000);
+                                    displayStart = finalS;
+                                  } else {
+                                    return null; // Skip if no overlap with opening hours
+                                  }
+                                }
+
+                                const displayTime = displayStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                const duration = minutes >= 60 ? `${Math.floor(minutes/60)}h ${minutes%60}m` : `${minutes}m`;
+                                
+                                return (
+                                  <span key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'white', padding: '6px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                                    <span style={{ fontWeight: 900, color: '#1e293b', fontSize: '0.7rem' }}>{day}</span>
+                                    <span style={{ fontWeight: 600 }}>{displayTime} Uhr</span>
+                                    <span style={{ color: '#94a3b8', fontSize: '0.7rem', fontWeight: 700 }}>({duration})</span>
+                                  </span>
+                                );
+                              });
+                            })()}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'center' }}>
                <button onClick={() => setSelectedQRUser(selectedStudent)} style={{ width: '100%', background: `${brandColor}10`, color: brandColor, border: `1px solid ${brandColor}30`, padding: '16px', borderRadius: '16px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
                  <QrCode size={20} /> Digitalen ID-Pass anzeigen
                </button>
@@ -1231,28 +2719,132 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
 
   const renderQRModal = () => {
     if (!selectedQRUser) return null;
+
+    const saveAsImage = async () => {
+      if (!qrCardRef.current) return;
+      try {
+        const { toJpeg } = await import('html-to-image');
+        const dataUrl = await toJpeg(qrCardRef.current, { 
+          quality: 0.95, 
+          backgroundColor: '#ffffff',
+          cacheBust: true,
+        });
+        const link = document.createElement('a');
+        link.download = `Groovelab_ID_${selectedQRUser.first_name}.jpg`;
+        link.href = dataUrl;
+        link.click();
+      } catch (err) {
+        console.error('Error saving ID:', err);
+      }
+    };
+
     return (
-      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(20px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setSelectedQRUser(null)}>
-        <div className="glass-panel" style={{ background: 'white', padding: '48px', borderRadius: '40px', textAlign: 'center', width: '90%', maxWidth: '440px', boxShadow: '0 30px 100px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-24px', marginRight: '-24px', marginBottom: '8px' }}>
-            <button onClick={() => setSelectedQRUser(null)} style={{ background: '#f1f5f9', border: 'none', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}>✕</button>
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(20px)', zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setSelectedQRUser(null)}>
+        <div style={{ width: '100%', maxWidth: '400px', position: 'relative' }} onClick={e => e.stopPropagation()}>
+          {/* Close Button */}
+          <button 
+            onClick={() => setSelectedQRUser(null)} 
+            style={{ position: 'absolute', top: '-60px', right: '0', background: 'rgba(255,255,255,0.1)', border: 'none', width: '44px', height: '44px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white' }}
+          >
+            <X size={24} />
+          </button>
+
+          {/* Unified ID Card Design */}
+          <div 
+            ref={qrCardRef}
+            style={{ 
+              background: 'white', 
+              borderRadius: '32px', 
+              boxShadow: '0 30px 60px rgba(0,0,0,0.4)',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              position: 'relative',
+              width: '100%'
+            }}
+          >
+            {/* Lanyard Hole Mockup */}
+            <div style={{ height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e293b' }}>
+              <div style={{ width: '36px', height: '8px', borderRadius: '4px', background: '#0f172a' }}></div>
+            </div>
+
+            {/* Status Header */}
+            <div style={{ 
+              background: selectedQRUser.role === 'student' ? brandColor : '#f59e0b', 
+              padding: '10px', 
+              textAlign: 'center',
+              textTransform: 'uppercase'
+            }}>
+              <div style={{ color: 'white', fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.2em' }}>
+                {selectedQRUser.role === 'student' ? 'Member Access' : 'Staff / Coach'}
+              </div>
+            </div>
+
+            {/* Content Area */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 24px 36px 24px', gap: '20px' }}>
+              {/* Portrait */}
+              <div style={{ 
+                width: '120px', 
+                height: '120px', 
+                borderRadius: '50%', 
+                border: `4px solid ${selectedQRUser.role === 'student' ? brandColor : '#f59e0b'}`,
+                padding: '4px',
+                background: 'white',
+                boxShadow: '0 8px 20px rgba(0,0,0,0.05)'
+              }}>
+                <div style={{ 
+                  width: '100%', 
+                  height: '100%', 
+                  borderRadius: '50%', 
+                  overflow: 'hidden',
+                  backgroundImage: `url(${selectedQRUser.photo_url || '/avatar_ghost.jpg'})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundColor: '#f1f5f9'
+                }}>
+                </div>
+              </div>
+
+              {/* Identity */}
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.1, letterSpacing: '-0.02em' }}>{selectedQRUser.first_name}</div>
+                <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#64748b', marginTop: '4px' }}>{selectedQRUser.last_name || 'Member'}</div>
+              </div>
+
+              {/* QR Code Container */}
+              <div style={{ 
+                background: 'white', 
+                padding: '16px', 
+                borderRadius: '20px',
+                border: '1px solid #f1f5f9',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.03)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <QRCode value={selectedQRUser.qr_token || selectedQRUser.id} size={150} />
+              </div>
+              
+              <p style={{ fontSize: '0.75rem', color: '#94a3b8', textAlign: 'center', margin: 0, fontWeight: 600, lineHeight: 1.4, maxWidth: '220px' }}>
+                Halte diesen Code vor die Kamera des iPads,<br />um dich automatisch am Platz anzumelden.
+              </p>
+            </div>
+
+            {/* Bottom Brand Stripe */}
+            <div style={{ 
+              height: '12px', 
+              background: `linear-gradient(90deg, ${selectedQRUser.role === 'student' ? brandColor : '#f59e0b'}, #1e293b, ${selectedQRUser.role === 'student' ? brandColor : '#f59e0b'})` 
+            }}></div>
           </div>
-          <div style={{ width: '80px', height: '80px', borderRadius: '24px', overflow: 'hidden', margin: '0 auto 24px', border: `3px solid ${brandColor}`, boxShadow: `0 8px 20px ${brandColor}30` }}>
-            <img src={selectedQRUser.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b' }}>{selectedQRUser.first_name} {selectedQRUser.last_name}</div>
-          <div style={{ fontSize: '0.875rem', color: brandColor, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '32px' }}>Student Pass / Digital ID</div>
-          
-          <div style={{ background: 'white', padding: '24px', borderRadius: '32px', border: '1px solid #f1f5f9', boxShadow: '0 20px 50px rgba(0,0,0,0.05)', display: 'inline-block', marginBottom: '32px' }}>
-            <QRCode value={selectedQRUser.qr_token || selectedQRUser.id} size={250} level="H" />
-          </div>
-          
-          <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '32px', fontWeight: 500 }}>
-            Halte diesen Code vor die Kamera des iPads,<br />um dich automatisch am Platz anzumelden.
-          </p>
-          
-          <button onClick={() => window.print()} style={{ width: '100%', background: brandColor, color: 'white', border: 'none', padding: '18px', borderRadius: '18px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.filter = 'brightness(1.1)'} onMouseLeave={e => e.currentTarget.style.filter = 'brightness(1)'}>
-            <Monitor size={18} /> QR-Code drucken
+
+          <button 
+            onClick={saveAsImage} 
+            style={{ width: '100%', background: brandColor, color: 'white', border: 'none', padding: '20px', borderRadius: '24px', fontWeight: 900, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginTop: '24px', boxShadow: `0 15px 35px ${brandColor}50`, transition: 'all 0.2s' }} 
+            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} 
+            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+          >
+            <Download size={24} /> Ausweis als JPEG speichern
           </button>
         </div>
       </div>
@@ -1278,19 +2870,20 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
     );
   };
   return (
-    <div style={{ flex: 1, padding: '24px 48px 48px 48px', overflowY: 'auto' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+    <div style={{ flex: 1, padding: '0px 48px 48px 48px', overflowY: 'auto' }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', marginTop: '16px' }}>
         <div>
-          <h1 style={{ fontSize: '2.5rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.03em', margin: 0 }}>
+          <h1 style={{ fontSize: '2rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.03em', margin: 0 }}>
             {sidebarItems.find(i => i.id === activeTab)?.label}
           </h1>
-          <p style={{ color: '#94a3b8', fontSize: '1rem', fontWeight: 500, marginTop: '4px' }}>
-            {(admin as any).schools?.name} • Management Dashboard
+          <p style={{ color: '#94a3b8', fontSize: '0.9rem', fontWeight: 500, marginTop: '2px' }}>
+            {(admin as any)?.schools?.name} • Management Dashboard
           </p>
         </div>
       </header>
 
       {activeTab === 'live' && renderLiveTab()}
+      {activeTab === 'bands' && renderBandsTab()}
       {activeTab === 'students' && renderStudentsTab()}
       {activeTab === 'team' && renderTeachersTab()}
       {activeTab === 'rooms' && renderRoomsTab()}
@@ -1302,17 +2895,194 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange }: Admi
       {renderStudentDetailModal()}
       {renderQRModal()}
       {renderLogoutDialog()}
+
+      {/* Modals for Band Editing (Teacher Sonderrecht) */}
+      {editingBand && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 5000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <form onSubmit={handleSaveBandEdit} className="glass-panel animation-slide-up" style={{ background: 'white', padding: '32px', borderRadius: '32px', maxWidth: '600px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+              <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Band bearbeiten</h2>
+              <button type="button" onClick={() => setEditingBand(null)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}><X size={20} /></button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Bandname</label>
+                  <input required value={editingBand.name} onChange={e => setEditingBand({...editingBand, name: e.target.value})} style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '6px', fontWeight: 700, background: '#f8fafc' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Genre</label>
+                  <input value={editingBand.genre || ''} onChange={e => setEditingBand({...editingBand, genre: e.target.value})} placeholder="z.B. Rock, Pop" style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '6px', fontWeight: 700, background: '#f8fafc' }} />
+                </div>
+              </div>
+
+              <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Bandcoach</label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={editingBand.coach_is_manual} 
+                      onChange={e => setEditingBand({...editingBand, coach_is_manual: e.target.checked})} 
+                    />
+                    Manuell festlegen
+                  </label>
+                </div>
+                
+                <select 
+                  value={editingBand.coach_id || ''} 
+                  onChange={e => setEditingBand({...editingBand, coach_id: e.target.value, coach_is_manual: true})}
+                  style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', fontWeight: 700, background: 'white' }}
+                >
+                  <option value="">Kein Coach / Automatisch</option>
+                  {teachers.map(t => (
+                    <option key={t.id} value={t.id}>{t.first_name} {t.last_name || ''}</option>
+                  ))}
+                </select>
+                <p style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '8px', fontWeight: 600 }}>
+                  {editingBand.coach_is_manual 
+                    ? 'Coach wurde manuell zugewiesen.' 
+                    : 'Automatisch: Der Lehrer mit den meisten verifizierten Mitgliedern.'}
+                </p>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Mitglieder verwalten</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {(editingBand.band_members || []).map((m: any) => {
+                    const u = Array.isArray(m.users) ? m.users[0] : m.users;
+                    return (
+                      <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                           <div style={{ width: '32px', height: '32px', borderRadius: '10px', overflow: 'hidden', background: m.user_id ? '#f1f5f9' : '#000000', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                             {m.user_id ? (
+                               <img src={u?.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                             ) : (
+                               <span style={{ color: 'white', fontSize: '0.75rem', fontWeight: 900 }}>{m.external_name?.[0] || 'E'}</span>
+                             )}
+                           </div>
+                           <div>
+                             <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e293b' }}>
+                               {m.user_id ? `${u?.first_name} ${u?.last_name || ''}` : m.external_name}
+                             </div>
+                             <div style={{ fontSize: '0.7rem', fontWeight: 700, color: brandColor, textTransform: 'uppercase' }}>{m.instrument}</div>
+                           </div>
+                         </div>
+                        <button type="button" onClick={() => handleRemoveMember(m.id)} style={{ background: '#fee2e2', border: 'none', color: '#ef4444', padding: '8px', borderRadius: '10px', cursor: 'pointer' }}><Trash2 size={16} /></button>
+                      </div>
+                    );
+                  })}
+                  <button type="button" onClick={() => setShowAddMember(editingBand.id)} style={{ padding: '16px', borderRadius: '16px', border: '2px dashed #cbd5e1', background: 'transparent', color: brandColor, fontWeight: 800, cursor: 'pointer', marginTop: '4px' }}>
+                    + Weiteren Schüler hinzufügen
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+                <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '16px', borderRadius: '16px', fontWeight: 800, cursor: 'pointer', boxShadow: '0 10px 20px -5px rgba(0,0,0,0.1)' }}>Änderungen speichern</button>
+                <button type="button" onClick={() => setEditingBand(null)} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '16px', borderRadius: '16px', fontWeight: 700, cursor: 'pointer' }}>Schließen</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Add Member Search Modal */}
+      {showAddMember && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div className="glass-panel animation-slide-up" style={{ background: 'white', padding: '32px', borderRadius: '32px', maxWidth: '450px', width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 900 }}>Schüler suchen</h2>
+              <button onClick={() => setShowAddMember(null)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={24} /></button>
+            </div>
+            
+            <div style={{ position: 'relative', marginBottom: '20px' }}>
+              <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              <input 
+                placeholder="Name eingeben..." 
+                value={memberSearch}
+                onChange={e => setMemberSearch(e.target.value)}
+                style={{ width: '100%', padding: '14px 14px 14px 40px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700 }}
+              />
+            </div>
+
+            <div style={{ maxHeight: '350px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', padding: '4px' }}>
+              {(() => {
+                const currentMemberIds = editingBand?.band_members?.map((m: any) => m.user_id) || [];
+                return students.filter(s => 
+                  !currentMemberIds.includes(s.id) &&
+                  `${s.first_name} ${s.last_name}`.toLowerCase().includes(memberSearch.toLowerCase())
+                ).map(s => (
+                <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <img src={s.photo_url || '/avatar_ghost.jpg'} style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} />
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{s.first_name} {s.last_name}</div>
+                   </div>
+                   <select 
+                     onChange={(e) => handleAddMember(showAddMember, s.id, e.target.value)}
+                     defaultValue=""
+                     style={{ padding: '8px', borderRadius: '10px', border: '1px solid #e2e8f0', fontWeight: 800, fontSize: '0.75rem', background: 'white' }}
+                   >
+                     <option value="" disabled>Instrument?</option>
+                     {Object.keys(ADMIN_INSTRUMENT_ICONS).map(inst => <option key={inst} value={inst}>{inst}</option>)}
+                   </select>
+                </div>
+                ));
+              })()}
+            </div>
+            <div style={{ borderTop: '1px solid #f1f5f9', marginTop: '24px', paddingTop: '24px' }}>
+              <h4 style={{ fontSize: '0.75rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '12px' }}>Externen Schüler hinzufügen</h4>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <input 
+                  placeholder="Name (z.B. Gesangsschülerin)" 
+                  value={externalName}
+                  onChange={e => setExternalName(e.target.value)}
+                  style={{ flex: 2, padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', fontWeight: 700, background: '#f8fafc' }}
+                />
+                <select 
+                  value={externalInstrument}
+                  onChange={e => setExternalInstrument(e.target.value)}
+                  style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', fontWeight: 700, background: 'white' }}
+                >
+                  {Object.keys(INSTRUMENT_COLORS).map(inst => <option key={inst} value={inst}>{inst}</option>)}
+                </select>
+                <button 
+                  type="button"
+                  onClick={() => handleAddMember(showAddMember!, null, externalInstrument, externalName)}
+                  disabled={!externalName}
+                  style={{ padding: '0 20px', borderRadius: '12px', border: 'none', background: brandColor, color: 'white', fontWeight: 800, cursor: 'pointer', opacity: externalName ? 1 : 0.5 }}
+                >
+                  +
+                </button>
+              </div>
+            </div>
+            
+            <button onClick={() => setShowAddMember(null)} style={{ width: '100%', marginTop: '20px', padding: '16px', borderRadius: '16px', border: 'none', background: '#f1f5f9', fontWeight: 700, cursor: 'pointer' }}>Abbrechen</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 function IDGallery({ users, brandColor, onShowQR }: { users: any[], brandColor: string, onShowQR: (user: any) => void }) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [vocalistOnlyMode, setVocalistOnlyMode] = useState(false);
   
-  const filteredUsers = users.filter(u => 
-    u.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    u.last_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredUsers = users.filter(u => {
+    const matchesSearch = u.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          u.last_name?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // Teachers are always shown if not in vocalistOnlyMode
+    // If vocalistOnlyMode, only show external vocalists
+    if (vocalistOnlyMode) {
+      return matchesSearch && u.is_external_vocalist;
+    } else {
+      // Normal mode: show teachers AND non-external students
+      return matchesSearch && (u.role !== 'student' || !u.is_external_vocalist);
+    }
+  });
 
   return (
     <div style={{ marginTop: '24px' }}>
@@ -1334,26 +3104,66 @@ function IDGallery({ users, brandColor, onShowQR }: { users: any[], brandColor: 
             <p style={{ color: '#64748b', fontWeight: 500 }}>Vollständige Galerie aller Lehrer und Schüler im Event-Stil.</p>
           </div>
           
-          <div style={{ position: 'relative', width: '300px' }}>
-            <Search size={20} color="#94a3b8" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
-            <input 
-              type="text" 
-              placeholder="Name suchen..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ 
-                width: '100%', 
-                padding: '14px 14px 14px 48px', 
-                borderRadius: '16px', 
-                border: '1px solid rgba(255,255,255,0.5)', 
-                background: 'rgba(255,255,255,0.8)',
-                color: '#1e293b',
-                fontWeight: 600,
-                fontSize: '0.95rem',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
-                outline: 'none'
-              }} 
-            />
+          <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+            {/* Filter Switch */}
+            <div style={{ background: 'rgba(241, 245, 249, 0.8)', padding: '4px', borderRadius: '14px', display: 'flex', gap: '4px', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)' }}>
+              <button 
+                onClick={() => setVocalistOnlyMode(false)}
+                style={{ 
+                  padding: '8px 16px', 
+                  borderRadius: '10px', 
+                  border: 'none', 
+                  background: !vocalistOnlyMode ? 'white' : 'transparent',
+                  color: !vocalistOnlyMode ? '#1e293b' : '#94a3b8',
+                  fontWeight: 800,
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  boxShadow: !vocalistOnlyMode ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Musiker
+              </button>
+              <button 
+                onClick={() => setVocalistOnlyMode(true)}
+                style={{ 
+                  padding: '8px 16px', 
+                  borderRadius: '10px', 
+                  border: 'none', 
+                  background: vocalistOnlyMode ? 'white' : 'transparent',
+                  color: vocalistOnlyMode ? '#1e293b' : '#94a3b8',
+                  fontWeight: 800,
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  boxShadow: vocalistOnlyMode ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Gesangsschüler
+              </button>
+            </div>
+
+            <div style={{ position: 'relative', width: '250px' }}>
+              <Search size={20} color="#94a3b8" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
+              <input 
+                type="text" 
+                placeholder="Name suchen..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{ 
+                  width: '100%', 
+                  padding: '12px 12px 12px 48px', 
+                  borderRadius: '14px', 
+                  border: '1px solid rgba(255,255,255,0.5)', 
+                  background: 'rgba(255,255,255,0.8)',
+                  color: '#1e293b',
+                  fontWeight: 600,
+                  fontSize: '0.9rem',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+                  outline: 'none'
+                }} 
+              />
+            </div>
           </div>
         </div>
         
@@ -1404,8 +3214,17 @@ function IDGallery({ users, brandColor, onShowQR }: { users: any[], brandColor: 
                   padding: '6px',
                   background: 'white'
                 }}>
-                  <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden' }}>
-                    <img src={u.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                  <div style={{ 
+                    width: '100%', 
+                    height: '100%', 
+                    borderRadius: '50%', 
+                    overflow: 'hidden',
+                    backgroundImage: `url(${u.photo_url || '/avatar_ghost.jpg'})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundColor: '#f1f5f9'
+                  }}>
                   </div>
                 </div>
 
@@ -1443,8 +3262,23 @@ function IDGallery({ users, brandColor, onShowQR }: { users: any[], brandColor: 
   );
 }
 
-function AcademySetup({ school, brandColor, onUpdate }: { school: any, brandColor: string, onUpdate: () => void }) {
+function AcademySetup({ 
+  school, 
+  brandColor, 
+  onUpdate,
+  onCleanupPlanning,
+  onResetPlanning
+}: { 
+  school: any, 
+  brandColor: string, 
+  onUpdate: () => void,
+  onCleanupPlanning: () => void,
+  onResetPlanning: () => void
+}) {
   const [name, setName] = useState(school?.name || '');
+  const [lat, setLat] = useState(school?.latitude?.toString() || '');
+  const [lng, setLng] = useState(school?.longitude?.toString() || '');
+  const [radius, setRadius] = useState(school?.geofence_radius_meters?.toString() || '100');
   const [hours, setHours] = useState<any>(school?.opening_hours || {
     monday: { start: '08:00', end: '20:00', active: true },
     tuesday: { start: '08:00', end: '20:00', active: true },
@@ -1470,7 +3304,13 @@ function AcademySetup({ school, brandColor, onUpdate }: { school: any, brandColo
     setIsSaving(true);
     const { error } = await supabase
       .from('schools')
-      .update({ name, opening_hours: hours })
+      .update({ 
+        name, 
+        opening_hours: hours,
+        latitude: lat ? Number(lat) : null,
+        longitude: lng ? Number(lng) : null,
+        geofence_radius_meters: radius ? Number(radius) : 100
+      })
       .eq('id', school.id);
     
     setIsSaving(false);
@@ -1491,13 +3331,42 @@ function AcademySetup({ school, brandColor, onUpdate }: { school: any, brandColo
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-        <div>
-          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>Akademie Name</label>
-          <input 
-            value={name} 
-            onChange={e => setName(e.target.value)}
-            style={{ width: '100%', maxWidth: '400px', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600, fontSize: '1.1rem' }}
-          />
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 100px', gap: '20px', alignItems: 'flex-end' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>Akademie Name</label>
+            <input 
+              value={name} 
+              onChange={e => setName(e.target.value)}
+              style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600, fontSize: '1rem' }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>Latitude</label>
+            <input 
+              value={lat} 
+              onChange={e => setLat(e.target.value)}
+              placeholder="z.B. 47.567"
+              style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600, fontSize: '1rem' }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>Longitude</label>
+            <input 
+              value={lng} 
+              onChange={e => setLng(e.target.value)}
+              placeholder="z.B. 7.796"
+              style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600, fontSize: '1rem' }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>Radius (m)</label>
+            <input 
+              value={radius} 
+              onChange={e => setRadius(e.target.value)}
+              type="number"
+              style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600, fontSize: '1rem' }}
+            />
+          </div>
         </div>
 
         <div>
@@ -1531,6 +3400,42 @@ function AcademySetup({ school, brandColor, onUpdate }: { school: any, brandColo
           </div>
         </div>
 
+        <div style={{ marginTop: '16px', padding: '24px', background: '#f8fafc', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
+          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '16px' }}>Login-Sicherheit & Geofencing</label>
+          <div style={{ display: 'flex', gap: '24px' }}>
+            <button 
+              onClick={() => setHours({ ...hours, enforce_hours: true })}
+              style={{ 
+                flex: 1,
+                padding: '16px',
+                borderRadius: '16px',
+                border: `2px solid ${hours.enforce_hours !== false ? brandColor : '#e2e8f0'}`,
+                background: hours.enforce_hours !== false ? `${brandColor}05` : 'white',
+                cursor: 'pointer',
+                textAlign: 'left'
+              }}
+            >
+              <div style={{ fontWeight: 800, color: hours.enforce_hours !== false ? brandColor : '#1e293b', marginBottom: '4px' }}>Strikte Öffnungszeiten</div>
+              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Labor-Login mit Geotracking NUR innerhalb der Öffnungszeiten erlaubt.</div>
+            </button>
+            <button 
+              onClick={() => setHours({ ...hours, enforce_hours: false })}
+              style={{ 
+                flex: 1,
+                padding: '16px',
+                borderRadius: '16px',
+                border: `2px solid ${hours.enforce_hours === false ? brandColor : '#e2e8f0'}`,
+                background: hours.enforce_hours === false ? `${brandColor}05` : 'white',
+                cursor: 'pointer',
+                textAlign: 'left'
+              }}
+            >
+              <div style={{ fontWeight: 800, color: hours.enforce_hours === false ? brandColor : '#1e293b', marginBottom: '4px' }}>Flexible Öffnungszeiten</div>
+              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Labor-Login mit Geotracking AUCH außerhalb der Öffnungszeiten erlaubt.</div>
+            </button>
+          </div>
+        </div>
+
         <button 
           onClick={handleSave}
           disabled={isSaving}
@@ -1548,6 +3453,31 @@ function AcademySetup({ school, brandColor, onUpdate }: { school: any, brandColo
         >
           {isSaving ? 'Speichere...' : 'Einstellungen speichern'}
         </button>
+
+        <div style={{ marginTop: '48px', padding: '24px', background: '#fef2f2', borderRadius: '24px', border: '1px solid #fee2e2' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#ef4444', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertCircle size={18} /> Systemwartung
+          </h3>
+          <p style={{ fontSize: '0.85rem', color: '#991b1b', marginBottom: '16px' }}>
+            Hier kannst du Datenleichen entfernen und die Datenbank konsistent halten.
+          </p>
+          <button 
+            onClick={onCleanupPlanning}
+            style={{ background: 'white', border: '1px solid #fee2e2', color: '#ef4444', padding: '10px 20px', borderRadius: '12px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s' }}
+            onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
+            onMouseLeave={e => e.currentTarget.style.background = 'white'}
+          >
+            Wochenplan bereinigen (Datenleichen entfernen)
+          </button>
+          <button 
+            onClick={onResetPlanning}
+            style={{ marginLeft: '12px', background: 'white', border: '1px solid #fee2e2', color: '#ef4444', padding: '10px 20px', borderRadius: '12px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s' }}
+            onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
+            onMouseLeave={e => e.currentTarget.style.background = 'white'}
+          >
+            Wochenplan komplett leeren
+          </button>
+        </div>
       </div>
     </div>
   );
