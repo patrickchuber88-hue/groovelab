@@ -1,20 +1,24 @@
--- Lösche alle vorhandenen Daten (Vorsicht: Nur für Development!)
-TRUNCATE TABLE user_progress, exercises, sessions, stations, rooms, users, schools CASCADE;
+-- Seed Data for Groovelab (Safe for Production)
+
 
 -- 1. Schule anlegen
 INSERT INTO schools (id, name, logo_url, primary_color)
-VALUES ('11111111-1111-1111-1111-111111111111', 'Groovelab Academy', '', '#3b82f6');
+VALUES ('11111111-1111-1111-1111-111111111111', 'Groovelab Academy', '', '#3b82f6')
+ON CONFLICT (id) DO NOTHING;
 
 -- 2. Räume und Plätze anlegen
 INSERT INTO rooms (id, school_id, name)
-VALUES ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'Main Hall');
+VALUES ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'Main Hall')
+ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO stations (id, room_id, name)
-VALUES ('33333333-3333-3333-3333-333333333333', '22222222-2222-2222-2222-222222222222', 'Platz 3');
+VALUES ('33333333-3333-3333-3333-333333333333', '22222222-2222-2222-2222-222222222222', 'Platz 3')
+ON CONFLICT (id) DO NOTHING;
 
 -- 3. Schüler anlegen (Alex M.)
 INSERT INTO users (id, school_id, role, first_name, last_name, instrument)
-VALUES ('44444444-4444-4444-4444-444444444444', '11111111-1111-1111-1111-111111111111', 'student', 'Alex', 'M.', 'Guitar');
+VALUES ('44444444-4444-4444-4444-444444444444', '11111111-1111-1111-1111-111111111111', 'student', 'Alex', 'M.', 'Guitar')
+ON CONFLICT (id) DO NOTHING;
 
 -- 4. Session anlegen (Alex ist gerade eingecheckt)
 INSERT INTO sessions (user_id, station_id, presence_minutes)
