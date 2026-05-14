@@ -2,13 +2,19 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ENUMS
-CREATE TYPE user_role AS ENUM ('student', 'teacher', 'admin');
-CREATE TYPE help_status AS ENUM ('pending', 'in_progress', 'resolved');
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
+        CREATE TYPE user_role AS ENUM ('student', 'teacher', 'admin');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'help_status') THEN
+        CREATE TYPE help_status AS ENUM ('pending', 'in_progress', 'resolved');
+    END IF;
+END $$;
 
 -- TABELLEN
 
 -- 1. Schulen (Mandanten)
-CREATE TABLE schools (
+CREATE TABLE IF NOT EXISTS schools (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
     logo_url TEXT,
@@ -20,7 +26,7 @@ CREATE TABLE schools (
 );
 
 -- 2. Benutzer (Schüler, Lehrer, Admins)
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     school_id UUID REFERENCES schools(id) ON DELETE CASCADE,
     role user_role NOT NULL,
@@ -33,13 +39,13 @@ CREATE TABLE users (
 );
 
 -- 3. Räume & Übeplätze (Stations)
-CREATE TABLE rooms (
+CREATE TABLE IF NOT EXISTS rooms (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     school_id UUID REFERENCES schools(id) ON DELETE CASCADE,
     name VARCHAR(100) NOT NULL
 );
 
-CREATE TABLE stations (
+CREATE TABLE IF NOT EXISTS stations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     room_id UUID REFERENCES rooms(id) ON DELETE CASCADE,
     name VARCHAR(50) NOT NULL,
@@ -47,7 +53,7 @@ CREATE TABLE stations (
 );
 
 -- 4. Check-ins & Präsenz-Tracking
-CREATE TABLE sessions (
+CREATE TABLE IF NOT EXISTS sessions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     station_id UUID REFERENCES stations(id),
@@ -58,14 +64,14 @@ CREATE TABLE sessions (
 );
 
 -- 5. Übungen & Fortschritt
-CREATE TABLE exercises (
+CREATE TABLE IF NOT EXISTS exercises (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     school_id UUID REFERENCES schools(id) ON DELETE CASCADE,
     title VARCHAR(255) NOT NULL,
     description TEXT
 );
 
-CREATE TABLE user_progress (
+CREATE TABLE IF NOT EXISTS user_progress (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     exercise_id UUID REFERENCES exercises(id) ON DELETE CASCADE,
@@ -77,7 +83,7 @@ CREATE TABLE user_progress (
 );
 
 -- 6. Hilfe-Ruf System
-CREATE TABLE help_requests (
+CREATE TABLE IF NOT EXISTS help_requests (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     station_id UUID REFERENCES stations(id) ON DELETE CASCADE,
