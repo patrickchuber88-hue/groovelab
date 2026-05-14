@@ -1,5 +1,6 @@
 -- Aktiviere UUID-Erweiterung, falls nicht vorhanden
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ENUMS
 DO $$ BEGIN
