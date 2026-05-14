@@ -1910,7 +1910,7 @@ function App() {
       }
 
       // Lade die Wochenplan-Daten
-      fetchPlanningData(userData.school_id);
+      fetchPlanningData(userData.school_id, userId);
 
       // Activity Chart Data (Letzte 7 Tage)
       const days = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
@@ -1966,8 +1966,9 @@ function App() {
     }
   };
 
-  const fetchPlanningData = async (schoolId: string) => {
-    if (!loggedInUserId || !schoolId) return;
+  const fetchPlanningData = async (schoolId: string, userIdArg?: string) => {
+    const currentUserId = userIdArg || loggedInUserId;
+    if (!currentUserId || !schoolId) return;
     
     try {
       // 1. Hole alle Planungs-Einträge der Schule
@@ -1993,7 +1994,7 @@ function App() {
         const filtered = planningData.filter((s: any) => activeUserIds.has(s.user_id));
         
         setGlobalPlannedSlots(filtered);
-        const mySlots = filtered.filter((s: any) => s.user_id === loggedInUserId).map((s: any) => `${s.day}-${s.time}`);
+        const mySlots = filtered.filter((s: any) => s.user_id === currentUserId).map((s: any) => `${s.day}-${s.time}`);
         setPlannedSlots(mySlots);
       }
     } catch (err) {
@@ -2046,7 +2047,6 @@ function App() {
       
       if (result.error) {
         console.error('[Planning] Datenbank-Fehler:', result.error.message);
-        // Zurücksetzen
         await fetchPlanningData(schoolId);
       } else {
         await fetchPlanningData(schoolId);
@@ -3466,7 +3466,7 @@ function App() {
                         {/* Legend */}
                         <div style={{ display: 'flex', gap: '12px', background: '#f8fafc', padding: '10px 16px', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
-                            <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#f59e0b' }}></div> Deine Zeit
+                            <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: brandColor }}></div> Deine Zeit
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
                             <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: 'rgba(79, 70, 229, 0.3)' }}></div> Lab voll
