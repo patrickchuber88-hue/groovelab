@@ -1396,7 +1396,7 @@ function App() {
       if (sessionRes.error) console.error('[Dashboard] Error fetching session:', sessionRes.error);
 
       if (allSessionsRes.data) {
-        const totalMins = allSessionsRes.data.reduce((acc, s) => {
+        const totalMins = allSessionsRes.data.reduce((acc: number, s: any) => {
           const start = new Date(s.check_in_time);
           const end = s.check_out_time ? new Date(s.check_out_time) : new Date();
           return acc + Math.max(0, Math.floor((end.getTime() - start.getTime()) / 60000));
@@ -2990,7 +2990,7 @@ function App() {
                   if (data) {
                     await handleLogin(data.id, true); // Loggt dich als Admin im Home-Modus ein
                     setUser(data);
-                    setIsLoading(false);
+                    setLoading(false);
                   }
                 }}
                 className="mt-4 w-full py-2 px-4 bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/50 rounded text-yellow-500 font-bold transition-all shadow-[0_0_15px_rgba(234,179,8,0.2)]"
