@@ -5699,8 +5699,13 @@ function App() {
            <div className="animation-scale-up" style={{ width: '100%', maxWidth: '1200px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', gap: '40px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                  <div>
-                    <h2 style={{ fontSize: '2.5rem', fontWeight: 950, color: 'white', margin: 0 }}>Wähle euer Artwork</h2>
-                    <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '1.1rem', marginTop: '8px', fontWeight: 700 }}>Klicke auf ein Bild, um es als euer neues Profilbild zu setzen.</p>
+                    <h2 style={{ fontSize: '2.5rem', fontWeight: 950, color: 'white', margin: 0 }}>
+                      {avatarPickerType === 'band' ? 'Wähle euer Band-Artwork' : 
+                       (user?.role === 'teacher' || user?.role === 'admin' ? 'Wähle deinen Lehrer-Avatar' : 'Wähle deinen Avatar')}
+                    </h2>
+                    <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '1.1rem', marginTop: '8px', fontWeight: 700 }}>
+                      {avatarPickerType === 'band' ? 'Klicke auf ein Bild, um es als euer neues Bandprofilbild zu setzen.' : 'Personalisiere dein Profil mit einem neuen Bild.'}
+                    </p>
                  </div>
                  <button onClick={() => setShowAvatarPicker(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: '60px', height: '60px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <X size={32} />
@@ -5716,10 +5721,11 @@ function App() {
                  padding: '24px',
                  margin: '0 -24px',
                  flex: 1
-               }}>
+              }}>
                 {(() => {
                   if (avatarPickerType === 'band') return BAND_AVATARS;
-                  if (user?.role === 'teacher' || user?.role === 'admin') return TEACHER_AVATARS;
+                  const role = (user?.role || '').toLowerCase();
+                  if (role === 'teacher' || role === 'admin') return TEACHER_AVATARS;
                   return STUDENT_AVATARS;
                 })().map(av => {
                    const isSelected = avatarPickerType === 'band' 
