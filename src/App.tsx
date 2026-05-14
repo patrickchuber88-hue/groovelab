@@ -8,7 +8,7 @@ import Confetti from 'react-confetti';
 import { useWindowSize } from 'react-use';
 import BandProfileContent from './components/BandProfileContent';
 import { ArtistGateway } from './components/ArtistGateway';
-import { supabase } from './lib/supabase';
+import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
 import { LoginScreen } from './components/LoginScreen';
 import { QRCodeModal } from './components/QRCodeModal';
 import { DeviceSetupScreen } from './components/DeviceSetupScreen';
@@ -1127,6 +1127,17 @@ function App() {
     { id: 'vocalist_male', url: '/vocalist_male.png' },
     { id: 'vocalist_female', url: '/vocalist_female.png' },
   ];
+
+  const TEACHER_AVATARS = [
+    { id: 'teacher_male', url: '/avatar_teacher_male.jpg' },
+    { id: 'teacher_female', url: '/avatar_teacher_female.jpg' },
+    { id: 'teacher_expert', url: '/avatar_teacher_expert.jpg' },
+    { id: 'teacher_drums', url: '/avatar_teacher_drums.jpg' },
+    { id: 'teacher_drummer', url: '/avatar_teacher_drummer.jpg' },
+    { id: 'teacher_gold_glasses', url: '/avatar_teacher_gold_glasses.jpg' },
+    { id: 'teacher_senior', url: '/avatar_teacher_senior.jpg' },
+    { id: 'teacher_clean', url: '/avatar_teacher_clean.jpg' },
+  ];
   const [customBandName, setCustomBandName] = useState('');
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [avatarPickerType, setAvatarPickerType] = useState<'band' | 'student'>('band');
@@ -1355,22 +1366,28 @@ function App() {
       console.log(`[Dashboard] Fetching data for user: ${userId}`);
       
       const [userRes, sessionRes, allSessionsRes, skillsRes, membershipsRes] = await Promise.all([
-        supabase.from('users').select('*, schools(*)').eq('id', userId).single(),
+        supabase.from('users').select('*, schools(*)').eq('id', userId).maybeSingle(),
         supabase.from('sessions').select('*, stations(name)').eq('user_id', userId).is('check_out_time', null).order('check_in_time', { ascending: false }).limit(1).maybeSingle(),
         supabase.from('sessions').select('check_in_time, check_out_time').eq('user_id', userId),
         supabase.from('user_song_skills').select(`
           id, progress_percent, is_stage_ready, is_pending_approval, instrument, part_number, difficulty_level, is_favorite, verified_by_id,
-          verified_by:users!user_song_skills_verified_by_id_fkey (first_name, last_name),
           songs (id, title, artist, media_link, tomplay_url, instrumentation)
         `).eq('user_id', userId),
-        supabase.from('band_members').select('instrument, bands(*, songs(*, instrumentation), band_songs(*, songs(*, instrumentation)))').eq('user_id', userId)
-      ]);
+        supabase.from('band_members').select('instrument, bands(id, name, school_id, song_id, status, photo_url)').eq('user_id', userId)
+      ]).catch(err => {
+        console.error('[Dashboard] Critical Fetch Error:', err);
+        return [ {error: err}, {error: err}, {error: err}, {error: err}, {error: err} ] as any;
+      });
+
+      if (userRes.error) console.error('[Dashboard] User Fetch Error:', userRes.error);
+      if (skillsRes.error) console.error('[Dashboard] Skills Fetch Error:', skillsRes.error);
+      if (membershipsRes.error) console.error('[Dashboard] Memberships Fetch Error:', membershipsRes.error);
 
       const userData = userRes.data;
-      if (userRes.error) console.error('[Dashboard] Error fetching profile:', userRes.error);
       if (userData) setUser(userData);
       
       if (!userData) {
+        console.warn('[Dashboard] No user data found for ID:', userId);
         setLoading(false);
         return;
       }
@@ -2937,6 +2954,58 @@ function App() {
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
           <div style={{ color: '#0f172a', fontWeight: 1000, fontSize: '1.75rem', letterSpacing: '-0.02em' }}>GrooveLab</div>
           <div style={{ color: '#64748b', fontWeight: 800, fontSize: '0.9rem', letterSpacing: '0.05em', opacity: 0.6 }}>THE SOCIAL EXPERIENCE</div>
+          
+          <div style={{ 
+            marginTop: '24px', 
+            padding: '8px 16px', 
+            background: (supabaseUrl && supabaseAnonKey) ? '#f0fdf4' : '#fef2f2', 
+            borderRadius: '12px',
+            fontSize: '11px',
+            fontWeight: 800,
+            color: (supabaseUrl && supabaseAnonKey) ? '#16a34a' : '#ef4444'
+          }}>
+            {(supabaseUrl && supabaseAnonKey) ? 'SUPABASE VERBUNDEN' : 'SUPABASE VERBINDUNG FEHLT'}
+          </div>
+          
+          {/* Diagnose Info */}
+          <div className="mt-8 p-4 bg-black/20 rounded-lg border border-white/10 text-xs font-mono text-white/60">
+            <div className="flex items-center gap-2 mb-2">
+              <div className={`w-2 h-2 rounded-full ${supabaseUrl && supabaseAnonKey ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-red-500 animate-pulse'}`} />
+              <span>SUPABASE STATUS: {supabaseUrl && supabaseAnonKey ? 'VERBUNDEN' : 'VERBINDUNG FEHLT'}</span>
+            </div>
+            {(!supabaseUrl || !supabaseAnonKey) && (
+              <p className="text-red-400 leading-relaxed">
+                ACHTUNG: VITE_SUPABASE_URL oder VITE_SUPABASE_ANON_KEY fehlen in den Environment Variables.
+              </p>
+            )}
+            
+            {/* Admin Bypass Button for Localhost */}
+            {import.meta.env.DEV && (
+              <button
+                onClick={async () => {
+                  const { data } = await supabase
+                    .from('users')
+                    .select('*, schools(*)')
+                    .eq('qr_token', '7b8e1a2c-4d5f-6a7b-8c9d-0e1f2a3b4c5d')
+                    .single();
+                  if (data) {
+                    await handleLogin(data.id, true); // Loggt dich als Admin im Home-Modus ein
+                    setUser(data);
+                    setIsLoading(false);
+                  }
+                }}
+                className="mt-4 w-full py-2 px-4 bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/50 rounded text-yellow-500 font-bold transition-all shadow-[0_0_15px_rgba(234,179,8,0.2)]"
+              >
+                🔓 DIREKT ALS ADMIN EINLOGGEN
+              </button>
+            )}
+          </div>
+          
+          {(!supabaseUrl || !supabaseAnonKey) && (
+            <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '8px', maxWidth: '250px', lineHeight: '1.4', textAlign: 'center' }}>
+              Bitte prüfe deine Vercel Environment Variables (VITE_SUPABASE_URL & VITE_SUPABASE_ANON_KEY).
+            </div>
+          )}
         </div>
       </div>
     );
@@ -5648,7 +5717,11 @@ function App() {
                  margin: '0 -24px',
                  flex: 1
                }}>
-                 {(avatarPickerType === 'band' ? BAND_AVATARS : STUDENT_AVATARS).map(av => {
+                {(() => {
+                  if (avatarPickerType === 'band') return BAND_AVATARS;
+                  if (user?.role === 'teacher' || user?.role === 'admin') return TEACHER_AVATARS;
+                  return STUDENT_AVATARS;
+                })().map(av => {
                    const isSelected = avatarPickerType === 'band' 
                      ? selectedBandForProfile?.photo_url === av.url 
                      : user?.photo_url === av.url;

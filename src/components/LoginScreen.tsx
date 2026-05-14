@@ -408,6 +408,57 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         </div>
       )}
 
+      {/* Admin Bypass for Localhost */}
+      {import.meta.env.DEV && (
+        <div style={{ marginTop: '24px', width: '100%', maxWidth: '360px' }}>
+          <button
+            onClick={async () => {
+              try {
+                console.log('[Bypass] Attempting Admin login...');
+                const { data: user, error } = await supabase
+                  .from('users')
+                  .select('id, role')
+                  .eq('qr_token', '7b8e1a2c-4d5f-6a7b-8c9d-0e1f2a3b4c5d')
+                  .maybeSingle();
+
+                if (error) {
+                  console.error('[Bypass] Supabase Error:', error);
+                  alert('Datenbank-Fehler: ' + error.message);
+                  return;
+                }
+
+                if (user) {
+                  console.log('[Bypass] User found, logging in:', user.id);
+                  onLogin(user.id, true);
+                } else {
+                  console.warn('[Bypass] No user found with this token.');
+                  alert('Admin-Nutzer wurde in der Datenbank nicht gefunden.');
+                }
+              } catch (err: any) {
+                console.error('[Bypass] Runtime Error:', err);
+                alert('Ein Fehler ist aufgetreten: ' + err.message);
+              }
+            }}
+            style={{
+              width: '100%',
+              padding: '16px',
+              background: '#fef9c3',
+              border: '2px solid #fde047',
+              borderRadius: '24px',
+              color: '#854d0e',
+              fontWeight: 800,
+              fontSize: '13px',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(234,179,8,0.15)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.02em'
+            }}
+          >
+            🔓 ADMIN BYPASS (LOCAL ONLY)
+          </button>
+        </div>
+      )}
+
       <div style={{ marginTop: '24px', width: '100%', maxWidth: '360px', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '0 10px' }}>
         {effectiveStationId ? (
           <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
