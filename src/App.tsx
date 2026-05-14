@@ -33,7 +33,7 @@ const APP_INSTRUMENT_COLORS: Record<string, string> = {
   "Vocals": "#22c55e", 
   "Piano": "#a855f7", "E-Piano": "#a855f7", "Keys": "#a855f7" 
 };
-const brandColor = "#eab308";
+const brandColor = "#f59e0b"; // Orange (matched with legend)
 
 // --- ANTI-FLICKER AVATAR SYSTEM ---
 const StudioAvatar = React.memo(({ src, style, className }: { src: string | null | undefined, style?: React.CSSProperties, className?: string }) => {
@@ -1977,24 +1977,14 @@ function App() {
         .select('*')
         .eq('school_id', schoolId);
         
-      // 2. Hole alle aktuell existierenden Nutzer-IDs der Schule
-      const { data: activeUsers, error: usersError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('school_id', schoolId);
-
-      if (planningError || usersError) {
-        console.error('[Planning] Fetch Error:', planningError || usersError);
+      if (planningError) {
+        console.error('[Planning] Fetch Error:', planningError);
         return;
       }
 
-      if (planningData && activeUsers) {
-        // Filtere nur Einträge, deren User noch existiert
-        const activeUserIds = new Set(activeUsers.map((u: any) => u.id));
-        const filtered = planningData.filter((s: any) => activeUserIds.has(s.user_id));
-        
-        setGlobalPlannedSlots(filtered);
-        const mySlots = filtered.filter((s: any) => s.user_id === currentUserId).map((s: any) => `${s.day}-${s.time}`);
+      if (planningData) {
+        setGlobalPlannedSlots(planningData);
+        const mySlots = planningData.filter((s: any) => s.user_id === currentUserId).map((s: any) => `${s.day}-${s.time}`);
         setPlannedSlots(mySlots);
       }
     } catch (err) {
@@ -2021,7 +2011,8 @@ function App() {
 
     const key = `${day}-${time}`;
     const isPlanned = plannedSlots.includes(key);
-
+    console.log(`[Planning] Toggle: ${key} (Current status: ${isPlanned ? 'planned' : 'not planned'})`);
+    
     // Optimistic Update
     const newPlanned = isPlanned 
       ? plannedSlots.filter(s => s !== key) 
@@ -2046,10 +2037,11 @@ function App() {
       }
       
       if (result.error) {
-        console.error('[Planning] Datenbank-Fehler:', result.error.message);
-        await fetchPlanningData(schoolId);
+        console.error('[Planning] Datenbank-Fehler:', result.error.message, result.error);
+        await fetchPlanningData(schoolId, loggedInUserId);
       } else {
-        await fetchPlanningData(schoolId);
+        console.log('[Planning] Datenbank-Erfolg:', isPlanned ? 'Deleted' : 'Inserted');
+        await fetchPlanningData(schoolId, loggedInUserId);
       }
     } catch (err) {
       console.error('[Planning] Kritischer Fehler beim Toggeln:', err);
@@ -3573,7 +3565,7 @@ function App() {
 
                                         return (
                                           <button 
-                                            key={day.id}
+                                            key={`${day.id}-${time}`}
                                             onClick={() => {
                                               if (isOpen) toggleSlot(day.id, time);
                                             }}
@@ -3594,7 +3586,9 @@ function App() {
                                               opacity: isOpen ? 1 : 0.6,
                                               padding: 0,
                                               width: '100%',
-                                              position: 'relative'
+                                              position: 'relative',
+                                              zIndex: 10,
+                                              pointerEvents: 'auto'
                                             }}>
                                             {content}
                                           </button>

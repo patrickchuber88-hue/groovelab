@@ -581,7 +581,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const handleResetAllPlanning = async () => {
     if (!admin?.school_id) return;
     if (!window.confirm("Bist du sicher? Dies löscht alle aktuellen Planungen für die gesamte Akademie!")) return;
-    const { error } = await supabase.from('weekly_planning').delete().eq('school_id', admin.school_id);
+    const { error } = await supabase.from('lab_planning').delete().eq('school_id', admin.school_id);
     if (error) alert("Fehler beim Zurücksetzen: " + error.message);
     else fetchData();
   };
