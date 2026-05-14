@@ -1909,8 +1909,10 @@ function App() {
         setTeachers(teachersData);
       }
 
-      // Lade die Wochenplan-Daten
-      fetchPlanningData(userData.school_id, userId);
+      // Lade die Wochenplan-Daten (mit kleiner Verzögerung für State-Stabilität)
+      setTimeout(() => {
+        fetchPlanningData(userData.school_id, userId);
+      }, 100);
 
       // Activity Chart Data (Letzte 7 Tage)
       const days = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
@@ -1967,7 +1969,7 @@ function App() {
   };
 
   const fetchPlanningData = async (schoolId: string, userIdArg?: string) => {
-    const currentUserId = userIdArg || loggedInUserId;
+    const currentUserId = userIdArg || loggedInUserId || sessionStorage.getItem('groovelab_user_id');
     if (!currentUserId || !schoolId) return;
     
     try {
