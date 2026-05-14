@@ -1,0 +1,3 @@
+git add .
+git commit -m "Sicherheits-Fix: Automatisches Löschen der Datenbank verhindert"
+git push
