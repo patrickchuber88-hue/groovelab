@@ -1553,22 +1553,20 @@ function App() {
           });
 
           
-          // Filter to only STAGE READY skills from the same school
-          const readySkills = (song?.user_song_skills || []).filter((s: any) => {
+          // Filter to all skills from the same school (practicing or mastered)
+          const schoolSkills = (song?.user_song_skills || []).filter((s: any) => {
             const prof = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
-            const isMatch = s?.is_stage_ready && prof?.school_id === userData.school_id;
-            return isMatch;
+            return prof?.school_id === userData.school_id;
           });
 
-          if (readySkills.length > 0) {
-            console.log(`[Matching] Song: ${song.title}, Ready Musicians: ${readySkills.length}`);
+          if (schoolSkills.length > 0) {
+            console.log(`[Matching] Song: ${song.title}, Musicians in pool: ${schoolSkills.length}`);
           }
 
           // Split by level
           ['starter', 'original'].forEach(level => {
-            const levelSkills = readySkills.filter((s: any) => (s?.difficulty_level || 'original') === level);
-            if (levelSkills.length === 0) return;
-
+            const levelSkills = schoolSkills.filter((s: any) => (s?.difficulty_level || 'original') === level);
+            
             // Filter out musicians who are already in a band project for this song
             const availableMusicians = levelSkills.filter((skill: any) => {
               // 1. Check if they are in ANY band project for this song (proposals or active)
@@ -1589,7 +1587,7 @@ function App() {
               return !isTaken;
             }).sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
-            console.log(`[Matching] Song: ${song.title}, Level: ${level}, Total Ready: ${levelSkills.length}, Available: ${availableMusicians.length}`);
+            console.log(`[Matching] Song: ${song.title}, Level: ${level}, Total: ${levelSkills.length}, Available: ${availableMusicians.length}`);
 
             const formationsList: any[] = [];
             
@@ -1617,7 +1615,7 @@ function App() {
                 photo_url: prof?.photo_url,
                 instrument: normalizedMemberInst,
                 created_at: skill.created_at,
-                isMastered: true
+                isMastered: !!skill.is_stage_ready
               };
               form.members.push(memberObj);
               form.memberMap[normalizedMemberInst] = memberObj;
@@ -1648,7 +1646,7 @@ function App() {
                 photo_url: prof?.photo_url,
                 instrument: normalizedMemberInst,
                 created_at: skill.created_at,
-                isMastered: true
+                isMastered: !!skill.is_stage_ready
               };
               form.members.push(memberObj);
               form.memberMap[normalizedMemberInst] = memberObj;
@@ -1743,8 +1741,9 @@ function App() {
               }
             });
 
-            // 3. Fallback: If NO formations exist for this level but there are skills
-            if (formationsList.length === 0 && availableMusicians.length > 0) {
+            // 3. Fallback: If NO formations exist for this level but there are school skills OR guest searches
+            const hasGuestSearch = (song.band_songs || []).some((bs: any) => (bs.difficulty_level || 'original') === level);
+            if (formationsList.length === 0 && (levelSkills.length > 0 || hasGuestSearch)) {
               formationsList.push({ id: `first_slot_${song.id}_${level}`, members: [], memberMap: {}, isInitial: true, level });
             }
 
@@ -4156,7 +4155,7 @@ function App() {
                                 const leader = sortedMembers[0];
                                 const isLeader = leader?.user_id === user?.id;
 
-                                const mySkill = userSongs.find(us => us.song_id === song.song_id && us.is_stage_ready && (us.difficulty_level || 'original') === song.level);
+                                const mySkill = userSongs.find(us => us.song_id === song.song_id && (us.difficulty_level || 'original') === song.level);
                                 const canJoin = mySkill && !isMySlot && !form.memberMap[mySkill.instrument] && !form.isComplete;
 
                                 return (
@@ -4349,7 +4348,7 @@ function App() {
                         {!(song?.formations || []).some((f: any) => (f?.members || []).some((m: any) => m?.user_id === user?.id)) && (
                           <button 
                             onClick={async () => {
-                              const mySkill = userSongs.find(us => us.song_id === song.song_id && us.is_stage_ready);
+                              const mySkill = userSongs.find(us => us.song_id === song.song_id);
                               if (mySkill) {
                                 const newId = `form_${Math.random().toString(36).substr(2, 9)}`;
                                 await supabase.from('user_song_skills').update({ formation_group: newId }).eq('id', mySkill.id);
@@ -4745,7 +4744,7 @@ function App() {
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                       {(() => {
-                        const mySkills = userSongs.filter((s: any) => s.is_stage_ready && s.instrument !== 'Vocals');
+                        const mySkills = userSongs.filter((s: any) => s.instrument !== 'Vocals');
                         
                         const guestOpportunities: any[] = [];
                         allBands.forEach(band => {
