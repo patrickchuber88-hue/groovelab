@@ -1330,10 +1330,9 @@ function App() {
     { id: 'bandstyle_boy_edrums', url: '/avatars/bandstyle_boy_edrums.png' },
     { id: 'bandstyle_boy_epiano', url: '/avatars/bandstyle_boy_epiano.png' },
     
-    // REQUESTED END-AVATARS (Boy ukulele, Girl acoustic, and Ghost at absolute end)
+    // REQUESTED END-AVATARS (Boy ukulele and Girl acoustic at absolute end)
     { id: 'teen_boy_acoustic_guitar', url: '/avatars/teen_boy_acoustic_guitar.png' },
-    { id: 'teen_girl_acoustic_guitar', url: '/avatars/teen_girl_acoustic_guitar.png' },
-    { id: 'avatar_ghost', url: '/avatar_ghost.jpg' }
+    { id: 'teen_girl_acoustic_guitar', url: '/avatars/teen_girl_acoustic_guitar.png' }
   ];
 
   const TEACHER_AVATARS = [

@@ -96,10 +96,9 @@ const STUDENT_AVATARS = [
   { id: 'bandstyle_boy_edrums', url: '/avatars/bandstyle_boy_edrums.png', label: 'Bandstyle Boy Drums' },
   { id: 'bandstyle_boy_epiano', url: '/avatars/bandstyle_boy_epiano.png', label: 'Bandstyle Boy Piano' },
   
-  // REQUESTED END-AVATARS (Boy ukulele, Girl acoustic, and Ghost at absolute end)
+  // REQUESTED END-AVATARS (Boy ukulele and Girl acoustic at absolute end)
   { id: 'teen_boy_acoustic_guitar', url: '/avatars/teen_boy_acoustic_guitar.png', label: 'Teen Boy Acoustic Guitar' },
-  { id: 'teen_girl_acoustic_guitar', url: '/avatars/teen_girl_acoustic_guitar.png', label: 'Teen Girl Acoustic Guitar' },
-  { id: 'b_ghost', url: '/avatar_ghost.jpg', label: 'Kein Profilbild' }
+  { id: 'teen_girl_acoustic_guitar', url: '/avatars/teen_girl_acoustic_guitar.png', label: 'Teen Girl Acoustic Guitar' }
 ];
 
 const getStationColor = (name: string | null | undefined) => {
