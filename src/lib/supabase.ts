@@ -1,16 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
-export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://msyxlqljswpertszbotf.supabase.co';
+export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_GF8tj3-jMPuOUGMC5tDamA_NUrNyGh4';
 
 console.log('[Supabase] Initializing with URL:', supabaseUrl ? `${supabaseUrl.substring(0, 15)}...` : 'MISSING');
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('❌ KRITISCH: Supabase Umgebungsvariablen fehlen! (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY)');
+  console.warn('[Supabase] Environment variables missing. Using stable fallback credentials.');
 }
 
-export const supabase = createClient(
-  supabaseUrl || 'https://placeholder-url.supabase.co',
-  supabaseAnonKey || 'placeholder-key'
-);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 

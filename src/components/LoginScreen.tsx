@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Tablet } from 'lucide-react';
+import { Music, Tablet, ShieldCheck, FileText, X } from 'lucide-react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { getDistanceFromLatLonInM } from '../utils/geo';
 
@@ -40,6 +40,8 @@ const isWithinOpeningHours = (openingHours: any) => {
 export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showImpressum, setShowImpressum] = useState(false);
   
   const [userPos, setUserPos] = useState<{lat: number, lng: number} | null>(null);
   
@@ -192,66 +194,68 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       // 2. Geofence Check (Simpel & Stabil)
       let isWithinAnyRoom = false;
-      let finalUserPos = userPos;
       
-      try {
-        if (!finalUserPos) {
-          console.log('[Login] No pre-fetched position, attempting quick fetch...');
-          finalUserPos = await new Promise<{lat: number, lng: number} | null>((resolve) => {
-            navigator.geolocation.getCurrentPosition(
-              (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-              () => resolve(null),
-              { enableHighAccuracy: true, timeout: 3000, maximumAge: 60000 }
-            );
-          });
-        }
+      // KIOSK BYPASS: If we are scanning on a configured iPad station, we inherently know it's in the room!
+      if (effectiveStationId) {
+        console.log('[Login] Kiosk mode detected. Bypassing GPS check entirely for lightning fast login.');
+        isWithinAnyRoom = true;
+      } else {
+        let finalUserPos = userPos;
+        
+        try {
+          if (!finalUserPos) {
+            console.log('[Login] No pre-fetched position, attempting quick fetch...');
+            finalUserPos = await new Promise<{lat: number, lng: number} | null>((resolve) => {
+              navigator.geolocation.getCurrentPosition(
+                (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                () => resolve(null),
+                { enableHighAccuracy: true, timeout: 3000, maximumAge: 60000 }
+              );
+            });
+          }
 
-        if (finalUserPos) {
-          console.log(`[Geofence] User position: ${finalUserPos.lat}, ${finalUserPos.lng}`);
-          // 1. Check Rooms (Multi-Point)
-          const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', user.school_id);
-          if (rooms) {
-            for (const room of rooms) {
-              const points = Array.isArray(room.geofence_points) ? room.geofence_points : [];
-              const allCoords = [...points];
-              if (room.latitude && room.longitude) allCoords.push({ lat: room.latitude, lng: room.longitude });
-              
-              for (const pt of allCoords) {
-                if (pt && pt.lat && pt.lng) {
-                  const dist = getDistanceFromLatLonInM(finalUserPos.lat, finalUserPos.lng, Number(pt.lat), Number(pt.lng));
-                  console.log(`[Geofence] Room "${room.name}" Point: ${Math.round(dist)}m away`);
-                  if (dist < 100) { 
-                    isWithinAnyRoom = true;
-                    break;
+          if (finalUserPos) {
+            console.log(`[Geofence] User position: ${finalUserPos.lat}, ${finalUserPos.lng}`);
+            // 1. Check Rooms (Multi-Point)
+            const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', user.school_id);
+            if (rooms) {
+              for (const room of rooms) {
+                const points = Array.isArray(room.geofence_points) ? room.geofence_points : [];
+                const allCoords = [...points];
+                if (room.latitude && room.longitude) allCoords.push({ lat: room.latitude, lng: room.longitude });
+                
+                for (const pt of allCoords) {
+                  if (pt && pt.lat && pt.lng) {
+                    const dist = getDistanceFromLatLonInM(finalUserPos.lat, finalUserPos.lng, Number(pt.lat), Number(pt.lng));
+                    console.log(`[Geofence] Room "${room.name}" Point: ${Math.round(dist)}m away`);
+                    if (dist < 100) { 
+                      isWithinAnyRoom = true;
+                      break;
+                    }
                   }
                 }
+                if (isWithinAnyRoom) break;
               }
-              if (isWithinAnyRoom) break;
             }
-          }
 
-          // 2. School Fallback (Single Point + Radius)
-          if (!isWithinAnyRoom && schoolData?.latitude && schoolData?.longitude) {
-            const distToSchool = getDistanceFromLatLonInM(
-              finalUserPos.lat, finalUserPos.lng, 
-              Number(schoolData.latitude), Number(schoolData.longitude)
-            );
-            const radius = schoolData.geofence_radius_meters || 150;
-            console.log(`[Geofence] School fallback: ${Math.round(distToSchool)}m away (Radius: ${radius}m)`);
-            if (distToSchool < radius) {
-              isWithinAnyRoom = true;
+            // 2. School Fallback (Single Point + Radius)
+            if (!isWithinAnyRoom && schoolData?.latitude && schoolData?.longitude) {
+              const distToSchool = getDistanceFromLatLonInM(
+                finalUserPos.lat, finalUserPos.lng, 
+                Number(schoolData.latitude), Number(schoolData.longitude)
+              );
+              const radius = schoolData.geofence_radius_meters || 150;
+              console.log(`[Geofence] School fallback: ${Math.round(distToSchool)}m away (Radius: ${radius}m)`);
+              if (distToSchool < radius) {
+                isWithinAnyRoom = true;
+              }
             }
+          } else {
+            console.warn('[Geofence] No user position available (Permission denied or timeout)');
           }
-        } else {
-          console.warn('[Geofence] No user position available (Permission denied or timeout)');
-          // If we are on a Kiosk station, we should be more lenient if GPS fails
-          if (effectiveStationId) {
-            console.log('[Geofence] Kiosk mode detected. Allowing Lab login despite missing GPS.');
-            isWithinAnyRoom = true;
-          }
+        } catch (geoErr) {
+          console.warn('[Login] Geolocation failed.', geoErr);
         }
-      } catch (geoErr) {
-        console.warn('[Login] Geolocation failed.', geoErr);
       }
 
       console.log(`[Login] Scan successful. Geofence match: ${isWithinAnyRoom}`);
@@ -434,7 +438,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       {/* Admin Bypass for Localhost */}
       {import.meta.env.DEV && (
-        <div style={{ marginTop: '24px', width: '100%', maxWidth: '360px' }}>
+        <div style={{ marginTop: '24px', width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <button
             onClick={async () => {
               try {
@@ -480,6 +484,38 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           >
             🔓 ADMIN BYPASS (LOCAL ONLY)
           </button>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
+            {[
+              { num: 1, token: '1d7d3cd1-ace9-4f88-abcb-53643b925e77' },
+              { num: 2, token: 'aab6fef4-5dca-45f5-a8b2-2009a20628bb' },
+              { num: 3, token: '8b1c79ce-f504-47c9-a664-417c7ceacb66' },
+              { num: 4, token: '8752290c-3e39-470d-b8fa-0c0aa0489920' },
+              { num: 5, token: '617a3cfc-84ac-42e9-9a20-d86eb82ac1bb' }
+            ].map(stud => (
+              <button
+                key={stud.num}
+                onClick={async () => {
+                  const { data: u } = await supabase.from('users').select('id').eq('qr_token', stud.token).maybeSingle();
+                  if (u) onLogin(u.id, true);
+                  else alert(`Schüler ${stud.num} nicht gefunden!`);
+                }}
+                style={{
+                  padding: '10px 4px',
+                  background: '#eff6ff',
+                  border: '1.5px solid #bfdbfe',
+                  borderRadius: '12px',
+                  color: '#1e40af',
+                  fontWeight: 800,
+                  fontSize: '0.72rem',
+                  cursor: 'pointer',
+                  textAlign: 'center'
+                }}
+              >
+                S{stud.num}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -529,8 +565,249 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         )}
       </div>
 
+      {/* Legal Footer */}
+      <div style={{ 
+        marginTop: '32px', 
+        display: 'flex', 
+        gap: '24px', 
+        fontSize: '11px', 
+        fontWeight: 800, 
+        color: '#94a3b8',
+        textTransform: 'uppercase',
+        letterSpacing: '0.05em'
+      }}>
+        <span 
+          onClick={() => setShowPrivacy(true)} 
+          style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
+          onMouseEnter={e => e.currentTarget.style.color = '#eab308'} 
+          onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}
+        >
+          Datenschutz
+        </span>
+        <span style={{ opacity: 0.5 }}>•</span>
+        <span 
+          onClick={() => setShowImpressum(true)} 
+          style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
+          onMouseEnter={e => e.currentTarget.style.color = '#eab308'} 
+          onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}
+        >
+          Impressum
+        </span>
+      </div>
+
+      {/* Privacy Policy Modal */}
+      {showPrivacy && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.40)',
+          backdropFilter: 'blur(16px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '20px',
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '32px',
+            boxShadow: '0 30px 80px rgba(15, 23, 42, 0.18)',
+            border: '1px solid #f1f5f9',
+            padding: '36px',
+            maxWidth: '560px',
+            width: '100%',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px'
+          }}>
+            <button 
+              onClick={() => setShowPrivacy(false)} 
+              style={{
+                position: 'absolute',
+                top: '24px',
+                right: '24px',
+                background: '#f1f5f9',
+                border: 'none',
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#64748b',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.background = '#e2e8f0'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#f1f5f9'; }}
+            >
+              <X size={20} />
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', color: '#eab308' }}>
+                <ShieldCheck size={28} />
+              </div>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#0f172a' }}>Datenschutzerklärung</h2>
+                <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>GrooveLab DSGVO Compliance</p>
+              </div>
+            </div>
+
+            <div style={{ 
+              fontSize: '13px', 
+              color: '#475569', 
+              lineHeight: '1.6', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '16px',
+              textAlign: 'left'
+            }}>
+              <div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>1. Allgemeine Hinweise und Pflichtinformationen</h4>
+                <p style={{ margin: 0 }}>Der Schutz Ihrer persönlichen Daten ist uns ein wichtiges Anliegen. GrooveLab speichert Daten zur Bereitstellung der Übungs- und Klassenzimmerplattform nach den Vorgaben der DSGVO. Zur Einhaltung der Datenminimierung werden Nachnamen von Schülern standardmäßig anonymisiert (nur die Initiale wird gespeichert, z.B. Max M.).</p>
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>2. Kamera & QR-Scanner</h4>
+                <p style={{ margin: 0 }}>Die Kamera deines Endgeräts wird ausschließlich lokal im Browser verwendet, um deinen GrooveLab-QR-Ausweis zu scannen. Es werden zu keinem Zeitpunkt Videostreams oder Bilder an Server übertragen oder dort gespeichert.</p>
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>3. Standortermittlung (Geofencing)</h4>
+                <p style={{ margin: 0 }}>GrooveLab prüft beim Einloggen kurz deinen Gerätestandort (GPS), um sicherzustellen, dass du dich im GrooveLab-Raum der Musikschule befindest. Diese Standortdaten werden rein lokal in deinem Browser berechnet und nicht an Server übertragen. In der Datenbank wird lediglich ein Bestätigungswert (Erfolgreich/Fehlgeschlagen) für deine aktive Session hinterlegt. Ein kontinuierliches Bewegungsprofil wird nicht erstellt.</p>
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>4. Rechte der Betroffenen</h4>
+                <p style={{ margin: 0 }}>Sie haben das Recht auf Auskunft, Berichtigung, Sperrung oder Löschung Ihrer Daten. Wenden Sie sich hierzu bitte an die Schulleitung Ihrer Musikakademie.</p>
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>5. Hosting & Datenbank-Infrastruktur</h4>
+                <p style={{ margin: 0 }}>Unsere Anwendung wird auf Servern externer Dienstleister gehostet, um einen sicheren und performanten Betrieb zu gewährleisten. Das Frontend wird über <strong>Vercel</strong> (Vercel Inc.) bereitgestellt, und die Datenbankinfrastruktur läuft über <strong>Supabase</strong> (Supabase Inc.). Mit beiden Dienstleistern wurden die gesetzlich vorgeschriebenen Verträge zur Auftragsverarbeitung (AV-Vertrag nach Art. 28 DSGVO) geschlossen, um den Schutz der Daten zu jeder Zeit zu gewährleisten.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Impressum Modal */}
+      {showImpressum && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.40)',
+          backdropFilter: 'blur(16px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '20px',
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '32px',
+            boxShadow: '0 30px 80px rgba(15, 23, 42, 0.18)',
+            border: '1px solid #f1f5f9',
+            padding: '36px',
+            maxWidth: '560px',
+            width: '100%',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px'
+          }}>
+            <button 
+              onClick={() => setShowImpressum(false)} 
+              style={{
+                position: 'absolute',
+                top: '24px',
+                right: '24px',
+                background: '#f1f5f9',
+                border: 'none',
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#64748b',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.background = '#e2e8f0'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#f1f5f9'; }}
+            >
+              <X size={20} />
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', color: '#eab308' }}>
+                <FileText size={28} />
+              </div>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#0f172a' }}>Impressum</h2>
+                <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gesetzliche Anbieterkennzeichnung</p>
+              </div>
+            </div>
+
+            <div style={{ 
+              fontSize: '13px', 
+              color: '#475569', 
+              lineHeight: '1.6', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '16px',
+              textAlign: 'left'
+            }}>
+              <div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>Angaben gemäß § 5 TMG</h4>
+                <p style={{ margin: 0 }}>
+                  Manuel Wagner<br/>
+                  Friedrichstr. 33<br/>
+                  79713 Bad Säckingen
+                </p>
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>Kontakt</h4>
+                <p style={{ margin: 0 }}>
+                  Mo-Fr: 08-15 Uhr<br/>
+                  Telefon: 07761 – 2416<br/>
+                  E-Mail: info@musaek.de
+                </p>
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>EU-Streitschlichtung</h4>
+                <p style={{ margin: 0 }}>
+                  Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: <a href="https://ec.europa.eu/consumers/odr/" target="_blank" rel="noopener noreferrer" style={{ color: '#eab308', textDecoration: 'underline' }}>https://ec.europa.eu/consumers/odr/</a>.<br/>
+                  Unsere E-Mail-Adresse finden Sie oben im Impressum.
+                </p>
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>Verbraucherstreitbeilegung / Universalschlichtungsstelle</h4>
+                <p style={{ margin: 0 }}>
+                  Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
       `}</style>
     </div>
   );

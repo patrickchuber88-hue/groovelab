@@ -5,7 +5,7 @@ dotenv.config({ path: '.env.local' });
 const supabase = createClient(process.env.VITE_SUPABASE_URL!, process.env.VITE_SUPABASE_ANON_KEY!);
 
 async function run() {
-  const { data: rooms } = await supabase.from('rooms').select('*');
-  console.log('Rooms columns:', Object.keys(rooms?.[0] || {}));
+  const { data: schools } = await supabase.from('schools').select('*');
+  console.log('Schools:', schools);
 }
 run();

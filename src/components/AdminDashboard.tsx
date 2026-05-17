@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check } from 'lucide-react';
+import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check } from 'lucide-react';
 import { 
   ResponsiveContainer,
   BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell,
-  PieChart as RechartsPieChart, Pie
+  PieChart as RechartsPieChart, Pie,
+  Radar, RadarChart, PolarGrid, PolarAngleAxis
 } from 'recharts';
 
 const INSTRUMENT_COLORS: Record<string, string> = {
@@ -51,7 +52,10 @@ const STUDENT_AVATARS = [
   { id: 'g_guitar', url: '/avatar_girl_guitar.jpg', label: 'Girl Guitar' },
   { id: 'g_piano', url: '/avatar_girl_piano.jpg', label: 'Girl Piano' },
   { id: 'voc_m', url: '/vocalist_male.png', label: 'Vocalist M' },
-  { id: 'voc_f', url: '/vocalist_female.png', label: 'Vocalist F' }
+  { id: 'voc_f', url: '/vocalist_female.png', label: 'Vocalist F' },
+  { id: 'kid_g_ukulele', url: '/avatars/kid_girl_ukulele.png', label: 'Kid Ukulele F' },
+  { id: 'kid_b_ukulele', url: '/avatars/kid_boy_ukulele.png', label: 'Kid Ukulele M' },
+  { id: 'b_ghost', url: '/avatar_ghost.jpg', label: 'Kein Profilbild' }
 ];
 
 const getStationColor = (name: string | null | undefined) => {
@@ -98,7 +102,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [externalInstrument, setExternalInstrument] = useState('Vocals');
   
   const [showAddStudent, setShowAddStudent] = useState(false);
-  const [newStudent, setNewStudent] = useState({ firstName: '', lastName: '', birthDate: '', photoUrl: '', isExternalVocalist: false });
+  const [newStudent, setNewStudent] = useState({ firstName: '', lastName: '', birthDate: '', photoUrl: '/avatar_ghost.jpg', isExternalVocalist: false });
   const [vocalistOnlyMode, setVocalistOnlyMode] = useState(false);
   
   const [showAddBand, setShowAddBand] = useState(false);
@@ -119,7 +123,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [newStationColor, setNewStationColor] = useState('#e5e7eb');
   
   const [showAddSong, setShowAddSong] = useState(false);
-  const [newSong, setNewSong] = useState({ artist: '', title: '', level: 1, media_link: '', tomplay_url: '', instrumentation: { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 } as Record<string, number> });
+  const [newSong, setNewSong] = useState({ artist: '', title: '', level: 1, media_link: '', tomplay_url: '', pdf_folder_url: '', pdf_drums_url: '', pdf_guitar_url: '', pdf_bass_url: '', pdf_vocals_url: '', pdf_keys_url: '', guitar_pro_url: '', bypass_wlan_check: false, instrumentation: { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 } as Record<string, number> });
   
   const [songSearch, setSongSearch] = useState('');
   const [songSearchType, setSongSearchType] = useState<'title' | 'artist'>('title');
@@ -499,7 +503,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       first_name: newStudent.firstName, 
       last_name: newStudent.lastName.length > 1 ? newStudent.lastName.charAt(0) + '.' : newStudent.lastName, 
       birth_date: null,
-      photo_url: newStudent.photoUrl || null,
+      photo_url: newStudent.photoUrl || '/avatar_ghost.jpg',
       qr_token: qrToken,
       is_external_vocalist: newStudent.isExternalVocalist,
       instrument: newStudent.isExternalVocalist ? 'Vocals' : 'Musiker'
@@ -509,7 +513,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     else if (data) { 
       setStudents([...students, data]); 
       setShowAddStudent(false); 
-      setNewStudent({ firstName: '', lastName: '', birthDate: '', photoUrl: '', isExternalVocalist: false }); 
+      setNewStudent({ firstName: '', lastName: '', birthDate: '', photoUrl: '/avatar_ghost.jpg', isExternalVocalist: false }); 
     }
   };
 
@@ -966,13 +970,21 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       level: newSong.level, 
       media_link: newSong.media_link,
       tomplay_url: newSong.tomplay_url,
+      pdf_folder_url: newSong.pdf_folder_url || '',
+      pdf_drums_url: newSong.pdf_drums_url || '',
+      pdf_guitar_url: newSong.pdf_guitar_url || '',
+      pdf_bass_url: newSong.pdf_bass_url || '',
+      pdf_vocals_url: newSong.pdf_vocals_url || '',
+      pdf_keys_url: newSong.pdf_keys_url || '',
+      guitar_pro_url: newSong.guitar_pro_url || '',
+      bypass_wlan_check: !!newSong.bypass_wlan_check,
       instrumentation: newSong.instrumentation
     }).select().single();
     if (error) alert('Fehler: ' + error.message);
     else if (data) { 
       setSongs([...songs, data]); 
       setShowAddSong(false); 
-      setNewSong({ artist: '', title: '', level: 1, media_link: '', tomplay_url: '', instrumentation: { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 } }); 
+      setNewSong({ artist: '', title: '', level: 1, media_link: '', tomplay_url: '', pdf_folder_url: '', pdf_drums_url: '', pdf_guitar_url: '', pdf_bass_url: '', pdf_vocals_url: '', pdf_keys_url: '', guitar_pro_url: '', bypass_wlan_check: false, instrumentation: { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 } }); 
     }
   };
 
@@ -985,6 +997,14 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       level: editingSong.level,
       media_link: editingSong.media_link,
       tomplay_url: editingSong.tomplay_url,
+      pdf_folder_url: editingSong.pdf_folder_url || '',
+      pdf_drums_url: editingSong.pdf_drums_url || '',
+      pdf_guitar_url: editingSong.pdf_guitar_url || '',
+      pdf_bass_url: editingSong.pdf_bass_url || '',
+      pdf_vocals_url: editingSong.pdf_vocals_url || '',
+      pdf_keys_url: editingSong.pdf_keys_url || '',
+      guitar_pro_url: editingSong.guitar_pro_url || '',
+      bypass_wlan_check: !!editingSong.bypass_wlan_check,
       instrumentation: editingSong.instrumentation
     }).eq('id', editingSong.id);
     
@@ -1048,8 +1068,30 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   };
 
 
+  const [studentBands, setStudentBands] = useState<any[]>([]);
+  const [studentDetailTab, setStudentDetailTab] = useState<'profile' | 'logbook'>('profile');
+
   const fetchStudentProfile = async (student: any) => {
     setSelectedStudent(student);
+    setStudentDetailTab('profile'); // Reset to default tab
+
+    // Fetch student's bands and filter out duplicates
+    const { data: bandsData } = await supabase
+      .from('band_members')
+      .select('bands(*)')
+      .eq('user_id', student.id);
+    
+    const uniqueBandsList: any[] = [];
+    const seenBandIds = new Set();
+    (bandsData || []).forEach((m: any) => {
+      const b = Array.isArray(m.bands) ? m.bands[0] : m.bands;
+      if (b && !seenBandIds.has(b.id)) {
+        seenBandIds.add(b.id);
+        uniqueBandsList.push(b);
+      }
+    });
+    setStudentBands(uniqueBandsList);
+
     const { data: skills } = await supabase
       .from('user_song_skills')
       .select('*, songs(*)')
@@ -1629,7 +1671,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             {/* External Vocalist Toggle */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
                <div 
-                 onClick={() => setNewStudent({...newStudent, isExternalVocalist: !newStudent.isExternalVocalist, photoUrl: !newStudent.isExternalVocalist ? STUDENT_AVATARS.find(a => a.id === 'voc_f')?.url || '' : ''})}
+                 onClick={() => setNewStudent({...newStudent, isExternalVocalist: !newStudent.isExternalVocalist, photoUrl: '/avatar_ghost.jpg'})}
                  style={{ 
                    width: '44px', height: '24px', borderRadius: '20px', 
                    background: newStudent.isExternalVocalist ? brandColor : '#cbd5e1', 
@@ -1647,29 +1689,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                </div>
             </div>
 
-            {/* Avatar Picker for new student */}
-            <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '12px', display: 'block' }}>Avatar wählen:</label>
-              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                {STUDENT_AVATARS.filter(a => {
-                  if (newStudent.isExternalVocalist) return a.id.startsWith('voc_');
-                  return !a.id.startsWith('voc_');
-                }).map(av => (
-                  <div 
-                    key={av.id}
-                    onClick={() => setNewStudent({...newStudent, photoUrl: av.url})}
-                    style={{ 
-                      width: '64px', height: '64px', borderRadius: '16px', overflow: 'hidden', cursor: 'pointer',
-                      border: newStudent.photoUrl === av.url ? `3px solid ${brandColor}` : '3px solid transparent',
-                      boxShadow: newStudent.photoUrl === av.url ? `0 8px 20px ${brandColor}40` : 'none',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <img src={av.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* Avatar Picker removed: students now get the ghost avatar by default */}
             <div style={{ display: 'flex', gap: '12px' }}>
               <button type="submit" style={{ flex: 1, background: brandColor, color: 'white', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 800, cursor: 'pointer' }}>Speichern</button>
               <button type="button" onClick={() => setShowAddStudent(false)} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 700, cursor: 'pointer' }}>Abbrechen</button>
@@ -1711,7 +1731,10 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             return matchesSearch && matchesType;
           }).map(s => (
             <div key={s.id} className="glass-panel" style={{ padding: '16px', background: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '20px', border: '1px solid #f1f5f9', transition: 'transform 0.2s', cursor: 'default' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div 
+                onClick={() => fetchStudentProfile(s)}
+                style={{ display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', flex: 1 }}
+              >
                 <div style={{ 
                   width: '52px', 
                   height: '52px', 
@@ -1732,10 +1755,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   />
                   <span style={{ fontSize: '1rem', fontWeight: 900, color: brandColor, zIndex: 1 }}>{s.first_name?.[0]}</span>
                 </div>
-                <div 
-                  onClick={() => fetchStudentProfile(s)}
-                  style={{ cursor: 'pointer' }}
-                >
+                <div>
                   <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '1.05rem' }}>{s.first_name} {s.last_name}</div>
                   <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>ID: {s.id.split('-')[0].toUpperCase()}</div>
                 </div>
@@ -2363,6 +2383,54 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               </div>
             </div>
 
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>OneDrive/Dropbox PDF-Ordner (Noten Ordner-Link)</label>
+                <input placeholder="https://onedrive.live.com/... oder Dropbox..." value={newSong.pdf_folder_url || ''} onChange={e => setNewSong({...newSong, pdf_folder_url: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '1rem', fontWeight: 600 }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>OneDrive Guitar Pro Link (.gp)</label>
+                <input placeholder="ms-onedrive://..." value={newSong.guitar_pro_url || ''} onChange={e => setNewSong({...newSong, guitar_pro_url: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '1rem', fontWeight: 600 }} />
+              </div>
+            </div>
+
+            <div style={{ padding: '24px', background: '#eff6ff', borderRadius: '20px', border: '1px solid #bfdbfe', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1e3a8a', margin: 0 }}>Instrumenten-spezifische PDFs (Direktanzeige in App)</h4>
+                <p style={{ fontSize: '0.8rem', color: '#3b82f6', margin: 0, fontWeight: 600 }}>🌟 Tipp: Kopiere hier direkte Dropbox/OneDrive Links zu den einzelnen PDF-Dateien. Diese werden für Schüler nahtlos direkt in der App geöffnet!</p>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e3a8a' }}>🎸 PDF E-Gitarre</label>
+                  <input placeholder="https://..." value={newSong.pdf_guitar_url || ''} onChange={e => setNewSong({...newSong, pdf_guitar_url: e.target.value})} style={{ padding: '12px', borderRadius: '10px', border: '1px solid #bfdbfe', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e3a8a' }}>🎸 PDF E-Bass</label>
+                  <input placeholder="https://..." value={newSong.pdf_bass_url || ''} onChange={e => setNewSong({...newSong, pdf_bass_url: e.target.value})} style={{ padding: '12px', borderRadius: '10px', border: '1px solid #bfdbfe', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e3a8a' }}>🥁 PDF E-Drums</label>
+                  <input placeholder="https://..." value={newSong.pdf_drums_url || ''} onChange={e => setNewSong({...newSong, pdf_drums_url: e.target.value})} style={{ padding: '12px', borderRadius: '10px', border: '1px solid #bfdbfe', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e3a8a' }}>🎹 PDF E-Piano / Keys</label>
+                  <input placeholder="https://..." value={newSong.pdf_keys_url || ''} onChange={e => setNewSong({...newSong, pdf_keys_url: e.target.value})} style={{ padding: '12px', borderRadius: '10px', border: '1px solid #bfdbfe', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e3a8a' }}>🎤 PDF Gesang / Vocals</label>
+                <input placeholder="https://..." value={newSong.pdf_vocals_url || ''} onChange={e => setNewSong({...newSong, pdf_vocals_url: e.target.value})} style={{ padding: '12px', borderRadius: '10px', border: '1px solid #bfdbfe', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: '#fffbeb', borderRadius: '16px', border: '1px solid #fef3c7' }}>
+              <input type="checkbox" id="add-bypass-wlan" checked={!!newSong.bypass_wlan_check} onChange={e => setNewSong({...newSong, bypass_wlan_check: e.target.checked})} style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: brandColor }} />
+              <label htmlFor="add-bypass-wlan" style={{ fontSize: '0.9rem', fontWeight: 700, color: '#b45309', cursor: 'pointer' }}>
+                WLAN-Sperre für diesen Song ignorieren (Entwickler-Bypass für Home-Testing)
+              </label>
+            </div>
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Arrangement / Instrumente</label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
@@ -2408,6 +2476,54 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 <Box size={20} color="#94a3b8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
                 <input placeholder="https://cloud.folder.link..." value={editingSong.media_link} onChange={e => setEditingSong({...editingSong, media_link: e.target.value})} style={{ width: '100%', padding: '14px 14px 14px 48px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '1rem', fontWeight: 600 }} />
               </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>OneDrive/Dropbox PDF-Ordner (Noten Ordner-Link)</label>
+                <input placeholder="https://onedrive.live.com/... oder Dropbox..." value={editingSong.pdf_folder_url || ''} onChange={e => setEditingSong({...editingSong, pdf_folder_url: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '1rem', fontWeight: 600 }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>OneDrive Guitar Pro Link (.gp)</label>
+                <input placeholder="ms-onedrive://..." value={editingSong.guitar_pro_url || ''} onChange={e => setEditingSong({...editingSong, guitar_pro_url: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '1rem', fontWeight: 600 }} />
+              </div>
+            </div>
+
+            <div style={{ padding: '24px', background: '#f0f9ff', borderRadius: '20px', border: '1px solid #bae6fd', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 900, color: '#0369a1', margin: 0 }}>Instrumenten-spezifische PDFs (Direktanzeige in App)</h4>
+                <p style={{ fontSize: '0.8rem', color: '#0284c7', margin: 0, fontWeight: 600 }}>🌟 Tipp: Kopiere hier direkte Dropbox/OneDrive Links zu den einzelnen PDF-Dateien. Diese werden für Schüler nahtlos direkt in der App geöffnet!</p>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0369a1' }}>🎸 PDF E-Gitarre</label>
+                  <input placeholder="https://..." value={editingSong.pdf_guitar_url || ''} onChange={e => setEditingSong({...editingSong, pdf_guitar_url: e.target.value})} style={{ padding: '12px', borderRadius: '10px', border: '1px solid #bae6fd', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0369a1' }}>🎸 PDF E-Bass</label>
+                  <input placeholder="https://..." value={editingSong.pdf_bass_url || ''} onChange={e => setEditingSong({...editingSong, pdf_bass_url: e.target.value})} style={{ padding: '12px', borderRadius: '10px', border: '1px solid #bae6fd', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0369a1' }}>🥁 PDF E-Drums</label>
+                  <input placeholder="https://..." value={editingSong.pdf_drums_url || ''} onChange={e => setEditingSong({...editingSong, pdf_drums_url: e.target.value})} style={{ padding: '12px', borderRadius: '10px', border: '1px solid #bae6fd', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0369a1' }}>🎹 PDF E-Piano / Keys</label>
+                  <input placeholder="https://..." value={editingSong.pdf_keys_url || ''} onChange={e => setEditingSong({...editingSong, pdf_keys_url: e.target.value})} style={{ padding: '12px', borderRadius: '10px', border: '1px solid #bae6fd', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0369a1' }}>🎤 PDF Gesang / Vocals</label>
+                <input placeholder="https://..." value={editingSong.pdf_vocals_url || ''} onChange={e => setEditingSong({...editingSong, pdf_vocals_url: e.target.value})} style={{ padding: '12px', borderRadius: '10px', border: '1px solid #bae6fd', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: '#fffbeb', borderRadius: '16px', border: '1px solid #fef3c7' }}>
+              <input type="checkbox" id="edit-bypass-wlan" checked={!!editingSong.bypass_wlan_check} onChange={e => setEditingSong({...editingSong, bypass_wlan_check: e.target.checked})} style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: brandColor }} />
+              <label htmlFor="edit-bypass-wlan" style={{ fontSize: '0.9rem', fontWeight: 700, color: '#b45309', cursor: 'pointer' }}>
+                WLAN-Sperre für diesen Song ignorieren (Entwickler-Bypass für Home-Testing)
+              </label>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -2551,244 +2667,531 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
   const renderStudentDetailModal = () => {
     if (!selectedStudent) return null;
+
+    const calculateAge = (birthDate: string) => {
+      if (!birthDate) return null;
+      const birth = new Date(birthDate);
+      const now = new Date();
+      let age = now.getFullYear() - birth.getFullYear();
+      const m = now.getMonth() - birth.getMonth();
+      if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
+      return age;
+    };
+
+    const memberSince = selectedStudent.created_at
+      ? new Date(selectedStudent.created_at).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
+      : '';
+    const age = calculateAge(selectedStudent.birth_date);
+
+    // Instrument normalization helper
+    const getInstrumentIcon = (name: string) => {
+      const lower = (name || '').toLowerCase();
+      if (lower.includes('gitarre') || lower.includes('guitar')) return '🎸';
+      if (lower.includes('bass')) return '🎸';
+      if (lower.includes('drum')) return '🥁';
+      if (lower.includes('keys') || lower.includes('piano')) return '🎹';
+      if (lower.includes('vocals') || lower.includes('gesang') || lower.includes('sing')) return '🎤';
+      return '🎵';
+    };
+
+    const STUDENT_MODAL_INSTRUMENT_ICONS: Record<string, string> = { Guitar: '🎸', Keys: '🎹', Drums: '🥁', Bass: '🎸', Vocals: '🎤' };
+
+    // Grouping logic for songs
+    const groupedSongs = (studentDetails || []).reduce((acc: any, s: any) => {
+      const songId = s.song_id;
+      const level = s.difficulty_level;
+      const key = `${songId}_${level}`;
+      if (!acc[key]) {
+        acc[key] = {
+          id: songId,
+          title: s.songs?.title,
+          artist: s.songs?.artist,
+          level: level,
+          instruments: []
+        };
+      }
+      acc[key].instruments.push({
+        name: s.instrument,
+        part_number: s.part_number || 1,
+        progress: s.progress_percent || 0,
+        is_stage_ready: s.is_stage_ready
+      });
+      return acc;
+    }, {});
+
+    const songsArray = Object.values(groupedSongs);
+    const practiceBoard = songsArray.filter((s: any) => s.instruments.some((i: any) => i.progress > 0 && !i.is_stage_ready));
+    const repertoire = songsArray.filter((s: any) => s.instruments.some((i: any) => i.is_stage_ready));
+
+    const studentRadarData = (() => {
+      const radarBase: Record<string, number> = { Guitar: 0, Bass: 0, Drums: 0, Keys: 0, Vocals: 0 };
+      (studentDetails || []).forEach((s: any) => {
+        const sInst = s.instrument?.toLowerCase();
+        if (!sInst) return;
+        
+        let target: string | null = null;
+        if (sInst === 'guitar' || sInst === 'e-gitarre') target = 'Guitar';
+        else if (sInst === 'bass' || sInst === 'e-bass') target = 'Bass';
+        else if (sInst === 'drums' || sInst === 'e-drums') target = 'Drums';
+        else if (sInst === 'keys' || sInst === 'piano' || sInst === 'e-piano') target = 'Keys';
+        else if (sInst === 'vocals' || sInst === 'gesang') target = 'Vocals';
+        
+        if (target && radarBase[target] !== undefined) {
+          const prog = s.progress_percent || 0;
+          const xp = (s.is_stage_ready || prog === 100) ? 500 : prog * 2;
+          radarBase[target] += xp;
+        }
+      });
+      return Object.entries(radarBase).map(([inst, xp]) => ({ instrument: inst, xp }));
+    })();
+
     return (
-      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-        <div className="glass-panel" style={{ width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', background: 'white', borderRadius: '32px', position: 'relative', animation: 'modalSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)' }}>
-          <button onClick={() => setSelectedStudent(null)} style={{ position: 'absolute', top: '24px', right: '24px', width: '40px', height: '40px', borderRadius: '50%', background: '#f8fafc', border: '1px solid #e2e8f0', cursor: 'pointer', color: '#64748b', zIndex: 10 }}>×</button>
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+        <div className="glass-panel animation-slide-up" style={{ background: 'white', padding: '32px', borderRadius: '32px', maxWidth: '800px', width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
           
-          <div style={{ height: '140px', background: `linear-gradient(135deg, ${brandColor}, ${brandColor}dd)`, position: 'relative' }}>
-            <div style={{ position: 'absolute', bottom: '-40px', left: '32px', display: 'flex', alignItems: 'flex-end', gap: '20px' }}>
-              <div style={{ width: '100px', height: '100px', borderRadius: '28px', border: '5px solid white', background: '#f8fafc', overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}>
+          {/* Close button */}
+          <button onClick={() => setSelectedStudent(null)} style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(0,0,0,0.05)', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s', zIndex: 10 }}>
+            <X size={20} />
+          </button>
+
+          {/* Student Profile Header */}
+          <div style={{ display: 'flex', gap: '24px', marginBottom: '32px', alignItems: 'center', width: '100%' }}>
+            <div style={{ display: 'flex', gap: '24px', alignItems: 'center', flexShrink: 0 }}>
+              <div style={{ width: '100px', height: '100px', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', border: '4px solid white', background: '#f1f5f9', flexShrink: 0 }}>
                 <img src={selectedStudent.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               </div>
-              <div style={{ marginBottom: '8px' }}>
-                <h3 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>{selectedStudent.first_name} {selectedStudent.last_name}</h3>
-                <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#64748b' }}>Mitglied der Akademie</div>
+              <div>
+                <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0, whiteSpace: 'nowrap' }}>{selectedStudent.first_name} {selectedStudent.last_name}</h2>
+                <div style={{ display: 'flex', gap: '16px', marginTop: '8px', alignItems: 'center', flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
+                    <Calendar size={14} /> Member seit {memberSince}
+                  </div>
+                  {(selectedStudent.age || age) && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
+                      <User size={14} /> {selectedStudent.age || age} Jahre
+                    </div>
+                  )}
+                  <div style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', padding: '4px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 950, display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }}>
+                    <Star size={12} fill="white" /> {(studentDetails || []).filter((s: any) => s.is_stage_ready).length * 100} XP
+                  </div>
+                </div>
+                
+                {/* Instrument Master Counters */}
+                <div style={{ display: 'flex', gap: '12px', marginTop: '12px', flexWrap: 'nowrap', alignItems: 'center' }}>
+                  {['Guitar', 'Keys', 'Drums', 'Bass', 'Vocals'].map(inst => {
+                    const count = (studentDetails || []).filter((s: any) => {
+                      const sInst = s.instrument?.toLowerCase();
+                      const target = inst.toLowerCase();
+                      let match = false;
+                      if (target === 'guitar') match = sInst === 'guitar' || sInst === 'e-gitarre';
+                      else if (target === 'bass') match = sInst === 'bass' || sInst === 'e-bass';
+                      else if (target === 'drums') match = sInst === 'drums' || sInst === 'e-drums';
+                      else if (target === 'keys') match = sInst === 'keys' || sInst === 'piano' || sInst === 'e-piano';
+                      else if (target === 'vocals') match = sInst === 'vocals' || sInst === 'gesang';
+                      else match = sInst === target;
+                      return match && s.is_stage_ready;
+                    }).length;
+
+                    return (
+                      <div key={inst} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', padding: '6px 10px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
+                        <span style={{ fontSize: '1rem' }}>{STUDENT_MODAL_INSTRUMENT_ICONS[inst] || '🎵'}</span>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 900, color: count > 0 ? brandColor : '#94a3b8' }}>{count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Instrument Badge - One line below */}
+                <div style={{ marginTop: '10px' }}>
+                  <div style={{ display: 'inline-block', background: '#f1f5f9', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {selectedStudent.instrument || 'Multi-Talent'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Skill Radar centered dynamically in the empty space */}
+            <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', minWidth: '240px' }}>
+              <div style={{ width: '240px', height: '165px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'transparent' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart cx="50%" cy="50%" outerRadius="75%" data={studentRadarData}>
+                    <PolarGrid stroke="#e2e8f0" />
+                    <PolarAngleAxis dataKey="instrument" tick={({ x, y, payload }) => (
+                      <text x={x} y={y} textAnchor="middle" dominantBaseline="central" style={{ fontSize: 10, fontWeight: 900, fill: '#94a3b8' }}>
+                        {payload.value}
+                      </text>
+                    )} />
+                    <Radar name="XP" dataKey="xp" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.4} />
+                  </RadarChart>
+                </ResponsiveContainer>
               </div>
             </div>
           </div>
 
-          <div style={{ padding: '64px 32px 32px 32px' }}>
-             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '32px' }}>
-                <div style={{ padding: '20px', background: '#f8fafc', borderRadius: '24px', border: '1px solid #f1f5f9' }}>
-                  <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '8px' }}>Pädagogische Notizen</div>
+          {/* Premium Tab Navigation */}
+          <div style={{ display: 'flex', gap: '16px', borderBottom: '2px solid #f1f5f9', padding: '0 0 12px 0', marginBottom: '28px' }}>
+            <button
+              onClick={() => setStudentDetailTab('profile')}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '8px 16px',
+                fontSize: '0.9rem',
+                fontWeight: 900,
+                color: studentDetailTab === 'profile' ? brandColor : '#94a3b8',
+                borderBottom: studentDetailTab === 'profile' ? `3px solid ${brandColor}` : '3px solid transparent',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.2s',
+                marginBottom: '-14px',
+                outline: 'none'
+              }}
+            >
+              <Music size={16} /> Profil & Musik
+            </button>
+            <button
+              onClick={() => setStudentDetailTab('logbook')}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '8px 16px',
+                fontSize: '0.9rem',
+                fontWeight: 900,
+                color: studentDetailTab === 'logbook' ? brandColor : '#94a3b8',
+                borderBottom: studentDetailTab === 'logbook' ? `3px solid ${brandColor}` : '3px solid transparent',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.2s',
+                marginBottom: '-14px',
+                outline: 'none'
+              }}
+            >
+              <Clock size={16} /> Logbuch & Notizen
+            </button>
+          </div>
+
+          {/* Tab Content Rendering */}
+          {studentDetailTab === 'profile' ? (
+            /* TAB 1: PROFIL & MUSIK */
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '32px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+                {/* Üben Board */}
+                <section>
+                  <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#3b82f6', letterSpacing: '0.1em', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Clock size={16} /> Üben Board
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {practiceBoard.map((s: any) => (
+                      <div key={s.id + s.level} style={{ background: '#f8fafc', padding: '16px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                          <div>
+                            <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>{s.artist}</div>
+                            <div style={{ fontWeight: 900, fontSize: '1rem', color: '#1e293b' }}>{s.title}</div>
+                          </div>
+                          <div style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 900, background: s.level === 'starter' ? '#fffbeb' : '#eff6ff', color: s.level === 'starter' ? '#b45309' : '#2563eb' }}>
+                            {s.level === 'starter' ? '🚀 STARTER' : '⚡ PRO'}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                          {s.instruments.map((inst: any, idx: number) => (
+                            <div key={idx} style={{ fontSize: '0.75rem', fontWeight: 700, padding: '4px 8px', borderRadius: '8px', background: 'white', border: '1px solid #e2e8f0', color: inst.progress === 100 ? '#10b981' : (inst.progress > 0 ? brandColor : '#94a3b8') }}>
+                              {getInstrumentIcon(inst.name)} {inst.name}{inst.part_number > 1 || (s.instruments.filter((i:any) => i.name === inst.name).length > 1) ? ` ${inst.part_number}` : ''}: {inst.progress}%
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    {practiceBoard.length === 0 && (
+                      <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', padding: '8px 0' }}>Keine Songs am Board.</div>
+                    )}
+                  </div>
+                </section>
+
+                {/* Repertoire */}
+                <section>
+                  <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#10b981', letterSpacing: '0.1em', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Award size={16} /> Repertoire
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {repertoire.map((s: any) => (
+                      <div key={s.id + s.level} style={{ background: '#f0fdf4', padding: '16px', borderRadius: '20px', border: '1px solid #bbf7d0' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                          <div>
+                            <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#15803d', opacity: 0.7, textTransform: 'uppercase' }}>{s.artist}</div>
+                            <div style={{ fontWeight: 900, fontSize: '1rem', color: '#166534' }}>{s.title}</div>
+                          </div>
+                          <div style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 900, background: '#dcfce7', color: '#15803d' }}>
+                            {s.level === 'starter' ? '🚀 STARTER' : '⚡ PRO'}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                          {s.instruments.filter((i: any) => i.is_stage_ready).map((inst: any, idx: number) => (
+                            <div key={idx} style={{ fontSize: '0.75rem', fontWeight: 700, padding: '4px 8px', borderRadius: '8px', background: 'white', border: '1px solid #bbf7d0', color: '#10b981' }}>
+                              {getInstrumentIcon(inst.name)} {inst.name}{inst.part_number > 1 || (s.instruments.filter((i:any) => i.name === inst.name).length > 1) ? ` ${inst.part_number}` : ''}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    {repertoire.length === 0 && (
+                      <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', padding: '8px 0' }}>Noch kein Repertoire.</div>
+                    )}
+                  </div>
+                </section>
+              </div>
+
+              <aside style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                {/* Meine Bands */}
+                <section>
+                  <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#ec4899', letterSpacing: '0.1em', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Users size={16} /> Bands
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {studentBands.map((b: any) => (
+                      <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: '#fdf2f8', borderRadius: '20px', border: '1px solid #fbcfe8' }}>
+                        <div style={{ width: '44px', height: '44px', borderRadius: '12px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
+                          <img src={b.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                        <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#9d174d' }}>{b.name}</div>
+                      </div>
+                    ))}
+                    {studentBands.length === 0 && (
+                      <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', padding: '8px 0' }}>In keiner Band aktiv.</div>
+                    )}
+                  </div>
+                </section>
+              </aside>
+            </div>
+          ) : (
+            /* TAB 2: LOGBUCH & NOTIZEN */
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.1fr', gap: '32px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                {/* Pädagogische Notizen */}
+                <section style={{ padding: '24px', background: '#f8fafc', borderRadius: '24px', border: '1px solid #f1f5f9' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>Pädagogische Notizen</div>
                   <textarea 
                     defaultValue={selectedStudent.teacher_notes || ''}
                     onBlur={async (e) => {
                       await supabase.from('users').update({ teacher_notes: e.target.value }).eq('id', selectedStudent.id);
                     }}
                     placeholder="Eindrücke festhalten..."
-                    style={{ width: '100%', background: 'transparent', border: 'none', resize: 'none', minHeight: '100px', fontSize: '0.9rem', color: '#475569', fontWeight: 500 }}
+                    style={{ width: '100%', background: 'transparent', border: 'none', resize: 'none', minHeight: '120px', fontSize: '0.9rem', color: '#475569', fontWeight: 500, outline: 'none' }}
                   />
-                </div>
-                <div style={{ padding: '20px', background: '#f8fafc', borderRadius: '24px', border: '1px solid #f1f5f9' }}>
-                  <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '12px' }}>Aktivität & Status</div>
+                </section>
+
+                {/* Aktivität & Status */}
+                <section style={{ padding: '24px', background: '#f8fafc', borderRadius: '24px', border: '1px solid #f1f5f9' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '12px' }}>Aktivität & Status</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }}></div>
                       <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#475569' }}>Konto aktiv</span>
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Registriert seit: {new Date(selectedStudent.created_at).toLocaleDateString()}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>Registriert seit: {new Date(selectedStudent.created_at).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
                   </div>
-                </div>
+                </section>
+
+                {/* Digital ID Pass Button */}
+                <section>
+                  <button onClick={() => setSelectedQRUser(selectedStudent)} style={{ width: '100%', background: `${brandColor}10`, color: brandColor, border: `1px solid ${brandColor}30`, padding: '16px', borderRadius: '20px', fontWeight: 900, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', transition: 'all 0.2s' }}>
+                    <QrCode size={20} /> Digitalen ID-Pass anzeigen
+                  </button>
+                </section>
               </div>
 
-              <div style={{ padding: '24px', background: '#f8fafc', borderRadius: '24px', border: '1px solid #f1f5f9', marginBottom: '32px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Anwesenheit / Logbuch</div>
-                  {studentSessions && studentSessions.length > 0 && (
-                    <button 
-                      onClick={() => {
-                        const getW = (d: Date) => {
-                          const date = new Date(d.getTime());
-                          date.setHours(0, 0, 0, 0);
-                          date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
-                          const week1 = new Date(date.getFullYear(), 0, 4);
-                          return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
-                        };
-                        
-                        const groups: Record<string, any[]> = {};
-                        studentSessions.forEach(s => {
-                          const d = new Date(s.check_in_time);
-                          const kw = getW(d);
-                          const key = `${d.getFullYear()}-W${kw}`;
-                          if (!groups[key]) groups[key] = [];
-                          groups[key].push(s);
-                        });
-
-                        let text = `LOGBUCH: ${selectedStudent.first_name} ${selectedStudent.last_name}\n`;
-                        text += `Stand: ${new Date().toLocaleDateString()}\n\n`;
-
-                        Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0])).forEach(([key, sessions]) => {
-                          const kw = key.split('-W')[1];
-                          let line = `KW${kw}: `;
+              <aside style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                {/* Anwesenheit / Logbuch */}
+                <section style={{ padding: '24px', background: '#f8fafc', borderRadius: '24px', border: '1px solid #f1f5f9' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Logbuch / Anwesenheit</div>
+                    {studentSessions && studentSessions.length > 0 && (
+                      <button 
+                        onClick={() => {
+                          const getW = (d: Date) => {
+                            const date = new Date(d.getTime());
+                            date.setHours(0, 0, 0, 0);
+                            date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
+                            const week1 = new Date(date.getFullYear(), 0, 4);
+                            return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+                          };
                           
-                          // Group by day within the week
-                          const dayGroups: Record<string, any[]> = {};
-                          sessions.forEach(s => {
-                            const date = new Date(s.check_in_time).toISOString().split('T')[0];
-                            if (!dayGroups[date]) dayGroups[date] = [];
-                            dayGroups[date].push(s);
+                          const groups: Record<string, any[]> = {};
+                          studentSessions.forEach(s => {
+                            const d = new Date(s.check_in_time);
+                            const kw = getW(d);
+                            const key = `${d.getFullYear()}-W${kw}`;
+                            if (!groups[key]) groups[key] = [];
+                            groups[key].push(s);
                           });
 
-                          const openingHours = admin?.schools?.opening_hours;
+                          let text = `LOGBUCH: ${selectedStudent.first_name} ${selectedStudent.last_name}\n`;
+                          text += `Stand: ${new Date().toLocaleDateString()}\n\n`;
 
-                          Object.entries(dayGroups).sort((a, b) => a[0].localeCompare(b[0])).forEach(([date, daySessions], idx) => {
-                            const sorted = daySessions.sort((a,b) => new Date(a.check_in_time).getTime() - new Date(b.check_in_time).getTime());
-                            const first = sorted[0];
-                            const last = sorted[sorted.length - 1];
+                          Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0])).forEach(([key, sessions]) => {
+                            const kw = key.split('-W')[1];
+                            let line = `KW${kw}: `;
                             
-                            const d = new Date(first.check_in_time);
-                            const dayName = ['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA'][d.getDay()];
-                            const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                            
-                            const sessionStart = new Date(first.check_in_time);
-                            const sessionEnd = last.check_out_time ? new Date(last.check_out_time) : new Date();
+                            const dayGroups: Record<string, any[]> = {};
+                            sessions.forEach(s => {
+                              const date = new Date(s.check_in_time).toISOString().split('T')[0];
+                              if (!dayGroups[date]) dayGroups[date] = [];
+                              dayGroups[date].push(s);
+                            });
 
-                            // Opening Hours Intersection
-                            let minutes = 0;
-                            let displayStart = sessionStart;
-                            const dayKey = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][sessionStart.getDay()];
-                            const config = openingHours?.[dayKey];
+                            const openingHours = admin?.schools?.opening_hours;
 
-                            if (config && config.active) {
-                              const [sH, sM] = config.start.split(':').map(Number);
-                              const [eH, eM] = config.end.split(':').map(Number);
-                              const oStart = new Date(sessionStart); oStart.setHours(sH, sM, 0, 0);
-                              const oEnd = new Date(sessionStart); oEnd.setHours(eH, eM, 0, 0);
+                            Object.entries(dayGroups).sort((a, b) => a[0].localeCompare(b[0])).forEach(([date, daySessions], idx) => {
+                              const sorted = daySessions.sort((a,b) => new Date(a.check_in_time).getTime() - new Date(b.check_in_time).getTime());
+                              const first = sorted[0];
+                              const last = sorted[sorted.length - 1];
                               
-                              const finalS = new Date(Math.max(sessionStart.getTime(), oStart.getTime()));
-                              const finalE = new Date(Math.min(sessionEnd.getTime(), oEnd.getTime()));
+                              const d = new Date(first.check_in_time);
+                              const dayName = ['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA'][d.getDay()];
                               
-                              if (finalS < finalE) {
-                                minutes = Math.floor((finalE.getTime() - finalS.getTime()) / 60000);
-                                displayStart = finalS;
-                              } else {
-                                return; // Don't show if no overlap
-                              }
-                            }
-                            
-                            const displayTime = displayStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                            const dur = minutes >= 60 ? `${Math.floor(minutes/60)}h ${minutes%60}m` : `${minutes}m`;
-                            line += `${idx > 0 ? ' | ' : ''}${dayName} ${displayTime} Uhr (${dur})`;
-                          });
-                          text += line + '\n';
-                        });
+                              const sessionStart = new Date(first.check_in_time);
+                              const sessionEnd = last.check_out_time ? new Date(last.check_out_time) : new Date();
 
-                        const blob = new Blob([text], { type: 'text/plain' });
-                        const url = URL.createObjectURL(blob);
-                        const link = document.createElement('a');
-                        link.href = url;
-                        link.download = `Anwesenheit_${selectedStudent.first_name}_${selectedStudent.last_name}.txt`;
-                        link.click();
-                        URL.revokeObjectURL(url);
-                      }}
-                      style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px 12px', fontSize: '0.65rem', fontWeight: 800, color: brandColor, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-                    >
-                      <Download size={12} /> EXPORT (.txt)
-                    </button>
-                  )}
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {(() => {
-                    if (!studentSessions || studentSessions.length === 0) {
-                      return <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>Noch keine Sessions aufgezeichnet.</div>;
-                    }
+                              let minutes = 0;
+                              let displayStart = sessionStart;
+                              const dayKey = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][sessionStart.getDay()];
+                              const config = openingHours?.[dayKey];
 
-                    const getWeekNum = (d: Date) => {
-                      const date = new Date(d.getTime());
-                      date.setHours(0, 0, 0, 0);
-                      date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
-                      const week1 = new Date(date.getFullYear(), 0, 4);
-                      return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
-                    };
-
-                    const groups: Record<string, any[]> = {};
-                    studentSessions.forEach(s => {
-                      const d = new Date(s.check_in_time);
-                      const kw = getWeekNum(d);
-                      const year = d.getFullYear();
-                      const key = `${year}-W${kw}`;
-                      if (!groups[key]) groups[key] = [];
-                      groups[key].push(s);
-                    });
-
-                    return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0])).map(([key, sessions]) => {
-                      const kw = key.split('-W')[1];
-                      return (
-                        <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', fontSize: '0.85rem', color: '#475569' }}>
-                          <span style={{ fontWeight: 800, color: brandColor, minWidth: '45px', marginTop: '4px' }}>KW{kw}</span>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', rowGap: '8px' }}>
-                            {(() => {
-                              const dayGroups: Record<string, any[]> = {};
-                              sessions.forEach(s => {
-                                const dStr = new Date(s.check_in_time).toISOString().split('T')[0];
-                                if (!dayGroups[dStr]) dayGroups[dStr] = [];
-                                dayGroups[dStr].push(s);
-                              });
-
-                              return Object.entries(dayGroups).sort((a, b) => a[0].localeCompare(b[0])).map(([date, daySessions], idx) => {
-                                const sorted = daySessions.sort((a,b) => new Date(a.check_in_time).getTime() - new Date(b.check_in_time).getTime());
-                                const first = sorted[0];
-                                const last = sorted[sorted.length - 1];
+                              if (config && config.active) {
+                                const [sH, sM] = config.start.split(':').map(Number);
+                                const [eH, eM] = config.end.split(':').map(Number);
+                                const oStart = new Date(sessionStart); oStart.setHours(sH, sM, 0, 0);
+                                const oEnd = new Date(sessionStart); oEnd.setHours(eH, eM, 0, 0);
                                 
-                                const d = new Date(first.check_in_time);
-                                const day = ['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA'][d.getDay()];
-                                const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                const finalS = new Date(Math.max(sessionStart.getTime(), oStart.getTime()));
+                                const finalE = new Date(Math.min(sessionEnd.getTime(), oEnd.getTime()));
                                 
-                                const sessionStart = new Date(first.check_in_time);
-                                const sessionEnd = last.check_out_time ? new Date(last.check_out_time) : new Date();
-
-                                // Opening Hours Intersection
-                                let minutes = 0;
-                                let displayStart = sessionStart;
-                                const openingHours = admin?.schools?.opening_hours;
-                                const dayKey = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][sessionStart.getDay()];
-                                const config = openingHours?.[dayKey];
-
-                                if (config && config.active) {
-                                  const [sH, sM] = config.start.split(':').map(Number);
-                                  const [eH, eM] = config.end.split(':').map(Number);
-                                  const oStart = new Date(sessionStart); oStart.setHours(sH, sM, 0, 0);
-                                  const oEnd = new Date(sessionStart); oEnd.setHours(eH, eM, 0, 0);
-                                  
-                                  const finalS = new Date(Math.max(sessionStart.getTime(), oStart.getTime()));
-                                  const finalE = new Date(Math.min(sessionEnd.getTime(), oEnd.getTime()));
-                                  
-                                  if (finalS < finalE) {
-                                    minutes = Math.floor((finalE.getTime() - finalS.getTime()) / 60000);
-                                    displayStart = finalS;
-                                  } else {
-                                    return null; // Skip if no overlap with opening hours
-                                  }
+                                if (finalS < finalE) {
+                                  minutes = Math.floor((finalE.getTime() - finalS.getTime()) / 60000);
+                                  displayStart = finalS;
+                                } else {
+                                  return;
                                 }
+                              }
+                              
+                              const displayTime = displayStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                              const dur = minutes >= 60 ? `${Math.floor(minutes/60)}h ${minutes%60}m` : `${minutes}m`;
+                              line += `${idx > 0 ? ' | ' : ''}${dayName} ${displayTime} Uhr (${dur})`;
+                            });
+                            text += line + '\n';
+                          });
 
-                                const displayTime = displayStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                                const duration = minutes >= 60 ? `${Math.floor(minutes/60)}h ${minutes%60}m` : `${minutes}m`;
-                                
-                                return (
-                                  <span key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'white', padding: '6px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                                    <span style={{ fontWeight: 900, color: '#1e293b', fontSize: '0.7rem' }}>{day}</span>
-                                    <span style={{ fontWeight: 600 }}>{displayTime} Uhr</span>
-                                    <span style={{ color: '#94a3b8', fontSize: '0.7rem', fontWeight: 700 }}>({duration})</span>
-                                  </span>
-                                );
-                              });
-                            })()}
+                          const blob = new Blob([text], { type: 'text/plain' });
+                          const url = URL.createObjectURL(blob);
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.download = `Anwesenheit_${selectedStudent.first_name}_${selectedStudent.last_name}.txt`;
+                          link.click();
+                          URL.revokeObjectURL(url);
+                        }}
+                        style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px 12px', fontSize: '0.65rem', fontWeight: 800, color: brandColor, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        <Download size={12} /> EXPORT (.txt)
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '350px', overflowY: 'auto', paddingRight: '4px' }}>
+                    {(() => {
+                      if (!studentSessions || studentSessions.length === 0) {
+                        return <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>Noch keine Sessions aufgezeichnet.</div>;
+                      }
+
+                      const getWeekNum = (d: Date) => {
+                        const date = new Date(d.getTime());
+                        date.setHours(0, 0, 0, 0);
+                        date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
+                        const week1 = new Date(date.getFullYear(), 0, 4);
+                        return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+                      };
+
+                      const groups: Record<string, any[]> = {};
+                      studentSessions.forEach(s => {
+                        const d = new Date(s.check_in_time);
+                        const kw = getWeekNum(d);
+                        const year = d.getFullYear();
+                        const key = `${year}-W${kw}`;
+                        if (!groups[key]) groups[key] = [];
+                        groups[key].push(s);
+                      });
+
+                      return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0])).map(([key, sessions]) => {
+                        const kw = key.split('-W')[1];
+                        return (
+                          <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px' }}>
+                            <span style={{ fontWeight: 800, color: brandColor, minWidth: '40px', marginTop: '4px' }}>KW{kw}</span>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                              {(() => {
+                                const dayGroups: Record<string, any[]> = {};
+                                sessions.forEach(s => {
+                                  const dStr = new Date(s.check_in_time).toISOString().split('T')[0];
+                                  if (!dayGroups[dStr]) dayGroups[dStr] = [];
+                                  dayGroups[dStr].push(s);
+                                });
+
+                                return Object.entries(dayGroups).sort((a, b) => a[0].localeCompare(b[0])).map(([date, daySessions], idx) => {
+                                  const sorted = daySessions.sort((a,b) => new Date(a.check_in_time).getTime() - new Date(b.check_in_time).getTime());
+                                  const first = sorted[0];
+                                  const last = sorted[sorted.length - 1];
+                                  
+                                  const d = new Date(first.check_in_time);
+                                  const day = ['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA'][d.getDay()];
+                                  
+                                  const sessionStart = new Date(first.check_in_time);
+                                  const sessionEnd = last.check_out_time ? new Date(last.check_out_time) : new Date();
+
+                                  let minutes = 0;
+                                  let displayStart = sessionStart;
+                                  const openingHours = admin?.schools?.opening_hours;
+                                  const dayKey = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][sessionStart.getDay()];
+                                  const config = openingHours?.[dayKey];
+
+                                  if (config && config.active) {
+                                    const [sH, sM] = config.start.split(':').map(Number);
+                                    const [eH, eM] = config.end.split(':').map(Number);
+                                    const oStart = new Date(sessionStart); oStart.setHours(sH, sM, 0, 0);
+                                    const oEnd = new Date(sessionStart); oEnd.setHours(eH, eM, 0, 0);
+                                    
+                                    const finalS = new Date(Math.max(sessionStart.getTime(), oStart.getTime()));
+                                    const finalE = new Date(Math.min(sessionEnd.getTime(), oEnd.getTime()));
+                                    
+                                    if (finalS < finalE) {
+                                      minutes = Math.floor((finalE.getTime() - finalS.getTime()) / 60000);
+                                      displayStart = finalS;
+                                    } else {
+                                      return null;
+                                    }
+                                  }
+
+                                  const displayTime = displayStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                  const duration = minutes >= 60 ? `${Math.floor(minutes/60)}h ${minutes%60}m` : `${minutes}m`;
+                                  
+                                  return (
+                                    <span key={idx} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'white', padding: '4px 8px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.75rem' }}>
+                                      <span style={{ fontWeight: 900, color: '#1e293b' }}>{day}</span>
+                                      <span style={{ fontWeight: 600 }}>{displayTime}</span>
+                                      <span style={{ color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700 }}>({duration})</span>
+                                    </span>
+                                  );
+                                });
+                              })()}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              </div>
-
-              <div style={{ textAlign: 'center' }}>
-               <button onClick={() => setSelectedQRUser(selectedStudent)} style={{ width: '100%', background: `${brandColor}10`, color: brandColor, border: `1px solid ${brandColor}30`, padding: '16px', borderRadius: '16px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-                 <QrCode size={20} /> Digitalen ID-Pass anzeigen
-               </button>
-             </div>
-          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </section>
+              </aside>
+            </div>
+          )}
         </div>
       </div>
     );

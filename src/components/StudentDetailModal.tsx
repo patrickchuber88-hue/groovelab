@@ -30,10 +30,16 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         .select('bands(*)')
         .eq('user_id', student.id);
       
-      const uniqueBands = (bandsData || [])
-        .map((m: any) => Array.isArray(m.bands) ? m.bands[0] : m.bands)
-        .filter(Boolean);
-      setBands(uniqueBands);
+      const uniqueBandsList: any[] = [];
+      const seenBandIds = new Set();
+      (bandsData || []).forEach((m: any) => {
+        const b = Array.isArray(m.bands) ? m.bands[0] : m.bands;
+        if (b && !seenBandIds.has(b.id)) {
+          seenBandIds.add(b.id);
+          uniqueBandsList.push(b);
+        }
+      });
+      setBands(uniqueBandsList);
 
       setLoading(false);
     };

@@ -6,6 +6,8 @@ const supabase = createClient(process.env.VITE_SUPABASE_URL!, process.env.VITE_S
 
 async function run() {
   const { data: rooms } = await supabase.from('rooms').select('*');
-  console.log('Rooms columns:', Object.keys(rooms?.[0] || {}));
+  console.log('Rooms:', rooms);
+  const { data: stations } = await supabase.from('stations').select('*');
+  console.log('Stations:', stations);
 }
 run();

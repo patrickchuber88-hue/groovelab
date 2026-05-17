@@ -298,6 +298,8 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
   const [stations, setStations] = useState<any[]>([]);
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
   const [wallSongs, setWallSongs] = useState<any[]>([]);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [allSubmissions, setAllSubmissions] = useState<any[]>([]);
   const [showAllSubmissions, setShowAllSubmissions] = useState(false);
@@ -334,6 +336,7 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
 
   const fetchData = async () => {
     if (!userId) return;
+    setFetchError(null);
 
     // Update coach presence in DB
     supabase.from('users').update({ last_seen: new Date().toISOString() }).eq('id', userId).then(() => {});
@@ -423,6 +426,13 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
         const { data: helpData } = await supabase.from('help_requests').select('*, users(*)').eq('school_id', tData.school_id).eq('status', 'pending').order('created_at', { ascending: false });
         setHelpRequests(helpData || []);
 
+        // Part B: Explicit Bands in Formation & Active (Fetched early to prevent TDZ errors in poolFormations)
+        const { data: formingBands } = await supabase
+          .from('bands')
+          .select('*, band_members(*, profiles:users(id, first_name, last_name, photo_url, created_at, birth_date)), songs(*), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, last_name, photo_url, created_at, birth_date)))')
+          .eq('school_id', tData.school_id)
+          .in('status', ['forming', 'active']);
+
         // 9. Band-Matching (Comprehensive Pool)
         // We fetch from 'songs' and also 'band_song_slots' to see who is already occupied
         const { data: wallData, error: wallErr } = await supabase
@@ -442,19 +452,137 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
 
         if (wallErr) console.error('[Dashboard] Error fetching wallData:', wallErr);
 
+        // Construct schoolSkillsMap for matching checks
+        const schoolSkillsMap: Record<string, any[]> = {};
+        (wallData || []).forEach((s: any) => {
+          (s.user_song_skills || []).forEach((skill: any) => {
+            if (!skill.song_id) skill.song_id = s.id;
+            if (!schoolSkillsMap[skill.user_id]) schoolSkillsMap[skill.user_id] = [];
+            schoolSkillsMap[skill.user_id].push(skill);
+          });
+        });
+
         const poolFormations: any[] = [];
         (wallData || []).forEach(song => {
+          // Pre-calculate all occupied user-instrument slots for this song across all its band projects (forming or active)
+          const occupiedUserInstruments = new Set<string>();
+
+          const projectsForThisSongMap = new Map<string, any>();
+          
+          // Collect band_songs from formingBands
+          (formingBands || []).forEach((b: any) => {
+            (b.band_songs || []).forEach((bs: any) => {
+              if (bs.song_id === song.id && bs.band_id) {
+                projectsForThisSongMap.set(b.id, {
+                  ...bs,
+                  bands: b,
+                  band_song_slots: bs.band_song_slots || []
+                });
+              }
+            });
+          });
+
+          // Also check forming bands that are currently founding on this song
+          (formingBands || []).filter((b: any) => b.song_id === song.id).forEach((b: any) => {
+            if (!projectsForThisSongMap.has(b.id)) {
+              projectsForThisSongMap.set(b.id, {
+                id: `forming_${b.id}`,
+                band_id: b.id,
+                status: 'forming',
+                bands: b,
+                band_song_slots: []
+              });
+            }
+          });
+
+          Array.from(projectsForThisSongMap.values()).forEach((bs: any) => {
+            if (bs.status === 'mastered') return;
+            const band = (formingBands || []).find((b: any) => b.id === bs.band_id) || bs.bands;
+            if (!band || band.school_id !== tData.school_id) return;
+
+            const slots = bs.band_song_slots || [];
+            const membersList: any[] = [];
+            const addedUserIds = new Set<string>();
+            const addedSlotKeys = new Set<string>();
+
+            // A. Add participants from slots (guests and suggester)
+            slots.filter((sl: any) => sl.user_id).forEach((sl: any) => {
+              const normalizedMemberInst = normalizeInstrument(sl.instrument);
+              
+              // Skip core band members in slots unless it's Vocals, so smart allocation handles them
+              const isCoreMember = (band.band_members || []).some((bm: any) => bm.user_id === sl.user_id);
+              if (isCoreMember && !normalizedMemberInst.includes('vocal') && !normalizedMemberInst.includes('gesang')) {
+                return;
+              }
+
+              const slPart = sl.part_number || 1;
+              const slotKey = `${sl.user_id}_${normalizedMemberInst}_${slPart}`;
+              if (addedSlotKeys.has(slotKey)) return;
+              addedSlotKeys.add(slotKey);
+              addedUserIds.add(sl.user_id);
+              
+              occupiedUserInstruments.add(`${sl.user_id}:${normalizedMemberInst}`);
+              membersList.push({ user_id: sl.user_id, instrument: normalizedMemberInst, part_number: slPart });
+            });
+
+            // B. Add core band members using the smart vacant slot allocation logic
+            const requiredInsts = song.instrumentation || { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 };
+            let instCount: Record<string, number> = {};
+            membersList.forEach((m: any) => {
+              instCount[m.instrument] = Math.max(instCount[m.instrument] || 0, m.part_number || 1);
+            });
+
+            (band.band_members || []).forEach((bm: any) => {
+              if (addedUserIds.has(bm.user_id)) return;
+              
+              const normalizedMemberInst = normalizeInstrument(bm.instrument);
+              const skills = schoolSkillsMap[bm.user_id] || [];
+
+              // Determine which instrument this core member should fill for this song
+              let targetInstrument = normalizedMemberInst;
+              
+              const isInstSlotFilled = (instName: string) => {
+                const normTarget = normalizeInstrument(instName);
+                const countRequired = requiredInsts[instName] || 0;
+                const countFilled = membersList.filter((m: any) => normalizeInstrument(m.instrument) === normTarget).length;
+                return countFilled >= countRequired;
+              };
+
+              const coreInstRequired = Object.keys(requiredInsts).some(ri => normalizeInstrument(ri) === normalizedMemberInst);
+              const coreInstFilled = isInstSlotFilled(bm.instrument);
+
+              if (coreInstRequired && !coreInstFilled) {
+                targetInstrument = normalizedMemberInst;
+              } else {
+                const alternativeInst = Object.keys(requiredInsts).find(ri => {
+                  const normRi = normalizeInstrument(ri);
+                  if (isInstSlotFilled(ri)) return false;
+                  return skills.some((sk: any) => 
+                    sk.song_id === song.id && 
+                    normalizeInstrument(sk.instrument) === normRi && 
+                    (sk.is_stage_ready || (sk.progress_percent || 0) >= 100)
+                  );
+                });
+                if (alternativeInst) {
+                  targetInstrument = normalizeInstrument(alternativeInst);
+                }
+              }
+
+              addedUserIds.add(bm.user_id);
+              occupiedUserInstruments.add(`${bm.user_id}:${targetInstrument}`);
+              membersList.push({ user_id: bm.user_id, instrument: targetInstrument, part_number: (instCount[targetInstrument] || 0) + 1 });
+            });
+          });
+
           const instrumentation = song.instrumentation || { 'E-Gitarre': 1, 'E-Drums': 1, 'E-Bass': 1 };
           
           ['starter', 'original'].forEach(level => {
             const levelSkills = (song.user_song_skills || []).filter((s: any) => {
               const prof = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
-              const isReady = s.is_stage_ready && (s.difficulty_level || 'original') === level && prof?.school_id === tData.school_id;
+              const isReady = (s.is_stage_ready || (s.progress_percent || 0) >= 100) && (s.difficulty_level || 'original') === level && prof?.school_id === tData.school_id;
               
-              // Filter out if already in a band for this song
-              const isOccupied = (occupiedSlots || []).some(os => 
-                os.user_id === s.user_id && (Array.isArray(os.band_songs) ? os.band_songs[0]?.song_id : (os.band_songs as any)?.song_id) === song.id
-              );
+              // Filter out if already in a band project for this song
+              const isOccupied = occupiedUserInstruments.has(`${s.user_id}:${normalizeInstrument(s.instrument)}`);
               
               return isReady && !isOccupied;
             });
@@ -495,10 +623,9 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
                 });
 
                 matchingKeys.forEach(([i, c]) => {
+                  const normTarget = normalizeInstrument(i);
                   const filledForInst = members.filter((s: any) => {
-                    const si = (s.instrument || '').toLowerCase();
-                    const target = i.toLowerCase();
-                    return si.includes(target.replace('e-', '')) || target.includes(si.replace('e-', ''));
+                    return normalizeInstrument(s.instrument) === normTarget;
                   }).length;
 
                   for(let k=0; k < (c as number) - filledForInst; k++) {
@@ -512,42 +639,28 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
                 });
               });
 
-              if (missingInstruments.length > 0) {
-                poolFormations.push({
-                  id: `pool_${song.id}_${level}_${groupKey}`,
-                  song: song,
-                  members,
-                  openSlots: missingInstruments.length,
-                  missingInstruments,
-                  type: 'pool'
-                });
-              }
+              poolFormations.push({
+                id: `pool_${song.id}_${level}_${groupKey}`,
+                song: song,
+                members,
+                openSlots: missingInstruments.length,
+                missingInstruments,
+                type: 'pool',
+                level
+              });
             });
           });
         });
 
-        // Construct schoolSkillsMap for matching checks
-        const schoolSkillsMap: Record<string, any[]> = {};
-        (wallData || []).forEach((s: any) => {
-          (s.user_song_skills || []).forEach((skill: any) => {
-            if (!skill.song_id) skill.song_id = s.id;
-            if (!schoolSkillsMap[skill.user_id]) schoolSkillsMap[skill.user_id] = [];
-            schoolSkillsMap[skill.user_id].push(skill);
-          });
-        });
 
-        // Part B: Explicit Bands in Formation
-        const { data: formingBands } = await supabase
-          .from('bands')
-          .select('*, band_members(*, profiles:users(id, first_name, last_name, photo_url, created_at, birth_date)), songs(*), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, last_name, photo_url, created_at, birth_date)))')
-          .eq('school_id', tData.school_id)
-          .eq('status', 'forming');
-          
-        // Collect all open proposals where logged-in user is a band member
+
+        // Collect all open proposals where logged-in user is a band member (or all proposals in school for coaches)
         const userProposals: any[] = [];
         (formingBands || []).forEach(b => {
-          const isUserBandMember = (b.band_members || []).some((m: any) => m.user_id === userId);
-          if (!isUserBandMember) return;
+          if (viewMode === 'student') {
+            const isUserBandMember = (b.band_members || []).some((m: any) => m.user_id === userId);
+            if (!isUserBandMember) return;
+          }
           
           (b.band_songs || []).forEach((bs: any) => {
             if (bs.status === 'proposal') {
@@ -645,74 +758,170 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
 
         const bandFormations: any[] = [];
         (formingBands || []).forEach(b => {
-          const mainSong = b.band_songs?.[0];
-          const songObj = mainSong?.songs || b.songs;
-          if (!songObj) return;
-
           const isUserBandMember = (b.band_members || []).some((m: any) => m.user_id === userId);
-          if (isUserBandMember) return; // Hide own band projects from Matching Board widget!
 
-          // If the band song status is 'proposal' or forming and we check approval status,
-          // only show the song publicly if all band members have approved (mastered) it for their instruments.
-          if (mainSong && mainSong.status === 'proposal') {
-            const bMembers = b.band_members || [];
-            if (bMembers.length === 0) return;
-            
-            const allApproved = bMembers.every((bm: any) => {
-              const bmInst = normalizeInstrument(bm.instrument);
-              if (bmInst === 'Vocals') return true;
-              const userSkills = schoolSkillsMap[bm.user_id] || [];
-              return userSkills.some((sk: any) => 
+          (b.band_songs || []).forEach((bs: any) => {
+            if (bs.status === 'mastered' || bs.status === 'active') return;
+            const songObj = bs.songs;
+            if (!songObj) return;
+
+            const slots = bs.band_song_slots || [];
+            const members: any[] = [];
+            const addedUserIds = new Set<string>();
+            const addedSlotKeys = new Set<string>();
+
+            // 1. Add participants from slots (guests only – skip core members so smart allocation handles them)
+            slots.filter((sl: any) => sl.user_id).forEach((sl: any) => {
+              const normalizedMemberInst = normalizeInstrument(sl.instrument);
+              
+              // Skip core band members in slots (unless Vocals) – smart allocation (step 2) will place them correctly
+              const isCoreMember = (b.band_members || []).some((bm: any) => bm.user_id === sl.user_id);
+              if (isCoreMember && !normalizedMemberInst.toLowerCase().includes('vocal') && !normalizedMemberInst.toLowerCase().includes('gesang')) {
+                return;
+              }
+
+              const slPart = sl.part_number || 1;
+              const slotKey = `${sl.user_id}_${normalizedMemberInst}_${slPart}`;
+              
+              if (addedSlotKeys.has(slotKey)) return;
+              addedSlotKeys.add(slotKey);
+              addedUserIds.add(sl.user_id);
+              
+              const prof = Array.isArray(sl.profiles) ? sl.profiles[0] : sl.profiles;
+              const skills = schoolSkillsMap[sl.user_id] || [];
+              const isMastered = skills.some((sk: any) => 
                 sk.song_id === songObj.id && 
-                normalizeInstrument(sk.instrument) === bmInst && 
+                normalizeInstrument(sk.instrument) === normalizedMemberInst && 
+                (sk.part_number || 1) === slPart &&
                 (sk.is_stage_ready || (sk.progress_percent || 0) >= 100)
               );
-            });
-            
-            if (!allApproved) return;
-          }
 
-          const slots = mainSong?.band_song_slots || [];
-          const filledMembers = slots.filter((s: any) => s.user_id);
-          
-          const inst = songObj?.instrumentation || { 'E-Gitarre': 1, 'E-Drums': 1, 'E-Bass': 1 };
-          const missingInstruments: string[] = [];
-          const order = ['E-Gitarre', 'E-Drums', 'E-Piano', 'E-Bass'];
-          order.forEach(targetInst => {
-            const matchingKeys = Object.entries(inst).filter(([i, c]) => {
-              const low = i.toLowerCase();
-              const targetLow = targetInst.toLowerCase();
-              return low.includes(targetLow.replace('e-', '')) || targetLow.includes(low.replace('e-', ''));
+              members.push({
+                user_id: sl.user_id,
+                first_name: prof?.first_name || 'Musiker',
+                photo_url: prof?.photo_url,
+                instrument: normalizedMemberInst,
+                part_number: slPart,
+                isFromBand: true,
+                isMastered
+              });
             });
 
-            matchingKeys.forEach(([i, c]) => {
-              const filledCount = slots.filter((s: any) => {
-                const si = (s.instrument || '').toLowerCase();
-                const target = i.toLowerCase();
-                return s.user_id && (si.includes(target.replace('e-', '')) || target.includes(si.replace('e-', '')));
-              }).length;
-              for(let k=0; k < (c as number) - filledCount; k++) {
-                let norm = i;
-                if (i.toLowerCase().includes('guitar')) norm = 'E-Gitarre';
-                else if (i.toLowerCase().includes('drum')) norm = 'E-Drums';
-                else if (i.toLowerCase().includes('bass')) norm = 'E-Bass';
-                else if (i.toLowerCase().includes('piano') || i.toLowerCase().includes('keys')) norm = 'E-Piano';
-                missingInstruments.push(norm);
+            // 2. Add core band members who aren't in slots yet
+            let instCount: Record<string, number> = {};
+            members.forEach((m: any) => {
+              instCount[m.instrument] = Math.max(instCount[m.instrument] || 0, m.part_number || 1);
+            });
+
+            (b.band_members || []).forEach((bm: any) => {
+              if (addedUserIds.has(bm.user_id)) return;
+              
+              const prof = bm.profiles ? (Array.isArray(bm.profiles) ? bm.profiles[0] : bm.profiles) : null;
+              if (prof) {
+                const normalizedMemberInst = normalizeInstrument(bm.instrument);
+                const skills = schoolSkillsMap[bm.user_id] || [];
+
+                // Determine which instrument this core member should fill for this song
+                let targetInstrument = normalizedMemberInst;
+                const requiredInsts = songObj.instrumentation || { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 };
+                
+                // Helper to check if a specific required instrument slot is already fully filled
+                const isInstSlotFilled = (instName: string) => {
+                  const normTarget = normalizeInstrument(instName);
+                  const countRequired = requiredInsts[instName] || 0;
+                  const countFilled = members.filter((m: any) => normalizeInstrument(m.instrument) === normTarget).length;
+                  return countFilled >= countRequired;
+                };
+
+                // If their core instrument is required by the song and not fully filled yet, use it
+                const coreInstRequired = Object.keys(requiredInsts).some(ri => normalizeInstrument(ri) === normalizedMemberInst);
+                const coreInstFilled = isInstSlotFilled(bm.instrument);
+
+                if (coreInstRequired && !coreInstFilled) {
+                  targetInstrument = normalizedMemberInst;
+                } else {
+                  // Otherwise, check if they have 100% mastered skills for any of the other required but empty/incomplete slots!
+                  const alternativeInst = Object.keys(requiredInsts).find(ri => {
+                    const normRi = normalizeInstrument(ri);
+                    if (isInstSlotFilled(ri)) return false;
+                    
+                    // Check if they have 100% skill for this instrument
+                    return skills.some((sk: any) => 
+                      sk.song_id === songObj.id && 
+                      normalizeInstrument(sk.instrument) === normRi && 
+                      (sk.is_stage_ready || (sk.progress_percent || 0) >= 100)
+                    );
+                  });
+                  
+                  if (alternativeInst) {
+                    targetInstrument = normalizeInstrument(alternativeInst);
+                  }
+                }
+
+                addedUserIds.add(bm.user_id);
+                const nextPart = (instCount[targetInstrument] || 0) + 1;
+                instCount[targetInstrument] = nextPart;
+
+                const isMastered = skills.some((sk: any) => 
+                  sk.song_id === songObj.id && 
+                  normalizeInstrument(sk.instrument) === targetInstrument && 
+                  (sk.part_number || 1) === nextPart &&
+                  (sk.is_stage_ready || (sk.progress_percent || 0) >= 100)
+                );
+
+                members.push({
+                  user_id: bm.user_id,
+                  first_name: prof.first_name || 'Musiker',
+                  photo_url: prof.photo_url,
+                  instrument: targetInstrument,
+                  part_number: nextPart,
+                  isFromBand: true,
+                  isMastered
+                });
               }
             });
-          });
 
-          bandFormations.push({
-            id: b.id,
-            song: songObj,
-            members: filledMembers,
-            openSlots: missingInstruments.length,
-            missingInstruments,
-            type: 'band'
+            const requiredInsts = songObj.instrumentation || { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 };
+            const missingInstruments: string[] = [];
+            const order = ['E-Gitarre', 'E-Drums', 'E-Piano', 'E-Bass'];
+            
+            order.forEach(targetInst => {
+              const matchingKeys = Object.entries(requiredInsts).filter(([i, c]) => {
+                const low = i.toLowerCase();
+                const targetLow = targetInst.toLowerCase();
+                return low.includes(targetLow.replace('e-', '')) || targetLow.includes(low.replace('e-', ''));
+              });
+
+              matchingKeys.forEach(([i, c]) => {
+                const normTarget = normalizeInstrument(i);
+                const filledCount = members.filter((m: any) => {
+                  return normalizeInstrument(m.instrument) === normTarget;
+                }).length;
+                
+                for(let k=0; k < (c as number) - filledCount; k++) {
+                  let norm = i;
+                  if (i.toLowerCase().includes('guitar')) norm = 'E-Gitarre';
+                  else if (i.toLowerCase().includes('drum')) norm = 'E-Drums';
+                  else if (i.toLowerCase().includes('bass')) norm = 'E-Bass';
+                  else if (i.toLowerCase().includes('piano') || i.toLowerCase().includes('keys')) norm = 'E-Piano';
+                  missingInstruments.push(norm);
+                }
+              });
+            });
+
+            bandFormations.push({
+              id: `band_${bs.id}`,
+              song: songObj,
+              members: members,
+              openSlots: missingInstruments.length,
+              missingInstruments,
+              type: 'band',
+              level: bs.difficulty_level || 'original'
+            });
           });
         });
 
-        // Combine and sort (Limit to 2 for the dashboard widget, prioritizing most complete)
+        // Combine and sort (Limit to 2 for the dashboard widget, prioritizing most complete, but hiding complete formations)
         const allMatching = [...bandFormations, ...poolFormations]
           .filter(f => f.openSlots > 0)
           .sort((a, b) => a.openSlots - b.openSlots)
@@ -730,24 +939,31 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
 
         if (userBandIds.length > 0) {
           const { data: bandsWithMembers } = await supabase.from('bands').select('id, name, band_members(user_id)').in('id', userBandIds);
-          const allMemberIds = [...new Set((bandsWithMembers || []).flatMap(b => b.band_members.map((m: any) => m.user_id)))];
+          const allMemberIds = [...new Set((bandsWithMembers || []).flatMap(b => (b.band_members || []).map((m: any) => m.user_id)))];
           
           if (allMemberIds.length > 0) {
             const { data: planning } = await supabase.from('lab_planning').select('*').in('user_id', allMemberIds);
             
             const suggestions = (bandsWithMembers || []).map(band => {
-              const bMemberIds = band.band_members.map((m: any) => m.user_id);
+              const bMemberIds = [...new Set((band.band_members || []).map((m: any) => m.user_id))];
               const bPlanning = (planning || []).filter(p => bMemberIds.includes(p.user_id));
               if (!bPlanning.length) return null;
 
-              const counts: Record<string, number> = {};
+              const slotUsers: Record<string, Set<string>> = {};
               bPlanning.forEach(s => {
                 const key = `${s.day}-${s.time}`;
-                counts[key] = (counts[key] || 0) + 1;
+                if (!slotUsers[key]) slotUsers[key] = new Set();
+                slotUsers[key].add(s.user_id);
               });
+
+              const counts: Record<string, number> = {};
+              Object.entries(slotUsers).forEach(([key, usersSet]) => {
+                counts[key] = usersSet.size;
+              });
+
               const vals = Object.values(counts);
               const maxMatches = vals.length ? Math.max(...vals) : 0;
-              if (maxMatches === 0) return null;
+              if (maxMatches <= 1) return null;
 
               const dayBlocks: Record<string, string[]> = {};
               bPlanning.forEach(s => {
@@ -784,7 +1000,15 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
               endTimeDate.setMinutes(endTimeDate.getMinutes() + 15);
               const formattedEnd = endTimeDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
-              return { bandId: band.id, bandName: band.name, day: bestDay, start: bestStart, end: formattedEnd, count: maxMatches };
+              return { 
+                bandId: band.id, 
+                bandName: band.name, 
+                day: bestDay, 
+                start: bestStart, 
+                end: formattedEnd, 
+                count: maxMatches,
+                totalMembers: bMemberIds.length 
+              };
             }).filter(Boolean);
             setRehearsalSuggestions(suggestions);
           }
@@ -792,6 +1016,7 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
       }
     } catch (err) {
       console.error('[Dashboard] Fetch error:', err);
+      setFetchError(err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -1091,106 +1316,70 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
           </div>
 
           <aside style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            {rehearsalSuggestions.length > 0 && (
-               <div className="card" style={{ 
-                 padding: '24px', 
-                 background: 'linear-gradient(135deg, #f0fdf4 0%, #f0fdfa 100%)', 
-                 border: '1px solid #dcfce7',
-                 borderRadius: '32px',
-                 boxShadow: '0 10px 30px rgba(22, 163, 74, 0.05)'
-               }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                    <div style={{ background: '#22c55e', color: 'white', padding: '8px', borderRadius: '10px' }}>
-                      <Clock size={18} />
-                    </div>
-                    <h3 style={{ fontSize: '0.85rem', fontWeight: 1000, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>Bandprobe Vorschläge</h3>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {rehearsalSuggestions.map((s, idx) => (
-                      <div key={idx} style={{ 
-                        background: 'rgba(255,255,255,0.6)', 
-                        padding: '8px 12px', 
-                        borderRadius: '12px', 
-                        border: '1px solid rgba(34, 197, 94, 0.1)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '12px'
-                      }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 900, color: '#166534', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{s.bandName}</div>
+            {/* Bandprobe Vorschläge Widget */}
+            <div className="card" style={{ 
+              padding: '24px', 
+              background: 'linear-gradient(135deg, #f0fdf4 0%, #f0fdfa 100%)', 
+              border: '1px solid #dcfce7',
+              borderRadius: '32px',
+              boxShadow: '0 10px 30px rgba(22, 163, 74, 0.05)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                <div style={{ background: '#22c55e', color: 'white', padding: '8px', borderRadius: '10px' }}>
+                  <Clock size={18} />
+                </div>
+                <h3 style={{ fontSize: '0.85rem', fontWeight: 1000, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>Bandprobe Vorschläge</h3>
+              </div>
+              
+              {rehearsalSuggestions.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {rehearsalSuggestions.map((s, idx) => (
+                    <div key={idx} style={{ 
+                      background: 'rgba(255,255,255,0.6)', 
+                      padding: '8px 12px', 
+                      borderRadius: '12px', 
+                      border: '1px solid rgba(34, 197, 94, 0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '12px'
+                    }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 900, color: '#166534', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{s.bandName}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ 
+                          fontSize: '0.62rem', 
+                          fontWeight: 950, 
+                          color: s.count === (s.totalMembers || s.count) ? '#15803d' : '#a16207',
+                          background: s.count === (s.totalMembers || s.count) ? '#dcfce7' : '#fef9c3',
+                          padding: '2px 6px',
+                          borderRadius: '6px',
+                          display: 'inline-block'
+                        }}>
+                          {s.count === (s.totalMembers || s.count) ? '🔥 100%' : `👥 ${s.count}/${s.totalMembers || s.count}`}
+                        </span>
                         <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap' }}>
                           {s.day.slice(0, 2)} {s.start}-{s.end}
                         </div>
                       </div>
-                    ))}
-                  </div>
-               </div>
-            )}
-
-            {/* Band-Repertoire Planer Widget (Very compact & Light-themed purple!) */}
-            {viewMode === 'student' && openProposals.length > 0 && (
-              <div 
-                className="card" 
-                onClick={() => setActiveTab('proposals')}
-                style={{ 
-                  padding: '18px 24px', 
-                  background: 'linear-gradient(135deg, #f5f3ff 0%, #fae8ff 100%)', 
-                  border: '1px solid #e9d5ff',
-                  borderRadius: '32px',
-                  boxShadow: '0 10px 30px rgba(139, 92, 246, 0.05)',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-3px)';
-                  e.currentTarget.style.boxShadow = '0 15px 35px rgba(139, 92, 246, 0.15)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 10px 30px rgba(139, 92, 246, 0.05)';
-                }}
-              >
-                <div style={{
-                  position: 'absolute',
-                  top: '-20px',
-                  right: '-20px',
-                  width: '80px',
-                  height: '80px',
-                  background: 'radial-gradient(circle, rgba(168, 85, 247, 0.2) 0%, transparent 70%)',
-                  pointerEvents: 'none'
-                }} />
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ 
-                    background: 'rgba(168, 85, 247, 0.15)', 
-                    color: '#7c3aed', 
-                    padding: '8px', 
-                    borderRadius: '12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.2)'
-                  }}>
-                    <Music size={18} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '0.65rem', fontWeight: 1000, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '2px' }}>
-                      Band-Repertoire Planer
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '0.9rem', fontWeight: 950, color: '#1e1b4b' }}>
-                        {openProposals.length} {openProposals.length === 1 ? 'offener Song' : 'offene Songs'}
-                      </span>
-                    </div>
-                  </div>
-                  <div style={{ color: '#7c3aed', fontWeight: 950, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                    Ansehen →
-                  </div>
+                  ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <div style={{ 
+                  background: 'rgba(255,255,255,0.5)', 
+                  padding: '12px 16px', 
+                  borderRadius: '16px', 
+                  border: '1px dashed rgba(34, 197, 94, 0.2)',
+                  textAlign: 'center',
+                  fontSize: '0.75rem',
+                  color: '#166534',
+                  lineHeight: '1.4',
+                  fontWeight: 750
+                }}>
+                  {viewMode === 'student' ? 'Noch keine Probezeit-Übereinstimmungen. Trage deine Zeiten im Labor-Planer ein!' : 'Noch keine Probezeit-Übereinstimmungen für deine Band-Mitglieder vorhanden.'}
+                </div>
+              )}
+            </div>
 
             {/* Band-Matching Section */}
             <div className="card" style={{ 
@@ -1238,96 +1427,116 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
                        };
 
                        return (
-                         <div key={form.id} style={{ 
-                           background: 'white', 
-                           padding: '20px', 
-                           borderRadius: '24px', 
-                           boxShadow: '0 4px 15px rgba(180, 83, 9, 0.02)',
-                           display: 'flex',
-                           flexDirection: 'column',
-                           gap: '16px',
-                           position: 'relative',
-                           border: '1px solid rgba(254, 243, 199, 0.4)'
-                         }}>
-                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                             <div style={{ flex: 1 }}>
-                               <h4 style={{ 
-                                 fontWeight: 1000, 
-                                 fontSize: '1.1rem', 
-                                 color: '#0f172a', 
-                                 lineHeight: 1.1,
-                                 margin: '0 0 4px 0',
-                                 letterSpacing: '-0.02em'
-                               }}>
-                                 {form.song?.title}
-                               </h4>
-                               <div style={{ 
-                                 fontSize: '0.7rem', 
-                                 fontWeight: 800, 
-                                 color: '#94a3b8', 
-                                 textTransform: 'uppercase', 
-                                 letterSpacing: '0.05em'
-                               }}>
-                                 {form.song?.artist}
-                               </div>
-                             </div>
-                             <div style={{ 
-                               background: '#fefce8', 
-                               color: '#854d0e', 
-                               padding: '4px 8px', 
-                               borderRadius: '8px', 
-                               fontSize: '0.6rem', 
-                               fontWeight: 1000,
-                               textTransform: 'uppercase',
-                               textAlign: 'center',
-                               lineHeight: 1.1
-                             }}>
-                               BAND<br/>#{fIdx + 1}
-                             </div>
-                           </div>
-                           
-                           <div style={{ display: 'flex', gap: '10px', flexWrap: 'nowrap' }}>
-                             {allRequired.map((item, idx) => {
-                               const inst = item.instrument;
-                               const part = item.part;
-                               
-                               // Accurate instrument-based and part-based fill check
-                               const isFilled = form.members.some((m: any) => {
-                                 const mi = (m.instrument || '').toLowerCase();
-                                 const target = inst.toLowerCase();
-                                 const mPart = m.part_number || 1;
-                                 const isSameInst = mi.includes(target.replace('e-', '')) || target.includes(mi.replace('e-', ''));
-                                 return isSameInst && mPart === part;
-                               });
-                               
-                               const color = colors[inst] || '#10b981';
-                               
-                               return (
-                                 <div key={idx} style={{ 
-                                   width: '48px', 
-                                   height: '48px', 
-                                   borderRadius: '12px', 
-                                   border: isFilled ? `2px solid ${color}` : '2px dashed #e2e8f0',
-                                   background: isFilled ? `${color}08` : 'transparent',
-                                   display: 'flex',
-                                   alignItems: 'center',
-                                   justifyContent: 'center',
-                                   fontSize: '1.25rem',
-                                   position: 'relative'
-                                 }}>
-                                   <span style={{ opacity: isFilled ? 1 : 0.2 }}>{getIcon(inst)}</span>
-                                   {!isFilled && (
-                                     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                       <div style={{ width: '14px', height: '1.5px', background: '#cbd5e1', transform: 'rotate(45deg)', position: 'absolute' }} />
-                                       <div style={{ width: '14px', height: '1.5px', background: '#cbd5e1', transform: 'rotate(-45deg)', position: 'absolute' }} />
-                                     </div>
-                                   )}
-                                 </div>
-                               );
-                             })}
-                           </div>
+                          <div key={form.id} 
+                            onClick={() => {
+                              if (viewMode === 'student' && onTabChange) {
+                                onTabChange('matching');
+                              }
+                            }}
+                            style={{ 
+                              background: 'white', 
+                              padding: '20px', 
+                              borderRadius: '24px', 
+                              boxShadow: '0 4px 15px rgba(180, 83, 9, 0.02)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '16px',
+                              position: 'relative',
+                              border: '1px solid rgba(254, 243, 199, 0.4)',
+                              cursor: viewMode === 'student' ? 'pointer' : 'default',
+                              transition: 'all 0.2s ease-in-out'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (viewMode === 'student') {
+                                e.currentTarget.style.borderColor = 'rgba(251, 191, 36, 0.6)';
+                                e.currentTarget.style.boxShadow = '0 8px 25px rgba(180, 83, 9, 0.08)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (viewMode === 'student') {
+                                e.currentTarget.style.borderColor = 'rgba(254, 243, 199, 0.4)';
+                                e.currentTarget.style.boxShadow = '0 4px 15px rgba(180, 83, 9, 0.02)';
+                              }
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                              <div style={{ flex: 1 }}>
+                                <h4 style={{ 
+                                  fontWeight: 1000, 
+                                  fontSize: '1.1rem', 
+                                  color: '#0f172a', 
+                                  lineHeight: 1.1,
+                                  margin: '0 0 4px 0',
+                                  letterSpacing: '-0.02em'
+                                }}>
+                                  {form.song?.title}
+                                </h4>
+                                <div style={{ 
+                                  fontSize: '0.7rem', 
+                                  fontWeight: 800, 
+                                  color: '#94a3b8', 
+                                  textTransform: 'uppercase', 
+                                  letterSpacing: '0.05em'
+                                }}>
+                                  {form.song?.artist}
+                                </div>
+                              </div>
+                              <div style={{ 
+                                background: '#fefce8', 
+                                color: '#854d0e', 
+                                padding: '4px 8px', 
+                                borderRadius: '8px', 
+                                fontSize: '0.6rem', 
+                                fontWeight: 1000,
+                                textTransform: 'uppercase',
+                                textAlign: 'center',
+                                lineHeight: 1.1
+                              }}>
+                                BAND<br/>#{fIdx + 1}
+                              </div>
+                            </div>
+                            
+                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'nowrap' }}>
+                              {allRequired.map((item, idx) => {
+                                const inst = item.instrument;
+                                const part = item.part;
+                                
+                                // Accurate instrument-based and part-based fill check
+                                const isFilled = form.members.some((m: any) => {
+                                  const normM = normalizeInstrument(m.instrument);
+                                  const normTarget = normalizeInstrument(inst);
+                                  const mPart = m.part_number || 1;
+                                  return normM === normTarget && mPart === part;
+                                });
+                                
+                                const color = colors[inst] || '#10b981';
+                                
+                                return (
+                                  <div key={idx} style={{ 
+                                    width: '48px', 
+                                    height: '48px', 
+                                    borderRadius: '12px', 
+                                    border: isFilled ? `2px solid ${color}` : '2px dashed #e2e8f0',
+                                    background: isFilled ? `${color}08` : 'transparent',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '1.25rem',
+                                    position: 'relative'
+                                  }}>
+                                    <span style={{ opacity: isFilled ? 1 : 0.2 }}>{getIcon(inst)}</span>
+                                    {!isFilled && (
+                                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <div style={{ width: '14px', height: '1.5px', background: '#cbd5e1', transform: 'rotate(45deg)', position: 'absolute' }} />
+                                        <div style={{ width: '14px', height: '1.5px', background: '#cbd5e1', transform: 'rotate(-45deg)', position: 'absolute' }} />
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
 
-                           {form.missingInstruments.length > 0 && (
+                            {form.missingInstruments.length > 0 ? (
                               <div style={{ 
                                 fontSize: '0.75rem', 
                                 fontWeight: 1000, 
@@ -1337,8 +1546,21 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
                               }}>
                                 GESUCHT: {form.missingInstruments.join(', ').toUpperCase()}
                               </div>
+                            ) : (
+                              <div style={{ 
+                                fontSize: '0.75rem', 
+                                fontWeight: 1000, 
+                                color: '#166534', 
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.08em',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}>
+                                <span>✨</span> BEREIT FÜR BAND-GRÜNDUNG! 🎸
+                              </div>
                             )}
-                         </div>
+                          </div>
                        );
                      })}
                   </div>
@@ -1358,8 +1580,176 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
                 )}
             </div>
 
+            {/* Challenge Pipeline Section (Only for Admins) */}
+            {viewMode === 'admin' && (
+              <div className="glass-panel" style={{ 
+                background: 'white', 
+                padding: '24px', 
+                borderRadius: '32px',
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.03)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px', minWidth: 0 }}>
+                  <div style={{ background: '#f59e0b', color: 'white', padding: '6px', borderRadius: '10px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)', flexShrink: 0 }}>
+                    <TrendingUp size={18} />
+                  </div>
+                  <h3 style={{ 
+                    fontSize: '0.8rem', 
+                    fontWeight: 950, 
+                    color: '#1e293b', 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.1em', 
+                    margin: 0,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    flex: 1
+                  }}>
+                    Challenge Pipeline
+                  </h3>
+                  <button 
+                    onClick={() => setShowAllSubmissions(true)}
+                    style={{ 
+                      background: '#f8fafc', 
+                      border: '1px solid #e2e8f0', 
+                      color: '#64748b', 
+                      fontSize: '0.65rem', 
+                      fontWeight: 800, 
+                      cursor: 'pointer',
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    Alle anzeigen <span style={{ background: '#f59e0b', color: 'white', padding: '1px 5px', borderRadius: '4px', fontSize: '0.6rem' }}>{allSubmissions.length}</span>
+                  </button>
+                </div>
+                
+                {submissions.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {submissions.slice(0, 5).map(sub => (
+                      <div key={sub.id} style={{ 
+                        background: '#f8fafc', 
+                        padding: '16px', 
+                        borderRadius: '24px', 
+                        border: '1px solid #f1f5f9',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ width: '44px', height: '44px', borderRadius: '14px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
+                            <AvatarImage src={sub.users?.photo_url} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px', minWidth: 0 }}>
+                                <div style={{ 
+                                  fontWeight: 950, 
+                                  fontSize: '0.9rem', 
+                                  color: '#1e293b', 
+                                  lineHeight: 1.1,
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
+                                }}>
+                                  {sub.users?.first_name}
+                                </div>
+                                {(() => {
+                                  const norm = normalizeInstrument(sub.instrument);
+                                  return (
+                                    <div style={{ 
+                                      width: '20px', height: '20px', borderRadius: '6px', 
+                                      background: INSTRUMENT_COLORS[norm] || '#cbd5e1', 
+                                      display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                                      fontSize: '0.7rem', flexShrink: 0,
+                                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                    }}>
+                                      {TEACHER_INSTRUMENT_ICONS[norm] || '🎸'}
+                                    </div>
+                                  );
+                                })()}
+                                <div style={{ background: '#e2e8f0', padding: '2px 8px', borderRadius: '6px', fontSize: '0.6rem', fontWeight: 950, color: '#475569', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  {(sub.difficulty_level === 'original' || sub.difficulty_level === 'pro') ? '⚡ PRO' : '🚀 STARTER'}
+                                </div>
+                              </div>
+
+                              <div style={{ 
+                                fontSize: '0.65rem', 
+                                fontWeight: 800, 
+                                color: '#64748b', 
+                                textTransform: 'uppercase', 
+                                overflow: 'hidden', 
+                                textOverflow: 'ellipsis', 
+                                whiteSpace: 'nowrap'
+                              }}>
+                                {sub.songs?.artist}: {sub.songs?.title}
+                              </div>
+                            </div>
+                          </div>
+
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button 
+                            onClick={() => handleRejectSubmission(sub.id)}
+                            style={{ 
+                              flex: 1,
+                              background: '#f1f5f9', 
+                              color: '#64748b', 
+                              border: 'none', 
+                              padding: '12px', 
+                              borderRadius: '14px', 
+                              fontSize: '0.7rem', 
+                              fontWeight: 950, 
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = '#e2e8f0'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                          >
+                            Üben
+                          </button>
+                          <button 
+                            onClick={() => handleApproveSubmission(sub.id)}
+                            style={{ 
+                              flex: 1,
+                              background: '#22c55e', 
+                              color: 'white', 
+                              border: 'none', 
+                              padding: '12px', 
+                              borderRadius: '14px', 
+                              fontSize: '0.7rem', 
+                              fontWeight: 950, 
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                              cursor: 'pointer',
+                              boxShadow: '0 4px 12px rgba(34, 197, 94, 0.2)',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                          >
+                            GO!
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '32px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ color: '#fcd34d' }}><Zap size={32} fill="#fcd34d" /></div>
+                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, lineHeight: 1.4 }}>Keine offenen Challenges. Alles unter Kontrolle!</div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Band News */}
-            {(viewMode === 'student' || unreadShouts.length > 0) && (
+            {unreadShouts.length > 0 && (
               <div className="glass-panel" style={{ 
                 background: '#f1f5f9', // Clean app-surface background
                 padding: '24px', 
@@ -1542,171 +1932,72 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
               </div>
             )}
 
-            {/* Challenge Pipeline Section (Only for Admins) */}
-            {viewMode === 'admin' && (
-              <div className="glass-panel" style={{ 
-                background: 'white', 
-                padding: '24px', 
-                borderRadius: '32px',
-                border: '1px solid #e2e8f0',
-                boxShadow: '0 10px 30px rgba(0,0,0,0.03)'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px', minWidth: 0 }}>
-                  <div style={{ background: '#f59e0b', color: 'white', padding: '6px', borderRadius: '10px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)', flexShrink: 0 }}>
-                    <TrendingUp size={18} />
-                  </div>
-                  <h3 style={{ 
-                    fontSize: '0.8rem', 
-                    fontWeight: 950, 
-                    color: '#1e293b', 
-                    textTransform: 'uppercase', 
-                    letterSpacing: '0.1em', 
-                    margin: 0,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    flex: 1
+            {/* Band-Repertoire Planer Widget (Very compact & Light-themed purple!) */}
+            {openProposals.length > 0 && (
+              <div 
+                className="card" 
+                onClick={() => setActiveTab('proposals')}
+                style={{ 
+                  padding: '18px 24px', 
+                  background: 'linear-gradient(135deg, #f5f3ff 0%, #fae8ff 100%)', 
+                  border: '1px solid #e9d5ff',
+                  borderRadius: '32px',
+                  boxShadow: '0 10px 30px rgba(139, 92, 246, 0.05)',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = '#c084fc';
+                  e.currentTarget.style.boxShadow = '0 15px 35px rgba(139, 92, 246, 0.15)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = '#e9d5ff';
+                  e.currentTarget.style.boxShadow = '0 10px 30px rgba(139, 92, 246, 0.05)';
+                }}
+              >
+                <div style={{
+                  position: 'absolute',
+                  top: '-20px',
+                  right: '-20px',
+                  width: '80px',
+                  height: '80px',
+                  background: 'radial-gradient(circle, rgba(168, 85, 247, 0.2) 0%, transparent 70%)',
+                  pointerEvents: 'none'
+                }} />
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ 
+                    background: 'rgba(168, 85, 247, 0.15)', 
+                    color: '#7c3aed', 
+                    padding: '8px', 
+                    borderRadius: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.2)'
                   }}>
-                    Challenge Pipeline
-                  </h3>
-                  <button 
-                    onClick={() => setShowAllSubmissions(true)}
-                    style={{ 
-                      background: '#f8fafc', 
-                      border: '1px solid #e2e8f0', 
-                      color: '#64748b', 
-                      fontSize: '0.65rem', 
-                      fontWeight: 800, 
-                      cursor: 'pointer',
-                      padding: '4px 10px',
-                      borderRadius: '8px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    Alle anzeigen <span style={{ background: '#f59e0b', color: 'white', padding: '1px 5px', borderRadius: '4px', fontSize: '0.6rem' }}>{allSubmissions.length}</span>
-                  </button>
+                    <Music size={18} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.65rem', fontWeight: 1000, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '2px' }}>
+                      Band-Repertoire Planer
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '0.9rem', fontWeight: 950, color: '#1e1b4b' }}>
+                        {openProposals.length > 0 ? (
+                          `${openProposals.length} ${openProposals.length === 1 ? 'offener Song' : 'offene Songs'}`
+                        ) : (
+                          'Keine offenen Songs (Alles aktuell!)'
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ color: '#7c3aed', fontWeight: 950, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                    Ansehen →
+                  </div>
                 </div>
-                
-                {submissions.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {submissions.slice(0, 5).map(sub => (
-                      <div key={sub.id} style={{ 
-                        background: '#f8fafc', 
-                        padding: '16px', 
-                        borderRadius: '24px', 
-                        border: '1px solid #f1f5f9',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '12px'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ width: '44px', height: '44px', borderRadius: '14px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
-                            <AvatarImage src={sub.users?.photo_url} />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px', minWidth: 0 }}>
-                                <div style={{ 
-                                  fontWeight: 950, 
-                                  fontSize: '0.9rem', 
-                                  color: '#1e293b', 
-                                  lineHeight: 1.1,
-                                  whiteSpace: 'nowrap',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis'
-                                }}>
-                                  {sub.users?.first_name}
-                                </div>
-                                {(() => {
-                                  const norm = normalizeInstrument(sub.instrument);
-                                  return (
-                                    <div style={{ 
-                                      width: '20px', height: '20px', borderRadius: '6px', 
-                                      background: INSTRUMENT_COLORS[norm] || '#cbd5e1', 
-                                      display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                                      fontSize: '0.7rem', flexShrink: 0,
-                                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                                    }}>
-                                      {TEACHER_INSTRUMENT_ICONS[norm] || '🎸'}
-                                    </div>
-                                  );
-                                })()}
-                                <div style={{ background: '#e2e8f0', padding: '2px 8px', borderRadius: '6px', fontSize: '0.6rem', fontWeight: 950, color: '#475569', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  {(sub.difficulty_level === 'original' || sub.difficulty_level === 'pro') ? '⚡ PRO' : '🚀 STARTER'}
-                                </div>
-                              </div>
-
-                              <div style={{ 
-                                fontSize: '0.65rem', 
-                                fontWeight: 800, 
-                                color: '#64748b', 
-                                textTransform: 'uppercase', 
-                                overflow: 'hidden', 
-                                textOverflow: 'ellipsis', 
-                                whiteSpace: 'nowrap'
-                              }}>
-                                {sub.songs?.artist}: {sub.songs?.title}
-                              </div>
-                            </div>
-                          </div>
-
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button 
-                            onClick={() => handleRejectSubmission(sub.id)}
-                            style={{ 
-                              flex: 1,
-                              background: '#f1f5f9', 
-                              color: '#64748b', 
-                              border: 'none', 
-                              padding: '12px', 
-                              borderRadius: '14px', 
-                              fontSize: '0.7rem', 
-                              fontWeight: 950, 
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.05em',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = '#e2e8f0'}
-                            onMouseLeave={(e) => e.currentTarget.style.background = '#f1f5f9'}
-                          >
-                            Üben
-                          </button>
-                          <button 
-                            onClick={() => handleApproveSubmission(sub.id)}
-                            style={{ 
-                              flex: 1,
-                              background: '#22c55e', 
-                              color: 'white', 
-                              border: 'none', 
-                              padding: '12px', 
-                              borderRadius: '14px', 
-                              fontSize: '0.7rem', 
-                              fontWeight: 950, 
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.05em',
-                              cursor: 'pointer',
-                              boxShadow: '0 4px 12px rgba(34, 197, 94, 0.2)',
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-                          >
-                            GO!
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{ textAlign: 'center', padding: '32px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ color: '#fcd34d' }}><Zap size={32} fill="#fcd34d" /></div>
-                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, lineHeight: 1.4 }}>Keine offenen Challenges. Alles unter Kontrolle!</div>
-                  </div>
-                )}
               </div>
             )}
 
@@ -2228,6 +2519,7 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
                 <p style={{ color: '#64748b', fontWeight: 600 }}>Es gibt aktuell keine ausstehenden Challenges.</p>
               </div>
             )}
+
           </div>
         </div>
       )}
