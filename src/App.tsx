@@ -1827,6 +1827,8 @@ function App() {
               const prof = Array.isArray(skill.profiles) ? skill.profiles[0] : skill.profiles;
               if (!prof) return;
 
+              const normalizedMemberInst = normalizeInstrument(skill.instrument);
+
               let form = formationsList.find(f => f.id === skill.formation_group);
               if (!form) {
                 form = { id: skill.formation_group, members: [], memberMap: {}, level };
@@ -3475,14 +3477,40 @@ function App() {
         <nav className="sidebar-menu" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {user.role?.toLowerCase() === 'student' ? (
             <>
-              {/* Profile for all */}
-              <button onClick={() => setActiveStudentTab('profile')} className={`sidebar-item ${activeStudentTab === 'profile' ? 'active' : ''}`}>
-                <Shield size={20} /> Profil
-              </button>
-              
-              {/* Common Student Menu */}
-              <button onClick={() => setActiveStudentTab('live')} className={`sidebar-item ${activeStudentTab === 'live' ? 'active' : ''}`}>
-                <Monitor size={20} /> Live Lab
+              {/* Special Live Lab Card (first position, not a standard menu item) */}
+              <button 
+                onClick={() => setActiveStudentTab('live')} 
+                style={{ 
+                  background: activeStudentTab === 'live' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #eff6ff, #dbeafe)', 
+                  border: activeStudentTab === 'live' ? 'none' : '1px solid #bfdbfe', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '12px', 
+                  color: activeStudentTab === 'live' ? 'white' : '#1d4ed8', 
+                  cursor: 'pointer',
+                  padding: '12px 16px',
+                  borderRadius: '16px',
+                  boxShadow: activeStudentTab === 'live' ? '0 10px 20px rgba(245, 158, 11, 0.25)' : '0 4px 12px rgba(59, 130, 246, 0.08)',
+                  position: 'relative',
+                  width: '100%',
+                  fontWeight: 900,
+                  fontSize: '0.88rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  marginBottom: '12px',
+                  transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+                }}
+                className="hover-scale"
+              >
+                <div style={{ 
+                  width: '8px', 
+                  height: '8px', 
+                  borderRadius: '50%', 
+                  background: activeStudentTab === 'live' ? 'white' : '#ef4444', 
+                  boxShadow: activeStudentTab === 'live' ? '0 0 8px white' : '0 0 8px #ef4444' 
+                }} className="animate-pulse"></div>
+                <Monitor size={18} color={activeStudentTab === 'live' ? 'white' : '#1d4ed8'} />
+                <span>Live Lab</span>
               </button>
 
               {/* Only for instrumentalists */}
@@ -3494,20 +3522,29 @@ function App() {
                   <button onClick={() => setActiveStudentTab('library')} className={`sidebar-item ${activeStudentTab === 'library' ? 'active' : ''}`}>
                     <Library size={20} /> Bibliothek
                   </button>
-                  <button onClick={() => setActiveStudentTab('matching')} className={`sidebar-item ${activeStudentTab === 'matching' ? 'active' : ''}`}>
-                    <Users size={20} /> Band Matching
-                  </button>
                 </>
               )}
 
-              <button onClick={() => setActiveStudentTab('bands')} className={`sidebar-item ${activeStudentTab === 'bands' ? 'active' : ''}`}>
-                <Box size={20} /> Deine Bands
-              </button>
               <button onClick={() => setActiveStudentTab('repertoire')} className={`sidebar-item ${activeStudentTab === 'repertoire' ? 'active' : ''}`}>
                 <Award size={20} /> Repertoire
               </button>
+
+              {!user.is_external_vocalist && (
+                <button onClick={() => setActiveStudentTab('matching')} className={`sidebar-item ${activeStudentTab === 'matching' ? 'active' : ''}`}>
+                  <Users size={20} /> Band-Matching
+                </button>
+              )}
+
+              <button onClick={() => setActiveStudentTab('bands')} className={`sidebar-item ${activeStudentTab === 'bands' ? 'active' : ''}`}>
+                <Box size={20} /> Bands
+              </button>
+
+              <button onClick={() => setActiveStudentTab('profile')} className={`sidebar-item ${activeStudentTab === 'profile' ? 'active' : ''}`}>
+                <Shield size={20} /> Profil
+              </button>
+
               <button onClick={() => setActiveStudentTab('team')} className={`sidebar-item ${activeStudentTab === 'team' ? 'active' : ''}`}>
-                <Users size={20} /> Lehrer
+                <Users size={20} /> Team
               </button>
             </>
           ) : (
@@ -3632,6 +3669,30 @@ function App() {
               <div style={{ width: '52px', height: '52px', borderRadius: '16px', border: '3px solid white', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
                 <img src={user.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
               </div>
+              {/* Elegant Logout Button next to avatar */}
+              <button 
+                onClick={() => handleLogout()}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  background: '#fff1f2', 
+                  border: '1px solid #ffe4e6', 
+                  padding: '8px 14px', 
+                  borderRadius: '12px', 
+                  color: '#f43f5e', 
+                  fontWeight: 800, 
+                  fontSize: '0.8rem', 
+                  cursor: 'pointer',
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  boxShadow: '0 4px 12px rgba(244, 63, 94, 0.08)'
+                }}
+                className="hover-scale"
+                title="Abmelden"
+              >
+                <LogOut size={14} color="#f43f5e" />
+                <span>Abmelden</span>
+              </button>
             </div>
           </div>
         </header>
@@ -5655,33 +5716,77 @@ function App() {
       )}
 
       {/* Mobile Bottom Navigation */}
-      <nav className="mobile-nav">
-        <button onClick={() => setActiveStudentTab('practice')} className={activeStudentTab === 'practice' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: activeStudentTab === 'practice' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
-          <Play size={24} />
+      <nav className="mobile-nav" style={{ gap: '4px', padding: '12px 8px 32px 8px', justifyContent: 'space-around' }}>
+        {/* Live Lab (special highlighted button, not a standard menu point) */}
+        <button 
+          onClick={() => setActiveStudentTab('live')} 
+          style={{ 
+            background: activeStudentTab === 'live' ? '#fef3c7' : 'linear-gradient(135deg, #eff6ff, #dbeafe)', 
+            border: activeStudentTab === 'live' ? 'none' : '1px solid #bfdbfe', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            gap: '2px', 
+            color: activeStudentTab === 'live' ? '#b45309' : '#1d4ed8', 
+            cursor: 'pointer',
+            padding: '6px 10px',
+            borderRadius: '16px',
+            boxShadow: activeStudentTab === 'live' ? '0 4px 12px rgba(234, 179, 8, 0.25)' : '0 4px 10px rgba(59, 130, 246, 0.1)',
+            position: 'relative',
+            flex: '0 0 auto',
+            minWidth: '64px',
+            height: '52px',
+            transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+          }}
+          className="hover-scale"
+        >
+          <span style={{ 
+            position: 'absolute', 
+            top: '4px', 
+            right: '4px', 
+            width: '8px', 
+            height: '8px', 
+            borderRadius: '50%', 
+            background: '#ef4444', 
+            boxShadow: '0 0 8px #ef4444' 
+          }} className="animate-pulse"></span>
+          <Monitor size={20} color={activeStudentTab === 'live' ? '#b45309' : '#1d4ed8'} />
+          <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.01em' }}>Live Lab</span>
+        </button>
+
+        <button onClick={() => setActiveStudentTab('practice')} className={activeStudentTab === 'practice' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'practice' ? brandColor : '#94a3b8', cursor: 'pointer', flex: 1 }}>
+          <Play size={20} />
           <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Üben</span>
         </button>
-        <button onClick={() => setActiveStudentTab('repertoire')} className={activeStudentTab === 'repertoire' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: activeStudentTab === 'repertoire' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
-          <Award size={24} />
+
+        <button onClick={() => setActiveStudentTab('library')} className={activeStudentTab === 'library' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'library' ? brandColor : '#94a3b8', cursor: 'pointer', flex: 1 }}>
+          <Library size={20} />
+          <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Bibliothek</span>
+        </button>
+
+        <button onClick={() => setActiveStudentTab('repertoire')} className={activeStudentTab === 'repertoire' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'repertoire' ? brandColor : '#94a3b8', cursor: 'pointer', flex: 1 }}>
+          <Award size={20} />
           <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Repertoire</span>
         </button>
-        <button onClick={() => setActiveStudentTab('library')} className={activeStudentTab === 'library' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: activeStudentTab === 'library' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
-          <Library size={24} />
-          <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Bib</span>
+
+        <button onClick={() => setActiveStudentTab('matching')} className={activeStudentTab === 'matching' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'matching' ? brandColor : '#94a3b8', cursor: 'pointer', flex: 1 }}>
+          <Users size={20} />
+          <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Band-Matching</span>
         </button>
-        <button onClick={() => setActiveStudentTab('matching')} className={activeStudentTab === 'matching' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: activeStudentTab === 'matching' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
-          <Users size={24} />
-          <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Matching</span>
-        </button>
-        <button onClick={() => setActiveStudentTab('bands')} className={activeStudentTab === 'bands' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: activeStudentTab === 'bands' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
-          <Box size={24} />
+
+        <button onClick={() => setActiveStudentTab('bands')} className={activeStudentTab === 'bands' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'bands' ? brandColor : '#94a3b8', cursor: 'pointer', flex: 1 }}>
+          <Box size={20} />
           <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Bands</span>
         </button>
-        <button onClick={() => setActiveStudentTab('profile')} className={activeStudentTab === 'profile' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: activeStudentTab === 'profile' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
-          <Shield size={24} />
+
+        <button onClick={() => setActiveStudentTab('profile')} className={activeStudentTab === 'profile' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'profile' ? brandColor : '#94a3b8', cursor: 'pointer', flex: 1 }}>
+          <Shield size={20} />
           <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Profil</span>
         </button>
-        <button onClick={() => setActiveStudentTab('team')} className={activeStudentTab === 'team' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: activeStudentTab === 'team' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
-          <Music size={24} />
+
+        <button onClick={() => setActiveStudentTab('team')} className={activeStudentTab === 'team' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'team' ? brandColor : '#94a3b8', cursor: 'pointer', flex: 1 }}>
+          <Music size={20} />
           <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Team</span>
         </button>
       </nav>
