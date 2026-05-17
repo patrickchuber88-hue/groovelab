@@ -41,6 +41,18 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  const [userPos, setUserPos] = useState<{lat: number, lng: number} | null>(null);
+  
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setUserPos({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        (err) => console.warn('[Login] Initial geo fetch failed:', err),
+        { enableHighAccuracy: true, maximumAge: 30000 }
+      );
+    }
+  }, []);
+
   let effectiveStationId = kioskStationId || localStorage.getItem('groovelab_station_id');
   if (effectiveStationId === 'skip') effectiveStationId = null;
 
@@ -172,22 +184,30 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       if (userErr || !user) throw new Error('Nutzer nicht gefunden.');
 
       const schoolData = Array.isArray(user.schools) ? user.schools[0] : user.schools;
+      
+      // Ensure school_id is available for room lookups even if not directly on the user object
+      if (!user.school_id && schoolData?.id) {
+        user.school_id = schoolData.id;
+      }
 
       // 2. Geofence Check (Simpel & Stabil)
       let isWithinAnyRoom = false;
-      let userPos: {lat: number, lng: number} | null = null;
+      let finalUserPos = userPos;
       
       try {
-        userPos = await new Promise<{lat: number, lng: number} | null>((resolve) => {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-            () => resolve(null),
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-          );
-        });
+        if (!finalUserPos) {
+          console.log('[Login] No pre-fetched position, attempting quick fetch...');
+          finalUserPos = await new Promise<{lat: number, lng: number} | null>((resolve) => {
+            navigator.geolocation.getCurrentPosition(
+              (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+              () => resolve(null),
+              { enableHighAccuracy: true, timeout: 3000, maximumAge: 60000 }
+            );
+          });
+        }
 
-        if (userPos) {
-          console.log(`[Geofence] User position: ${userPos.lat}, ${userPos.lng}`);
+        if (finalUserPos) {
+          console.log(`[Geofence] User position: ${finalUserPos.lat}, ${finalUserPos.lng}`);
           // 1. Check Rooms (Multi-Point)
           const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', user.school_id);
           if (rooms) {
@@ -198,7 +218,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               
               for (const pt of allCoords) {
                 if (pt && pt.lat && pt.lng) {
-                  const dist = getDistanceFromLatLonInM(userPos.lat, userPos.lng, Number(pt.lat), Number(pt.lng));
+                  const dist = getDistanceFromLatLonInM(finalUserPos.lat, finalUserPos.lng, Number(pt.lat), Number(pt.lng));
                   console.log(`[Geofence] Room "${room.name}" Point: ${Math.round(dist)}m away`);
                   if (dist < 100) { 
                     isWithinAnyRoom = true;
@@ -211,13 +231,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           }
 
           // 2. School Fallback (Single Point + Radius)
-
           if (!isWithinAnyRoom && schoolData?.latitude && schoolData?.longitude) {
             const distToSchool = getDistanceFromLatLonInM(
-              userPos.lat, userPos.lng, 
+              finalUserPos.lat, finalUserPos.lng, 
               Number(schoolData.latitude), Number(schoolData.longitude)
             );
-            const radius = schoolData.geofence_radius_meters || 100;
+            const radius = schoolData.geofence_radius_meters || 150;
             console.log(`[Geofence] School fallback: ${Math.round(distToSchool)}m away (Radius: ${radius}m)`);
             if (distToSchool < radius) {
               isWithinAnyRoom = true;
@@ -225,6 +244,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           }
         } else {
           console.warn('[Geofence] No user position available (Permission denied or timeout)');
+          // If we are on a Kiosk station, we should be more lenient if GPS fails
+          if (effectiveStationId) {
+            console.log('[Geofence] Kiosk mode detected. Allowing Lab login despite missing GPS.');
+            isWithinAnyRoom = true;
+          }
         }
       } catch (geoErr) {
         console.warn('[Login] Geolocation failed.', geoErr);
@@ -468,10 +492,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             </div>
             <button 
               onClick={() => {
-                if (window.confirm('Kiosk Modus beenden?')) {
-                  localStorage.removeItem('groovelab_station_id');
-                  window.location.reload();
-                }
+                localStorage.removeItem('groovelab_station_id');
+                window.location.reload();
               }}
               style={{ background: 'none', border: 'none', color: '#f87171', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', cursor: 'pointer' }}
             >

@@ -15,7 +15,8 @@ import { DeviceSetupScreen } from './components/DeviceSetupScreen';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
 import { TeacherDetailModal } from './components/TeacherDetailModal';
-import { normalizeInstrument as normalize } from './utils/instruments';
+import { normalizeInstrument } from './utils/instruments';
+import { getDistanceFromLatLonInM } from './utils/geo';
 import './App.css';
 
 const APP_INSTRUMENT_ICONS: Record<string, string> = { 
@@ -59,6 +60,48 @@ const StudioAvatar = React.memo(({ src, style, className }: { src: string | null
     </div>
   );
 }, (prev, next) => prev.src === next.src);
+
+const renderBandAvatar = (name: string, photoUrl?: string | null, size: string = '64px', borderRadius: string = '18px') => {
+  if (photoUrl) {
+    return (
+      <div style={{ width: size, height: size, borderRadius, overflow: 'hidden', flexShrink: 0 }}>
+        <img src={photoUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={name} />
+      </div>
+    );
+  }
+  
+  // Hash the name to pick a beautiful premium gradient
+  const gradients = [
+    'linear-gradient(135deg, #6366f1, #a855f7)', // Indigo to Purple
+    'linear-gradient(135deg, #ec4899, #f43f5e)', // Pink to Rose
+    'linear-gradient(135deg, #3b82f6, #06b6d4)', // Blue to Cyan
+    'linear-gradient(135deg, #10b981, #3b82f6)', // Emerald to Blue
+    'linear-gradient(135deg, #f59e0b, #e11d48)'  // Amber to Rose
+  ];
+  
+  let hash = 0;
+  const str = name || '';
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const gradient = gradients[Math.abs(hash) % gradients.length];
+  const firstLetter = (name || 'B').substring(0, 1).toUpperCase();
+  
+  return (
+    <div style={{ 
+      width: size, height: size, borderRadius, 
+      background: gradient, 
+      display: 'flex', alignItems: 'center', justifyContent: 'center', 
+      color: 'white', fontWeight: 950, fontSize: `calc(${size} * 0.4)`,
+      textShadow: '0 2px 4px rgba(0,0,0,0.15)',
+      flexShrink: 0,
+      userSelect: 'none'
+    }}>
+      {firstLetter}
+    </div>
+  );
+};
+
 
 
 // --- Band Name Generator Words ---
@@ -328,7 +371,7 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
       
       return isMatch && (s.part_number || 1) === slot.partNumber;
     });
-    return existing || {
+    const result = existing ? { ...existing } : {
       id: `mock-${songGroup.song_id}-${slot.instrument}-${slot.partNumber}-${activeDifficulty}`,
       song_id: songGroup.song_id,
       instrument: slot.instrument,
@@ -339,7 +382,24 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
       is_pending_approval: false,
       isMock: true
     };
+    if (!result.part_number) {
+      result.part_number = slot.partNumber;
+    }
+    return result;
   });
+
+  const getSkillLabel = (s: any) => {
+    const instrumentation = songGroup?.instrumentation || {};
+    const reqCount = instrumentation[s.instrument] || 0;
+    if (reqCount > 1) {
+      return `${s.instrument} ${s.part_number || 1}`;
+    }
+    const totalWithSameInst = displaySkills.filter((x: any) => x.instrument === s.instrument).length;
+    if (totalWithSameInst > 1) {
+      return `${s.instrument} ${s.part_number || 1}`;
+    }
+    return s.instrument;
+  };
 
   const [activeSlotId, setActiveSlotId] = useState(() => {
     const pending = displaySkills.find((s: any) => s?.is_pending_approval);
@@ -483,15 +543,21 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
                     alignItems: 'center', 
                     gap: '6px', 
                     padding: '6px 12px', 
-                    background: s.progress > 0 ? `${APP_INSTRUMENT_COLORS[s.instrument]}15` : '#f8fafc',
+                    background: s.progress > 0 ? APP_INSTRUMENT_COLORS[s.instrument] + '15' : '#f8fafc',
                     borderRadius: '12px',
-                    border: `1px solid ${s.progress > 0 ? `${APP_INSTRUMENT_COLORS[s.instrument]}20` : '#f1f5f9'}`,
+                    border: '1px solid ' + (s.progress > 0 ? APP_INSTRUMENT_COLORS[s.instrument] + '20' : '#f1f5f9'),
                     opacity: s.progress > 0 ? 1 : 0.3,
                     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                     cursor: 'pointer'
                   }}
+                  title={getSkillLabel(s) + ' (' + s.progress + '%)'}
                 >
-                  <span style={{ fontSize: '1.1rem' }}>{APP_INSTRUMENT_ICONS[s.instrument] || '🎸'}</span>
+                  <span style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                    {APP_INSTRUMENT_ICONS[s.instrument] || '🎸'}
+                    {displaySkills.filter((x: any) => x.instrument === s.instrument).length > 1 && (
+                      <span style={{ fontSize: '0.65rem', fontWeight: 900, opacity: 0.8, color: s.progress > 0 ? APP_INSTRUMENT_COLORS[s.instrument] : '#94a3b8' }}>{s.part_number || 1}</span>
+                    )}
+                  </span>
                   <span style={{ fontSize: '0.75rem', fontWeight: 800, color: s.progress > 0 ? APP_INSTRUMENT_COLORS[s.instrument] : '#94a3b8' }}>
                     {s.progress}%
                   </span>
@@ -618,7 +684,7 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
                       <Award size={28} />
                     </div>
                     <div>
-                      <div style={{ fontWeight: 900, fontSize: '1.1rem' }}>{activeSkill.instrument} Meisterleistung!</div>
+                      <div style={{ fontWeight: 900, fontSize: '1.1rem' }}>{getSkillLabel(activeSkill)} Meisterleistung!</div>
                       <div style={{ fontSize: '0.9rem', fontWeight: 600, opacity: 0.8 }}>Du hast dieses Instrument zu 100% gemeistert.</div>
                     </div>
                   </div>
@@ -628,7 +694,7 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', fontSize: '0.9rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                        <span style={{ fontSize: '1.2rem' }}>{APP_INSTRUMENT_ICONS[activeSkill.instrument]}</span>
-                       {activeSkill.instrument} Training
+                       {getSkillLabel(activeSkill)} Training
                     </span>
                     <span style={{ color: APP_INSTRUMENT_COLORS[activeSkill.instrument] || brandColor }}>{activeSkill.progress}%</span>
                   </div>
@@ -711,16 +777,25 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
                 const missing: string[] = [];
                 let isFullyStaffed = true;
                 
-                Object.entries(required).forEach(([inst, count]) => {
-                  const normTarget = normalize(inst);
-                  if (normTarget === 'Vocals') return; // Vocals handled separately
-                  
-                  const needed = count as number;
-                  const current = filled[normTarget] || 0;
-                  if (current < needed) {
-                    isFullyStaffed = false;
-                    for(let i=0; i < (needed-current); i++) missing.push(inst);
-                  }
+                const order = ['E-Gitarre', 'E-Drums', 'E-Piano', 'E-Bass'];
+                order.forEach(targetInst => {
+                  const matchingEntries = Object.entries(required).filter(([inst]) => {
+                    const norm = normalize(inst);
+                    const normTarget = normalize(targetInst);
+                    return norm === normTarget;
+                  });
+
+                  matchingEntries.forEach(([inst, count]) => {
+                    const normTarget = normalize(inst);
+                    if (normTarget === 'Vocals') return;
+                    
+                    const needed = count as number;
+                    const current = filled[normTarget] || 0;
+                    if (current < needed) {
+                      isFullyStaffed = false;
+                      for(let i=0; i < (needed-current); i++) missing.push(inst);
+                    }
+                  });
                 });
 
                 return (
@@ -745,28 +820,47 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
                     </div>
                     
                     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                      {matchingBand.band_members?.map((member: any, idx: number) => {
-                        const u = Array.isArray(member.users) ? member.users[0] : member.users;
-                        return (
-                          <div key={`mem-${idx}`} style={{ 
-                            display: 'flex', alignItems: 'center', gap: '10px', 
-                            background: 'white', padding: '8px 12px', borderRadius: '14px', 
-                            border: member.user_id === userId ? '1.5px solid #ef4444' : '1px solid #f1f5f9',
-                            boxShadow: member.user_id === userId ? '0 4px 12px rgba(239, 68, 68, 0.15)' : '0 2px 6px rgba(0,0,0,0.02)' 
-                          }}>
-                            <div style={{ width: '28px', height: '28px', borderRadius: '50%', overflow: 'hidden', background: '#f1f5f9' }}>
-                              {member.user_id ? (
-                                 <StudioAvatar src={u?.photo_url} />
-                              ) : (
-                                 <div style={{ width: '100%', height: '100%', background: '#1e293b', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 900 }}>{member.external_name?.[0] || 'E'}</div>
-                              )}
+                      {(() => {
+                        const grouped: Record<string, any> = {};
+                        (matchingBand.band_members || []).forEach((m: any) => {
+                          const u = Array.isArray(m.users) ? m.users[0] : m.users;
+                          const uid = u?.id || m.external_name || m.user_id;
+                          if (!uid) return;
+                          if (!grouped[uid]) {
+                            grouped[uid] = { ...m, user: u, instruments: [m.instrument] };
+                          } else {
+                            if (!grouped[uid].instruments.includes(m.instrument)) {
+                              grouped[uid].instruments.push(m.instrument);
+                            }
+                          }
+                        });
+
+                        return Object.values(grouped).map((member: any, idx: number) => {
+                          const u = member.user;
+                          const nonVocals = member.instruments.filter((inst: string) => !inst.toLowerCase().includes('vocals') && !inst.toLowerCase().includes('gesang'));
+                          const displayInst = nonVocals.length > 0 ? nonVocals[0] : member.instruments[0];
+
+                          return (
+                            <div key={`mem-${idx}`} style={{ 
+                              display: 'flex', alignItems: 'center', gap: '10px', 
+                              background: 'white', padding: '8px 12px', borderRadius: '14px', 
+                              border: member.user_id === userId ? '1.5px solid #ef4444' : '1px solid #f1f5f9',
+                              boxShadow: member.user_id === userId ? '0 4px 12px rgba(239, 68, 68, 0.15)' : '0 2px 6px rgba(0,0,0,0.02)' 
+                            }}>
+                              <div style={{ width: '28px', height: '28px', borderRadius: '50%', overflow: 'hidden', background: '#f1f5f9' }}>
+                                {member.user_id ? (
+                                   <StudioAvatar src={u?.photo_url} />
+                                ) : (
+                                   <div style={{ width: '100%', height: '100%', background: '#1e293b', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 900 }}>{member.external_name?.[0] || 'E'}</div>
+                                )}
+                              </div>
+                              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b' }}>
+                                {APP_INSTRUMENT_ICONS[displayInst] || '🎸'} {member.user_id ? (u?.first_name || 'Mitglied') : member.external_name}
+                              </div>
                             </div>
-                            <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b' }}>
-                              {APP_INSTRUMENT_ICONS[member.instrument] || '🎸'} {member.user_id ? (u?.first_name || 'Mitglied') : member.external_name}
-                            </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        });
+                      })()}
                       
                       {missing.map((inst, idx) => (
                         <div key={`miss-${idx}`} style={{ 
@@ -879,27 +973,32 @@ function App() {
     const updateData: any = {
       first_name: editingProfile.first_name,
       last_name: editingProfile.last_name,
-      photo_url: editingProfile.photo_url,
-      instrument: editingProfile.instrument,
-      bio: editingProfile.bio,
-      expertise: editingProfile.expertise,
-      bands: editingProfile.bands,
-      gear: editingProfile.gear,
-      listening: editingProfile.listening
+      photo_url: editingProfile.photo_url
     };
 
     if (user.role === 'student') {
       updateData.age = editingProfile.age;
+    } else {
+      updateData.instrument = editingProfile.instrument;
+      updateData.bio = editingProfile.bio;
+      updateData.expertise = editingProfile.expertise;
+      updateData.bands = editingProfile.bands;
+      updateData.gear = editingProfile.gear;
+      updateData.listening = editingProfile.listening;
     }
 
     const { error } = await supabase.from('users').update(updateData).eq('id', user.id);
     
     if (error) alert('Fehler beim Aktualisieren: ' + error.message);
     else {
-      setShowEditProfile(false);
-      // Refresh local user state
-      const { data: updatedUser } = await supabase.from('users').select('*, schools(*)').eq('id', user.id).single();
+      const { data: updatedUser, error: userErr } = await supabase.from('users').select('*, schools(*)').eq('id', user.id).single();
+      if (userErr || !updatedUser) {
+        console.error('[Dashboard] User data fetch error:', userErr);
+        return;
+      }
+      console.log('[Dashboard] User data updated:', updatedUser.first_name, 'School:', updatedUser.school_id);
       if (updatedUser) setUser(updatedUser);
+      setShowEditProfile(false);
     }
   };
   const [userSongs, setUserSongs] = useState<any[]>([]);
@@ -957,12 +1056,18 @@ function App() {
   const [restoredBandId] = useState(() => localStorage.getItem('groovelab_selected_band_id'));
 
   const [suggestingSkill, setSuggestingSkill] = useState<any>(null);
-  const [exclusiveProposal, setExclusiveProposal] = useState<boolean>(false);
+  const [exclusiveProposal, setExclusiveProposal] = useState<boolean>(true);
   const [matchingLevelFilter, setMatchingLevelFilter] = useState<'all' | 'starter' | 'pro'>('all');
   const [pendingFounding, setPendingFounding] = useState<any | null>(null);
   const [showFoundingModal, setShowFoundingModal] = useState(false);
   const [foundingName, setFoundingName] = useState('');
-  const [lastAutoTriggeredFormId, setLastAutoTriggeredFormId] = useState<string | null>(null);
+  const [lastAutoTriggeredFormId, setLastAutoTriggeredFormId] = useState<string | null>(sessionStorage.getItem('groovelab_last_form_id'));
+  
+  const updateAutoTriggerId = (id: string | null) => {
+    setLastAutoTriggeredFormId(id);
+    if (id) sessionStorage.setItem('groovelab_last_form_id', id);
+    else sessionStorage.removeItem('groovelab_last_form_id');
+  };
   
   useEffect(() => {
     if (showFoundingModal && !foundingName) {
@@ -973,6 +1078,7 @@ function App() {
   }, [showFoundingModal]);
 
   const ignoredFoundingIds = useRef<string[]>([]);
+  const gatewayJustClosed = useRef<boolean>(false);
   
   // Removed redundant FAILSAFE effect to prevent loop conflicts.
   // The detection logic is now centralized in fetchDashboardData for better control.
@@ -992,13 +1098,16 @@ function App() {
     if (suggestingSkill?.song_id) {
        localStorage.setItem(`groovelab_founding_ignored_${user.id}_${suggestingSkill.song_id}`, 'true');
     }
+    if (suggestingSkill?.songs?.id) {
+       localStorage.setItem(`groovelab_founding_ignored_${user.id}_${suggestingSkill.songs.id}`, 'true');
+    }
 
     setSuggestingSkill(null);
   };
 
   // Auto-trigger Band Founding Modal when formation is complete
   useEffect(() => {
-    if (!user || suggestingSkill || selectedBandForGateway || pendingFounding || showBandProfile) return;
+    if (!user || suggestingSkill || selectedBandForGateway || pendingFounding || showBandProfile || gatewayJustClosed.current) return;
 
     // 1. Auto-trigger: If user is in a band and mastered a new skill, suggest it to their band first
     if (userBands.length > 0) {
@@ -1040,8 +1149,33 @@ function App() {
             const leader = sortedMembers[0];
             const isLeader = leader?.user_id === user.id;
 
+            // Only trigger this founding dialog for the selected leader
+            if (!isLeader) {
+              console.log('[AutoTrigger] Current user is not the leader. Skipping popup for non-leader.');
+              continue;
+            }
+
+            // 1. Check if we already have a band for this song/group locally to avoid re-triggering
+            const alreadyHaveBand = userBands.some((b: any) => 
+              b.formation_group === form.id || 
+              b.song_id === song.id ||
+              b.song_id === song.song_id ||
+              (b.band_songs || []).some((bs: any) => bs.song_id === song.id || bs.song_id === song.song_id || bs.songs?.id === song.id)
+            );
+            
+            const isDone = localStorage.getItem(`groovelab_founding_done_${user.id}_${song.id}`) || 
+                           localStorage.getItem(`groovelab_founding_done_${user.id}_${song.song_id}`) ||
+                           localStorage.getItem(`groovelab_form_done_${user.id}_${form.id}`) ||
+                           localStorage.getItem(`groovelab_founding_ignored_${user.id}_${song.id}`) ||
+                           localStorage.getItem(`groovelab_founding_ignored_${user.id}_${song.song_id}`);
+            
+            if (alreadyHaveBand || isDone || ignoredFoundingIds.current.includes(form.id)) {
+              console.log('[AutoTrigger] Already have band, formation processed, or ignored. Skipping.');
+              continue;
+            }
+
             // Auto-trigger founding flow
-            setLastAutoTriggeredFormId(form.id);
+            updateAutoTriggerId(form.id);
             
             // Check for multi-band conflict first (mimic button logic)
             if (userBands.length > 0) {
@@ -1090,6 +1224,19 @@ function App() {
   }, [showBandProfile, bandProfileView, selectedBandForProfile]);
 
   const BAND_AVATARS = [
+    { id: 'band_kids_formation_light_1', url: '/avatars/band_kids_formation_light_1.png', size: 5 },
+    { id: 'band_kids_formation_light_2', url: '/avatars/band_kids_formation_light_2.png', size: 5 },
+    { id: 'band_kids_formation_light_3', url: '/avatars/band_kids_formation_light_3.png', size: 5 },
+    { id: 'band_kids_formation_light_4', url: '/avatars/band_kids_formation_light_4.png', size: 5 },
+    { id: 'band_kids_formation_1', url: '/avatars/band_kids_formation_1.png', size: 5 },
+    { id: 'band_kids_formation_2', url: '/avatars/band_kids_formation_2.png', size: 5 },
+    { id: 'band_kids_formation_3', url: '/avatars/band_kids_formation_3.png', size: 5 },
+    { id: 'band_kids_formation_4', url: '/avatars/band_kids_formation_4.png', size: 5 },
+    { id: 'band_kids_duo', url: '/avatars/band_kids_duo.png', size: 2 },
+    { id: 'band_kids_trio', url: '/avatars/band_kids_trio.png', size: 3 },
+    { id: 'band_kids_quartet', url: '/avatars/band_kids_quartet.png', size: 4 },
+    { id: 'band_kids_quintet', url: '/avatars/band_kids_quintet.png', size: 5 },
+    { id: 'band_kids_groovelab', url: '/avatars/band_kids_groovelab.png', size: 4 },
     { id: '3_1', url: '/band_avatar_3_musicians_1_1777469162449.png', size: 3 },
     { id: '3_2', url: '/band_avatar_3_musicians_2_1777469216449.png', size: 3 },
     { id: '3_3', url: '/band_avatar_3_musicians_3_1777469286463.png', size: 3 },
@@ -1118,14 +1265,28 @@ function App() {
     { id: 'avatar_girl_guitar', url: '/avatar_girl_guitar.jpg' },
     { id: 'avatar_boy_piano', url: '/avatar_boy_piano.jpg' },
     { id: 'avatar_girl_piano', url: '/avatar_girl_piano.jpg' },
+    { id: 'student_boy_eguitar_2', url: '/avatars/student_boy_eguitar_2.png' },
+    { id: 'student_girl_eguitar_2', url: '/avatars/student_girl_eguitar_2.png' },
+    { id: 'student_boy_ebass_1', url: '/avatars/student_boy_ebass_1.png' },
+    { id: 'student_girl_ebass_1', url: '/avatars/student_girl_ebass_1.png' },
+    { id: 'student_boy_drums_2', url: '/avatars/student_boy_drums_2.png' },
+    { id: 'student_girl_drums_2', url: '/avatars/student_girl_drums_2.png' },
+    { id: 'student_boy_piano_2', url: '/avatars/student_boy_piano_2.png' },
+    { id: 'student_girl_piano_2', url: '/avatars/student_girl_piano_2.png' },
+    { id: 'student_boy_vocals_1', url: '/avatars/student_boy_vocals_1.png' },
+    { id: 'student_girl_vocals_1', url: '/avatars/student_girl_vocals_1.png' },
+    { id: 'student_boy_keyboard_1', url: '/avatars/student_boy_keyboard_1.png' },
+    { id: 'vocalist_female', url: '/vocalist_female.png' },
+    { id: 'student_boy_producer_1', url: '/avatars/student_boy_producer_1.png' },
+    { id: 'student_tech_1', url: '/avatars/student_tech_1.png' },
+    { id: 'vocalist_male', url: '/vocalist_male.png' },
     { id: 'student_eguitar_1', url: '/avatars/student_eguitar_1.png' },
-    { id: 'student_vocals_1', url: '/avatars/student_vocals_1.png' },
     { id: 'student_drums_1', url: '/avatars/student_drums_1.png' },
     { id: 'student_piano_1', url: '/avatars/student_piano_1.png' },
     { id: 'student_bass_1', url: '/avatars/student_bass_1.png' },
-    { id: 'student_tech_1', url: '/avatars/student_tech_1.png' },
-    { id: 'vocalist_male', url: '/vocalist_male.png' },
-    { id: 'vocalist_female', url: '/vocalist_female.png' },
+    { id: 'student_vocals_1', url: '/avatars/student_vocals_1.png' },
+    { id: 'teen_boy_eguitar_17', url: '/avatars/teen_boy_eguitar_17.png' },
+    { id: 'student_teen_boy_guitar_1', url: '/avatars/student_teen_boy_guitar_1.png' },
   ];
 
   const TEACHER_AVATARS = [
@@ -1248,7 +1409,6 @@ function App() {
         const now = new Date().toISOString();
         await supabase.from('users').update({ last_seen: now }).eq('id', user.id);
 
-        // Geofence Check
         // Geofence Check (Strict Enforcement)
         try {
           const userPos = await new Promise<{lat: number, lng: number} | null>((resolve) => {
@@ -1259,9 +1419,11 @@ function App() {
             );
           });
 
+          let isInside = false;
           if (userPos) {
-            const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', user.school_id);
-            let isInside = false;
+            const schoolId = user.school_id || (Array.isArray(user.schools) ? user.schools[0]?.id : user.schools?.id);
+            const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', schoolId);
+            
             if (rooms) {
               for (const room of rooms) {
                 const points = Array.isArray(room.geofence_points) ? room.geofence_points : [];
@@ -1269,17 +1431,12 @@ function App() {
                 if (room.latitude && room.longitude) allCoords.push({ lat: room.latitude, lng: room.longitude });
                 
                 for (const pt of allCoords) {
-                  // Reuse distance logic if possible, or define here
-                  const R = 6371e3;
-                  const dLat = (Number(pt.lat) - userPos.lat) * (Math.PI / 180);
-                  const dLon = (Number(pt.lng) - userPos.lng) * (Math.PI / 180);
-                  const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(userPos.lat * (Math.PI / 180)) * Math.cos(Number(pt.lat) * (Math.PI / 180)) * Math.sin(dLon/2) * Math.sin(dLon/2);
-                  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-                  const dist = R * c;
-
-                  if (dist < 100) { 
-                    isInside = true;
-                    break;
+                  if (pt && pt.lat && pt.lng) {
+                    const dist = getDistanceFromLatLonInM(userPos.lat, userPos.lng, Number(pt.lat), Number(pt.lng));
+                    if (dist < 100) { 
+                      isInside = true;
+                      break;
+                    }
                   }
                 }
                 if (isInside) break;
@@ -1287,14 +1444,12 @@ function App() {
             }
 
             // 2. School Fallback (Single Point + Radius)
-            const school = (user as any).schools;
+            const school = Array.isArray(user.schools) ? user.schools[0] : user.schools;
             if (!isInside && school?.latitude && school?.longitude) {
-              const R = 6371e3;
-              const dLat = (school.latitude - userPos.lat) * (Math.PI / 180);
-              const dLon = (school.longitude - userPos.lng) * (Math.PI / 180);
-              const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(userPos.lat * (Math.PI / 180)) * Math.cos(school.latitude * (Math.PI / 180)) * Math.sin(dLon/2) * Math.sin(dLon/2);
-              const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-              const distToSchool = R * c;
+              const distToSchool = getDistanceFromLatLonInM(
+                userPos.lat, userPos.lng, 
+                Number(school.latitude), Number(school.longitude)
+              );
               
               if (distToSchool < (school.geofence_radius_meters || 150)) {
                 isInside = true;
@@ -1373,7 +1528,7 @@ function App() {
           id, progress_percent, is_stage_ready, is_pending_approval, instrument, part_number, difficulty_level, is_favorite, verified_by_id,
           songs (id, title, artist, media_link, tomplay_url, instrumentation)
         `).eq('user_id', userId),
-        supabase.from('band_members').select('instrument, bands(id, name, school_id, song_id, status, photo_url)').eq('user_id', userId)
+        supabase.from('band_members').select('instrument, bands(id, name, school_id, song_id, status, photo_url, songs(*), band_songs(*, songs(*), band_song_slots(*)))').eq('user_id', userId)
       ]).catch(err => {
         console.error('[Dashboard] Critical Fetch Error:', err);
         return [ {error: err}, {error: err}, {error: err}, {error: err}, {error: err} ] as any;
@@ -1384,13 +1539,18 @@ function App() {
       if (membershipsRes.error) console.error('[Dashboard] Memberships Fetch Error:', membershipsRes.error);
 
       const userData = userRes.data;
-      if (userData) setUser(userData);
       
       if (!userData) {
         console.warn('[Dashboard] No user data found for ID:', userId);
         setLoading(false);
         return;
       }
+
+      if (!userData.school_id && userData.schools) {
+        userData.school_id = Array.isArray(userData.schools) ? userData.schools[0]?.id : userData.schools?.id;
+      }
+      
+      setUser(userData);
 
       setSession(sessionRes.data);
       if (sessionRes.error) console.error('[Dashboard] Error fetching session:', sessionRes.error);
@@ -1425,39 +1585,85 @@ function App() {
         const band = m.bands;
         if (!band) return [];
 
-        const songs = [];
-        // Main band song
-        if (band.songs) {
-          songs.push({
-            id: `vocal_${band.id}_${band.songs.id}`, song_id: band.songs.id, user_id: userId, title: band.songs.title || '...', artist: band.songs.artist || '...',
-            progress: 100, instrument: 'Vocals', difficulty_level: 'original',
-            is_stage_ready: true, is_favorite: false, locked: false, is_pending_approval: false,
-            media_link: band.songs.media_link, tomplay_url: band.songs.tomplay_url, instrumentation: band.songs.instrumentation
-          });
-        }
-        // Project songs
+        const songs: any[] = [];
+        const addedSongIds = new Set<string>();
+
+        // 1. Process from band_songs where user is assigned to Vocals slot
         (band.band_songs || []).forEach((bs: any) => {
-          const s = bs.songs;
-          if (s && s.id !== band.song_id) {
+          const s = Array.isArray(bs.songs) ? bs.songs[0] : bs.songs;
+          if (!s) return;
+          
+          const isMyVocalSlot = (bs.band_song_slots || []).some((slot: any) => 
+            slot.user_id === userId && 
+            ((slot.instrument || '').toLowerCase().includes('vocal') || (slot.instrument || '').toLowerCase().includes('gesang'))
+          );
+          
+          if (isMyVocalSlot) {
             songs.push({
               id: `vocal_proj_${bs.id}_${s.id}`, song_id: s.id, user_id: userId, title: s.title || '...', artist: s.artist || '...',
               progress: 100, instrument: 'Vocals', difficulty_level: bs.difficulty_level || 'original',
               is_stage_ready: true, is_favorite: false, locked: false, is_pending_approval: false,
               media_link: s.media_link, tomplay_url: s.tomplay_url, instrumentation: s.instrumentation
             });
+            addedSongIds.add(s.id);
           }
         });
+
+        // 2. Fallback for the main band song if it wasn't added yet (to be safe)
+        const bSong = Array.isArray(band.songs) ? band.songs[0] : band.songs;
+        if (bSong && !addedSongIds.has(bSong.id)) {
+          // Check if this student has a Vocals slot for the main song (or if they are the core vocalist, fallback to adding it if no slots exist at all)
+          const mainBandSongRow = (band.band_songs || []).find((bs: any) => {
+            const s = Array.isArray(bs.songs) ? bs.songs[0] : bs.songs;
+            return s && s.id === bSong.id;
+          });
+          
+          let shouldAddMain = false;
+          if (mainBandSongRow) {
+            const hasAnyVocalSlots = (mainBandSongRow.band_song_slots || []).some((slot: any) => 
+              ((slot.instrument || '').toLowerCase().includes('vocal') || (slot.instrument || '').toLowerCase().includes('gesang'))
+            );
+            if (hasAnyVocalSlots) {
+              shouldAddMain = (mainBandSongRow.band_song_slots || []).some((slot: any) => 
+                slot.user_id === userId && 
+                ((slot.instrument || '').toLowerCase().includes('vocal') || (slot.instrument || '').toLowerCase().includes('gesang'))
+              );
+            } else {
+              shouldAddMain = true; // Fallback if slots aren't populated yet
+            }
+          } else {
+            shouldAddMain = true; // Fallback if band_songs row doesn't exist yet
+          }
+
+          if (shouldAddMain) {
+            songs.push({
+              id: `vocal_${band.id}_${bSong.id}`, song_id: bSong.id, user_id: userId, title: bSong.title || '...', artist: bSong.artist || '...',
+              progress: 100, instrument: 'Vocals', difficulty_level: 'original',
+              is_stage_ready: true, is_favorite: false, locked: false, is_pending_approval: false,
+              media_link: bSong.media_link, tomplay_url: bSong.tomplay_url, instrumentation: bSong.instrumentation
+            });
+          }
+        }
         return songs;
       });
 
       setUserSongs([...instrumentalSongs, ...vocalSongs]);
 
+      const schoolId = userData.school_id || (Array.isArray(userData.schools) ? userData.schools[0]?.id : userData.schools?.id);
+      console.log(`[Dashboard] Using schoolId: ${schoolId} for user ${userId}`);
+
+      if (!schoolId) {
+        console.warn('[Dashboard] No school_id found. Board will be empty.');
+        setLoading(false);
+        return;
+      }
+
       // 2. Parallelize wall data and band related fetches
       const [wallRes, membersRes, formingBandsRes] = await Promise.all([
         supabase.from('songs').select(`
-          id, artist, title, media_link, instrumentation, level,
+          id, artist, title, media_link, instrumentation,
           user_song_skills (
-            id, song_id, instrument, difficulty_level, is_stage_ready, user_id, created_at, formation_group,
+            id, song_id, instrument, part_number, difficulty_level, is_stage_ready, user_id, created_at, formation_group,
             profiles:users!user_song_skills_user_id_fkey(first_name, photo_url, school_id)
           ),
           band_songs (
@@ -1468,10 +1674,12 @@ function App() {
               profiles:users!band_song_slots_user_id_fkey(first_name, photo_url)
             )
           )
-        `).eq('school_id', userData.school_id),
-        supabase.from('band_members').select('user_id, bands(id, status, song_id, band_songs(song_id, status))'),
-        supabase.from('bands').select('*, band_members(*, users:profiles(id, first_name, photo_url)), band_songs(*, band_song_slots(*))').eq('school_id', userData.school_id)
+        `).eq('school_id', schoolId),
+        supabase.from('band_members').select('user_id, bands!inner(id, status, song_id, school_id, band_songs(song_id, status))').eq('bands.school_id', schoolId),
+        supabase.from('bands').select('*, band_members(*, profiles:users(id, first_name, photo_url)), band_songs(*, band_song_slots(*))').eq('school_id', schoolId)
       ]);
+      
+      if (wallRes.data) console.log(`[Dashboard] wallRes returned ${wallRes.data.length} songs.`);
 
       if (wallRes.error) console.error('[Dashboard] Error fetching wall data:', wallRes.error);
       
@@ -1484,7 +1692,12 @@ function App() {
         });
       });
 
+      if (wallRes.error) {
+        console.error('[Dashboard] Songs query error:', wallRes.error);
+        return;
+      }
       const wallData = wallRes.data || [];
+      console.log('[Dashboard] Wall data fetched. Count:', wallData.length);
       const allMembers = membersRes.data || [];
 
       // --- FOUNDING DETECTION (Manual Trigger Only) ---
@@ -1511,16 +1724,33 @@ function App() {
                   const candidate = (songData.user_song_skills || []).find((s: any) => {
                     if (!s.is_stage_ready || s.difficulty_level !== level || s.user_id === userId) return false;
                     
-                    // If exclusive, only allow current band members to auto-fill
-                    if (bandSong.is_exclusive) {
-                      const isBandMember = (band.band_members || []).some((m: any) => m.user_id === s.user_id);
-                      if (!isBandMember) return false;
+                    // 1. MUST match the slot instrument we are looking to fill!
+                    if (normalizeInstrument(s.instrument) !== normalizeInstrument(inst)) return false;
+
+                    // 2. If the user is already a member of this band, their assigned instrument in band_members MUST also match!
+                    const memberRecord = (band.band_members || []).find((m: any) => m.user_id === s.user_id);
+                    if (memberRecord) {
+                      if (normalizeInstrument(memberRecord.instrument) !== normalizeInstrument(inst)) return false;
                     }
 
-                    return !currentMemberships.some((m: any) => m.user_id === s.user_id && (m.bands?.id === band.id || m.bands?.song_id === songData.id));
+                    // 3. If exclusive, only allow current band members to auto-fill
+                    if (bandSong.is_exclusive) {
+                      if (!memberRecord) return false;
+                    }
+
+                    // Make sure they are not already in the slots of this proposed song
+                    const isAlreadyInSlots = slots.some((sl: any) => sl.user_id === s.user_id);
+                    if (isAlreadyInSlots) return false;
+
+                    // Make sure they are not active on this song in a DIFFERENT band
+                    return !currentMemberships.some((m: any) => m.user_id === s.user_id && m.bands?.id !== band.id && m.bands?.song_id === songData.id);
                   });
                   if (candidate) {
-                    await supabase.from('band_members').insert({ band_id: band.id, user_id: candidate.user_id, instrument: inst, role: 'member' });
+                    // Check if they are already in the band_members table for this band with the correct instrument
+                    const isAlreadyMember = (band.band_members || []).some((m: any) => m.user_id === candidate.user_id && normalizeInstrument(m.instrument) === normalizeInstrument(inst));
+                    if (!isAlreadyMember) {
+                      await supabase.from('band_members').insert({ band_id: band.id, user_id: candidate.user_id, instrument: inst, role: 'member' });
+                    }
                     await supabase.from('band_song_slots').insert({ band_song_id: bandSong.id, user_id: candidate.user_id, instrument: inst, status: 'joined' });
                     currentMemberships.push({ user_id: candidate.user_id, bands: { id: band.id, song_id: band.song_id } } as any);
                   }
@@ -1534,6 +1764,7 @@ function App() {
         const processedWall: any[] = [];
         
         wallData.forEach((song: any) => {
+          console.log('[Dashboard] Processing song:', song.title, 'ID:', song.id);
           const instrumentation = song?.instrumentation || { Guitar: 1, Bass: 1, Drums: 1, Keys: 0 };
           const requiredInsts: Record<string, number> = {};
           
@@ -1554,19 +1785,18 @@ function App() {
 
           
           // Filter to all skills from the same school (practicing or mastered)
-          const schoolSkills = (song?.user_song_skills || []).filter((s: any) => {
-            const prof = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
-            return prof?.school_id === userData.school_id;
-          });
-
-          if (schoolSkills.length > 0) {
-            console.log(`[Matching] Song: ${song.title}, Musicians in pool: ${schoolSkills.length}`);
-          }
+          const schoolSkills = (song?.user_song_skills || []);
 
           // Split by level
           ['starter', 'original'].forEach(level => {
-            const levelSkills = schoolSkills.filter((s: any) => (s?.difficulty_level || 'original') === level);
+            // CRITICAL: Only include musicians who have mastered the song (100% or stage ready)
+            const levelSkills = schoolSkills.filter((s: any) => 
+              (s?.difficulty_level || 'original') === level && 
+              (s.is_stage_ready || (s.progress_percent || 0) >= 100)
+            );
             
+            const formationsList: any[] = [];
+
             // Filter out musicians who are already in a band project for this song
             const availableMusicians = levelSkills.filter((skill: any) => {
               // 1. Check if they are in ANY band project for this song (proposals or active)
@@ -1576,7 +1806,7 @@ function App() {
                 if (inSlot) return true;
                 
                 // Check core members of that band
-                const band = allBands?.find(b => b.id === bs.band_id);
+                const band = formingBands.find((b: any) => b.id === bs.band_id);
                 return (band?.band_members || []).some((bm: any) => bm.user_id === skill.user_id);
               });
               
@@ -1585,28 +1815,26 @@ function App() {
               // 2. Check existing "solo" formations (already in list)
               const isTaken = formationsList.some(f => f.members.some((m: any) => m.user_id === skill.user_id));
               return !isTaken;
-            }).sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+            }).sort((a: any, b: any) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
 
-            console.log(`[Matching] Song: ${song.title}, Level: ${level}, Total: ${levelSkills.length}, Available: ${availableMusicians.length}`);
+            if (levelSkills.length > 0) {
+              console.log(`[Matching] Song: ${song.title}, Level: ${level}, Mastered pool: ${levelSkills.length}, Available: ${availableMusicians.length}`);
+            }
 
-            const formationsList: any[] = [];
-            
             // 1. Explicit groups
             availableMusicians.filter((s: any) => s.formation_group).forEach((skill: any) => {
+              const prof = Array.isArray(skill.profiles) ? skill.profiles[0] : skill.profiles;
+              if (!prof) return;
+
               let form = formationsList.find(f => f.id === skill.formation_group);
               if (!form) {
                 form = { id: skill.formation_group, members: [], memberMap: {}, level };
                 formationsList.push(form);
               }
-              const prof = Array.isArray(skill.profiles) ? skill.profiles[0] : skill.profiles;
-              const lowerInst = skill.instrument?.toLowerCase() || '';
-              if (lowerInst === 'vocals' || lowerInst === 'gesang') return;
-              let normalizedMemberInst = skill.instrument;
-              if (lowerInst === 'guitar' || lowerInst === 'e-gitarre') normalizedMemberInst = 'E-Gitarre';
-              else if (lowerInst === 'bass' || lowerInst === 'e-bass') normalizedMemberInst = 'E-Bass';
-              else if (lowerInst === 'drums' || lowerInst === 'e-drums') normalizedMemberInst = 'E-Drums';
-              else if (lowerInst === 'piano' || lowerInst === 'keys' || lowerInst === 'e-piano') normalizedMemberInst = 'E-Piano';
-              else if (lowerInst === 'vocals' || lowerInst === 'gesang') normalizedMemberInst = 'Vocals';
+              
+              const normalizedMemberInst = normalizeInstrument(skill.instrument);
+              const currentCount = form.members.filter((m: any) => m.instrument === normalizedMemberInst).length;
+              const nextPart = currentCount + 1;
 
               const memberObj = {
                 user_id: skill.user_id,
@@ -1614,30 +1842,36 @@ function App() {
                 first_name: prof?.first_name || 'Musiker',
                 photo_url: prof?.photo_url,
                 instrument: normalizedMemberInst,
+                part_number: nextPart,
                 created_at: skill.created_at,
-                isMastered: !!skill.is_stage_ready
+                isMastered: true
               };
               form.members.push(memberObj);
-              form.memberMap[normalizedMemberInst] = memberObj;
-
+              form.memberMap[`${normalizedMemberInst}_${nextPart}`] = memberObj;
             });
 
             // 2. Automatic groups
             availableMusicians.filter((s: any) => !s.formation_group).forEach((skill: any) => {
-              let form = formationsList.find(f => !f.memberMap[skill.instrument] && !f.members.some((m: any) => m.user_id === skill.user_id));
+              const prof = Array.isArray(skill.profiles) ? skill.profiles[0] : skill.profiles;
+              if (!prof) return;
+
+              const normalizedMemberInst = normalizeInstrument(skill.instrument);
+              
+              let form = formationsList.find(f => {
+                const userAlreadyIn = f.members.some((m: any) => m.user_id === skill.user_id);
+                if (userAlreadyIn) return false;
+                const currentCount = f.members.filter((m: any) => m.instrument === normalizedMemberInst).length;
+                const requiredCount = song.instrumentation?.[normalizedMemberInst] || song.instrumentation?.[skill.instrument] || 0;
+                return currentCount < requiredCount;
+              });
+
               if (!form) {
                 form = { id: `auto_${song.id}_${level}_${formationsList.length}`, members: [], memberMap: {}, level };
                 formationsList.push(form);
               }
-              const prof = Array.isArray(skill.profiles) ? skill.profiles[0] : skill.profiles;
-              const lowerInst = skill.instrument?.toLowerCase() || '';
-              if (lowerInst === 'vocals' || lowerInst === 'gesang') return;
-              let normalizedMemberInst = skill.instrument;
-              if (lowerInst === 'guitar' || lowerInst === 'e-gitarre') normalizedMemberInst = 'E-Gitarre';
-              else if (lowerInst === 'bass' || lowerInst === 'e-bass') normalizedMemberInst = 'E-Bass';
-              else if (lowerInst === 'drums' || lowerInst === 'e-drums') normalizedMemberInst = 'E-Drums';
-              else if (lowerInst === 'piano' || lowerInst === 'keys' || lowerInst === 'e-piano') normalizedMemberInst = 'E-Piano';
-              else if (lowerInst === 'vocals' || lowerInst === 'gesang') normalizedMemberInst = 'Vocals';
+
+              const currentCount = form.members.filter((m: any) => m.instrument === normalizedMemberInst).length;
+              const nextPart = currentCount + 1;
 
               const memberObj = {
                 user_id: skill.user_id,
@@ -1645,40 +1879,87 @@ function App() {
                 first_name: prof?.first_name || 'Musiker',
                 photo_url: prof?.photo_url,
                 instrument: normalizedMemberInst,
+                part_number: nextPart,
                 created_at: skill.created_at,
-                isMastered: !!skill.is_stage_ready
+                isMastered: true
               };
               form.members.push(memberObj);
-              form.memberMap[normalizedMemberInst] = memberObj;
-
+              form.memberMap[`${normalizedMemberInst}_${nextPart}`] = memberObj;
             });
 
             // 2.5 Add existing Band Proposals (Guest Search)
-            (song.band_songs || []).forEach((bs: any) => {
+            const projectsForThisSongMap = new Map<string, any>();
+            (song.band_songs || []).forEach((p: any) => {
+              if (p.band_id) projectsForThisSongMap.set(p.band_id, p);
+            });
+            
+            formingBands.filter((b: any) => b.song_id === song.id).forEach((b: any) => {
+              if (!projectsForThisSongMap.has(b.id)) {
+                projectsForThisSongMap.set(b.id, {
+                  id: `forming_${b.id}`,
+                  band_id: b.id,
+                  status: 'forming',
+                  bands: b,
+                  band_song_slots: []
+                });
+              }
+            });
+
+            const projectsForThisSong = Array.from(projectsForThisSongMap.values());
+
+            projectsForThisSong.forEach((bs: any) => {
               if (bs.status === 'mastered') return;
               const bsLevel = bs.difficulty_level || 'original';
               if (bsLevel !== level) return;
               
-              const band = bs.bands;
-              if (!band || band.school_id !== userData.school_id) return;
+              const band = formingBands.find((b: any) => b.id === bs.band_id) || bs.bands;
+              if (!band || band.school_id !== schoolId) return;
+
+              const isUserBandMember = (band.band_members || []).some((m: any) => m.user_id === userId);
+
+              // If it's an existing band song proposal, only show it publicly if all active band members have approved (mastered) it,
+              // EXCEPT if the logged-in user is a member of this band (they should always see their own band's proposals).
+              if (bs.status === 'proposal' && !isUserBandMember) {
+                const bMembers = band.band_members || [];
+                if (bMembers.length === 0) return;
+                
+                const allApproved = bMembers.every((bm: any) => {
+                  const bmInst = normalizeInstrument(bm.instrument);
+                  if (bmInst === 'Vocals') return true;
+                  const userSkills = schoolSkillsMap[bm.user_id] || [];
+                  return userSkills.some((sk: any) => 
+                    sk.song_id === song.id && 
+                    normalizeInstrument(sk.instrument) === bmInst && 
+                    (sk.is_stage_ready || (sk.progress_percent || 0) >= 100)
+                  );
+                });
+                
+                if (!allApproved) return;
+              }
 
               const slots = bs.band_song_slots || [];
               const members: any[] = [];
               const addedUserIds = new Set<string>();
+              const addedSlotKeys = new Set<string>();
 
               // 1. Add participants from slots (guests and suggester)
               slots.filter((sl: any) => sl.user_id).forEach((sl: any) => {
-                if (addedUserIds.has(sl.user_id)) return;
+                const normalizedMemberInst = normalizeInstrument(sl.instrument);
+                const slPart = sl.part_number || 1;
+                const slotKey = `${sl.user_id}_${normalizedMemberInst}_${slPart}`;
+                
+                if (addedSlotKeys.has(slotKey)) return;
+                addedSlotKeys.add(slotKey);
                 addedUserIds.add(sl.user_id);
                 
-                const prof = sl.profiles;
-                const normalizedMemberInst = normalize(sl.instrument);
+                const prof = Array.isArray(sl.profiles) ? sl.profiles[0] : sl.profiles;
 
                 const skills = schoolSkillsMap[sl.user_id] || [];
                 const isMastered = skills.some((sk: any) => 
                   sk.song_id === song.id && 
-                  normalize(sk.instrument) === normalizedMemberInst && 
-                  (sk.is_stage_ready || sk.progress_percent >= 100)
+                  normalizeInstrument(sk.instrument) === normalizedMemberInst && 
+                  (sk.part_number || 1) === slPart &&
+                  (sk.is_stage_ready || (sk.progress_percent || 0) >= 100)
                 );
 
                 members.push({
@@ -1686,102 +1967,118 @@ function App() {
                   first_name: prof?.first_name || 'Musiker',
                   photo_url: prof?.photo_url,
                   instrument: normalizedMemberInst,
+                  part_number: slPart,
                   isFromBand: true,
                   isMastered
                 });
               });
 
               // 2. Add core band members who aren't in slots yet
-              const coreBand = allBands?.find(b => b.id === bs.band_id);
+              const coreBand = formingBands.find((b: any) => b.id === bs.band_id);
+              let instCount: Record<string, number> = {};
+              members.forEach((m: any) => {
+                instCount[m.instrument] = Math.max(instCount[m.instrument] || 0, m.part_number || 1);
+              });
+
               (coreBand?.band_members || []).forEach((bm: any) => {
                 if (addedUserIds.has(bm.user_id)) return;
                 addedUserIds.add(bm.user_id);
                 
-                const prof = bm.users ? (Array.isArray(bm.users) ? bm.users[0] : bm.users) : null;
-                const normalizedMemberInst = normalize(bm.instrument);
+                const prof = bm.profiles ? (Array.isArray(bm.profiles) ? bm.profiles[0] : bm.profiles) : null;
+                const normalizedMemberInst = normalizeInstrument(bm.instrument);
 
-                const skills = schoolSkillsMap[bm.user_id] || [];
-                const isMastered = skills.some((sk: any) => 
-                  sk.song_id === song.id && 
-                  normalize(sk.instrument) === normalizedMemberInst && 
-                  (sk.is_stage_ready || sk.progress_percent >= 100)
-                );
+                if (prof) {
+                  const nextPart = (instCount[normalizedMemberInst] || 0) + 1;
+                  instCount[normalizedMemberInst] = nextPart;
 
-                members.push({
-                  user_id: bm.user_id,
-                  first_name: prof?.first_name || 'Musiker',
-                  photo_url: prof?.photo_url,
-                  instrument: normalizedMemberInst,
-                  isFromBand: true,
-                  isMastered
-                });
-              });
+                  const skills = schoolSkillsMap[bm.user_id] || [];
+                  const isMastered = skills.some((sk: any) => 
+                    sk.song_id === song.id && 
+                    normalizeInstrument(sk.instrument) === normalizedMemberInst && 
+                    (sk.part_number || 1) === nextPart &&
+                    (sk.is_stage_ready || (sk.progress_percent || 0) >= 100)
+                  );
 
-              // Only show on wall if there are open slots (excluding vocals)
-              const filledInstrumentMap: Record<string, number> = {};
-              members.forEach((m: any) => {
-                if (m.instrument !== 'Vocals') {
-                  filledInstrumentMap[m.instrument] = (filledInstrumentMap[m.instrument] || 0) + 1;
+                  members.push({
+                    user_id: bm.user_id,
+                    first_name: prof.first_name || 'Musiker',
+                    photo_url: prof.photo_url,
+                    instrument: normalizedMemberInst,
+                    part_number: nextPart,
+                    isFromBand: true,
+                    isMastered
+                  });
                 }
               });
 
-              const hasOpenSlots = Object.entries(requiredInsts).some(([inst, count]) => {
-                return (filledInstrumentMap[inst] || 0) < count;
-              });
+              const requiredInsts = song.instrumentation || { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 };
+              const totalRequired = Object.entries(requiredInsts).reduce((acc, [inst, count]) => {
+                const low = inst.toLowerCase();
+                if (low.includes('vocals') || low.includes('gesang')) return acc;
+                return acc + (count as number);
+              }, 0);
 
-              if (hasOpenSlots) {
-                formationsList.push({
-                  id: `band_${bs.id}`,
-                  members,
-                  memberMap: members.reduce((acc: any, m: any) => ({...acc, [m.instrument]: m}), {}),
-                  level,
-                  originBand: band,
-                  bandSongId: bs.id
-                });
+              const instrumentalists = members.filter((m: any) => {
+                const low = (m.instrument || '').toLowerCase();
+                return !low.includes('vocals') && !low.includes('gesang');
+              }).length;
+
+              if (instrumentalists >= totalRequired) {
+                if (!(bs.status === 'proposal' && isUserBandMember)) {
+                  return;
+                }
               }
+
+              formationsList.push({
+                id: `band_${bs.id}`,
+                originBand: band,
+                bandSongId: bs.id,
+                band_song_slots: bs.band_song_slots || [],
+                song_id: song.id,
+                status: bs.status,
+                members,
+                memberMap: members.reduce((acc, m) => ({ ...acc, [`${m.instrument}_${m.part_number}`]: m }), {}),
+                level
+              });
             });
 
-            // 3. Fallback: If NO formations exist for this level but there are school skills OR guest searches
-            const hasGuestSearch = (song.band_songs || []).some((bs: any) => (bs.difficulty_level || 'original') === level);
-            if (formationsList.length === 0 && (levelSkills.length > 0 || hasGuestSearch)) {
+            // 3. Fallback: Only show if there is actually at least one unmatched mastered musician!
+            if (formationsList.length === 0 && availableMusicians.length > 0) {
               formationsList.push({ id: `first_slot_${song.id}_${level}`, members: [], memberMap: {}, isInitial: true, level });
             }
-
+            
             const levelFormations = formationsList.map(form => {
               const isComplete = Object.keys(requiredInsts).every(inst => {
                 const lower = inst.toLowerCase();
                 if (lower.includes('vocals') || lower.includes('gesang')) return true;
-                if (requiredInsts[inst] === 0) return true;
+                const needed = requiredInsts[inst] || 0;
+                if (needed === 0) return true;
                 
-                // Extremely robust instrument check
-                const hasInst = form.members.some((m: any) => {
-                  const mInst = (m.instrument || '').toLowerCase();
-                  const target = inst.toLowerCase();
-                  return mInst === target || 
-                         (mInst === 'e-gitarre' && target === 'guitar') || (mInst === 'guitar' && target === 'e-gitarre') ||
-                         (mInst === 'e-bass' && target === 'bass') || (mInst === 'bass' && target === 'e-bass') ||
-                         (mInst === 'e-drums' && target === 'drums') || (mInst === 'drums' && target === 'e-drums') ||
-                         (mInst === 'e-piano' && target === 'piano') || (mInst === 'piano' && target === 'e-piano') || (mInst === 'keys' && target === 'e-piano');
-                });
-                return hasInst;
+                const normTarget = normalizeInstrument(inst);
+                const matchingCount = form.members.filter((m: any) => {
+                  return normalizeInstrument(m.instrument) === normTarget;
+                }).length;
+                
+                return matchingCount >= needed;
               });
-              return {
-                ...form,
-                isComplete
-              };
+              return { ...form, isComplete };
             });
 
             if (levelFormations.length > 0) {
-              processedWall.push({
-                id: `${song.id}_${level}`,
-                song_id: song.id,
-                artist: song.artist || 'Unbekannter Künstler',
-                title: song.title || 'Unbekannter Titel',
-                media_link: song.media_link,
-                instrumentation: requiredInsts,
-                formations: levelFormations,
-                level: level
-              });
+              const uniqueId = `${song.id}_${level}`;
+              // Avoid duplicates
+              if (!processedWall.some(w => w.id === uniqueId)) {
+                processedWall.push({
+                  id: uniqueId,
+                  song_id: song.id,
+                  artist: song.artist || 'Unbekannter Künstler',
+                  title: song.title || 'Unbekannter Titel',
+                  media_link: song.media_link,
+                  instrumentation: requiredInsts,
+                  formations: levelFormations,
+                  level: level
+                });
+              }
             }
           });
         });
@@ -1789,7 +2086,10 @@ function App() {
         // --- FINAL FILTERING: Keep all formations until founded ---
         const filteredWall = processedWall.filter((ws: any) => ws.formations.length > 0);
 
-        setWallSongs(filteredWall);
+        console.log('[Dashboard] Setting processedWall. Final count:', filteredWall.length);
+        console.log('[Dashboard] Processed IDs:', filteredWall.map(w => w.id));
+      setWallSongs(filteredWall);
+      console.log('[Dashboard] fetchDashboardData complete.');
 
 
       // Lade alle Songs der Schule für die Bibliothek
@@ -1970,7 +2270,11 @@ function App() {
 
   const fetchPlanningData = async (schoolId: string, userIdArg?: string) => {
     const currentUserId = userIdArg || loggedInUserId || sessionStorage.getItem('groovelab_user_id');
-    if (!currentUserId || !schoolId) return;
+    console.log(`[Planning] Fetching for School: ${schoolId}, User: ${currentUserId}`);
+    if (!currentUserId || !schoolId) {
+      console.warn('[Planning] Missing userId or schoolId', { currentUserId, schoolId });
+      return;
+    }
     
     try {
       // 1. Hole alle Planungs-Einträge der Schule
@@ -1978,6 +2282,8 @@ function App() {
         .from('lab_planning')
         .select('*')
         .eq('school_id', schoolId);
+      
+      console.log(`[Planning] DB Result:`, { count: planningData?.length, error: planningError });
         
       if (planningError) {
         console.error('[Planning] Fetch Error:', planningError);
@@ -2006,6 +2312,7 @@ function App() {
       schoolId = Array.isArray(user.schools) ? user.schools[0]?.id : user.schools?.id;
     }
     
+    console.log(`[Planning] Toggle attempt for ${day}-${time}. SchoolId: ${schoolId}, UserId: ${loggedInUserId}`);
     if (!schoolId) {
       console.warn('[Planning] Keine School ID gefunden, breche ab.');
       return;
@@ -2054,11 +2361,14 @@ function App() {
   const handleHelpRequest = async () => {
     if (!session?.station_id || !loggedInUserId) return;
     
+    const sId = user?.school_id || (Array.isArray(user?.schools) ? user?.schools[0]?.id : user?.schools?.id);
+    
     const { error } = await supabase
       .from('help_requests')
       .insert({
         user_id: loggedInUserId,
         station_id: session.station_id,
+        school_id: sId,
         status: 'pending'
       });
       
@@ -2139,8 +2449,15 @@ function App() {
     if (!target || !user) return;
     try {
       setLoading(true);
+      const groupID = target.formation_group;
       
-      const { data: alreadyFounded } = await supabase.from('bands').select('id').eq('forming_song_id', target.song_id || target.id).maybeSingle();
+      const { data: alreadyFounded } = await supabase
+        .from('bands')
+        .select('id')
+        .eq('song_id', target.song_id || target.id)
+        .eq('formation_group', groupID)
+        .maybeSingle();
+        
       if (alreadyFounded) {
         setPendingFounding(null);
         fetchDashboardData(user.id);
@@ -2151,17 +2468,57 @@ function App() {
       
       // 1. Determine members and coach BEFORE creating the band record
       let formationMembers: any[] = [];
-      const groupID = target.formation_group;
       let calculatedCoachId = null;
+
+      // Idempotency check: Does a band for this formation group already exist?
+      if (groupID) {
+        const { data: existingGroupBand } = await supabase
+          .from('bands')
+          .select('id')
+          .eq('formation_group', groupID)
+          .maybeSingle();
+        
+        if (existingGroupBand) {
+          console.log('[Founding] Band already exists for this group. Opening existing gateway.');
+          setPendingFounding(null);
+          setSuggestingSkill(null);
+          
+          // Fetch full details of the existing band to show the gateway
+          const { data: fullBand } = await supabase
+            .from('bands')
+            .select('*, band_songs(*, songs(*)), band_members(*, profiles:users(*)), band_song_slots(*)')
+            .eq('id', existingGroupBand.id)
+            .single();
+
+          if (fullBand) {
+            setSelectedBandForGateway(fullBand);
+          }
+          
+          await fetchDashboardData(user.id, false);
+          return;
+        }
+      }
 
       if (groupID) {
         console.log('[Founding] Pre-fetching members for group:', groupID);
         const { data: groupData } = await supabase
           .from('user_song_skills')
-          .select('user_id, instrument, verified_by_id, profiles:users(first_name, photo_url)')
+          .select('user_id, instrument, verified_by_id, created_at, profiles:users(first_name, photo_url)')
           .eq('formation_group', groupID);
           
         if (groupData && groupData.length > 0) {
+          // Identify the true leader (first one who mastered it)
+          const sorted = [...groupData].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+          const actualLeaderId = sorted[0].user_id;
+
+          // If current user is NOT the leader, they shouldn't be founding it (double check)
+          if (actualLeaderId !== user.id) {
+            console.warn('[Founding] Non-leader tried to found band. Cancelling.');
+            setPendingFounding(null);
+            setSuggestingSkill(null);
+            return;
+          }
+
           formationMembers = groupData.map((d: any) => ({
             user_id: d.user_id,
             instrument: d.instrument,
@@ -2187,7 +2544,8 @@ function App() {
           school_id: user.school_id,
           song_id: target.song_id || target.songs?.id || target.id,
           coach_id: calculatedCoachId,
-          status: 'forming'
+          status: 'forming',
+          formation_group: groupID
         })
         .select()
         .single();
@@ -2201,7 +2559,8 @@ function App() {
           band_id: newBand.id, 
           song_id: target.song_id || target.songs?.id || target.id, 
           status: 'active',
-          suggested_by: user.id 
+          suggested_by: user.id,
+          difficulty_level: target.difficulty_level || target.level || 'starter'
         })
         .select()
         .single();
@@ -2237,7 +2596,8 @@ function App() {
       const memberInserts = uniqueMembers.map((m: any) => ({
         band_id: newBand.id,
         user_id: m.user_id,
-        instrument: m.instrument
+        instrument: m.instrument,
+        confetti_seen: m.user_id === user.id ? true : false
       }));
 
       const slotInserts = uniqueMembers.map((m: any) => ({
@@ -2257,9 +2617,6 @@ function App() {
 
       const createdSlots = slotInserts;
 
-      // Mark this specific song-founding as done in localStorage to prevent re-triggering
-      localStorage.setItem(`groovelab_founding_done_${user.id}_${target.song_id || target.id}`, 'true');
-      
       // Also mark the specific skill record as prompted so the Glückwunsch modal doesn't re-appear
       const promptKey = `groovelab_prompted_${user.id}`;
       const promptedIds = JSON.parse(localStorage.getItem(promptKey) || '[]');
@@ -2270,22 +2627,22 @@ function App() {
 
       console.log('[Founding] Artist Gateway Created for all members!');
       
+      // 1. Close all triggers/modals first
+      localStorage.setItem(`groovelab_founding_done_${user.id}_${target.song_id || target.id}`, 'true');
+      if (groupID) localStorage.setItem(`groovelab_form_done_${user.id}_${groupID}`, 'true');
+      
       setShowFoundingModal(false);
       setPendingFounding(null);
       setFoundingName('');
       setSuggestingSkill(null); // Close the congrats modal immediately
       
-      // Immediate sync
-      await fetchDashboardData(user.id);
-      
-      // Switch to bands tab so the gateway can render
-      setActiveStudentTab('bands');
-      
-      // Open the gateway immediately for the founder
+      // 2. Open the gateway celebration UI IMMEDIATELY for the founder
+      // We do this before the background sync to ensure the user sees the "WOW" effect instantly
+      console.log('[Founding] Opening Celebration Gateway UI...');
       setSelectedBandForGateway({ 
         ...newBand, 
-        songs: { title: target.title || target.songs?.title }, 
-        band_members: formationMembers.map((m: any) => ({
+        songs: { title: target.title || target.songs?.title || 'Dein Song' }, 
+        band_members: uniqueMembers.map((m: any) => ({
           ...m,
           role: m.user_id === user.id ? 'leader' : 'member'
         })),
@@ -2294,12 +2651,28 @@ function App() {
           band_song_slots: createdSlots
         }]
       });
+
+      // 3. Background sync - ensure loading is NOT set to true during this sync
+      console.log('[Founding] Triggering background data sync in parallel...');
+      // We don't await this if we want maximum speed, but awaiting it ensures consistency 
+      // before switching tabs. Let's await it but keep it fast.
+      await fetchDashboardData(user.id, false);
+      
+      // 4. Switch to bands tab so the gateway can stay visible if closed
+      setActiveStudentTab('bands');
       
     } catch (err: any) {
-      console.error('[Founding] Error:', err);
+      console.error('[Founding] Error during band creation:', err);
       alert('Fehler bei der Gateway-Eröffnung: ' + err.message);
     } finally {
+      console.log('[Founding] Finishing process, clearing loading state.');
+      // Safety: always ensure loading is false
       setLoading(false);
+      // Extra safety: force it again after a tiny delay if we're still stuck
+      setTimeout(() => {
+        console.log('[Founding] Final safety check, loading is:', loading);
+        if (loading) setLoading(false);
+      }, 500);
     }
   };
 
@@ -2636,7 +3009,7 @@ function App() {
           band_song_id: bsData.id,
           user_id: user.id,
           instrument: skill.instrument,
-          part_number: 1
+          part_number: skill.part_number || 1
         });
 
       if (slotErr) throw slotErr;
@@ -2919,16 +3292,10 @@ function App() {
         </div>
       );
     }
-    // Show a premium loading state for public visitors
+    // Show a minimalist loading state for public visitors
     return (
-      <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '32px' }}>
-        <div className="loading-pulse" style={{ width: '120px', height: '120px', borderRadius: '40px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Music size={60} color="#eab308" />
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-          <div style={{ color: '#0f172a', fontWeight: 1000, fontSize: '1.5rem', letterSpacing: '-0.02em' }}>GrooveLab</div>
-          <div style={{ color: '#64748b', fontWeight: 800, fontSize: '0.85rem', letterSpacing: '0.05em', opacity: 0.6 }}>THE SOCIAL EXPERIENCE</div>
-        </div>
+      <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="animate-spin" style={{ width: '24px', height: '24px', border: '2px solid #e2e8f0', borderTopColor: '#eab308', borderRadius: '50%' }}></div>
       </div>
     );
   }
@@ -2940,72 +3307,30 @@ function App() {
 
   if (loading || !user) {
     return (
-      <div className="app-container flex-center" style={{ background: '#ffffff', gap: '32px' }}>
-        <div className="loading-pulse" style={{ width: '120px', height: '120px', borderRadius: '40px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.05)' }}>
-          <Music size={60} color="#eab308" />
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-          <div style={{ color: '#0f172a', fontWeight: 1000, fontSize: '1.75rem', letterSpacing: '-0.02em' }}>GrooveLab</div>
-          <div style={{ color: '#64748b', fontWeight: 800, fontSize: '0.9rem', letterSpacing: '0.05em', opacity: 0.6 }}>THE SOCIAL EXPERIENCE</div>
-          
-          <div style={{ 
-            marginTop: '24px', 
-            padding: '8px 16px', 
-            background: (supabaseUrl && supabaseAnonKey) ? '#f0fdf4' : '#fef2f2', 
-            borderRadius: '12px',
-            fontSize: '11px',
-            fontWeight: 800,
-            color: (supabaseUrl && supabaseAnonKey) ? '#16a34a' : '#ef4444'
-          }}>
-            {(supabaseUrl && supabaseAnonKey) ? 'SUPABASE VERBUNDEN' : 'SUPABASE VERBINDUNG FEHLT'}
-          </div>
-          
-          {/* Diagnose Info */}
-          <div className="mt-8 p-4 bg-black/20 rounded-lg border border-white/10 text-xs font-mono text-white/60">
-            <div className="flex items-center gap-2 mb-2">
-              <div className={`w-2 h-2 rounded-full ${supabaseUrl && supabaseAnonKey ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-red-500 animate-pulse'}`} />
-              <span>SUPABASE STATUS: {supabaseUrl && supabaseAnonKey ? 'VERBUNDEN' : 'VERBINDUNG FEHLT'}</span>
-            </div>
-            {(!supabaseUrl || !supabaseAnonKey) && (
-              <p className="text-red-400 leading-relaxed">
-                ACHTUNG: VITE_SUPABASE_URL oder VITE_SUPABASE_ANON_KEY fehlen in den Environment Variables.
-              </p>
-            )}
-            
-            {/* Admin Bypass Button for Localhost */}
-            {import.meta.env.DEV && (
-              <button
-                onClick={async () => {
-                  const { data } = await supabase
-                    .from('users')
-                    .select('*, schools(*)')
-                    .eq('qr_token', '7b8e1a2c-4d5f-6a7b-8c9d-0e1f2a3b4c5d')
-                    .single();
-                  if (data) {
-                    await handleLogin(data.id, true); // Loggt dich als Admin im Home-Modus ein
-                    setUser(data);
-                    setLoading(false);
-                  }
-                }}
-                className="mt-4 w-full py-2 px-4 bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/50 rounded text-yellow-500 font-bold transition-all shadow-[0_0_15px_rgba(234,179,8,0.2)]"
-              >
-                🔓 DIREKT ALS ADMIN EINLOGGEN
-              </button>
-            )}
-          </div>
-          
-          {(!supabaseUrl || !supabaseAnonKey) && (
-            <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '8px', maxWidth: '250px', lineHeight: '1.4', textAlign: 'center' }}>
-              Bitte prüfe deine Vercel Environment Variables (VITE_SUPABASE_URL & VITE_SUPABASE_ANON_KEY).
-            </div>
+      <div style={{ position: 'fixed', inset: 0, background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+         {/* Minimal loading indicator instead of full splash */}
+         <div className="animate-spin" style={{ width: '24px', height: '24px', border: '2px solid #e2e8f0', borderTopColor: '#eab308', borderRadius: '50%' }}></div>
+         
+         {import.meta.env.DEV && (
+            <button
+              onClick={async () => {
+                const { data } = await supabase.from('users').select('*').eq('role', 'admin').limit(1).single();
+                if (data) {
+                  await handleLogin(data.id, true);
+                  setUser(data);
+                  setLoading(false);
+                }
+              }}
+              style={{ position: 'absolute', bottom: '20px', opacity: 0.3, fontSize: '10px' }}
+            >
+              🔓 BYPASS
+            </button>
           )}
-        </div>
       </div>
     );
   }
 
-
-
+  // 3. MAIN DASHBOARD LOGIC (Resumes here after Auth/Loading checks)
   const calculateSkillXP = (skill: any) => {
     const prog = skill.progress || 0;
     if (skill.is_stage_ready || prog === 100) return 500;
@@ -3124,7 +3449,7 @@ function App() {
       `}</style>
       {/* Sidebar Navigation (iPad/Desktop) */}
       <aside className="sidebar-nav">
-        <div className="sidebar-logo" style={{ padding: '32px 24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="sidebar-logo" style={{ padding: '8px 0px', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{ 
             width: '42px', 
             height: '42px', 
@@ -3224,9 +3549,9 @@ function App() {
           )}
         </nav>
 
-        <div style={{ marginTop: 'auto', borderTop: '1px solid #f1f5f9', paddingTop: '24px', paddingBottom: '32px' }}>
-          <div style={{ padding: '0 16px', marginBottom: '16px' }}>
-             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ marginTop: 'auto', borderTop: '1px solid #f1f5f9', paddingTop: '16px', paddingBottom: '16px' }}>
+          <div style={{ padding: '0 8px', marginBottom: '12px' }}>
+             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ position: 'relative' }}>
                   <div style={{ width: '44px', height: '44px', borderRadius: '12px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
                     <StudioAvatar src={user.photo_url} />
@@ -3250,7 +3575,7 @@ function App() {
           </button>
           <button 
             onClick={() => handleLogout()}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', borderRadius: '14px', border: 'none', background: 'transparent', color: '#ef4444', fontWeight: 800, cursor: 'pointer' }}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '12px', border: 'none', background: 'transparent', color: '#ef4444', fontWeight: 800, cursor: 'pointer' }}
           >
             <LogOut size={18} color="#ef4444" /> Abmelden
           </button>
@@ -3721,9 +4046,7 @@ function App() {
                                 setShowBandProfile(true);
                               }}
                               style={{ width: '100%', textAlign: 'left', cursor: 'pointer', padding: '24px', background: '#fff', borderRadius: '24px', border: '1px solid #f1f5f9', display: 'flex', gap: '20px', alignItems: 'center', transition: 'all 0.2s' }}>
-                              <div style={{ width: '64px', height: '64px', borderRadius: '18px', overflow: 'hidden', background: '#f8fafc', border: '2px solid #f1f5f9' }}>
-                                <StudioAvatar src={b.photo_url} />
-                              </div>
+                              {renderBandAvatar(b.name, b.photo_url, '64px', '18px')}
                               <div style={{ flex: 1 }}>
                                 <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b' }}>{b.name}</div>
                                 <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b', marginTop: '2px' }}>
@@ -3964,38 +4287,38 @@ function App() {
                   </div>
                 ) : (
                   groupedRepertoireSongs.map((group: any) => (
-                    <div key={group.song_id} className="glass-panel" style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+                    <div key={group.song_id} className="glass-panel" style={{ padding: '14px 18px', background: 'white', borderRadius: '18px', border: '1px solid #f1f5f9' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                         <div>
-                          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>{group.artist}</div>
-                          <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b' }}>{group.title}</div>
+                          <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', lineHeight: 1 }}>{group.artist}</div>
+                          <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.2 }}>{group.title}</div>
                         </div>
-                        <div style={{ background: '#f0fdf4', color: '#10b981', padding: '6px 12px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Award size={14} /> 100%
+                        <div style={{ background: '#f0fdf4', color: '#10b981', padding: '4px 10px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+                          <Award size={12} /> 100%
                         </div>
                       </div>
                       
-                      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                      <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
                         {group.skills.map((s: any) => (
-                          <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', padding: '4px 10px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>
+                          <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f8fafc', padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 700, color: '#64748b' }}>
                             {APP_INSTRUMENT_ICONS[s.instrument as keyof typeof APP_INSTRUMENT_ICONS]} {s.instrument}
                           </div>
                         ))}
                       </div>
 
-                      <div style={{ background: '#10b981', height: '8px', borderRadius: '4px', width: '100%', marginBottom: '12px' }}></div>
-                      <div style={{ color: '#10b981', fontSize: '0.85rem', fontWeight: 900, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                      <div style={{ background: '#10b981', height: '4px', borderRadius: '2px', width: '100%', marginBottom: '6px' }}></div>
+                      <div style={{ color: '#10b981', fontSize: '0.72rem', fontWeight: 900, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                         Du bist bereit für eine Band
                       </div>
                       
                       {group.skills.some((s: any) => s.verified_by) && (
-                        <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px', marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Expertise-Check</div>
+                        <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px', marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Expertise-Check</div>
                             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                               {group.skills.filter((s: any) => s.verified_by).map((s: any) => (
-                                <div key={s.id} style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  <Check size={12} color="#10b981" strokeWidth={3} />
+                                <div key={s.id} style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                  <Check size={10} color="#10b981" strokeWidth={3} />
                                   {s.instrument}: {s.verified_by.first_name} {s.verified_by.last_name?.[0]}.
                                 </div>
                               ))}
@@ -4079,12 +4402,16 @@ function App() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     {filteredWall.map((song: any) => {
                     const isExpanded = expandedMatchingSong === song.id;
-                    const firstForm = song.formations?.[0];
-                    const openSlots = Math.max(0, Object.keys(song.instrumentation || {}).reduce((acc, inst) => {
+                    const totalRequired = Object.entries(song.instrumentation || {}).reduce((acc, [inst, count]) => {
                       const low = inst.toLowerCase();
                       if (low.includes('vocals') || low.includes('gesang')) return acc;
-                      return acc + (song.instrumentation[inst] || 0);
-                    }, 0) - (firstForm?.members?.length || 0));
+                      return acc + (count as number);
+                    }, 0);
+
+                    const openSlots = Math.max(0, song.formations.reduce((acc: number, form: any) => {
+                      const instrumentalists = form.members?.filter((m: any) => m.instrument !== 'Vocals').length || 0;
+                      return acc + Math.max(0, totalRequired - instrumentalists);
+                    }, 0));
 
                     return (
                     <div key={song.id} style={{ display: 'flex', flexDirection: 'column' }}>
@@ -4136,14 +4463,19 @@ function App() {
                         }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                             {(() => {
-                              // If there's a guest search (band proposal), ONLY show that one.
-                              const guestSearch = song.formations.find((f: any) => !!f.originBand);
-                              const finalFormations = guestSearch ? [guestSearch] : song.formations;
+                              const finalFormations = [...song.formations].sort((a, b) => {
+                                const aMine = (a.members || []).some((m: any) => m.user_id === user?.id);
+                                const bMine = (b.members || []).some((m: any) => m.user_id === user?.id);
+                                if (aMine && !bMine) return -1;
+                                if (!aMine && bMine) return 1;
+                                return 0;
+                              });
                               
                               return finalFormations.map((form: any, fIndex: number) => {
                                 const mySlot = (form?.members || []).find((m: any) => m?.user_id === user?.id);
                                 const isMySlot = !!mySlot;
                                 const isGuestSearch = !!form.originBand;
+                                const isProposal = form.status === 'proposal';
                                 
                                 const sortedMembers = [...(form?.members || [])].sort((a, b) => 
                                   new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
@@ -4156,8 +4488,8 @@ function App() {
 
                                 return (
                                   <div key={form.id} style={{ 
-                                    background: isGuestSearch ? '#0f172a' : (isMySlot ? '#f0f9ff' : '#f8fafc'), 
-                                    border: isGuestSearch ? '1px solid rgba(255,255,255,0.1)' : (isMySlot ? '2px solid #3b82f6' : '1px solid #e2e8f0'),
+                                    background: isProposal ? 'linear-gradient(135deg, #1e1b4b, #0f0728)' : (isGuestSearch ? '#0f172a' : (isMySlot ? '#f0f9ff' : '#f8fafc')), 
+                                    border: isProposal ? '2px dashed #a855f7' : (isGuestSearch ? '1px solid rgba(255,255,255,0.1)' : (isMySlot ? '2px solid #3b82f6' : '1px solid #e2e8f0')),
                                     borderRadius: '24px', padding: '24px',
                                     boxShadow: isGuestSearch ? '0 10px 25px -5px rgba(0,0,0,0.3)' : 'none'
                                   }}>
@@ -4166,14 +4498,21 @@ function App() {
                                         <div style={{ 
                                           fontSize: '0.75rem', 
                                           fontWeight: 950, 
-                                          color: isGuestSearch ? '#a855f7' : (isMySlot ? '#3b82f6' : (form.isInitial ? '#ca8a04' : '#64748b')), 
+                                          color: isProposal ? '#a855f7' : (isGuestSearch ? '#a855f7' : (isMySlot ? '#3b82f6' : (form.isInitial ? '#ca8a04' : '#64748b'))), 
                                           textTransform: 'uppercase', 
                                           letterSpacing: '0.05em',
                                           display: 'flex',
                                           flexDirection: 'column',
                                           gap: '2px'
                                         }}>
-                                          <span>{isGuestSearch ? `🎸 GASTMUSIKER-SUCHE ${isMySlot ? '(DEINE BAND)' : ''}` : (isMySlot ? '✨ Deine Formation' : (form.isInitial ? '📢 Offenes Recruiting' : `Band-Slot #${fIndex + 1}`))}</span>
+                                          <span>
+                                            {isProposal 
+                                              ? `📢 BAND-PROJEKT (ABSTIMMUNG LÄUFT)` 
+                                              : (isGuestSearch 
+                                                  ? `🎸 GASTMUSIKER-SUCHE ${isMySlot ? '(DEINE BAND)' : ''}` 
+                                                  : (isMySlot ? '✨ Deine Formation' : (form.isInitial ? '📢 Offenes Recruiting' : `Band-Slot #${fIndex + 1}`)))
+                                            }
+                                          </span>
                                         </div>
                                       </div>
                                 {canJoin && (
@@ -4227,9 +4566,7 @@ function App() {
                                     onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
                                     onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
                                   >
-                                    <div style={{ width: '64px', height: '64px', borderRadius: '18px', overflow: 'hidden', border: '2px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)' }}>
-                                      <img src={form.originBand.photo_url || '/band_placeholder.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={form.originBand.name} />
-                                    </div>
+                                    {renderBandAvatar(form.originBand.name, form.originBand.photo_url, '64px', '18px')}
                                     <div>
                                       <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.4)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Band Projekt</div>
                                       <div style={{ fontSize: '1rem', fontWeight: 950, color: 'white', lineHeight: 1.2 }}>{form.originBand.name}</div>
@@ -4239,57 +4576,78 @@ function App() {
                                 )}
 
                                 <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap', flex: 1 }}>
-                                {['E-Gitarre', 'E-Drums', 'E-Piano', 'E-Bass'].filter(inst => (song?.instrumentation?.[inst] || 0) > 0).map(inst => {
-                                  const member = form.memberMap[inst];
+                                  {(() => {
+                                    const req = song.instrumentation || { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1 };
+                                    const requiredSlots: any[] = [];
+                                    Object.entries(req).forEach(([inst, count]) => {
+                                      if (inst.toLowerCase().includes('vocals') || inst.toLowerCase().includes('gesang')) return;
+                                      for (let i = 1; i <= (count as number); i++) {
+                                        requiredSlots.push({ inst, part: i });
+                                      }
+                                    });
 
-                                  const isMe = member?.user_id === user?.id;
-                                  
-                                  return (
-                                    <div key={inst} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '80px', position: 'relative' }}>
-                                      <div style={{ 
-                                        width: '64px', height: '64px', borderRadius: '18px', 
-                                        background: member ? (isGuestSearch ? 'rgba(255,255,255,0.05)' : 'white') : (isGuestSearch ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)'), 
-                                        border: (isMe || member?.isMastered) ? `3px solid #ef4444` : (member ? (isGuestSearch ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0') : '2px dashed #cbd5e1'),
-                                        boxShadow: isMe ? '0 0 15px rgba(239, 68, 68, 0.3)' : 'none',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
-                                        filter: member && !member.isMastered ? 'grayscale(100%)' : 'none',
-                                        opacity: member && !member.isMastered ? 0.6 : 1
-                                      }}>
-                                        {member ? (
-                                          <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-                                            <img 
-                                              src={member.photo_url || '/avatar_ghost.jpg'} 
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                setSelectedStudentForPreview(member);
-                                              }}
-                                              style={{ width: '100%', height: '100%', borderRadius: '15px', objectFit: 'cover', cursor: 'pointer' }} 
-                                              alt="" 
-                                            />
-                                            {member.isMastered && (
-                                              <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: '#22c55e', color: 'white', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', zIndex: 10 }}>
-                                                <CheckCircle size={12} strokeWidth={4} />
+                                    // Sort slots: Guitar, Drums, Piano, Bass
+                                    requiredSlots.sort((a, b) => {
+                                      const orderMap: Record<string, number> = { 'e-gitarre': 1, 'e-drums': 2, 'e-piano': 3, 'e-bass': 4 };
+                                      const idxA = orderMap[a.inst.toLowerCase()] || 99;
+                                      const idxB = orderMap[b.inst.toLowerCase()] || 99;
+                                      if (idxA !== idxB) return idxA - idxB;
+                                      return a.part - b.part;
+                                    });
+
+                                    return requiredSlots.map(({ inst, part }) => {
+                                      const key = `${inst}_${part}`;
+                                      const member = form.memberMap[key] || form.memberMap[`${normalizeInstrument(inst)}_${part}`];
+                                      const isMe = member?.user_id === user?.id;
+                                      const instLabel = (req[inst] || 0) > 1 ? `${inst} ${part}` : inst;
+                                      
+                                      return (
+                                        <div key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '80px', position: 'relative' }}>
+                                          <div style={{ 
+                                            width: '64px', height: '64px', borderRadius: '18px', 
+                                            background: member ? (isGuestSearch ? 'rgba(255,255,255,0.05)' : 'white') : (isGuestSearch ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)'), 
+                                            border: (isMe || member?.isMastered) ? `3px solid #ef4444` : (member ? (isGuestSearch ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0') : '2px dashed #cbd5e1'),
+                                            boxShadow: isMe ? '0 0 15px rgba(239, 68, 68, 0.3)' : 'none',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+                                            filter: member && !member.isMastered ? 'grayscale(100%)' : 'none',
+                                            opacity: member && !member.isMastered ? 0.6 : 1
+                                          }}>
+                                            {member ? (
+                                              <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+                                                <img 
+                                                  src={member.photo_url || '/avatar_ghost.jpg'} 
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedStudentForPreview(member);
+                                                  }}
+                                                  style={{ width: '100%', height: '100%', borderRadius: '15px', objectFit: 'cover', cursor: 'pointer' }} 
+                                                  alt="" 
+                                                />
+                                                {member.isMastered && (
+                                                  <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: '#22c55e', color: 'white', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', zIndex: 10 }}>
+                                                    <CheckCircle size={12} strokeWidth={4} />
+                                                  </div>
+                                                )}
+                                              </div>
+                                            ) : (
+                                              <div style={{ fontSize: '1.5rem', opacity: 0.2 }}>{APP_INSTRUMENT_ICONS[inst as keyof typeof APP_INSTRUMENT_ICONS] || '❓'}</div>
+                                            )}
+                                          </div>
+                                          <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px', width: '100%' }}>
+                                            <div style={{ fontSize: '0.65rem', fontWeight: 950, color: member ? (isGuestSearch ? 'white' : '#1e293b') : (isGuestSearch ? 'rgba(255,255,255,0.3)' : '#94a3b8'), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                                              {member ? member.first_name : instLabel}
+                                            </div>
+                                            {member && (
+                                              <div style={{ fontSize: '0.45rem', fontWeight: 800, color: isGuestSearch ? 'rgba(255,255,255,0.3)' : '#94a3b8', textTransform: 'uppercase' }}>
+                                                {instLabel}
                                               </div>
                                             )}
                                           </div>
-                                        ) : (
-                                          <div style={{ fontSize: '1.5rem', opacity: 0.2 }}>{APP_INSTRUMENT_ICONS[inst as keyof typeof APP_INSTRUMENT_ICONS] || '❓'}</div>
-                                        )}
-                                      </div>
-                                      <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px', width: '100%' }}>
-                                        <div style={{ fontSize: '0.65rem', fontWeight: 950, color: member ? (isGuestSearch ? 'white' : '#1e293b') : (isGuestSearch ? 'rgba(255,255,255,0.3)' : '#94a3b8'), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
-                                          {member ? member.first_name : inst}
                                         </div>
-                                        {member && (
-                                          <div style={{ fontSize: '0.45rem', fontWeight: 800, color: isGuestSearch ? 'rgba(255,255,255,0.3)' : '#94a3b8', textTransform: 'uppercase' }}>
-                                            {inst}
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
+                                      );
+                                    });
+                                  })()}
+                                </div>
                               </div>
 
                                {form.isComplete && isMySlot && (
@@ -4456,51 +4814,66 @@ function App() {
                           );
                         }
 
-                        return displayedBands.map((band: any) => (
-                          <div 
-                            key={band.id} 
-                            onClick={() => { 
-                              setSelectedBandForProfile(band); 
-                              setShowBandProfile(true); 
-                            }}
-                            className="glass-panel hover-card" 
-                            style={{ 
-                              background: 'white', padding: '24px', borderRadius: '32px', border: '1px solid #f1f5f9',
-                              display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer',
-                              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                            }}
-                          >
-                            <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
-                              <div style={{ width: '80px', height: '80px', borderRadius: '24px', overflow: 'hidden', border: '3px solid #f8fafc', boxShadow: '0 8px 24px rgba(0,0,0,0.05)' }}>
-                                  <StudioAvatar src={band.photo_url} />
-                              </div>
-                              <div>
-                                  <h3 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>{band.name}</h3>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
-                                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: brandColor }}>{band.genre || 'Bandprojekt'}</span>
-                                    <span style={{ color: '#cbd5e1' }}>•</span>
-                                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#94a3b8' }}>{band.band_members?.length} Mitglieder</span>
+                        return displayedBands.map((band: any) => {
+                          const uniqueMembersList = (() => {
+                            const grouped: Record<string, any> = {};
+                            (band.band_members || []).forEach((m: any) => {
+                              const u = m.users ? (Array.isArray(m.users) ? m.users[0] : m.users) : null;
+                              const uid = u?.id || m.external_name || m.user_id || m.student_id;
+                              if (uid) {
+                                grouped[uid] = { ...m, user: u };
+                              }
+                            });
+                            return Object.values(grouped);
+                          })();
+
+                          return (
+                            <div 
+                              key={band.id} 
+                              onClick={() => { 
+                                setSelectedBandForProfile(band); 
+                                setShowBandProfile(true); 
+                              }}
+                              className="glass-panel hover-card" 
+                              style={{ 
+                                background: 'white', padding: '24px', borderRadius: '32px', border: '1px solid #f1f5f9',
+                                display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer',
+                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                              }}
+                            >
+                              <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
+                                {renderBandAvatar(band.name, band.photo_url, '80px', '24px')}
+                                <div>
+                                    <h3 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>{band.name}</h3>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
+                                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: brandColor }}>{band.genre || 'Bandprojekt'}</span>
+                                      <span style={{ color: '#cbd5e1' }}>•</span>
+                                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#94a3b8' }}>{uniqueMembersList.length} Mitglieder</span>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                              <div style={{ display: 'flex', WebkitMaskImage: 'linear-gradient(to right, transparent, black 40%)', WebkitMaskSize: '100% 100%' }}>
-                                  {band.band_members?.map((m: any, idx: number) => (
-                                    <div key={idx} style={{ width: '32px', height: '32px', borderRadius: '50%', border: '2px solid white', marginLeft: idx === 0 ? 0 : '-12px', overflow: 'hidden', background: m.user_id ? '#f1f5f9' : '#000000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        {m.user_id ? (
-                                          <img src={m.users?.[0]?.photo_url || m.users?.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
-                                        ) : (
-                                          <span style={{ color: 'white', fontSize: '0.6rem', fontWeight: 900 }}>{m.external_name?.[0] || 'E'}</span>
-                                        )}
-                                    </div>
-                                  ))}
-                              </div>
-                              <div style={{ width: '40px', height: '40px', borderRadius: '14px', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1' }}>
-                                  <ChevronRight size={24} />
+                              <div style={{ display: 'flex', gap: '12px' }}>
+                                <div style={{ display: 'flex', WebkitMaskImage: 'linear-gradient(to right, transparent, black 40%)', WebkitMaskSize: '100% 100%' }}>
+                                    {uniqueMembersList.map((m: any, idx: number) => {
+                                      const u = m.user;
+                                      return (
+                                        <div key={idx} style={{ width: '32px', height: '32px', borderRadius: '50%', border: '2px solid white', marginLeft: idx === 0 ? 0 : '-12px', overflow: 'hidden', background: m.user_id ? '#f1f5f9' : '#000000', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title={`${u?.first_name || m.external_name || 'Mitglied'} (${m.instrument})`}>
+                                            {m.user_id ? (
+                                              <img src={u?.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                                            ) : (
+                                              <span style={{ color: 'white', fontSize: '0.6rem', fontWeight: 900 }}>{m.external_name?.[0] || 'E'}</span>
+                                            )}
+                                        </div>
+                                      );
+                                    })}
+                                </div>
+                                <div style={{ width: '40px', height: '40px', borderRadius: '14px', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1' }}>
+                                    <ChevronRight size={24} />
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ));
+                          );
+                        });
                       })()}
                     </div>
                   </div>
@@ -4727,116 +5100,7 @@ function App() {
                       })()}
                     </div>
 
-                    {/* Instrument-Finder Widget */}
-                    <div style={{ marginTop: '24px', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
-                      <Music size={20} />
-                    </div>
-                      <div>
-                        <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Instrumenten-Finder</h3>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8' }}>Gastmusiker gesucht</div>
-                      </div>
-                    </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      {(() => {
-                        const mySkills = userSongs.filter((s: any) => s.instrument !== 'Vocals');
-                        
-                        const guestOpportunities: any[] = [];
-                        allBands.forEach(band => {
-                          if (band.band_members?.some((m: any) => m.user_id === user.id)) return;
-                          
-                          const bSongs = band.band_songs || [];
-                          bSongs.forEach((bs: any) => {
-                            const song = bs.songs;
-                            if (!song) return;
-                            
-                            const req = song.instrumentation || { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1 };
-                            const filledSlots = bs.band_song_slots || [];
-                            const coreMembers = band.band_members || [];
-                            
-                            const coreMemberIds = coreMembers.map((m: any) => m.user_id);
-                            const guestMusicians = filledSlots.filter((s: any) => s.user_id && !coreMemberIds.includes(s.user_id));
-                            
-                            Object.entries(req).forEach(([inst, count]) => {
-                              if (inst.toLowerCase().includes('vocal') || inst.toLowerCase().includes('gesang')) return;
-                              
-                              let filledCount = 0;
-                              const target = inst.toLowerCase();
-                              const checkInstMatch = (si: string) => {
-                                si = (si || '').toLowerCase();
-                                return si.includes(target.replace('e-', '')) || target.includes(si.replace('e-', ''));
-                              };
-
-                              filledCount += coreMembers.filter((m: any) => m.user_id && checkInstMatch(m.instrument)).length;
-                              filledCount += guestMusicians.filter((m: any) => m.user_id && checkInstMatch(m.instrument)).length;
-                              
-                              const openCount = (count as number) - filledCount;
-                              if (openCount > 0) {
-                                const canIJoin = mySkills.some((s: any) => 
-                                  s.song_id === song.id && 
-                                  ((s.instrument || '').toLowerCase() === inst.toLowerCase() || 
-                                   (s.instrument || '').toLowerCase().includes(inst.toLowerCase().replace('e-', '')) || 
-                                   inst.toLowerCase().includes((s.instrument || '').toLowerCase().replace('e-', '')))
-                                );
-                                
-                                if (canIJoin) {
-                                  guestOpportunities.push({ band, song, bs, inst, openCount });
-                                }
-                              }
-                            });
-                          });
-                        });
-
-                        if (guestOpportunities.length === 0) {
-                          return (
-                            <div style={{ textAlign: 'center', padding: '32px 16px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
-                              <div style={{ fontSize: '2rem', marginBottom: '12px', filter: 'grayscale(1)', opacity: 0.5 }}>🎸</div>
-                              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#64748b' }}>Keine offenen Plätze für dich</div>
-                            </div>
-                          );
-                        }
-
-                        return guestOpportunities.map((opp, idx) => {
-                          const isJoining = isJoiningGuest === `${opp.band.id}-${opp.song.id}-${opp.inst}`;
-                          return (
-                            <div key={`${opp.band.id}-${opp.song.id}-${opp.inst}-${idx}`} className="glass-panel" style={{ background: 'white', padding: '24px', borderRadius: '24px', border: '1px solid #f1f5f9' }}>
-                              <div style={{ marginBottom: '16px' }}>
-                                <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.2 }}>{opp.song.title}</div>
-                                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#64748b', marginBottom: '8px' }}>{opp.song.artist}</div>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Band: <span style={{ color: '#1e293b' }}>{opp.band.name}</span></div>
-                              </div>
-                              
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', background: '#eff6ff', padding: '8px 12px', borderRadius: '12px', color: '#3b82f6', fontSize: '0.8rem', fontWeight: 900 }}>
-                                 <Music size={16} /> Gesucht: {opp.inst}
-                              </div>
-
-                              <button 
-                                disabled={isJoining}
-                                onClick={async () => {
-                                  if(!window.confirm(`Möchtest du als Gastmusiker (${opp.inst}) bei ${opp.band.name} für den Song ${opp.song.title} einsteigen?`)) return;
-                                  setIsJoiningGuest(`${opp.band.id}-${opp.song.id}-${opp.inst}`);
-                                  try {
-                                    await supabase.from('band_song_slots').insert({
-                                      band_song_id: opp.bs.id,
-                                      user_id: user.id,
-                                      instrument: opp.inst,
-                                      status: 'accepted'
-                                    });
-                                    await fetchDashboardData(user.id);
-                                  } finally {
-                                    setIsJoiningGuest(null);
-                                  }
-                                }}
-                                style={{ width: '100%', padding: '12px', borderRadius: '16px', border: 'none', background: '#3b82f6', color: 'white', fontWeight: 900, cursor: isJoining ? 'default' : 'pointer', fontSize: '0.85rem', opacity: isJoining ? 0.7 : 1 }}
-                              >
-                                {isJoining ? 'Beitritt...' : 'Als Gast beitreten'}
-                              </button>
-                            </div>
-                          );
-                        });
-                      })()}
-                    </div>
                   </div>
                 </div>
             </section>
@@ -5140,28 +5404,28 @@ function App() {
               Bist du bereit für den nächsten Schritt?
             </p>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {userBands.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', textAlign: 'left' }}>Meinen Bands vorschlagen</div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={exclusiveProposal} 
-                        onChange={e => setExclusiveProposal(e.target.checked)}
-                        style={{ cursor: 'pointer' }}
-                      />
-                      <span style={{ fontSize: '0.65rem', fontWeight: 800, color: exclusiveProposal ? brandColor : '#94a3b8' }}>EXKLUSIV</span>
-                    </label>
-                  </div>
-                  {userBands
-                    .filter(band => {
-                      // Filter out bands that already have this song as 'complete'
-                      const bandSong = (band.band_songs || []).find((bs: any) => (bs.songs?.id || bs.song_id) === suggestingSkill.song_id);
-                      if (!bandSong) return true; // Song not yet in band -> show
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', textAlign: 'left' }}>
+              
+              {/* Option 1 Panel */}
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ background: brandColor, color: 'white', width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 900 }}>1</div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Song einer deiner Bands vorschlagen</div>
+                </div>
+                
+                {userBands.length > 0 ? (
+                  (() => {
+                    const filteredBands = userBands.filter(band => {
+                      const myMember = (band.band_members || []).find((m: any) => m.user_id === user?.id);
+                      if (!myMember) return false;
                       
-                      // If it's already in repertoire, check if all slots are filled
+                      const skillInst = normalizeInstrument(suggestingSkill.instrument);
+                      const memberInst = normalizeInstrument(myMember.instrument);
+                      if (skillInst !== memberInst) return false;
+
+                      const bandSong = (band.band_songs || []).find((bs: any) => (bs.songs?.id || bs.song_id) === suggestingSkill.song_id);
+                      if (!bandSong) return true;
+                      
                       const song = globalSongs.find(s => s.id === suggestingSkill.song_id);
                       if (!song || !song.instrumentation) return true;
                       
@@ -5174,106 +5438,181 @@ function App() {
                         return filled >= needed;
                       });
                       
-                      return !isComplete; // Only show if NOT complete
-                    })
-                    .map(band => (
-                    <button 
-                      key={band.id}
-                      onClick={() => handleSuggestToBand(band.id, suggestingSkill)}
-                      style={{ width: '100%', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '16px', borderRadius: '16px', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', transition: 'all 0.2s' }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
-                      onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}
-                    >
-                      <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: brandColor, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 }}>{band.name?.[0]}</div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 800, color: '#1e293b' }}>{band.name}</div>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Mitglieder benachrichtigen</div>
-                      </div>
-                      <Plus size={20} color={brandColor} />
-                    </button>
-                  ))}
-                </div>
-              )}
-              
-              <div style={{ width: '100%', position: 'relative', marginBottom: '20px' }}>
-                <input 
-                  type="text"
-                  value={foundingName}
-                  onChange={(e) => setFoundingName(e.target.value)}
-                  placeholder="Wie soll deine Band heißen?"
-                  style={{ 
-                    width: '100%', 
-                    padding: '24px 60px 24px 24px', 
-                    background: '#f8fafc', 
-                    border: '2px solid #e2e8f0', 
-                    borderRadius: '24px', 
-                    color: '#1e293b', 
-                    fontSize: '1.2rem', 
-                    fontWeight: 700,
-                    textAlign: 'center',
-                    outline: 'none',
-                    transition: 'all 0.2s'
-                  }}
-                  onFocus={e => e.currentTarget.style.borderColor = brandColor}
-                  onBlur={e => e.currentTarget.style.borderColor = '#e2e8f0'}
-                />
-                <button 
-                  onClick={(e) => { e.stopPropagation(); setFoundingName(generateRandomBandName()); }}
-                  style={{ 
-                    position: 'absolute', 
-                    right: '16px', 
-                    top: '50%', 
-                    transform: 'translateY(-50%)', 
-                    background: 'white', 
-                    border: '1px solid #e2e8f0', 
-                    color: brandColor, 
-                    width: '44px', 
-                    height: '44px', 
-                    borderRadius: '12px', 
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
-                  }}
-                  title="Neuen Namen würfeln"
-                >
-                  <RotateCcw size={20} />
-                </button>
-              </div>
-              
-              <div style={{ height: '1px', background: '#f1f5f9', margin: '8px 0' }}></div>
-              
-              <button 
-                onClick={() => {
-                  handleFoundBand(suggestingSkill);
-                }}
-                className="hero-cta-artistic"
-                style={{ 
-                  width: '100%', 
-                  background: `linear-gradient(135deg, ${brandColor}, #d97706)`, 
-                  border: 'none', 
-                  padding: '24px', 
-                  borderRadius: '24px', 
-                  fontSize: '1.2rem', 
-                  fontWeight: 900, 
-                  color: 'white', 
-                  cursor: 'pointer', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  gap: '12px',
-                  boxShadow: `0 20px 40px ${brandColor}40`,
-                  transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-                }}
-              >
-                <Zap size={24} fill="white" /> EIGENE BAND GRÜNDEN 🚀
-              </button>
+                      return !isComplete;
+                    });
 
-              
+                    if (filteredBands.length === 0) {
+                      return (
+                        <div style={{ color: '#64748b', fontSize: '0.9rem', fontStyle: 'italic', padding: '8px 0' }}>
+                          Keine deiner Bands sucht derzeit dieses Instrument oder du spielst in der Band ein anderes Instrument.
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {filteredBands.map(band => (
+                          <button 
+                            key={band.id}
+                            onClick={() => handleSuggestToBand(band.id, suggestingSkill)}
+                            style={{ width: '100%', background: 'white', border: '1px solid #e2e8f0', padding: '16px', borderRadius: '16px', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = brandColor; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+                          >
+                            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: brandColor, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 }}>{band.name?.[0]}</div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 800, color: '#1e293b' }}>{band.name}</div>
+                              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Mitglieder benachrichtigen</div>
+                            </div>
+                            <Plus size={20} color={brandColor} />
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <div style={{ color: '#64748b', fontSize: '0.9rem', fontStyle: 'italic', padding: '8px 0' }}>Du bist derzeit noch in keiner Band registriert.</div>
+                )}
+              </div>
+
+              {/* Option 2 Panel */}
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ background: brandColor, color: 'white', width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 900 }}>2</div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Neue Formation suchen oder gründen</div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <button 
+                    onClick={() => {
+                      setActiveStudentTab('matching');
+                      setSuggestingSkill(null);
+                    }}
+                    style={{ 
+                      width: '100%', 
+                      background: 'white', 
+                      border: '1px solid #cbd5e1', 
+                      color: '#1e293b', 
+                      padding: '16px', 
+                      borderRadius: '16px', 
+                      fontWeight: 800, 
+                      fontSize: '0.95rem', 
+                      cursor: 'pointer', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      gap: '8px',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.borderColor = '#94a3b8'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                  >
+                    <Users size={18} /> NEUE FORMATION SUCHEN
+                  </button>
+
+                  {/* If formation completed, show founding actions */}
+                  {suggestingSkill.isLeader ? (
+                    <div style={{ marginTop: '12px', borderTop: '1px solid #e2e8f0', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>Deine Band gründen:</div>
+                      <div style={{ width: '100%', position: 'relative' }}>
+                        <input 
+                          type="text"
+                          value={foundingName}
+                          onChange={(e) => setFoundingName(e.target.value)}
+                          placeholder="Wie soll deine Band heißen?"
+                          style={{ 
+                            width: '100%', 
+                            padding: '16px 50px 16px 16px', 
+                            background: 'white', 
+                            border: '1px solid #cbd5e1', 
+                            borderRadius: '16px', 
+                            color: '#1e293b', 
+                            fontSize: '1rem', 
+                            fontWeight: 700,
+                            textAlign: 'center',
+                            outline: 'none',
+                            transition: 'all 0.2s'
+                          }}
+                          onFocus={e => e.currentTarget.style.borderColor = brandColor}
+                          onBlur={e => e.currentTarget.style.borderColor = '#cbd5e1'}
+                        />
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setFoundingName(generateRandomBandName()); }}
+                          style={{ 
+                            position: 'absolute', 
+                            right: '8px', 
+                            top: '50%', 
+                            transform: 'translateY(-50%)', 
+                            background: '#f8fafc', 
+                            border: '1px solid #cbd5e1', 
+                            color: brandColor, 
+                            width: '36px', 
+                            height: '36px', 
+                            borderRadius: '10px', 
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                          title="Neuen Namen würfeln"
+                        >
+                          <RotateCcw size={16} />
+                        </button>
+                      </div>
+
+                      <button 
+                        onClick={() => {
+                          handleFoundBand(suggestingSkill);
+                        }}
+                        className="hero-cta-artistic"
+                        style={{ 
+                          width: '100%', 
+                          background: `linear-gradient(135deg, ${brandColor}, #d97706)`, 
+                          border: 'none', 
+                          padding: '18px', 
+                          borderRadius: '16px', 
+                          fontSize: '1.05rem', 
+                          fontWeight: 900, 
+                          color: 'white', 
+                          cursor: 'pointer', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          gap: '8px',
+                          boxShadow: `0 10px 20px ${brandColor}25`,
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <Zap size={20} fill="white" /> EIGENE BAND GRÜNDEN 🚀
+                      </button>
+                    </div>
+                  ) : suggestingSkill.leaderName ? (
+                    <div style={{ 
+                      marginTop: '12px',
+                      background: 'white', 
+                      padding: '20px', 
+                      borderRadius: '16px', 
+                      border: '1px solid #e2e8f0',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{ fontSize: '1.5rem', marginBottom: '8px' }}>🎸</div>
+                      <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.95rem', marginBottom: '8px' }}>Formation vollständig!</div>
+                      <div style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: '1.5' }}>
+                        Dein Teamkollege <span style={{ color: brandColor, fontWeight: 900 }}>{suggestingSkill.leaderName}</span> wurde als Bandleader ausgewählt und gründet gerade eure neue Band.
+                      </div>
+                      <div style={{ marginTop: '12px', fontSize: '0.7rem', color: brandColor, fontWeight: 800, letterSpacing: '0.05em' }} className="animate-pulse">
+                        BITTE KURZ WARTEN...
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              {/* Maybe later button */}
               <button 
                 onClick={() => dismissSuggestion(suggestingSkill.id)}
-                style={{ width: '100%', background: 'transparent', border: 'none', padding: '12px', fontSize: '0.9rem', fontWeight: 700, color: '#94a3b8', cursor: 'pointer' }}
+                style={{ width: '100%', background: 'transparent', border: 'none', padding: '12px', fontSize: '0.9rem', fontWeight: 700, color: '#94a3b8', cursor: 'pointer', marginTop: '-8px' }}
               >
                 Vielleicht später
               </button>
@@ -5360,81 +5699,106 @@ function App() {
               <button type="button" onClick={() => setShowEditProfile(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={24} /></button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-
             <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname</label>
-                  <input required value={editingProfile.first_name} onChange={e => setEditingProfile({...editingProfile, first_name: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Nachname</label>
-                  <input required value={editingProfile.last_name} onChange={e => setEditingProfile({...editingProfile, last_name: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
-                </div>
-              </div>
+              {user.role === 'student' ? (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname</label>
+                      <input required value={editingProfile.first_name || ''} onChange={e => setEditingProfile({...editingProfile, first_name: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Anfangsbuchstabe Nachname</label>
+                      <input required maxLength={1} value={editingProfile.last_name || ''} onChange={e => {
+                        const val = e.target.value.trim().substring(0, 1).toUpperCase();
+                        setEditingProfile({...editingProfile, last_name: val});
+                      }} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                    </div>
+                  </div>
 
-              <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '12px', display: 'block' }}>Instrumente (Icons anklicken):</label>
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                  {["Gitarre", "Bass", "Drums", "Vocals", "Piano / Keys"].map(inst => {
-                    const isSelected = (editingProfile.instrument || '').includes(inst);
-                    return (
-                      <button
-                        key={inst}
-                        type="button"
-                        onClick={() => {
-                          const current = (editingProfile.instrument || '').split(',').map((s: string) => s.trim()).filter(Boolean);
-                          const next = current.includes(inst) ? current.filter((s: string) => s !== inst) : [...current, inst];
-                          setEditingProfile({...editingProfile, instrument: next.join(', ')});
-                        }}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', borderRadius: '14px', 
-                          border: `2px solid ${isSelected ? brandColor : '#e2e8f0'}`,
-                          background: isSelected ? `${brandColor}10` : 'white',
-                          color: isSelected ? '#1e293b' : '#64748b',
-                          fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s'
-                        }}
-                      >
-                        <span style={{ fontSize: '1.2rem' }}>{APP_INSTRUMENT_ICONS[inst]}</span> {inst}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Alter (optional)</label>
+                    <input type="number" min={1} max={99} placeholder="z.B. 12" value={editingProfile.age || ''} onChange={e => {
+                      const val = e.target.value === '' ? null : parseInt(e.target.value, 10);
+                      setEditingProfile({...editingProfile, age: val});
+                    }} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname</label>
+                      <input required value={editingProfile.first_name || ''} onChange={e => setEditingProfile({...editingProfile, first_name: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Nachname</label>
+                      <input required value={editingProfile.last_name || ''} onChange={e => setEditingProfile({...editingProfile, last_name: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                    </div>
+                  </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Musikalischer Werdegang (Bio)</label>
-                <textarea placeholder="Erzähle etwas über deinen Werdegang..." value={editingProfile.bio || ''} onChange={e => setEditingProfile({...editingProfile, bio: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 500, minHeight: '100px', fontSize: '0.95rem', lineHeight: 1.5 }} />
-              </div>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '12px', display: 'block' }}>Instrumente (Icons anklicken):</label>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                      {["Gitarre", "Bass", "Drums", "Vocals", "Piano / Keys"].map(inst => {
+                        const isSelected = (editingProfile.instrument || '').includes(inst);
+                        return (
+                          <button
+                            key={inst}
+                            type="button"
+                            onClick={() => {
+                              const current = (editingProfile.instrument || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+                              const next = current.includes(inst) ? current.filter((s: string) => s !== inst) : [...current, inst];
+                              setEditingProfile({...editingProfile, instrument: next.join(', ')});
+                            }}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', borderRadius: '14px', 
+                              border: `2px solid ${isSelected ? brandColor : '#e2e8f0'}`,
+                              background: isSelected ? `${brandColor}10` : 'white',
+                              color: isSelected ? '#1e293b' : '#64748b',
+                              fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s'
+                            }}
+                          >
+                            <span style={{ fontSize: '1.2rem' }}>{APP_INSTRUMENT_ICONS[inst]}</span> {inst}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Expertise & Stile</label>
-                  <input placeholder="z.B. Jazz, Rock, Metal..." value={editingProfile.expertise || ''} onChange={e => setEditingProfile({...editingProfile, expertise: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Bands & Projekte</label>
-                  <input placeholder="Aktuelle Bands..." value={editingProfile.bands || ''} onChange={e => setEditingProfile({...editingProfile, bands: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
-                </div>
-              </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Musikalischer Werdegang (Bio)</label>
+                    <textarea placeholder="Erzähle etwas über deinen Werdegang..." value={editingProfile.bio || ''} onChange={e => setEditingProfile({...editingProfile, bio: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 500, minHeight: '100px', fontSize: '0.95rem', lineHeight: 1.5 }} />
+                  </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Equipment / Gear</label>
-                  <input placeholder="Dein Setup..." value={editingProfile.gear || ''} onChange={e => setEditingProfile({...editingProfile, gear: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Aktuell im Ohr</label>
-                  <input placeholder="Was hörst du gerade?" value={editingProfile.listening || ''} onChange={e => setEditingProfile({...editingProfile, listening: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
-                </div>
-              </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Expertise & Stile</label>
+                      <input placeholder="z.B. Jazz, Rock, Metal..." value={editingProfile.expertise || ''} onChange={e => setEditingProfile({...editingProfile, expertise: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Bands & Projekte</label>
+                      <input placeholder="Aktuelle Bands..." value={editingProfile.bands || ''} onChange={e => setEditingProfile({...editingProfile, bands: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Equipment / Gear</label>
+                      <input placeholder="Dein Setup..." value={editingProfile.gear || ''} onChange={e => setEditingProfile({...editingProfile, gear: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Aktuell im Ohr</label>
+                      <input placeholder="Was hörst du gerade?" value={editingProfile.listening || ''} onChange={e => setEditingProfile({...editingProfile, listening: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div style={{ display: 'flex', gap: '16px', marginTop: '12px' }}>
                 <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '18px', borderRadius: '20px', fontWeight: 900, fontSize: '1.1rem', cursor: 'pointer', boxShadow: `0 10px 30px ${brandColor}30` }}>Speichern</button>
                 <button type="button" onClick={() => setShowEditProfile(false)} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '18px', borderRadius: '20px', fontWeight: 800, cursor: 'pointer' }}>Abbrechen</button>
               </div>
-            </div>
             </div>
           </form>
         </div>
@@ -5781,7 +6145,18 @@ function App() {
       {/* Artist Gateway Modal */}
       <ArtistGateway 
         show={!!selectedBandForGateway || !!pendingFounding} 
-        onClose={clearConfetti}
+        onClose={() => {
+          gatewayJustClosed.current = true;
+          setSelectedBandForGateway(null);
+          setPendingFounding(null);
+          clearConfetti();
+          if (user) {
+            fetchDashboardData(user.id, false);
+          }
+          setTimeout(() => {
+            gatewayJustClosed.current = false;
+          }, 3000);
+        }}
         user={user}
         pendingFounding={pendingFounding}
         selectedBandForGateway={selectedBandForGateway}

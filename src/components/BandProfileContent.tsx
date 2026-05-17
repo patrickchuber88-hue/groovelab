@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   CheckCircle, Monitor, Lock, ExternalLink, Settings, 
   Music, Zap, Users, Award, PlayCircle, Youtube, Calendar, Camera, X,
-  ChevronLeft, ChevronRight, Clock, AlertCircle, RotateCcw, QrCode, Plus, Mic2
+  ChevronLeft, ChevronRight, Clock, AlertCircle, RotateCcw, QrCode, Plus, Mic2, MapPin
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -25,6 +25,56 @@ interface BandProfileContentProps {
   isSharedView?: boolean;
   onRefresh?: () => void;
 }
+
+const renderBandAvatar = (name: string, photoUrl?: string | null, size: string = '64px', borderRadius: string = '18px') => {
+  if (photoUrl) {
+    return (
+      <div style={{ width: size, height: size, borderRadius, overflow: 'hidden', flexShrink: 0 }}>
+        <img src={photoUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={name} />
+      </div>
+    );
+  }
+  
+  // Hash the name to pick a beautiful premium gradient
+  const gradients = [
+    'linear-gradient(135deg, #6366f1, #a855f7)', // Indigo to Purple
+    'linear-gradient(135deg, #ec4899, #f43f5e)', // Pink to Rose
+    'linear-gradient(135deg, #3b82f6, #06b6d4)', // Blue to Cyan
+    'linear-gradient(135deg, #10b981, #3b82f6)', // Emerald to Blue
+    'linear-gradient(135deg, #f59e0b, #e11d48)'  // Amber to Rose
+  ];
+  
+  let hash = 0;
+  const str = name || '';
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const gradient = gradients[Math.abs(hash) % gradients.length];
+  const firstLetter = (name || 'B').substring(0, 1).toUpperCase();
+  
+  return (
+    <div style={{ 
+      width: size, height: size, borderRadius, 
+      background: gradient, 
+      display: 'flex', alignItems: 'center', justifyContent: 'center', 
+      color: 'white', fontWeight: 950, fontSize: `calc(${size} * 0.35)`,
+      textShadow: '0 2px 4px rgba(0,0,0,0.15)',
+      flexShrink: 0,
+      userSelect: 'none'
+    }}>
+      {firstLetter}
+    </div>
+  );
+};
+
+const ensureAbsoluteUrl = (url: string): string => {
+  if (!url) return '#';
+  const trimmed = url.trim();
+  if (/^(f|ht)tps?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  return `https://${trimmed}`;
+};
 
 const BandProfileContent: React.FC<BandProfileContentProps> = ({
   selectedBandForProfile,
@@ -381,6 +431,13 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
     return (selectedBandForProfile.band_members || [])
       .map((m: any) => m.user_id || m.student_id)
       .filter(Boolean);
+  }, [selectedBandForProfile.band_members]);
+
+  const uniqueMembersCount = React.useMemo(() => {
+    const ids = (selectedBandForProfile.band_members || [])
+      .map((m: any) => m.user_id || m.student_id || m.external_name)
+      .filter(Boolean);
+    return new Set(ids).size;
   }, [selectedBandForProfile.band_members]);
 
   useEffect(() => {
@@ -741,13 +798,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
              <div style={{ maxWidth: '1600px', margin: '0 auto', width: '100%', padding: '0 40px', position: 'relative', zIndex: 2 }}>
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: '40px' }}>
                      <div style={{ position: 'relative', width: '220px', height: '220px', borderRadius: '40px', overflow: 'hidden', boxShadow: '0 30px 80px rgba(0,0,0,0.6)', border: '4px solid rgba(255,255,255,0.2)' }}>
-                       {selectedBandForProfile.photo_url ? (
-                          <img src={selectedBandForProfile.photo_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                       ) : (
-                          <div style={{ width: '100%', height: '100%', background: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                             <Users size={80} color="black" />
-                          </div>
-                       )}
+                       {renderBandAvatar(selectedBandForProfile.name, selectedBandForProfile.photo_url, '100%', '100%')}
 
                        {/* BAND Badge Integrated into Photo - Bottom Left */}
                        <div style={{ position: 'absolute', bottom: '20px', left: '20px', background: 'rgba(35, 35, 35, 0.9)', backdropFilter: 'blur(10px)', color: 'white', padding: '6px 12px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 950, textTransform: 'uppercase', boxShadow: '0 10px 20px rgba(0,0,0,0.3)', zIndex: 11, border: '1px solid rgba(255,255,255,0.1)' }}>BAND</div>
@@ -787,7 +838,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                        }}>{selectedBandForProfile.name}</h1>
 
                       <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                         <span style={{ fontSize: '0.85rem', color: 'white', fontWeight: 800 }}>{selectedBandForProfile.band_members?.length || 0} Mitglieder</span>
+                         <span style={{ fontSize: '0.85rem', color: 'white', fontWeight: 800 }}>{uniqueMembersCount} Mitglieder</span>
                          <span style={{ fontSize: '0.85rem', color: 'white', fontWeight: 800 }}>{repertoireSongs.length} Songs im Repertoire</span>
                          
                          {/* GROOVELAB ORIGINAL Stamp Look (Inverted) */}
@@ -921,6 +972,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                               const isMastered = skills.some((sk: any) => 
                                 sk.song_id === prop.song_id && 
                                 normalize(sk.instrument) === normTarget && 
+                                (sk.part_number || 1) === slot.part &&
                                 (sk.progress_percent >= 100 || sk.is_stage_ready)
                               );
                               
@@ -1336,15 +1388,14 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                            });
                         })()}
                     </div>
-                 </div>
-
-                 <div style={widgetStyle}>
+                  </div>
+                  <div style={widgetStyle}>
                     <h4 style={widgetHeaderStyle}><Music size={16} color={brandColor} /> Musik</h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                        {(selectedBandForProfile.soundcloud_links || []).map((track: any, i: number) => {
                          const trackData = typeof track === 'string' ? { title: 'Track ' + (i + 1), url: track } : track;
                          return (
-                           <a key={i} href={trackData.url} target="_blank" rel="noopener noreferrer" style={{ padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '12px', color: 'white', textDecoration: 'none' }}>
+                           <a key={i} href={ensureAbsoluteUrl(trackData.url)} onClick={e => e.stopPropagation()} target="_blank" rel="noopener noreferrer" style={{ padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '12px', color: 'white', textDecoration: 'none' }}>
                               <PlayCircle size={18} color={brandColor} />
                               <div style={{ flex: 1, fontSize: '0.8rem', fontWeight: 800 }}>{trackData.title || 'Track ' + (i + 1)}</div>
                               <ExternalLink size={12} style={{ opacity: 0.4 }} />
@@ -1358,17 +1409,23 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                 </div>
 
                 <div style={widgetStyle}>
-                   <h4 style={widgetHeaderStyle}><Youtube size={16} color="#ff0000" /> Videos</h4>
-                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {(selectedBandForProfile.youtube_links || []).map((url: string, i: number) => (
-                         <a key={i} href={url} target="_blank" rel="noopener noreferrer" style={{ padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '12px', color: 'white', textDecoration: 'none' }}>
-                            <Youtube size={18} color="#ff0000" />
-                            <div style={{ flex: 1, fontSize: '0.8rem', fontWeight: 800 }}>Video {i + 1}</div>
-                            <ExternalLink size={12} style={{ opacity: 0.4 }} />
-                         </a>
-                      ))}
-                   </div>
-                </div>
+                    <h4 style={widgetHeaderStyle}><Youtube size={16} color="#ff0000" /> Videos</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                       {(selectedBandForProfile.youtube_links || []).map((video: any, i: number) => {
+                         const videoData = typeof video === 'string' ? { title: 'Video ' + (i + 1), url: video } : video;
+                         return (
+                           <a key={i} href={ensureAbsoluteUrl(videoData.url)} onClick={e => e.stopPropagation()} target="_blank" rel="noopener noreferrer" style={{ padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '12px', color: 'white', textDecoration: 'none' }}>
+                              <Youtube size={18} color="#ff0000" />
+                              <div style={{ flex: 1, fontSize: '0.8rem', fontWeight: 800 }}>{videoData.title || 'Video ' + (i + 1)}</div>
+                              <ExternalLink size={12} style={{ opacity: 0.4 }} />
+                           </a>
+                         );
+                      })}
+                      {(selectedBandForProfile.youtube_links || []).length === 0 && (
+                        <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)', textAlign: 'center', margin: 0 }}>Keine Videos vorhanden.</p>
+                      )}
+                    </div>
+                 </div>
 
                  <div style={widgetStyle}>
                    <h4 style={widgetHeaderStyle}><Calendar size={16} /> Termine</h4>
@@ -1376,7 +1433,18 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                       {(selectedBandForProfile.appointments || []).map((app: any, idx: number) => (
                          <div key={idx} style={{ borderLeft: `2px solid ${brandColor}`, paddingLeft: "12px", marginBottom: idx === selectedBandForProfile.appointments.length - 1 ? 0 : "16px" }}>
                             <div style={{ fontSize: "0.85rem", fontWeight: 800, color: "white" }}>{app.title}</div>
-                            <div style={{ fontSize: "0.75rem", color: "white", fontWeight: 700 }}>{app.date ? new Date(app.date).toLocaleDateString() : "TBD"}</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+                               <span style={{ fontSize: "0.75rem", color: "rgba(255, 255, 255, 0.7)", fontWeight: 700 }}>
+                                  {app.date ? new Date(app.date).toLocaleDateString('de-DE') : "TBD"}
+                               </span>
+                               {app.location && (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: "0.75rem", color: "rgba(255, 255, 255, 0.5)", fontWeight: 600 }}>
+                                     <span style={{ color: brandColor }}>•</span>
+                                     <MapPin size={10} style={{ color: brandColor }} />
+                                     {app.location}
+                                  </span>
+                               )}
+                            </div>
                          </div>
                       ))}
                    </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic } from 'lucide-react';
+import { Music, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check } from 'lucide-react';
 import { 
   ResponsiveContainer,
   BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell,
@@ -143,6 +143,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
   const [manualCoords, setManualCoords] = useState<Record<string, string>>({});
   const [showManualInput, setShowManualInput] = useState<string | null>(null);
+
+  const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
+  const [editingRoomName, setEditingRoomName] = useState('');
 
   const brandColor = admin?.schools?.brand_color || '#eab308';
 
@@ -775,6 +778,16 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     }
   };
 
+  const handleUpdateRoomName = async (roomId: string) => {
+    if (!editingRoomName.trim()) return;
+    const { error } = await supabase.from('rooms').update({ name: editingRoomName }).eq('id', roomId);
+    if (error) alert(error.message);
+    else {
+      setRooms(rooms.map(r => r.id === roomId ? { ...r, name: editingRoomName } : r));
+      setEditingRoomId(null);
+    }
+  };
+
   const handleDeleteRoom = async (roomId: string) => {
     if (!window.confirm('Raum und alle darin enthaltenen iPads wirklich löschen?')) return;
     const { error } = await supabase.from('rooms').delete().eq('id', roomId);
@@ -1353,48 +1366,61 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {filteredBands.map((band: any) => (
-              <div key={band.id} className="glass-panel" 
-                onClick={() => onOpenBandProfile?.(band)}
-                style={{ 
-                  background: 'white', borderRadius: '24px', padding: '20px 24px', border: '1px solid #f1f5f9', boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
-                  display: 'grid', gridTemplateColumns: 'auto 1fr auto auto', alignItems: 'center', gap: '24px', cursor: 'pointer', transition: 'all 0.2s'
-                }}
-                onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
-                onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
-              >
-                <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-                  {band.photo_url ? (
-                    <img src={band.photo_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
-                  ) : (
-                    <Music size={24} color="white" />
-                  )}
-                </div>
+            {filteredBands.map((band: any) => {
+              const uniqueMembersList = (() => {
+                const grouped: Record<string, any> = {};
+                (band.band_members || []).forEach((m: any) => {
+                  const u = m.users ? (Array.isArray(m.users) ? m.users[0] : m.users) : null;
+                  const uid = u?.id || m.external_name || m.user_id || m.student_id;
+                  if (uid) {
+                    grouped[uid] = { ...m, user: u };
+                  }
+                });
+                return Object.values(grouped);
+              })();
 
-                <div>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', margin: '0 0 4px 0' }}>{band.name}</h3>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: brandColor, textTransform: 'uppercase' }}>{band.genre || 'Bandprojekt'}</span>
-                    <span style={{ color: '#cbd5e1' }}>•</span>
-                    <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>{band.band_members?.length || 0} Mitglieder</span>
+              return (
+                <div key={band.id} className="glass-panel" 
+                  onClick={() => onOpenBandProfile?.(band)}
+                  style={{ 
+                    background: 'white', borderRadius: '24px', padding: '20px 24px', border: '1px solid #f1f5f9', boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
+                    display: 'grid', gridTemplateColumns: 'auto 1fr auto auto', alignItems: 'center', gap: '24px', cursor: 'pointer', transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                  onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                >
+                  <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                    {band.photo_url ? (
+                      <img src={band.photo_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                    ) : (
+                      <Music size={24} color="white" />
+                    )}
                   </div>
-                </div>
 
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  {(band.band_members || []).slice(0, 5).map((m: any, i: number) => {
-                    const u = Array.isArray(m.users) ? m.users[0] : m.users;
-                    return (
-                      <div key={i} style={{ width: '32px', height: '32px', borderRadius: '10px', overflow: 'hidden', border: '2px solid white', marginLeft: i === 0 ? 0 : '-12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', background: 'white' }} title={`${u?.first_name} (${m.instrument})`}>
-                        <img src={u?.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
-                      </div>
-                    );
-                  })}
-                  {(band.band_members || []).length > 5 && (
-                    <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: '#f1f5f9', border: '2px solid white', marginLeft: '-12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 800, color: '#64748b' }}>
-                      +{(band.band_members || []).length - 5}
+                  <div>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', margin: '0 0 4px 0' }}>{band.name}</h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: brandColor, textTransform: 'uppercase' }}>{band.genre || 'Bandprojekt'}</span>
+                      <span style={{ color: '#cbd5e1' }}>•</span>
+                      <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>{uniqueMembersList.length} Mitglieder</span>
                     </div>
-                  )}
-                </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    {uniqueMembersList.slice(0, 5).map((m: any, i: number) => {
+                      const u = m.user;
+                      return (
+                        <div key={i} style={{ width: '32px', height: '32px', borderRadius: '10px', overflow: 'hidden', border: '2px solid white', marginLeft: i === 0 ? 0 : '-12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', background: 'white' }} title={`${u?.first_name || m.external_name || 'Mitglied'} (${m.instrument})`}>
+                          <img src={u?.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                        </div>
+                      );
+                    })}
+                    {uniqueMembersList.length > 5 && (
+                      <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: '#f1f5f9', border: '2px solid white', marginLeft: '-12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 800, color: '#64748b' }}>
+                        +{uniqueMembersList.length - 5}
+                      </div>
+                    )}
+                  </div>
 
                 <div style={{ display: 'flex', gap: '12px' }} onClick={e => e.stopPropagation()}>
                   <button onClick={() => setEditingBand(band)} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '12px', cursor: 'pointer', color: '#64748b' }}><Monitor size={18} /></button>
@@ -1414,7 +1440,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   </button>
                 </div>
               </div>
-            ))}
+            );
+          })}
             {filteredBands.length === 0 && (
               <div style={{ textAlign: 'center', padding: '80px', background: 'white', borderRadius: '32px', border: '2px dashed #e2e8f0' }}>
                   <div style={{ fontSize: '3rem', margin: '0 auto 20px auto', width: '80px', height: '80px', background: '#f8fafc', borderRadius: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🔍</div>
@@ -1657,11 +1684,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               <input required placeholder="Vorname" value={editingStudent.first_name} onChange={e => setEditingStudent({...editingStudent, first_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
               <input required placeholder="Nachname" value={editingStudent.last_name} onChange={e => setEditingStudent({...editingStudent, last_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
             </div>
-            <ElegantBirthdayPicker 
-              label="Geburtsdatum"
-              value={editingStudent.birth_date || '2010-01-01'}
-              onChange={newVal => setEditingStudent({...editingStudent, birth_date: newVal})}
-            />
+
             <div style={{ display: 'flex', gap: '12px' }}>
               <button type="submit" style={{ flex: 1, background: brandColor, color: 'white', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 800, cursor: 'pointer' }}>Aktualisieren</button>
               <button type="button" onClick={() => setEditingStudent(null)} style={{ flex: 1, background: 'white', color: '#64748b', border: '1px solid #e2e8f0', padding: '14px', borderRadius: '12px', fontWeight: 700, cursor: 'pointer' }}>Abbrechen</button>
@@ -2031,7 +2054,67 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     <Box size={20} color={brandColor} />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>{room.name}</h3>
+                    {editingRoomId === room.id ? (
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <input 
+                          autoFocus
+                          value={editingRoomName}
+                          onChange={e => setEditingRoomName(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') handleUpdateRoomName(room.id);
+                            if (e.key === 'Escape') setEditingRoomId(null);
+                          }}
+                          style={{ 
+                            fontSize: '1rem', 
+                            fontWeight: 700, 
+                            padding: '4px 12px', 
+                            borderRadius: '10px', 
+                            border: `2px solid ${brandColor}`,
+                            outline: 'none',
+                            width: '200px'
+                          }}
+                        />
+                        <button 
+                          onClick={() => handleUpdateRoomName(room.id)}
+                          style={{ 
+                            background: brandColor, 
+                            color: 'white', 
+                            border: 'none', 
+                            borderRadius: '8px', 
+                            width: '32px', 
+                            height: '32px', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            cursor: 'pointer' 
+                          }}
+                        >
+                          <Check size={16} strokeWidth={3} />
+                        </button>
+                        <button 
+                          onClick={() => setEditingRoomId(null)}
+                          style={{ 
+                            background: '#f1f5f9', 
+                            color: '#64748b', 
+                            border: 'none', 
+                            borderRadius: '8px', 
+                            width: '32px', 
+                            height: '32px', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            cursor: 'pointer' 
+                          }}
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => { setEditingRoomId(room.id); setEditingRoomName(room.name); }}>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>{room.name}</h3>
+                        <Pencil size={14} color="#94a3b8" />
+                      </div>
+                    )}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
                       {(room.geofence_points || []).map((pt: any, idx: number) => (
                         <div key={idx} style={{ 

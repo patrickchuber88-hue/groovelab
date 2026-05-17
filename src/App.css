@@ -567,12 +567,12 @@ div:hover > .photo-overlay {
 }
 
 .sidebar-nav {
-  width: 280px;
+  width: 220px;
   background: white;
   border-right: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
-  padding: 32px 24px;
+  padding: 24px 16px;
   position: sticky;
   top: 0;
   height: 100vh;
@@ -582,28 +582,28 @@ div:hover > .photo-overlay {
 .sidebar-logo {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 48px;
+  gap: 8px;
+  margin-bottom: 32px;
 }
 
 .sidebar-menu {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   flex: 1;
 }
 
 .sidebar-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 16px;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
   border: none;
   background: transparent;
   color: #64748b;
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   cursor: pointer;
   transition: all 0.2s ease;
   text-align: left;
@@ -704,4 +704,9 @@ div:hover > .photo-overlay {
   .xp-bar-container {
     grid-column: 1 / -1;
   }
+}
+@keyframes pulse-red {
+  0% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.4); }
+  70% { box-shadow: 0 0 0 15px rgba(225, 29, 72, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); }
 }

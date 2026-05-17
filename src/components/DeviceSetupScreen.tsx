@@ -13,36 +13,60 @@ export function DeviceSetupScreen() {
 
 
   React.useEffect(() => {
-    fetchData();
+    const controller = new AbortController();
+    fetchData(0, controller.signal);
+    return () => controller.abort();
   }, []);
 
-  const fetchData = async () => {
+  const fetchData = async (retryCount = 0, signal?: AbortSignal) => {
     try {
       setLoading(true);
       setError(null);
       
-      const { data: school, error: schoolError } = await supabase.from('schools').select('id').limit(1).single();
+      console.log(`[Setup] Fetching school data (Attempt ${retryCount + 1})...`);
+      const { data: school, error: schoolError } = await supabase
+        .from('schools')
+        .select('id')
+        .limit(1)
+        .single();
+      
       if (schoolError) {
+        if (schoolError.message === 'FetchError: aborted' || schoolError.name === 'AbortError') return;
+        
         console.error('Error fetching school:', schoolError);
+        // If it's a Lock error, try again once after a short delay
+        if (retryCount < 1 && schoolError.message?.includes('Lock')) {
+          setTimeout(() => fetchData(retryCount + 1, signal), 500);
+          return;
+        }
         setError(`Schule konnte nicht geladen werden: ${schoolError.message}`);
         return;
       }
+
       if (!school) {
         setError('Keine Schule in der Datenbank gefunden.');
         return;
       }
 
-      const { data: roomsData, error: roomsError } = await supabase.from('rooms').select('*').eq('school_id', school.id);
+      if (signal?.aborted) return;
+      const { data: roomsData, error: roomsError } = await supabase.from('rooms').select('*').eq('school_id', school.id).order('name');
+      console.log(`[Setup] Rooms found for school ${school.id}:`, roomsData?.length || 0);
+      
+      if (signal?.aborted) return;
       if (roomsError) {
         console.error('Error fetching rooms:', roomsError);
         setError(`Räume konnten nicht geladen werden: ${roomsError.message}`);
-      } else if (roomsData) {
+      } else if (roomsData && roomsData.length > 0) {
         setRooms(roomsData);
-        if (roomsData.length > 0) setSelectedRoomId(roomsData[0].id);
-        else setError('Keine Räume für diese Schule gefunden.');
+        setSelectedRoomId(roomsData[0].id);
+      } else {
+        console.warn('[Setup] No rooms found for this school ID.');
+        setRooms([]);
+        setError('Keine Räume für diese Schule gefunden. (Bitte Admin-Dashboard prüfen)');
       }
 
-      const { data: stationsData, error: stationsError } = await supabase.from('stations').select('*');
+      const { data: stationsData, error: stationsError } = await supabase.from('stations').select('*').order('name');
+      if (signal?.aborted) return;
       if (stationsError) {
         console.error('Error fetching stations:', stationsError);
       } else if (stationsData) {
@@ -56,6 +80,7 @@ export function DeviceSetupScreen() {
         .is('check_out_time', null)
         .gt('last_seen', tenMinsAgo);
       
+      if (signal?.aborted) return;
       if (sessionError) {
         console.error('Error fetching sessions:', sessionError);
       } else if (activeSessions) {
@@ -64,10 +89,11 @@ export function DeviceSetupScreen() {
       }
 
     } catch (err: any) {
+      if (err.name === 'AbortError') return;
       console.error('Unexpected setup error:', err);
       setError(`Ein unerwarteter Fehler ist aufgetreten: ${err.message}`);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   };
 
@@ -104,7 +130,17 @@ export function DeviceSetupScreen() {
 
       <div className="glass-panel" style={{ width: '100%', maxWidth: '400px', padding: '24px', background: 'white', display: 'flex', flexDirection: 'column', gap: '20px' }}>
         
-        {error && <div style={{ color: '#ef4444', fontSize: '0.875rem', padding: '8px', background: '#fef2f2', borderRadius: '8px' }}>{error}</div>}
+        {error && (
+          <div style={{ color: '#ef4444', fontSize: '0.875rem', padding: '12px', background: '#fef2f2', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <span>{error}</span>
+            <button 
+              onClick={() => fetchData()} 
+              style={{ background: '#ef4444', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', alignSelf: 'center' }}
+            >
+              Erneut versuchen
+            </button>
+          </div>
+        )}
         
         <div style={{ textAlign: 'left' }}>
           <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Raum auswählen</label>
