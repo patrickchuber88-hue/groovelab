@@ -127,23 +127,24 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
         }}
         style={{ 
           background: 'white', 
-          padding: '16px', 
+          padding: '10px 12px', 
           minHeight: '135px', 
           aspectRatio: '1 / 0.8',
           display: 'flex', 
           flexDirection: 'column', 
           position: 'relative', 
           border: isActive ? `2px solid ${color}` : '1px solid #f1f5f9',
-          boxShadow: 'none',
+          boxShadow: isActive ? `0 12px 30px rgba(0,0,0,0.03), 0 2px 8px ${color}10` : 'none',
           borderRadius: '24px',
           cursor: isActive ? 'pointer' : 'default',
           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           overflow: 'hidden'
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-          <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-            {stationName}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 900, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+            <span>{stationName}</span>
+            {sess && <span style={{ color: color, fontWeight: 900, textTransform: 'none' }}>• {activeMins}m übt</span>}
           </div>
           {hasHelpRequest && (
             <div style={{ 
@@ -190,24 +191,32 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
         </div>
 
         {sess ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: 'auto' }}>
-            <div style={{ width: '60px', height: '60px', borderRadius: '16px', overflow: 'hidden', border: `2px solid ${color}`, boxShadow: `0 8px 20px ${color}20`, flexShrink: 0 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, marginTop: '2px' }}>
+            <div style={{ 
+              width: '88px', 
+              height: '88px', 
+              borderRadius: '22px', 
+              overflow: 'hidden', 
+              border: `3px solid ${color}`, 
+              boxShadow: `0 10px 28px ${color}25`, 
+              flexShrink: 0, 
+              marginBottom: '6px',
+              transition: 'all 0.3s ease'
+            }}>
               <AvatarImage src={sess.users?.photo_url} />
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ textAlign: 'center', minWidth: 0, width: '100%' }}>
               <div style={{ 
                 fontWeight: 950, 
-                fontSize: '1.1rem', 
+                fontSize: '0.95rem', 
                 color: '#1e293b', 
                 lineHeight: 1.1, 
-                marginBottom: '2px',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis'
               }}>
                 {sess.users?.first_name}
               </div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: color }}>{activeMins}m <span style={{ opacity: 0.7, fontWeight: 600, color: '#64748b' }}>übt</span></div>
             </div>
           </div>
         ) : (

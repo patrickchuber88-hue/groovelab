@@ -62,14 +62,14 @@ export function DeviceSetupScreen() {
       if (finalStations.length === 0) {
         console.warn('[Setup] No stations found in DB. Using stable fallback stations.');
         finalStations = [
-          { id: '33333333-3333-3333-3333-333333333331', name: 'Platz 1', room_id: firstRoomId },
-          { id: '33333333-3333-3333-3333-333333333332', name: 'Platz 2', room_id: firstRoomId },
-          { id: '33333333-3333-3333-3333-333333333333', name: 'Platz 3', room_id: firstRoomId },
-          { id: '33333333-3333-3333-3333-333333333334', name: 'Platz 4', room_id: firstRoomId },
-          { id: '33333333-3333-3333-3333-333333333335', name: 'Platz 5', room_id: firstRoomId },
-          { id: '33333333-3333-3333-3333-333333333336', name: 'Platz 6', room_id: firstRoomId },
-          { id: '33333333-3333-3333-3333-333333333337', name: 'Platz 7', room_id: firstRoomId },
-          { id: '33333333-3333-3333-3333-333333333338', name: 'Platz 8', room_id: firstRoomId },
+          { id: '33333333-3333-3333-3333-333333333331', name: 'iPad 1', room_id: firstRoomId },
+          { id: '33333333-3333-3333-3333-333333333332', name: 'iPad 2', room_id: firstRoomId },
+          { id: '33333333-3333-3333-3333-333333333333', name: 'iPad 3', room_id: firstRoomId },
+          { id: '33333333-3333-3333-3333-333333333334', name: 'iPad 4', room_id: firstRoomId },
+          { id: '33333333-3333-3333-3333-333333333335', name: 'iPad 5', room_id: firstRoomId },
+          { id: '33333333-3333-3333-3333-333333333336', name: 'iPad 6', room_id: firstRoomId },
+          { id: '33333333-3333-3333-3333-333333333337', name: 'iPad 7', room_id: firstRoomId },
+          { id: '33333333-3333-3333-3333-333333333338', name: 'iPad 8', room_id: firstRoomId },
           { id: '33333333-3333-3333-3333-333333333339', name: 'Lehrer iPad', room_id: firstRoomId }
         ];
       }

@@ -2284,7 +2284,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
               {showAddStationForRoom === room.id && (
                 <form onSubmit={(e) => handleAddStation(e, room.id)} style={{ display: 'flex', gap: '8px', marginBottom: '16px', animation: 'fadeIn 0.3s' }}>
-                  <input required placeholder="iPad Name (z.B. Platz 1)" value={newStationName} onChange={e => setNewStationName(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.875rem' }} />
+                  <input required placeholder="iPad Name (z.B. iPad 1)" value={newStationName} onChange={e => setNewStationName(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.875rem' }} />
                   <button type="submit" style={{ background: brandColor, color: 'white', border: 'none', padding: '10px 16px', borderRadius: '10px', fontWeight: 700, fontSize: '0.875rem' }}>OK</button>
                 </form>
               )}
