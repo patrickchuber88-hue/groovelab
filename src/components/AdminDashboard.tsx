@@ -1888,14 +1888,14 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '12px', display: 'block' }}>Instrumente (Icons anklicken):</label>
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                 {["Gitarre", "Bass", "Drums", "Vocals", "Piano / Keys"].map(inst => {
-                  const isSelected = (editingTeacher.instrument || '').includes(inst);
+                  const currentInstruments = (editingTeacher.instrument || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+                  const isSelected = currentInstruments.includes(inst);
                   return (
                     <button
                       key={inst}
                       type="button"
                       onClick={() => {
-                        const current = (editingTeacher.instrument || '').split(',').map((s: string) => s.trim()).filter(Boolean);
-                        const next = current.includes(inst) ? current.filter((s: string) => s !== inst) : [...current, inst];
+                        const next = isSelected ? currentInstruments.filter((s: string) => s !== inst) : [...currentInstruments, inst];
                         setEditingTeacher({...editingTeacher, instrument: next.join(', ')});
                       }}
                       style={{
@@ -1930,16 +1930,10 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Equipment / Gear</label>
-                <input placeholder="Welches Gear nutzt du?" value={editingTeacher.gear || ''} onChange={e => setEditingTeacher({...editingTeacher, gear: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600 }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Lieblingsbands</label>
+                <input placeholder="z.B. Metallica, Radiohead, Daft Punk..." value={editingTeacher.listening || ''} onChange={e => setEditingTeacher({...editingTeacher, listening: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600 }} />
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Aktuell im Ohr (Listening)</label>
-                <input placeholder="Was hörst du gerade?" value={editingTeacher.listening || ''} onChange={e => setEditingTeacher({...editingTeacher, listening: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600 }} />
-              </div>
-            </div>
 
             <div style={{ display: 'flex', gap: '16px', marginTop: '12px' }}>
               <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '20px', borderRadius: '20px', fontWeight: 900, fontSize: '1.1rem', cursor: 'pointer', boxShadow: `0 10px 30px ${brandColor}30`, transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>Änderungen speichern</button>
