@@ -294,7 +294,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode, fallbac
 
 function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isBandReady, onDelete, userBands = [], userId, isExpanded, onToggle }: any) {
   const { width } = useWindowSize();
-  const [activeDifficulty, setActiveDifficulty] = useState('original'); // 'starter' | 'original'
+  const [activeDifficulty, setActiveDifficulty] = useState('starter'); // 'starter' | 'original'
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [isChallengeHovered, setIsChallengeHovered] = useState(false);
 
@@ -403,7 +403,29 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
 
   const [activeSlotId, setActiveSlotId] = useState(() => {
     const pending = displaySkills.find((s: any) => s?.is_pending_approval);
-    return pending?.id || displaySkills[0]?.id || '';
+    if (pending) return pending.id;
+
+    // Smart Match: If the user plays an instrument in the band, select that instrument slot by default!
+    const userBandInst = matchingBand?.myInstrument;
+    if (userBandInst) {
+      const matchedSlot = displaySkills.find((s: any) => {
+        const sBase = getBaseInst(s.instrument);
+        const uBase = getBaseInst(userBandInst);
+        if (sBase === uBase) {
+          // Match parts (e.g. "E-Gitarre 2" -> part 2)
+          const partMatch = userBandInst.match(/\d+/);
+          const userPartNum = partMatch ? parseInt(partMatch[0]) : 1;
+          return (s.part_number || 1) === userPartNum;
+        }
+        return false;
+      });
+      if (matchedSlot) return matchedSlot.id;
+      
+      const baseMatchedSlot = displaySkills.find((s: any) => getBaseInst(s.instrument) === getBaseInst(userBandInst));
+      if (baseMatchedSlot) return baseMatchedSlot.id;
+    }
+
+    return displaySkills[0]?.id || '';
   });
 
   useEffect(() => {
@@ -542,12 +564,16 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
                     display: 'flex', 
                     alignItems: 'center', 
                     gap: '6px', 
-                    padding: '6px 12px', 
-                    background: s.progress > 0 ? APP_INSTRUMENT_COLORS[s.instrument] + '15' : '#f8fafc',
+                    padding: s.id === activeSlotId ? '5.5px 11.5px' : '6px 12px',
+                    background: s.id === activeSlotId 
+                      ? '#ffffff' 
+                      : (s.progress > 0 ? APP_INSTRUMENT_COLORS[s.instrument] + '10' : '#f8fafc'),
                     borderRadius: '12px',
-                    border: '1px solid ' + (s.progress > 0 ? APP_INSTRUMENT_COLORS[s.instrument] + '20' : '#f1f5f9'),
-                    opacity: s.progress > 0 ? 1 : 0.3,
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    border: s.id === activeSlotId 
+                      ? `1.5px solid ${APP_INSTRUMENT_COLORS[s.instrument] || brandColor}` 
+                      : '1px solid ' + (s.progress > 0 ? APP_INSTRUMENT_COLORS[s.instrument] + '20' : '#f1f5f9'),
+                    opacity: s.id === activeSlotId ? 1 : (s.progress > 0 ? 0.9 : 0.35),
+                    transition: 'all 0.2s ease-in-out',
                     cursor: 'pointer'
                   }}
                   title={getSkillLabel(s) + ' (' + s.progress + '%)'}
@@ -555,10 +581,19 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
                   <span style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '2px' }}>
                     {APP_INSTRUMENT_ICONS[s.instrument] || '🎸'}
                     {displaySkills.filter((x: any) => x.instrument === s.instrument).length > 1 && (
-                      <span style={{ fontSize: '0.65rem', fontWeight: 900, opacity: 0.8, color: s.progress > 0 ? APP_INSTRUMENT_COLORS[s.instrument] : '#94a3b8' }}>{s.part_number || 1}</span>
+                      <span style={{ 
+                        fontSize: '0.65rem', 
+                        fontWeight: 900, 
+                        opacity: 0.9, 
+                        color: (s.id === activeSlotId || s.progress > 0) ? (APP_INSTRUMENT_COLORS[s.instrument] || brandColor) : '#94a3b8' 
+                      }}>{s.part_number || 1}</span>
                     )}
                   </span>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: s.progress > 0 ? APP_INSTRUMENT_COLORS[s.instrument] : '#94a3b8' }}>
+                  <span style={{ 
+                    fontSize: '0.75rem', 
+                    fontWeight: 900, 
+                    color: (s.id === activeSlotId || s.progress > 0) ? (APP_INSTRUMENT_COLORS[s.instrument] || brandColor) : '#94a3b8' 
+                  }}>
                     {s.progress}%
                   </span>
                 </div>
@@ -746,7 +781,8 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
                         cursor: 'pointer', 
                         position: 'relative', 
                         zIndex: 10,
-                        margin: 0
+                        margin: 0,
+                        color: APP_INSTRUMENT_COLORS[activeSkill.instrument] || brandColor
                       }} 
                       className="custom-range-slider"
                     />
@@ -1107,7 +1143,7 @@ function App() {
 
   // Auto-trigger Band Founding Modal when formation is complete
   useEffect(() => {
-    if (!user || suggestingSkill || selectedBandForGateway || pendingFounding || showBandProfile || gatewayJustClosed.current) return;
+    if (loading || !user || suggestingSkill || selectedBandForGateway || pendingFounding || showBandProfile || gatewayJustClosed.current) return;
 
     // 1. Auto-trigger: If user is in a band and mastered a new skill, suggest it to their band first
     if (userBands.length > 0) {
@@ -1209,7 +1245,25 @@ function App() {
         }
       }
     }
-  }, [wallSongs, activeStudentTab, user, userBands.length, suggestingSkill, selectedBandForGateway, pendingFounding, showBandProfile]);
+  }, [wallSongs, activeStudentTab, user, userBands, suggestingSkill, selectedBandForGateway, pendingFounding, showBandProfile, loading]);
+
+  // Safety check: If suggestingSkill is set but userBands loads and indicates
+  // that the song is already suggested or active in their band, dismiss the popup immediately.
+  useEffect(() => {
+    if (suggestingSkill && user && userBands.length > 0) {
+      const targetSongId = suggestingSkill.song_id || suggestingSkill.songs?.id;
+      if (targetSongId) {
+        const alreadyInBand = userBands.some((b: any) => 
+          b.song_id === targetSongId || 
+          (b.band_songs || []).some((bs: any) => bs.song_id === targetSongId || bs.songs?.id === targetSongId)
+        );
+        if (alreadyInBand) {
+          console.log('[AutoTrigger] Automatically dismissing congratulations modal since song is already in band repertoire:', targetSongId);
+          setSuggestingSkill(null);
+        }
+      }
+    }
+  }, [userBands, suggestingSkill, user]);
   const [selectedStudentForPreview, setSelectedStudentForPreview] = useState<any>(null);
 
   // PERSISTENCE LOGIC: Save band profile state

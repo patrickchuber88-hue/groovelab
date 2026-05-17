@@ -207,7 +207,7 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
             </div>
             <div style={{ textAlign: 'center', minWidth: 0, width: '100%' }}>
               <div style={{ 
-                fontWeight: 950, 
+                fontWeight: 750, 
                 fontSize: '0.95rem', 
                 color: '#1e293b', 
                 lineHeight: 1.1, 

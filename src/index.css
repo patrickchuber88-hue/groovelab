@@ -244,3 +244,68 @@ body {
     left: 200%;
   }
 }
+
+/* Custom Touch-Optimized Range Slider for iPad */
+.custom-range-slider {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 40px;
+  background: transparent;
+  cursor: pointer;
+  touch-action: none; /* Prevents default page panning/scrolling while dragging */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Webkit Track styles */
+.custom-range-slider::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 40px;
+  background: transparent; /* Visual track is rendered by absolute divs underneath */
+  border: none;
+}
+
+.custom-range-slider::-moz-range-track {
+  width: 100%;
+  height: 40px;
+  background: transparent;
+  border: none;
+}
+
+/* Custom Large, highly touchable thumb handles */
+.custom-range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 5px solid currentColor; /* Dynamic coloring matching current instrument color! */
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.16), 0 3px 6px rgba(0, 0, 0, 0.08);
+  cursor: grab;
+  margin-top: 4px; /* Center the 32px thumb vertically within the 40px track */
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s;
+}
+
+.custom-range-slider:active::-webkit-slider-thumb {
+  transform: scale(1.25);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24), 0 4px 10px rgba(0, 0, 0, 0.12);
+  cursor: grabbing;
+}
+
+/* Firefox Thumb styles */
+.custom-range-slider::-moz-range-thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 5px solid currentColor;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.16), 0 3px 6px rgba(0, 0, 0, 0.08);
+  cursor: grab;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s;
+}
+
+.custom-range-slider:active::-moz-range-thumb {
+  transform: scale(1.25);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24), 0 4px 10px rgba(0, 0, 0, 0.12);
+  cursor: grabbing;
+}
