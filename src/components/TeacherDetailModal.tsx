@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Headphones, Guitar, Radio, Music, Heart } from 'lucide-react';
+import { X, Headphones, Guitar, Music, Heart } from 'lucide-react';
 
 interface TeacherDetailModalProps {
   teacher: any;
@@ -107,20 +107,12 @@ export const TeacherDetailModal: React.FC<TeacherDetailModalProps> = ({ teacher,
               <p style={{ fontSize: '0.95rem', lineHeight: 1.5, color: '#475569', margin: 0, fontWeight: 600 }}>{bands || "Keine Bands oder Projekte eingetragen."}</p>
             </section>
 
-            {/* Gear & Listening */}
-            <section style={{ background: '#fffbeb', padding: '24px', borderRadius: '24px', border: '1px solid #fef3c7', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div>
-                <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#b45309', marginBottom: '8px' }}>
-                  <Radio size={14} /> Equipment / Gear
-                </h4>
-                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#78350f', lineHeight: 1.4 }}>{gear || "Kein Equipment gelistet."}</div>
-              </div>
-              <div style={{ borderTop: '1px solid #fde68a', paddingTop: '16px' }}>
-                <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#b45309', marginBottom: '8px' }}>
-                  <Heart size={14} fill="#b45309" /> Aktuell im Ohr
-                </h4>
-                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#78350f', lineHeight: 1.4 }}>{listeningTo || "Keine Favoriten eingetragen."}</div>
-              </div>
+            {/* Lieblingsbands */}
+            <section style={{ background: '#fffbeb', padding: '24px', borderRadius: '24px', border: '1px solid #fef3c7' }}>
+              <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#b45309', marginBottom: '8px' }}>
+                <Heart size={14} fill="#b45309" /> Lieblingsbands
+              </h4>
+              <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#78350f', lineHeight: 1.4 }}>{listeningTo || "Keine Favoriten eingetragen."}</div>
             </section>
           </div>
         </div>

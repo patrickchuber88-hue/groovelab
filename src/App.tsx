@@ -5319,7 +5319,7 @@ function App() {
                           letterSpacing: '0.05em',
                           marginBottom: '16px'
                         }}>
-                          {t.role === 'admin' ? 'Dozent' : 'Lehrer'}
+                          {t.role === 'admin' ? 'Lehrer' : 'Lehrer'}
                         </div>
 
                         <div style={{ 
