@@ -54,8 +54,6 @@ const STUDENT_AVATARS = [
   { id: 'b_bass', url: '/avatar_boy_bass.jpg', label: 'Classic Boy Bass' },
   
   // Teenagers & Mid-Age - Warm Acoustic / Studio Style
-  { id: 'teen_girl_acoustic_guitar', url: '/avatars/teen_girl_acoustic_guitar.png', label: 'Teen Girl Acoustic Guitar' },
-  { id: 'teen_boy_acoustic_guitar', url: '/avatars/teen_boy_acoustic_guitar.png', label: 'Teen Boy Acoustic Guitar' },
   { id: 'teen_girl_eguitar_focused', url: '/avatars/teen_girl_eguitar_focused.png', label: 'Teen Girl Electric Guitar' },
   { id: 'student_teen_boy_guitar_1', url: '/avatars/student_teen_boy_guitar_1.png', label: 'Teen Boy Guitar (Casual)' },
   { id: 'student_girl_eguitar_3', url: '/avatars/student_girl_eguitar_3.png', label: 'Student Girl Guitar 3' },
@@ -98,6 +96,9 @@ const STUDENT_AVATARS = [
   { id: 'bandstyle_boy_edrums', url: '/avatars/bandstyle_boy_edrums.png', label: 'Bandstyle Boy Drums' },
   { id: 'bandstyle_boy_epiano', url: '/avatars/bandstyle_boy_epiano.png', label: 'Bandstyle Boy Piano' },
   
+  // REQUESTED END-AVATARS (Boy ukulele, Girl acoustic, and Ghost at absolute end)
+  { id: 'teen_boy_acoustic_guitar', url: '/avatars/teen_boy_acoustic_guitar.png', label: 'Teen Boy Acoustic Guitar' },
+  { id: 'teen_girl_acoustic_guitar', url: '/avatars/teen_girl_acoustic_guitar.png', label: 'Teen Girl Acoustic Guitar' },
   { id: 'b_ghost', url: '/avatar_ghost.jpg', label: 'Kein Profilbild' }
 ];
 

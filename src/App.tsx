@@ -1288,8 +1288,6 @@ function App() {
     { id: 'avatar_boy_bass', url: '/avatar_boy_bass.jpg' },
     
     // Teenagers & Mid-Age - Warm Acoustic / Studio Style
-    { id: 'teen_girl_acoustic_guitar', url: '/avatars/teen_girl_acoustic_guitar.png' },
-    { id: 'teen_boy_acoustic_guitar', url: '/avatars/teen_boy_acoustic_guitar.png' },
     { id: 'teen_girl_eguitar_focused', url: '/avatars/teen_girl_eguitar_focused.png' },
     { id: 'student_teen_boy_guitar_1', url: '/avatars/student_teen_boy_guitar_1.png' },
     { id: 'student_girl_eguitar_3', url: '/avatars/student_girl_eguitar_3.png' },
@@ -1311,7 +1309,7 @@ function App() {
     { id: 'vocalist_female', url: '/vocalist_female.png' },
     { id: 'student_boy_producer_1', url: '/avatars/student_boy_producer_1.png' },
     
-    // Digital Neon & Additional Teens (Boy-heavy integration at transition)
+    // Digital Neon & Additional Teens (Alternating)
     { id: 'bandstyle_girl_eguitar', url: '/avatars/bandstyle_girl_eguitar.png' },
     { id: 'vocalist_male', url: '/vocalist_male.png' },
     { id: 'bandstyle_girl_ebass', url: '/avatars/bandstyle_girl_ebass.png' },
@@ -1330,7 +1328,12 @@ function App() {
     { id: 'bandstyle_boy_eguitar', url: '/avatars/bandstyle_boy_eguitar.png' },
     { id: 'bandstyle_boy_ebass', url: '/avatars/bandstyle_boy_ebass.png' },
     { id: 'bandstyle_boy_edrums', url: '/avatars/bandstyle_boy_edrums.png' },
-    { id: 'bandstyle_boy_epiano', url: '/avatars/bandstyle_boy_epiano.png' }
+    { id: 'bandstyle_boy_epiano', url: '/avatars/bandstyle_boy_epiano.png' },
+    
+    // REQUESTED END-AVATARS (Boy ukulele, Girl acoustic, and Ghost at absolute end)
+    { id: 'teen_boy_acoustic_guitar', url: '/avatars/teen_boy_acoustic_guitar.png' },
+    { id: 'teen_girl_acoustic_guitar', url: '/avatars/teen_girl_acoustic_guitar.png' },
+    { id: 'avatar_ghost', url: '/avatar_ghost.jpg' }
   ];
 
   const TEACHER_AVATARS = [
