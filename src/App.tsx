@@ -1667,6 +1667,10 @@ function App() {
       const instrumentalSongs = safeSkills.map((p: any) => {
           const song = Array.isArray(p.songs) ? p.songs[0] : p.songs;
           if (!song) return null;
+          // EXCLUDE VOCALS/GESANG FROM INDIVIDUAL SKILLS: THEY MUST BE IN A FORMATION
+          const pi = (p.instrument || '').toLowerCase();
+          if (pi.includes('vocal') || pi.includes('gesang')) return null;
+
           return {
             id: p.id, song_id: song.id, user_id: userId, title: song.title || '...', artist: song.artist || '...',
             progress: p.is_stage_ready ? 100 : Math.min(90, p.progress_percent || 0),
@@ -1747,7 +1751,20 @@ function App() {
         return songs;
       });
 
-      setUserSongs([...instrumentalSongs, ...vocalSongs]);
+      // De-duplicate combined list by (song_id, instrument) to ensure bulletproof UI counts
+      const combinedSongs = [...instrumentalSongs, ...vocalSongs];
+      const uniqueCombined: any[] = [];
+      const seenCombinedKeys = new Set<string>();
+
+      combinedSongs.forEach((song: any) => {
+        const key = `${song.song_id}_${(song.instrument || '').toLowerCase()}`;
+        if (!seenCombinedKeys.has(key)) {
+          seenCombinedKeys.add(key);
+          uniqueCombined.push(song);
+        }
+      });
+
+      setUserSongs(uniqueCombined);
 
       const schoolId = userData.school_id || (Array.isArray(userData.schools) ? userData.schools[0]?.id : userData.schools?.id);
       console.log(`[Dashboard] Using schoolId: ${schoolId} for user ${userId}`);

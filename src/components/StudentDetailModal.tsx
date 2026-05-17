@@ -13,6 +13,7 @@ interface StudentDetailModalProps {
 export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student, onClose }) => {
   const [skills, setSkills] = useState<any[]>([]);
   const [bands, setBands] = useState<any[]>([]);
+  const [vocalsSongIds, setVocalsSongIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,6 +41,22 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         }
       });
       setBands(uniqueBandsList);
+
+      // Fetch vocals slots (formation singing)
+      const { data: slotsData } = await supabase
+        .from('band_song_slots')
+        .select('*, band_songs(*)')
+        .eq('user_id', student.id);
+      
+      const vIds = new Set<string>();
+      (slotsData || []).forEach((s: any) => {
+        const isVocal = (s.instrument || '').toLowerCase().includes('vocal') || (s.instrument || '').toLowerCase().includes('gesang');
+        const songId = s.band_songs?.song_id;
+        if (isVocal && s.status !== 'declined' && songId) {
+          vIds.add(String(songId));
+        }
+      });
+      setVocalsSongIds(vIds);
 
       setLoading(false);
     };
@@ -109,25 +126,32 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 </div>
               )}
               <div style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', padding: '4px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 950, display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }}>
-                <Star size={12} fill="white" /> {skills.filter(s => s.is_stage_ready).length * 100} XP
+                <Star size={12} fill="white" /> {(skills.filter(s => {
+                  const isVocal = (s.instrument || '').toLowerCase().includes('vocal') || (s.instrument || '').toLowerCase().includes('gesang');
+                  return s.is_stage_ready && !isVocal;
+                }).length + vocalsSongIds.size) * 100} XP
               </div>
             </div>
             
             {/* Instrument Master Counters */}
             <div style={{ display: 'flex', gap: '12px', marginTop: '12px', flexWrap: 'wrap' }}>
               {['Guitar', 'Keys', 'Drums', 'Bass', 'Vocals'].map(inst => {
-                const count = skills.filter(s => {
-                  const sInst = s.instrument?.toLowerCase();
-                  const target = inst.toLowerCase();
-                  let match = false;
-                  if (target === 'guitar') match = sInst === 'guitar' || sInst === 'e-gitarre';
-                  else if (target === 'bass') match = sInst === 'bass' || sInst === 'e-bass';
-                  else if (target === 'drums') match = sInst === 'drums' || sInst === 'e-drums';
-                  else if (target === 'keys') match = sInst === 'keys' || sInst === 'piano' || sInst === 'e-piano';
-                  else if (target === 'vocals') match = sInst === 'vocals' || sInst === 'gesang';
-                  else match = sInst === target;
-                  return match && s.is_stage_ready;
-                }).length;
+                let count = 0;
+                if (inst === 'Vocals') {
+                  count = vocalsSongIds.size;
+                } else {
+                  count = skills.filter(s => {
+                    const sInst = s.instrument?.toLowerCase();
+                    const target = inst.toLowerCase();
+                    let match = false;
+                    if (target === 'guitar') match = sInst === 'guitar' || sInst === 'e-gitarre';
+                    else if (target === 'bass') match = sInst === 'bass' || sInst === 'e-bass';
+                    else if (target === 'drums') match = sInst === 'drums' || sInst === 'e-drums';
+                    else if (target === 'keys') match = sInst === 'keys' || sInst === 'piano' || sInst === 'e-piano';
+                    else match = sInst === target;
+                    return match && s.is_stage_ready;
+                  }).length;
+                }
 
                 return (
                   <div key={inst} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', padding: '6px 10px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
