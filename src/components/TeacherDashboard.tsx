@@ -2192,7 +2192,7 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
                         </div>
 
                         <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                           {sub.instrument}
+                           {sub.instrument}{sub.part_number && sub.part_number > 1 ? ` ${sub.part_number}` : ''}
                         </div>
                      </div>
                    </div>

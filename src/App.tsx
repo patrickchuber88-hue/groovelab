@@ -372,7 +372,7 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
       return isMatch && (s.part_number || 1) === slot.partNumber;
     });
     const result = existing ? { ...existing } : {
-      id: `mock-${songGroup.song_id}-${slot.instrument}-${slot.partNumber}-${activeDifficulty}`,
+      id: `mock::${songGroup.song_id}::${slot.instrument}::${slot.partNumber}::${activeDifficulty}`,
       song_id: songGroup.song_id,
       instrument: slot.instrument,
       part_number: slot.partNumber,
@@ -420,10 +420,10 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
       let prevInst = '';
       let prevPart = 1;
 
-      if (activeSlotId.startsWith('mock-')) {
-        const parts = activeSlotId.split('-');
-        prevInst = parts[2];
-        prevPart = parseInt(parts[3]) || 1;
+      if (activeSlotId.startsWith('mock::')) {
+        const parts = activeSlotId.split('::');
+        prevInst = parts[2];   // instrument
+        prevPart = parseInt(parts[3]) || 1; // partNumber
       } else {
         const prevSkill = songGroup.skills.find((s: any) => s.id === activeSlotId);
         if (prevSkill) {
@@ -592,8 +592,8 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
           <div style={{ display: 'flex', alignItems: 'center', gap: '32px', flexShrink: 0, paddingLeft: '20px', borderLeft: width > 1000 ? '1px solid #f1f5f9' : 'none', marginLeft: 'auto' }}>
             <div style={{ textAlign: 'right', minWidth: '100px' }}>
               <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Gesamt</div>
-              <div style={{ fontSize: '1.75rem', fontWeight: 950, color: activeSkill.progress >= 100 ? '#10b981' : (APP_INSTRUMENT_COLORS[activeSkill.instrument] || brandColor), lineHeight: 1 }}>
-                {activeSkill.progress}%
+              <div style={{ fontSize: '1.75rem', fontWeight: 950, color: localProgress >= 100 ? '#10b981' : (APP_INSTRUMENT_COLORS[activeSkill.instrument] || brandColor), lineHeight: 1 }}>
+                {localProgress}%
               </div>
             </div>
             
@@ -696,7 +696,7 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
                        <span style={{ fontSize: '1.2rem' }}>{APP_INSTRUMENT_ICONS[activeSkill.instrument]}</span>
                        {getSkillLabel(activeSkill)} Training
                     </span>
-                    <span style={{ color: APP_INSTRUMENT_COLORS[activeSkill.instrument] || brandColor }}>{activeSkill.progress}%</span>
+                    <span style={{ color: APP_INSTRUMENT_COLORS[activeSkill.instrument] || brandColor }}>{localProgress}%</span>
                   </div>
                   
                   <div style={{ position: 'relative', width: '100%', height: '40px', display: 'flex', alignItems: 'center' }}>
@@ -705,7 +705,7 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
                     <div style={{ 
                       position: 'absolute', 
                       height: '12px', 
-                      width: `${activeSkill.progress}%`, 
+                      width: `${localProgress}%`, 
                       background: APP_INSTRUMENT_COLORS[activeSkill.instrument] || brandColor, 
                       borderRadius: '6px', 
                       transition: 'width 0.2s ease-out' 
@@ -883,11 +883,11 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
             </div>
 
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px', minWidth: '200px', paddingTop: '40px' }}>
-              {!activeSkill.is_pending_approval && !activeSkill.is_stage_ready && activeSkill.progress >= 90 && (
+              {!activeSkill.is_pending_approval && !activeSkill.is_stage_ready && localProgress >= 90 && (
                 <button 
                   onMouseEnter={() => setIsChallengeHovered(true)}
                   onMouseLeave={() => setIsChallengeHovered(false)}
-                  onClick={() => onSubmitForApproval(activeSkill)} 
+                  onClick={() => onSubmitForApproval({ ...activeSkill, progress: localProgress })} 
                   style={{ 
                     width: '100%', padding: '18px', borderRadius: '20px', 
                     background: isChallengeHovered ? '#000000' : brandColor, 
@@ -1572,6 +1572,7 @@ function App() {
             id: p.id, song_id: song.id, user_id: userId, title: song.title || '...', artist: song.artist || '...',
             progress: p.is_stage_ready ? 100 : Math.min(90, p.progress_percent || 0),
             instrument: p.instrument, difficulty_level: p.difficulty_level || 'original',
+            part_number: p.part_number || 1,
             is_stage_ready: !!p.is_stage_ready, is_favorite: !!p.is_favorite, locked: !p.is_stage_ready,
             is_pending_approval: !!p.is_pending_approval, media_link: song.media_link, tomplay_url: song.tomplay_url, instrumentation: song.instrumentation
           };
@@ -1832,9 +1833,8 @@ function App() {
                 formationsList.push(form);
               }
               
-              const normalizedMemberInst = normalizeInstrument(skill.instrument);
               const currentCount = form.members.filter((m: any) => m.instrument === normalizedMemberInst).length;
-              const nextPart = currentCount + 1;
+              const nextPart = skill.part_number || (currentCount + 1);
 
               const memberObj = {
                 user_id: skill.user_id,
@@ -1871,7 +1871,7 @@ function App() {
               }
 
               const currentCount = form.members.filter((m: any) => m.instrument === normalizedMemberInst).length;
-              const nextPart = currentCount + 1;
+              const nextPart = skill.part_number || (currentCount + 1);
 
               const memberObj = {
                 user_id: skill.user_id,
@@ -2938,7 +2938,8 @@ function App() {
           user_id: loggedInUserId, 
           song_id: skill.song_id,
           instrument: skill.instrument,
-          difficulty_level: skill.difficulty_level
+          difficulty_level: skill.difficulty_level,
+          part_number: skill.part_number || 1
         });
 
       if (findErr) throw new Error('Find-Error: ' + findErr.message);
@@ -2959,6 +2960,7 @@ function App() {
           song_id: skill.song_id,
           instrument: skill.instrument,
           difficulty_level: skill.difficulty_level || 'original',
+          part_number: skill.part_number || 1,
           progress_percent: skill.progress || 90,
           is_pending_approval: true,
           is_stage_ready: false
