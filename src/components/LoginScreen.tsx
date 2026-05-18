@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Tablet, ShieldCheck, FileText, X } from 'lucide-react';
+import { Music, Tablet, ShieldCheck, FileText, X, Check } from 'lucide-react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { getDistanceFromLatLonInM } from '../utils/geo';
 
@@ -43,6 +43,83 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showImpressum, setShowImpressum] = useState(false);
   
+  // Secret Master Admin click combo state
+  const [logoClicks, setLogoClicks] = useState(0);
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [adminUsernameInput, setAdminUsernameInput] = useState('');
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [adminLoginLoading, setAdminLoginLoading] = useState(false);
+
+  // Reset logo clicks after 3 seconds of inactivity
+  useEffect(() => {
+    if (logoClicks > 0) {
+      const timer = setTimeout(() => setLogoClicks(0), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [logoClicks]);
+
+  const handleAdminLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminUsernameInput.trim() || !adminPasswordInput.trim()) return;
+    try {
+      setAdminLoginLoading(true);
+      setError(null);
+      
+      const { data: user, error: userErr } = await supabase
+        .from('users')
+        .select('*')
+        .eq('is_master_admin', true)
+        .eq('master_admin_username', adminUsernameInput.trim())
+        .eq('master_admin_password', adminPasswordInput.trim())
+        .maybeSingle();
+
+      if (userErr || !user) {
+        throw new Error('Ungültige Master-Admin Anmeldedaten.');
+      }
+
+      console.log('[Login] Master Admin logged in with credentials.');
+      setShowAdminModal(false);
+      
+      // Clean inputs
+      setAdminUsernameInput('');
+      setAdminPasswordInput('');
+      
+      finalizeLogin(user, null, true);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setAdminLoginLoading(false);
+    }
+  };
+
+  // Onboarding parameters for invited school coaches
+  const urlParams = new URLSearchParams(window.location.search);
+  const inviteSchoolId = urlParams.get('invite_school_id');
+  
+  const [schoolName, setSchoolName] = useState<string>('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [registeredUser, setRegisteredUser] = useState<any>(null);
+  const [loadingSchool, setLoadingSchool] = useState(false);
+  const [signingUp, setSigningUp] = useState(false);
+
+  useEffect(() => {
+    async function loadSchoolName() {
+      if (!inviteSchoolId) return;
+      try {
+        setLoadingSchool(true);
+        const { data, error } = await supabase.from('schools').select('name').eq('id', inviteSchoolId).maybeSingle();
+        if (error) throw error;
+        if (data) setSchoolName(data.name);
+      } catch (err) {
+        console.error("Error loading invite school name:", err);
+      } finally {
+        setLoadingSchool(false);
+      }
+    }
+    loadSchoolName();
+  }, [inviteSchoolId]);
+
   const [userPos, setUserPos] = useState<{lat: number, lng: number} | null>(null);
   
   useEffect(() => {
@@ -217,6 +294,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       if (userErr || !user) throw new Error('Nutzer nicht gefunden.');
 
+      // Early exit if the user scanned is the Master Admin
+      if (user.is_master_admin) {
+        console.log('[Login] Master Admin QR token scanned! Logging in directly.');
+        finalizeLogin(user, null, true);
+        return;
+      }
+
       const schoolData = Array.isArray(user.schools) ? user.schools[0] : user.schools;
       
       // Ensure school_id is available for room lookups even if not directly on the user object
@@ -304,6 +388,187 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [geoDebug, setGeoDebug] = useState<any>(null);
   const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
+  // Intercept and render coach self-onboarding if invite parameters are in URL
+  if (inviteSchoolId) {
+    if (registeredUser) {
+      return (
+        <div style={{
+          position: 'fixed', inset: 0, backgroundColor: '#0f172a',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          padding: '20px', fontFamily: '"Outfit", "Inter", sans-serif', zIndex: 9999, color: '#f8fafc'
+        }}>
+          <div style={{
+            width: '100%', maxWidth: '440px', background: 'rgba(255, 255, 255, 0.03)',
+            backdropFilter: 'blur(16px)', borderRadius: '32px', padding: '32px',
+            border: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', flexDirection: 'column',
+            alignItems: 'center', boxShadow: '0 40px 100px rgba(0, 0, 0, 0.4)', boxSizing: 'border-box'
+          }}>
+            <div style={{
+              width: '60px', height: '60px', borderRadius: '50%', background: '#22c55e20',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px'
+            }}>
+              <Check size={32} color="#22c55e" />
+            </div>
+            <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#22c55e', margin: '0 0 10px 0', textAlign: 'center' }}>
+              Registrierung erfolgreich!
+            </h1>
+            <p style={{ color: '#94a3b8', fontSize: '13px', textAlign: 'center', lineHeight: '1.5', margin: '0 0 24px 0' }}>
+              Dein GrooveLab Coach-Ausweis wurde erstellt. Mache einen <strong>Screenshot</strong> oder drucke diesen QR-Code aus, um dich ab sofort einzuloggen.
+            </p>
+            
+            <div style={{
+              background: 'white', padding: '16px', borderRadius: '24px',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.2)', marginBottom: '24px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <img 
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${registeredUser.qr_token}`} 
+                alt="GrooveLab QR Code" 
+                style={{ width: '200px', height: '200px' }}
+              />
+            </div>
+
+            <div style={{
+              width: '100%', padding: '16px', background: 'rgba(255, 255, 255, 0.02)',
+              borderRadius: '16px', border: '1px solid rgba(255,255,255,0.06)',
+              marginBottom: '24px', boxSizing: 'border-box'
+            }}>
+              <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>Name</div>
+              <div style={{ fontSize: '1rem', fontWeight: 700, color: 'white' }}>{registeredUser.first_name} {registeredUser.last_name}</div>
+              
+              <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '12px', marginBottom: '4px' }}>Schule</div>
+              <div style={{ fontSize: '1rem', fontWeight: 700, color: '#eab308' }}>{schoolName || 'GrooveLab Academy'}</div>
+            </div>
+
+            <button
+              onClick={() => onLogin(registeredUser.id, true)}
+              style={{
+                width: '100%', padding: '14px 20px', borderRadius: '16px',
+                background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                border: 'none', color: '#0f172a', fontWeight: 800, fontSize: '0.95rem',
+                cursor: 'pointer', boxShadow: '0 8px 24px rgba(234, 179, 8, 0.25)',
+                transition: 'all 0.2s', outline: 'none'
+              }}
+            >
+              Direkt zum Dashboard einloggen
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div style={{
+        position: 'fixed', inset: 0, backgroundColor: '#0f172a',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        padding: '20px', fontFamily: '"Outfit", "Inter", sans-serif', zIndex: 9999, color: '#f8fafc'
+      }}>
+        <div style={{
+          width: '100%', maxWidth: '440px', background: 'rgba(255, 255, 255, 0.03)',
+          backdropFilter: 'blur(16px)', borderRadius: '32px', padding: '32px',
+          border: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', flexDirection: 'column',
+          boxShadow: '0 40px 100px rgba(0, 0, 0, 0.4)', boxSizing: 'border-box'
+        }}>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+            <div style={{
+              background: '#eab308', padding: '8px', borderRadius: '12px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <Music size={24} color="#0f172a" />
+            </div>
+            <div style={{ fontSize: '1.25rem', fontWeight: 800 }}>GrooveLab Einladung</div>
+          </div>
+
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
+            Registriere dich als Coach
+          </h2>
+          <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: '0 0 24px 0', lineHeight: '1.5' }}>
+            Du wurdest eingeladen, als Coach für die Schule <strong style={{ color: '#eab308' }}>{loadingSchool ? 'wird geladen...' : (schoolName || 'GrooveLab Academy')}</strong> beizutreten.
+          </p>
+
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            if (!firstName.trim() || !lastName.trim()) return;
+            try {
+              setSigningUp(true);
+              const newQrToken = crypto.randomUUID();
+              const newUserId = crypto.randomUUID();
+              
+              const { data, error } = await supabase
+                .from('users')
+                .insert({
+                  id: newUserId,
+                  school_id: inviteSchoolId,
+                  role: 'teacher',
+                  first_name: firstName,
+                  last_name: lastName,
+                  qr_token: newQrToken
+                })
+                .select()
+                .single();
+
+              if (error) throw error;
+              setRegisteredUser(data);
+            } catch (err: any) {
+              console.error("Error signing up coach:", err);
+              alert("Fehler bei der Registrierung: " + err.message);
+            } finally {
+              setSigningUp(false);
+            }
+          }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600, marginBottom: '6px' }}>Vorname *</label>
+              <input
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="z.B. Patrick"
+                required
+                style={{
+                  width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: '10px',
+                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+                  color: 'white', fontSize: '0.9rem', outline: 'none'
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600, marginBottom: '6px' }}>Nachname *</label>
+              <input
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="z.B. Huber"
+                required
+                style={{
+                  width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: '10px',
+                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+                  color: 'white', fontSize: '0.9rem', outline: 'none'
+                }}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={signingUp}
+              style={{
+                marginTop: '8px', padding: '14px', borderRadius: '12px',
+                background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                border: 'none', color: '#0f172a', fontWeight: 800, fontSize: '0.9rem',
+                cursor: 'pointer', boxShadow: '0 8px 20px rgba(234, 179, 8, 0.2)',
+                transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}
+            >
+              {signingUp ? 'Registriere...' : 'Registrierung abschließen'}
+            </button>
+          </form>
+
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ 
@@ -334,7 +599,30 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         <Music size={40} color="#eab308" />
       </div>
 
-      <h1 style={{ fontSize: '32px', fontWeight: 1000, color: '#0f172a', marginBottom: '8px', margin: 0, letterSpacing: '-0.02em' }}>GrooveLab</h1>
+      <h1 
+        onClick={() => {
+          setLogoClicks(prev => {
+            const next = prev + 1;
+            if (next >= 5) {
+              setShowAdminModal(true);
+              return 0;
+            }
+            return next;
+          });
+        }}
+        style={{ 
+          fontSize: '32px', 
+          fontWeight: 1000, 
+          color: '#0f172a', 
+          marginBottom: '8px', 
+          margin: 0, 
+          letterSpacing: '-0.02em',
+          cursor: 'default',
+          userSelect: 'none'
+        }}
+      >
+        GrooveLab
+      </h1>
       <p style={{ color: '#64748b', textAlign: 'center', fontSize: '14px', marginBottom: '48px', maxWidth: '300px', lineHeight: '1.5', fontWeight: 600 }}>
         Halte deinen Ausweis vor die Kamera,<br/>um dich einzuloggen.
       </p>
@@ -803,6 +1091,180 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden Master Admin Credentials Login Modal */}
+      {showAdminModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.40)',
+          backdropFilter: 'blur(16px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '20px',
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '32px',
+            boxShadow: '0 30px 80px rgba(15, 23, 42, 0.18)',
+            border: '1px solid #f1f5f9',
+            padding: '36px',
+            maxWidth: '440px',
+            width: '100%',
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px',
+            boxSizing: 'border-box'
+          }}>
+            <button 
+              onClick={() => {
+                setShowAdminModal(false);
+                setAdminUsernameInput('');
+                setAdminPasswordInput('');
+              }} 
+              style={{
+                position: 'absolute',
+                top: '24px',
+                right: '24px',
+                background: '#f1f5f9',
+                border: 'none',
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#64748b',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.background = '#e2e8f0'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#f1f5f9'; }}
+            >
+              <X size={20} />
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#eab308' }}>
+                <ShieldCheck size={28} />
+              </div>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#0f172a' }}>Master-Admin Login</h2>
+                <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>GrooveLab Master Administration</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleAdminLogin} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Benutzername
+                </label>
+                <input
+                  type="text"
+                  value={adminUsernameInput}
+                  onChange={(e) => setAdminUsernameInput(e.target.value)}
+                  placeholder="z.B. admin"
+                  required
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: '14px 16px',
+                    borderRadius: '12px',
+                    background: '#ffffff',
+                    border: '1.5px solid #e2e8f0',
+                    color: '#1e293b',
+                    fontSize: '0.95rem',
+                    fontWeight: 600,
+                    outline: 'none',
+                    transition: 'all 0.2s'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#eab308';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Passwort
+                </label>
+                <input
+                  type="password"
+                  value={adminPasswordInput}
+                  onChange={(e) => setAdminPasswordInput(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: '14px 16px',
+                    borderRadius: '12px',
+                    background: '#ffffff',
+                    border: '1.5px solid #e2e8f0',
+                    color: '#1e293b',
+                    fontSize: '0.95rem',
+                    fontWeight: 600,
+                    outline: 'none',
+                    transition: 'all 0.2s'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#eab308';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                  }}
+                />
+              </div>
+
+              {error && (
+                <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#ef4444', padding: '12px', borderRadius: '12px', fontSize: '12px', fontWeight: 700, textAlign: 'center' }}>
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={adminLoginLoading}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  borderRadius: '14px',
+                  background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontSize: '0.95rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 8px 24px rgba(15, 23, 42, 0.15)',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  marginTop: '10px'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 12px 28px rgba(15, 23, 42, 0.25)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'none';
+                  e.currentTarget.style.boxShadow = '0 8px 24px rgba(15, 23, 42, 0.15)';
+                }}
+              >
+                {adminLoginLoading ? 'Verifiziere...' : 'Einloggen'}
+              </button>
+            </form>
           </div>
         </div>
       )}

@@ -14,6 +14,7 @@ import { QRCodeModal } from './components/QRCodeModal';
 import { DeviceSetupScreen } from './components/DeviceSetupScreen';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
+import { MasterAdminDashboard } from './components/MasterAdminDashboard';
 import { TeacherDetailModal } from './components/TeacherDetailModal';
 import { StudentDetailModal } from './components/StudentDetailModal';
 import { normalizeInstrument, renderInstrumentIcon } from './utils/instruments';
@@ -3902,7 +3903,9 @@ function App() {
     localStorage.removeItem('groovelab_active_tab');
   };
 
-  if (!stationIdFromStorage) {
+  const hasInviteSchoolId = new URLSearchParams(window.location.search).has('invite_school_id');
+
+  if (!stationIdFromStorage && !loggedInUserId && !hasInviteSchoolId) {
     return <DeviceSetupScreen />;
   }
 
@@ -4114,6 +4117,16 @@ function App() {
           )}
       </div>
     );
+  }
+
+  // 2.5 MASTER ADMIN PORTAL BYPASS
+  if (user.is_master_admin) {
+    return <MasterAdminDashboard onLogout={handleLogout} />;
+  }
+
+  // If a normal student/teacher is logged in without a station, send to setup
+  if (!stationIdFromStorage) {
+    return <DeviceSetupScreen />;
   }
 
   // 3. MAIN DASHBOARD LOGIC (Resumes here after Auth/Loading checks)

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Tablet } from 'lucide-react';
+import { Music, Tablet, X, ShieldCheck } from 'lucide-react';
 
 export function DeviceSetupScreen() {
   const [rooms, setRooms] = useState<any[]>([]);
@@ -10,6 +10,58 @@ export function DeviceSetupScreen() {
   const [selectedRoomId, setSelectedRoomId] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Secret Master Admin click combo state
+  const [logoClicks, setLogoClicks] = useState(0);
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [adminUsernameInput, setAdminUsernameInput] = useState('');
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [adminLoginLoading, setAdminLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+
+  // Reset logo clicks after 3 seconds of inactivity
+  React.useEffect(() => {
+    if (logoClicks > 0) {
+      const timer = setTimeout(() => setLogoClicks(0), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [logoClicks]);
+
+  const handleAdminLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminUsernameInput.trim() || !adminPasswordInput.trim()) return;
+    try {
+      setAdminLoginLoading(true);
+      setLoginError(null);
+      
+      const { data: user, error: userErr } = await supabase
+        .from('users')
+        .select('*')
+        .eq('is_master_admin', true)
+        .eq('master_admin_username', adminUsernameInput.trim())
+        .eq('master_admin_password', adminPasswordInput.trim())
+        .maybeSingle();
+
+      if (userErr || !user) {
+        throw new Error('Ungültige Master-Admin Anmeldedaten.');
+      }
+
+      console.log('[Setup] Master Admin logged in from Device Setup.');
+      
+      // Clean inputs
+      setAdminUsernameInput('');
+      setAdminPasswordInput('');
+      setShowAdminModal(false);
+
+      // Finalize login (reload to activate Master Admin Dashboard)
+      sessionStorage.setItem('groovelab_user_id', user.id);
+      window.location.reload();
+    } catch (err: any) {
+      setLoginError(err.message);
+    } finally {
+      setAdminLoginLoading(false);
+    }
+  };
 
 
   React.useEffect(() => {
@@ -118,7 +170,21 @@ export function DeviceSetupScreen() {
       <div className="school-logo" style={{ width: 80, height: 80, borderRadius: 20, marginBottom: 24, boxShadow: '0 8px 24px rgba(234, 179, 8, 0.2)' }}>
         <Music size={40} />
       </div>
-      <h1 style={{ fontSize: '1.5rem', marginBottom: '8px' }}>Geräte-Setup</h1>
+      <h1 
+        onClick={() => {
+          setLogoClicks(prev => {
+            const next = prev + 1;
+            if (next >= 5) {
+              setShowAdminModal(true);
+              return 0;
+            }
+            return next;
+          });
+        }}
+        style={{ fontSize: '1.5rem', marginBottom: '8px', cursor: 'default', userSelect: 'none' }}
+      >
+        Geräte-Setup
+      </h1>
       <p style={{ color: 'var(--text-muted)', marginBottom: '32px', fontSize: '0.875rem', maxWidth: '280px' }}>
         Weise diesem Gerät eine feste Nummer zu, um es als Schüler-Terminal zu nutzen.
       </p>
@@ -282,6 +348,185 @@ export function DeviceSetupScreen() {
           </button>
         </div>
       </div>
+
+      {/* Hidden Master Admin Credentials Login Modal */}
+      {showAdminModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.40)',
+          backdropFilter: 'blur(16px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '20px',
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '32px',
+            boxShadow: '0 30px 80px rgba(15, 23, 42, 0.18)',
+            border: '1px solid #f1f5f9',
+            padding: '36px',
+            maxWidth: '440px',
+            width: '100%',
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px',
+            boxSizing: 'border-box'
+          }}>
+            <button 
+              onClick={() => {
+                setShowAdminModal(false);
+                setAdminUsernameInput('');
+                setAdminPasswordInput('');
+                setLoginError(null);
+              }} 
+              style={{
+                position: 'absolute',
+                top: '24px',
+                right: '24px',
+                background: '#f1f5f9',
+                border: 'none',
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#64748b',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.background = '#e2e8f0'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#f1f5f9'; }}
+            >
+              <X size={20} />
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#eab308' }}>
+                <ShieldCheck size={28} />
+              </div>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#0f172a', textAlign: 'left' }}>Master-Admin Login</h2>
+                <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left' }}>GrooveLab Master Administration</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleAdminLogin} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <div style={{ textAlign: 'left' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Benutzername
+                </label>
+                <input
+                  type="text"
+                  value={adminUsernameInput}
+                  onChange={(e) => setAdminUsernameInput(e.target.value)}
+                  placeholder="z.B. admin"
+                  required
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: '14px 16px',
+                    borderRadius: '12px',
+                    background: '#ffffff',
+                    border: '1.5px solid #e2e8f0',
+                    color: '#1e293b',
+                    fontSize: '0.95rem',
+                    fontWeight: 600,
+                    outline: 'none',
+                    transition: 'all 0.2s'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#eab308';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                  }}
+                />
+              </div>
+
+              <div style={{ textAlign: 'left' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Passwort
+                </label>
+                <input
+                  type="password"
+                  value={adminPasswordInput}
+                  onChange={(e) => setAdminPasswordInput(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: '14px 16px',
+                    borderRadius: '12px',
+                    background: '#ffffff',
+                    border: '1.5px solid #e2e8f0',
+                    color: '#1e293b',
+                    fontSize: '0.95rem',
+                    fontWeight: 600,
+                    outline: 'none',
+                    transition: 'all 0.2s'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#eab308';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                  }}
+                />
+              </div>
+
+              {loginError && (
+                <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#ef4444', padding: '12px', borderRadius: '12px', fontSize: '12px', fontWeight: 700, textAlign: 'center' }}>
+                  {loginError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={adminLoginLoading}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  borderRadius: '14px',
+                  background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontSize: '0.95rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 8px 24px rgba(15, 23, 42, 0.15)',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  marginTop: '10px'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 12px 28px rgba(15, 23, 42, 0.25)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'none';
+                  e.currentTarget.style.boxShadow = '0 8px 24px rgba(15, 23, 42, 0.15)';
+                }}
+              >
+                {adminLoginLoading ? 'Verifiziere...' : 'Einloggen'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+      `}</style>
     </div>
   );
 }
