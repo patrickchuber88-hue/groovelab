@@ -29,31 +29,53 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
   const inst = songData?.instrumentation || { 'E-Gitarre': 1, 'E-Drums': 1 }; // Minimum fallback
   const requiredCount = Object.values(inst).reduce((acc: number, val: any) => acc + (val || 0), 0);
 
-  const slots: any[] = [];
+  // 1. Gather all actual joined members
+  const joinedCards = members.map((m: any) => {
+    const userObj = m.profiles 
+      ? (Array.isArray(m.profiles) ? m.profiles[0] : m.profiles)
+      : (m.users ? (Array.isArray(m.users) ? m.users[0] : m.users) : m);
+    
+    return {
+      isFilled: true,
+      member: m,
+      userObj: userObj,
+      userId: m.user_id || userObj?.id || m.id,
+      firstName: m.first_name || userObj?.first_name || 'Musiker',
+      photoUrl: m.photo_url || userObj?.photo_url || '/avatar_ghost.jpg',
+      instrument: m.instrument || 'Instrument'
+    };
+  });
+
+  // Helper to normalize instrument name
+  const normalize = (name: string) => {
+    const lower = (name || '').toLowerCase();
+    if (lower.includes('guitar') || lower.includes('gitarre')) return 'e-gitarre';
+    if (lower.includes('bass')) return 'e-bass';
+    if (lower.includes('drum') || lower.includes('schlagzeug')) return 'e-drums';
+    if (lower.includes('piano') || lower.includes('key') || lower.includes('klavier')) return 'e-piano';
+    if (lower.includes('vocal') || lower.includes('gesang')) return 'vocals';
+    return lower;
+  };
+
+  // 2. Identify missing required slots
+  const emptyCards: any[] = [];
   Object.entries(inst).forEach(([instrument, count]) => {
     const isVoc = instrument.toLowerCase().includes('vocal') || instrument.toLowerCase().includes('gesang');
-    if (isVoc) return; // Skip original vocal slots from instrumentation to use custom logic
-    for (let i = 0; i < (count as number); i++) {
-      slots.push({ instrument });
+    if (isVoc) return; // Vocalists are already fully shown in joinedCards
+
+    const normInst = normalize(instrument);
+    const joinedCount = joinedCards.filter((c: any) => normalize(c.instrument) === normInst).length;
+    const needed = Math.max(0, (count as number) - joinedCount);
+
+    for (let i = 0; i < needed; i++) {
+      emptyCards.push({
+        isFilled: false,
+        instrument: instrument
+      });
     }
   });
 
-  // Always show at least 1 vocal slot if any singer exists, or up to 2 if 2 singers exist
-  const vocalists = members.filter((m: any) => (m.instrument || '').toLowerCase().includes('vocal') || (m.instrument || '').toLowerCase().includes('gesang'));
-  const uniqueVocalistIds = Array.from(new Set(vocalists.map((m: any) => m.user_id || m.users?.id || m.id)));
-  
-  // If a vocalist also plays an instrument, they are already covered by an instrumental slot.
-  // We only need EXTRA slots for those who ONLY sing.
-  const onlySingersCount = uniqueVocalistIds.filter(uid => {
-    const myInsts = members.filter((m: any) => (m.user_id || m.users?.id || m.id) === uid).map((m: any) => (m.instrument || '').toLowerCase());
-    return myInsts.every((inst: string) => inst.includes('vocal') || inst.includes('gesang'));
-  }).length;
-
-  for (let i = 0; i < Math.min(2, onlySingersCount); i++) {
-    slots.push({ instrument: 'Vocals' });
-  }
-
-  const filledIndices = new Set();
+  const allCards = [...joinedCards, ...emptyCards];
 
   const [suggestion, setSuggestion] = React.useState<any>(null);
 
@@ -190,42 +212,30 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
         </div>
 
         <div className="musician-stage" style={{ display: 'flex', justifyContent: 'center', gap: '32px', flexWrap: 'wrap' }}>
-          {slots.map((slot, idx) => {
-            const member = members.find((m: any, mIdx: number) => {
-                if (filledIndices.has(mIdx)) return false;
-                const mInst = (m.instrument || '').toLowerCase();
-                const sInst = (slot.instrument || '').toLowerCase();
-                const isMatch = mInst === sInst || 
-                               (mInst === 'e-gitarre' && sInst === 'guitar') || (mInst === 'guitar' && sInst === 'e-gitarre') ||
-                               (mInst === 'e-bass' && sInst === 'bass') || (mInst === 'bass' && sInst === 'e-bass') ||
-                               (mInst === 'e-drums' && sInst === 'drums') || (mInst === 'drums' && sInst === 'e-drums') ||
-                               (mInst === 'e-piano' && sInst === 'piano') || (mInst === 'piano' && sInst === 'e-piano') || (mInst === 'keys' && sInst === 'e-piano');
-                if (isMatch) {
-                    filledIndices.add(mIdx);
-                    return true;
-                }
-                return false;
-            });
-
-            // Find all instruments this member has in this band
-            const mUserId = member?.user_id || member?.users?.id || (member?.users?.[0]?.id);
-            const allMyInstruments = mUserId ? members.filter((m: any) => (m.user_id || m.users?.id || m.id) === mUserId).map((m: any) => m.instrument) : [];
+          {allCards.map((card, idx) => {
+            const isMe = card.isFilled && card.userId === user?.id;
+            
+            // Find all instruments this member has in this band to see if they also do vocals
+            const allMyInstruments = card.isFilled && card.userId 
+              ? members.filter((m: any) => (m.user_id || m.users?.id || m.id) === card.userId).map((m: any) => m.instrument) 
+              : [];
             const hasVocals = allMyInstruments.some((inst: string) => inst?.toLowerCase().includes('vocal') || inst?.toLowerCase().includes('gesang'));
-            const mainInst = slot.instrument;
+            const mainInst = card.instrument;
             const displayInstrument = hasVocals && mainInst?.toLowerCase() !== 'vocals' && mainInst?.toLowerCase() !== 'gesang' 
                 ? `${mainInst} & Gesang` 
                 : mainInst;
 
-            const isMe = mUserId === user?.id;
-            
             return (
               <div key={idx} className={`musician-card-stage ${isMe ? 'active' : ''}`}>
                 <div className="spotlight-beam" />
                 <div className="musician-avatar-stage">
-                  {member ? (
+                  {card.isFilled ? (
                      <img 
-                       src={(member.profiles || member.users || member).photo_url || '/avatar_ghost.jpg'} 
+                       src={card.photoUrl || '/avatar_ghost.jpg'} 
                        alt=""
+                       onError={(e) => {
+                         e.currentTarget.src = '/avatar_ghost.jpg';
+                       }}
                      />
                   ) : (
                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem', opacity: 0.1 }}>👤</div>
@@ -236,11 +246,11 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
                 </div>
                 
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontWeight: 900, color: member ? 'white' : 'rgba(255,255,255,0.2)', fontSize: '1.2rem', marginBottom: '8px' }}>
-                    {member ? (member.first_name || (member.profiles || member.users || member).first_name || 'Musiker') : 'Wartend...'}
+                  <div style={{ fontWeight: 900, color: card.isFilled ? 'white' : 'rgba(255,255,255,0.2)', fontSize: '1.2rem', marginBottom: '8px' }}>
+                    {card.isFilled ? card.firstName : 'Wartend...'}
                   </div>
                   <div className="instrument-label">
-                     {APP_INSTRUMENT_ICONS[slot.instrument as keyof typeof APP_INSTRUMENT_ICONS] || '🎸'} {displayInstrument}
+                     {APP_INSTRUMENT_ICONS[card.instrument as keyof typeof APP_INSTRUMENT_ICONS] || '🎸'} {displayInstrument}
                   </div>
                 </div>
               </div>

@@ -1056,7 +1056,7 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
 }
 
 function App() {
-  const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => sessionStorage.getItem('groovelab_user_id'));
+  const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => localStorage.getItem('groovelab_user_id'));
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [session, setSession] = useState<any>(null);
@@ -1136,7 +1136,7 @@ function App() {
   const [libraryAlphaFilter, setLibraryAlphaFilter] = useState<string | null>(null);
   const [librarySearchType, setLibrarySearchType] = useState<'title' | 'artist'>('title');
   const [activeStudentsCount, setActiveStudentsCount] = useState(0);
-  const [locationMode, setLocationMode] = useState<'lab' | 'home'>(() => (sessionStorage.getItem('groovelab_location_mode') as 'lab' | 'home') || 'home');
+  const [locationMode, setLocationMode] = useState<'lab' | 'home'>(() => (localStorage.getItem('groovelab_location_mode') as 'lab' | 'home') || 'home');
   const [personalRejections] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [showCamera, setShowCamera] = useState(false);
@@ -1161,12 +1161,12 @@ function App() {
   const [pendingFounding, setPendingFounding] = useState<any | null>(null);
   const [showFoundingModal, setShowFoundingModal] = useState(false);
   const [foundingName, setFoundingName] = useState('');
-  const [lastAutoTriggeredFormId, setLastAutoTriggeredFormId] = useState<string | null>(sessionStorage.getItem('groovelab_last_form_id'));
+  const [lastAutoTriggeredFormId, setLastAutoTriggeredFormId] = useState<string | null>(localStorage.getItem('groovelab_last_form_id'));
   
   const updateAutoTriggerId = (id: string | null) => {
     setLastAutoTriggeredFormId(id);
-    if (id) sessionStorage.setItem('groovelab_last_form_id', id);
-    else sessionStorage.removeItem('groovelab_last_form_id');
+    if (id) localStorage.setItem('groovelab_last_form_id', id);
+    else localStorage.removeItem('groovelab_last_form_id');
   };
   
   useEffect(() => {
@@ -1563,88 +1563,15 @@ function App() {
         fetchDashboardData(loggedInUserId);
       }, 15000);
 
-      // 2. Continuous Geofence & Heartbeat Monitor (Students only)
+      // 2. Continuous Heartbeat Monitor (Students only)
       const heartbeatInterval = setInterval(async () => {
         if (!user || user.role !== 'student' || !session || session.check_out_time) return;
 
-        console.log('[Heartbeat] Checking geofence and updating last_seen...');
+        console.log('[Heartbeat] Updating last_seen...');
         
-        // Update user's last_seen in DB
+        // Update user's last_seen in DB to keep them active on the dashboard
         const now = new Date().toISOString();
         await supabase.from('users').update({ last_seen: now }).eq('id', user.id);
-
-        // Geofence Check (Strict Enforcement)
-        try {
-          const userPos = await new Promise<{lat: number, lng: number} | null>((resolve) => {
-            navigator.geolocation.getCurrentPosition(
-              (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-              () => resolve(null),
-              { enableHighAccuracy: true, timeout: 5000 }
-            );
-          });
-
-          let isInside = false;
-          if (userPos) {
-            const schoolId = user.school_id || (Array.isArray(user.schools) ? user.schools[0]?.id : user.schools?.id);
-            const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', schoolId);
-            
-            if (rooms) {
-              for (const room of rooms) {
-                const points = Array.isArray(room.geofence_points) ? room.geofence_points : [];
-                const allCoords = [...points];
-                if (room.latitude && room.longitude) allCoords.push({ lat: room.latitude, lng: room.longitude });
-                
-                for (const pt of allCoords) {
-                  if (pt && pt.lat && pt.lng) {
-                    const dist = getDistanceFromLatLonInM(userPos.lat, userPos.lng, Number(pt.lat), Number(pt.lng));
-                    if (dist < 100) { 
-                      isInside = true;
-                      break;
-                    }
-                  }
-                }
-                if (isInside) break;
-              }
-            }
-
-            // 2. School Fallback (Single Point + Radius)
-            const school = Array.isArray(user.schools) ? user.schools[0] : user.schools;
-            if (!isInside && school?.latitude && school?.longitude) {
-              const distToSchool = getDistanceFromLatLonInM(
-                userPos.lat, userPos.lng, 
-                Number(school.latitude), Number(school.longitude)
-              );
-              
-              if (distToSchool < (school.geofence_radius_meters || 150)) {
-                isInside = true;
-              }
-            }
-
-            // If they were in Lab mode but are now outside, move to Home mode
-            if (!isInside && session.gps_verified) {
-              console.log('[Heartbeat] Left geofence. Moving to Home mode.');
-              await supabase.from('sessions').update({ 
-                gps_verified: false,
-                station_id: null 
-              }).eq('id', session.id);
-              
-              // Sync local state immediately
-              setLocationMode('home');
-              fetchDashboardData(user.id);
-            } else if (isInside && !session.gps_verified) {
-              // If they were in Home mode but are now inside, move to Lab mode
-              console.log('[Heartbeat] Entered geofence. Moving to Lab mode.');
-              await supabase.from('sessions').update({ 
-                gps_verified: true
-              }).eq('id', session.id);
-              
-              setLocationMode('lab');
-              fetchDashboardData(user.id);
-            }
-          }
-        } catch (e) {
-          console.warn('[Heartbeat] Geofence check failed', e);
-        }
       }, 30000); // Every 30 seconds
 
       return () => {
@@ -2517,7 +2444,7 @@ function App() {
   };
 
   const fetchPlanningData = async (schoolId: string, userIdArg?: string) => {
-    const currentUserId = userIdArg || loggedInUserId || sessionStorage.getItem('groovelab_user_id');
+    const currentUserId = userIdArg || loggedInUserId || localStorage.getItem('groovelab_user_id');
     console.log(`[Planning] Fetching for School: ${schoolId}, User: ${currentUserId}`);
     if (!currentUserId || !schoolId) {
       console.warn('[Planning] Missing userId or schoolId', { currentUserId, schoolId });
@@ -3431,8 +3358,8 @@ function App() {
     setLoggedInUserId(null);
     setUser(null);
     setSession(null);
-    sessionStorage.removeItem('groovelab_user_id');
-    sessionStorage.removeItem('groovelab_location_mode');
+    localStorage.removeItem('groovelab_user_id');
+    localStorage.removeItem('groovelab_location_mode');
     localStorage.removeItem('groovelab_active_tab');
   };
 
@@ -3451,8 +3378,8 @@ function App() {
 
     setLoggedInUserId(userId);
     setLocationMode(mode);
-    sessionStorage.setItem('groovelab_user_id', userId);
-    sessionStorage.setItem('groovelab_location_mode', mode);
+    localStorage.setItem('groovelab_user_id', userId);
+    localStorage.setItem('groovelab_location_mode', mode);
 
     // Always start with the Live Lab after login!
     setActiveStudentTab('live');

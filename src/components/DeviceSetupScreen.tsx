@@ -103,7 +103,7 @@ export function DeviceSetupScreen() {
       await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('id', busySession.id);
     }
 
-    sessionStorage.removeItem('groovelab_user_id');
+    localStorage.removeItem('groovelab_user_id');
     localStorage.setItem('groovelab_station_id', stationId);
     window.location.reload();
   };
