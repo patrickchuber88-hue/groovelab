@@ -4644,19 +4644,21 @@ function DeviceSetupScreen({
       return (
         <div style={{
           background: '#f8fafc',
-          border: '2px dashed #e2e8f0',
-          borderRadius: '16px',
-          padding: '12px',
+          border: '2px dashed #cbd5e1',
+          borderRadius: '24px',
+          padding: '16px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          minHeight: '80px',
+          minHeight: '100px',
           color: '#94a3b8',
           fontSize: '0.75rem',
-          fontWeight: 700
+          fontWeight: 800,
+          boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)'
         }}>
-          {defaultName} (inaktiv)
+          <div style={{ opacity: 0.6, fontSize: '1.2rem', marginBottom: '4px' }}>📴</div>
+          {defaultName} (nicht aktiv)
         </div>
       );
     }
@@ -4665,204 +4667,197 @@ function DeviceSetupScreen({
     const isCurrentDevice = localStorage.getItem('groovelab_station_id') === station.id;
 
     return (
-      <div style={{
-        background: 'white',
-        border: `2px solid ${isCurrentDevice ? brandColor : '#e2e8f0'}`,
-        borderRadius: '16px',
-        padding: '12px',
-        minHeight: '80px',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        position: 'relative',
-        boxShadow: isCurrentDevice ? `0 10px 15px -3px ${brandColor}15` : '0 1px 3px rgba(0,0,0,0.05)',
-        transition: 'all 0.2s ease'
-      }}>
+      <div 
+        onClick={async () => {
+          if (isCurrentDevice) return;
+          if (window.confirm(`Möchtest du dieses iPad fest für "${station.name}" konfigurieren?`)) {
+            localStorage.setItem('groovelab_station_id', station.id);
+            window.location.reload();
+          }
+        }}
+        style={{
+          background: isCurrentDevice 
+            ? 'linear-gradient(135deg, #ffffff 0%, #fffbeb 100%)' 
+            : 'white',
+          border: isCurrentDevice 
+            ? `3px solid ${brandColor}` 
+            : '2px solid #f1f5f9',
+          borderRadius: '24px',
+          padding: '16px',
+          minHeight: '110px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          position: 'relative',
+          cursor: isCurrentDevice ? 'default' : 'pointer',
+          boxShadow: isCurrentDevice 
+            ? `0 12px 24px -10px ${brandColor}30, 0 4px 6px -2px ${brandColor}10` 
+            : '0 4px 20px -2px rgba(148, 163, 184, 0.06), 0 2px 4px -1px rgba(148, 163, 184, 0.03)',
+          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+          transform: isCurrentDevice ? 'none' : 'translateY(0px)',
+          userSelect: 'none'
+        }}
+        onMouseEnter={e => {
+          if (!isCurrentDevice) {
+            e.currentTarget.style.transform = 'translateY(-3px)';
+            e.currentTarget.style.borderColor = `${brandColor}40`;
+            e.currentTarget.style.boxShadow = '0 20px 25px -5px rgba(148, 163, 184, 0.1), 0 10px 10px -5px rgba(148, 163, 184, 0.04)';
+          }
+        }}
+        onMouseLeave={e => {
+          if (!isCurrentDevice) {
+            e.currentTarget.style.transform = 'translateY(0px)';
+            e.currentTarget.style.borderColor = '#f1f5f9';
+            e.currentTarget.style.boxShadow = '0 4px 20px -2px rgba(148, 163, 184, 0.06), 0 2px 4px -1px rgba(148, 163, 184, 0.03)';
+          }
+        }}
+      >
         {isCurrentDevice && (
-          <span style={{
+          <div style={{
             position: 'absolute',
-            top: '-8px',
-            right: '12px',
-            background: brandColor,
+            top: '-10px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: `linear-gradient(135deg, ${brandColor} 0%, #f59e0b 100%)`,
             color: 'white',
-            fontSize: '0.55rem',
-            fontWeight: 900,
-            padding: '2px 8px',
-            borderRadius: '10px',
-            letterSpacing: '0.05em',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            fontSize: '0.6rem',
+            fontWeight: 1000,
+            padding: '3px 12px',
+            borderRadius: '20px',
+            boxShadow: `0 4px 8px ${brandColor}40`,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            whiteSpace: 'nowrap',
+            letterSpacing: '0.05em'
           }}>
-            DIESES GERÄT
-          </span>
+            <span>✨</span> DIESES IPAD <span>✨</span>
+          </div>
         )}
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-          <span style={{ fontWeight: 800, fontSize: '0.8rem', color: '#1e293b' }}>
-            {station.name}
-          </span>
-          <span style={{
-            width: '8px',
-            height: '8px',
-            borderRadius: '50%',
-            background: activeSession ? '#10b981' : '#cbd5e1',
-            boxShadow: activeSession ? '0 0 6px #10b981' : 'none'
-          }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '10px',
+              background: isCurrentDevice ? `${brandColor}15` : '#f8fafc',
+              color: isCurrentDevice ? brandColor : '#64748b',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1rem',
+              transition: 'all 0.2s'
+            }}>
+              <Tablet size={16} />
+            </div>
+            <span style={{ fontWeight: 900, fontSize: '0.9rem', color: '#1e293b' }}>
+              {station.name}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{
+              fontSize: '0.65rem',
+              fontWeight: 800,
+              color: activeSession ? '#10b981' : '#64748b',
+              background: activeSession ? '#d1fae5' : '#f1f5f9',
+              padding: '2px 8px',
+              borderRadius: '12px'
+            }}>
+              {activeSession ? 'Besetzt' : 'Frei'}
+            </span>
+          </div>
         </div>
 
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', marginBottom: '6px' }}>
+        <div style={{ 
+          margin: '10px 0', 
+          flex: 1, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          justifyContent: 'center', 
+          background: activeSession ? '#f8fafc' : 'transparent',
+          borderRadius: '16px',
+          padding: activeSession ? '8px 12px' : '0 12px',
+          border: activeSession ? '1px solid #f1f5f9' : 'none'
+        }}>
           {activeSession ? (
-            <div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#334155' }}>
-                {activeSession.profiles?.first_name} {activeSession.profiles?.last_name}
-              </div>
-              <div style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 500 }}>
-                seit {new Date(activeSession.check_in_time).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                backgroundImage: `url(${activeSession.profiles?.photo_url || '/avatar_ghost.jpg'})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundColor: '#cbd5e1',
+                border: '2px solid white',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
+              }} />
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#334155', lineHeight: 1.2 }}>
+                  {activeSession.profiles?.first_name} {activeSession.profiles?.last_name?.charAt(0)}.
+                </div>
+                <div style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 600 }}>
+                  am Üben...
+                </div>
               </div>
             </div>
           ) : (
-            <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700 }}>
-              Frei
+            <span style={{ fontSize: '0.75rem', color: '#cbd5e1', fontWeight: 700, fontStyle: 'italic' }}>
+              Zum Koppeln tippen
             </span>
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: '6px', width: '100%' }}>
-          {activeSession ? (
+        <div style={{ width: '100%' }}>
+          {isCurrentDevice ? (
             <button
-              onClick={async () => {
-                if (window.confirm(`${activeSession.profiles?.first_name} manuell ausbuchen?`)) {
-                  const { error } = await supabase
-                    .from('sessions')
-                    .update({ check_out_time: new Date().toISOString() })
-                    .eq('id', activeSession.id);
-                  if (error) alert("Fehler: " + error.message);
-                  else onUpdate();
-                }
-              }}
-              style={{
-                flex: 1,
-                padding: '6px',
-                borderRadius: '8px',
-                border: 'none',
-                background: '#fee2e2',
-                color: '#ef4444',
-                fontSize: '0.65rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                textAlign: 'center'
-              }}
-            >
-              Ausbuchen
-            </button>
-          ) : (
-            <button
-              onClick={() => setBookingStationId(bookingStationId === station.id ? null : station.id)}
-              style={{
-                flex: 1,
-                padding: '6px',
-                borderRadius: '8px',
-                border: 'none',
-                background: `${brandColor}15`,
-                color: brandColor,
-                fontSize: '0.65rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                textAlign: 'center'
-              }}
-            >
-              {bookingStationId === station.id ? 'Abbrechen' : 'Einbuchen'}
-            </button>
-          )}
-
-          {!isCurrentDevice && (
-            <button
-              onClick={() => {
-                if (window.confirm(`Möchtest du dieses iPad fest als "${station.name}" konfigurieren?`)) {
-                  localStorage.setItem('groovelab_station_id', station.id);
+              onClick={async (e) => {
+                e.stopPropagation();
+                if (window.confirm("Dieses iPad wirklich entkoppeln und in den Mobil-Modus versetzen?")) {
+                  localStorage.removeItem('groovelab_station_id');
                   window.location.reload();
                 }
               }}
-              title="Dieses iPad verknüpfen"
               style={{
-                padding: '6px',
-                borderRadius: '8px',
-                border: '1px solid #e2e8f0',
-                background: 'white',
-                color: '#64748b',
+                width: '100%',
+                padding: '8px',
+                borderRadius: '12px',
+                border: 'none',
+                background: '#fee2e2',
+                color: '#ef4444',
+                fontSize: '0.75rem',
+                fontWeight: 900,
                 cursor: 'pointer',
+                transition: 'all 0.15s',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                width: '26px'
+                gap: '4px'
               }}
+              onMouseEnter={e => e.currentTarget.style.background = '#fecaca'}
+              onMouseLeave={e => e.currentTarget.style.background = '#fee2e2'}
             >
-              <Monitor size={12} />
+              <span>🔌</span> Kopplung aufheben
             </button>
+          ) : (
+            <div style={{
+              width: '100%',
+              padding: '8px',
+              borderRadius: '12px',
+              background: '#f8fafc',
+              border: '1.5px solid #e2e8f0',
+              color: '#64748b',
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              textAlign: 'center',
+              transition: 'all 0.15s'
+            }}>
+              Koppeln
+            </div>
           )}
         </div>
-
-        {bookingStationId === station.id && (
-          <div style={{
-            position: 'absolute',
-            bottom: '42px',
-            left: 0,
-            right: 0,
-            background: 'white',
-            border: '1px solid #e2e8f0',
-            borderRadius: '12px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-            zIndex: 10,
-            padding: '6px',
-            maxHeight: '120px',
-            overflowY: 'auto'
-          }}>
-            <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px', padding: '0 4px' }}>
-              Schüler einbuchen
-            </div>
-            {students
-              .filter(st => !activeSessions.some(as => as.user_id === st.id))
-              .map(st => (
-                <button
-                  key={st.id}
-                  onClick={async () => {
-                    const { error } = await supabase
-                      .from('sessions')
-                      .insert({
-                        user_id: st.id,
-                        station_id: station.id,
-                        check_in_time: new Date().toISOString()
-                      });
-                    if (error) alert("Fehler: " + error.message);
-                    else {
-                      setBookingStationId(null);
-                      onUpdate();
-                    }
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '5px 8px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: 'transparent',
-                    textAlign: 'left',
-                    fontSize: '0.7rem',
-                    fontWeight: 600,
-                    color: '#475569',
-                    cursor: 'pointer'
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                >
-                  {st.first_name} {st.last_name}
-                </button>
-              ))}
-            {students.filter(st => !activeSessions.some(as => as.user_id === st.id)).length === 0 && (
-              <div style={{ fontSize: '0.65rem', color: '#94a3b8', padding: '4px', fontStyle: 'italic' }}>
-                Keine freien Schüler
-              </div>
-            )}
-          </div>
-        )}
       </div>
     );
   };
