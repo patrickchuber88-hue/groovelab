@@ -475,10 +475,10 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       if (activeTab === 'live') {
         const { data: sData } = await supabase
           .from('sessions')
-          .select('*, profiles:users(*), stations(*)')
-          .eq('school_id', adminData.school_id)
+          .select('*, profiles:users!inner(*), stations(*)')
+          .eq('profiles.school_id', adminData.school_id)
           .is('check_out_time', null)
-          .order('start_time', { ascending: false });
+          .order('check_in_time', { ascending: false });
         setActiveSessions(sData || []);
       } else if (activeTab === 'students') {
         const { data: studentsData } = await supabase
@@ -580,6 +580,24 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         setSetupRooms(rData || []);
         const { data: sData } = await supabase.from('stations').select('*, rooms!inner(school_id)').eq('rooms.school_id', adminData.school_id).order('name');
         setSetupStations(sData || []);
+        
+        // Fetch active sessions
+        const { data: activeSessionsData } = await supabase
+          .from('sessions')
+          .select('*, profiles:users!inner(*), stations(*)')
+          .eq('profiles.school_id', adminData.school_id)
+          .is('check_out_time', null)
+          .order('check_in_time', { ascending: false });
+        setActiveSessions(activeSessionsData || []);
+        
+        // Fetch students roster for manual check-in
+        const { data: studentsData } = await supabase
+          .from('users')
+          .select('*')
+          .eq('school_id', adminData.school_id)
+          .eq('role', 'student')
+          .order('first_name');
+        if (studentsData) setStudents(studentsData);
       }
     }
   };
@@ -3214,16 +3232,17 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   );
 
   const renderSetupTab = () => (
-    <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
-      <AcademySetup 
-        school={admin?.schools} 
-        brandColor={brandColor} 
-        onUpdate={() => fetchData()} 
-        onCleanupPlanning={handleCleanupPlanning}
-        onResetPlanning={handleResetAllPlanning}
-      />
-      <DeviceSetupScreen rooms={rooms} stations={stations} brandColor={brandColor} />
-    </div>
+    <DeviceSetupScreen 
+      rooms={setupRooms} 
+      stations={setupStations} 
+      brandColor={brandColor} 
+      activeSessions={activeSessions}
+      students={students}
+      school={admin?.schools}
+      onUpdate={() => fetchData()}
+      onCleanupPlanning={handleCleanupPlanning}
+      onResetPlanning={handleResetAllPlanning}
+    />
   );
 
   const renderStudentDetailModal = () => {
@@ -3700,6 +3719,55 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                       <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#475569' }}>Konto aktiv</span>
                     </div>
                     <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>Registriert seit: {new Date(selectedStudent.created_at).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+                    
+                    {/* Toggle Messages Sidebar Menu */}
+                    <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span style={{ fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>Nachrichten-Menü</span>
+                        <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 500 }}>Sidebar-Tab für Schüler aktivieren</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const newValue = selectedStudent.show_messages_menu !== false ? false : true;
+                          const updatedStudent = { ...selectedStudent, show_messages_menu: newValue };
+                          setSelectedStudent(updatedStudent);
+                          setStudents(prev => prev.map(s => s.id === selectedStudent.id ? updatedStudent : s));
+                          
+                          const { error } = await supabase
+                            .from('users')
+                            .update({ show_messages_menu: newValue })
+                            .eq('id', selectedStudent.id);
+                            
+                          if (error) {
+                            alert("Fehler beim Speichern: " + error.message);
+                          }
+                        }}
+                        style={{
+                          width: '46px',
+                          height: '24px',
+                          borderRadius: '12px',
+                          background: selectedStudent.show_messages_menu !== false ? brandColor : '#cbd5e1',
+                          border: 'none',
+                          cursor: 'pointer',
+                          position: 'relative',
+                          padding: '2px',
+                          transition: 'background-color 0.2s ease',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <div style={{
+                          width: '20px',
+                          height: '20px',
+                          borderRadius: '50%',
+                          background: 'white',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                          transform: selectedStudent.show_messages_menu !== false ? 'translateX(22px)' : 'translateX(0px)',
+                          transition: 'transform 0.2s ease'
+                        }} />
+                      </button>
+                    </div>
                   </div>
                 </section>
 
@@ -4482,19 +4550,32 @@ function IDGallery({ users, brandColor, onShowQR }: { users: any[], brandColor: 
   );
 }
 
-function AcademySetup({ 
-  school, 
+function DeviceSetupScreen({ 
+  rooms, 
+  stations, 
   brandColor, 
+  activeSessions, 
+  students, 
+  school,
   onUpdate,
   onCleanupPlanning,
   onResetPlanning
 }: { 
-  school: any, 
+  rooms: any[], 
+  stations: any[], 
   brandColor: string, 
+  activeSessions: any[], 
+  students: any[], 
+  school: any,
   onUpdate: () => void,
   onCleanupPlanning: () => void,
   onResetPlanning: () => void
 }) {
+  const [activeSubTab, setActiveSubTab] = useState<'academy' | 'device' | 'maintenance'>('device');
+  const [selectedRoomId, setSelectedRoomId] = useState(() => rooms[0]?.id || '');
+  const [bookingStationId, setBookingStationId] = useState<string | null>(null);
+
+  // Academy Setup state
   const [name, setName] = useState(school?.name || '');
   const [lat, setLat] = useState(school?.latitude?.toString() || '');
   const [lng, setLng] = useState(school?.longitude?.toString() || '');
@@ -4510,6 +4591,12 @@ function AcademySetup({
   });
   const [isSaving, setIsSaving] = useState(false);
 
+  useEffect(() => {
+    if (rooms.length > 0 && !selectedRoomId) {
+      setSelectedRoomId(rooms[0].id);
+    }
+  }, [rooms, selectedRoomId]);
+
   const days = [
     { id: 'monday', label: 'Montag' },
     { id: 'tuesday', label: 'Dienstag' },
@@ -4520,7 +4607,7 @@ function AcademySetup({
     { id: 'sunday', label: 'Sonntag' }
   ];
 
-  const handleSave = async () => {
+  const handleSaveAcademy = async () => {
     setIsSaving(true);
     const { error } = await supabase
       .from('schools')
@@ -4538,302 +4625,676 @@ function AcademySetup({
     else onUpdate();
   };
 
-  return (
-    <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
-        <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: `${brandColor}10`, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Shield size={24} />
-        </div>
-        <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b' }}>Akademie-Einstellungen</h2>
-          <p style={{ fontSize: '0.875rem', color: '#64748b' }}>Globaler Name und Betriebszeiten für dein Groovelab.</p>
-        </div>
-      </div>
+  const roomStations = stations.filter(s => s.room_id === selectedRoomId);
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 100px', gap: '20px', alignItems: 'flex-end' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>Akademie Name</label>
-            <input 
-              value={name} 
-              onChange={e => setName(e.target.value)}
-              style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600, fontSize: '1rem' }}
-            />
-          </div>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>Latitude</label>
-            <input 
-              value={lat} 
-              onChange={e => setLat(e.target.value)}
-              placeholder="z.B. 47.567"
-              style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600, fontSize: '1rem' }}
-            />
-          </div>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>Longitude</label>
-            <input 
-              value={lng} 
-              onChange={e => setLng(e.target.value)}
-              placeholder="z.B. 7.796"
-              style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600, fontSize: '1rem' }}
-            />
-          </div>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>Radius (m)</label>
-            <input 
-              value={radius} 
-              onChange={e => setRadius(e.target.value)}
-              type="number"
-              style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600, fontSize: '1rem' }}
-            />
-          </div>
-        </div>
-
-        <div>
-          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '16px' }}>Öffnungszeiten</label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '600px' }}>
-            {days.map(day => (
-              <div key={day.id} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 1fr 100px', alignItems: 'center', gap: '16px', padding: '12px', background: hours[day.id]?.active ? '#f8fafc' : 'transparent', borderRadius: '12px', opacity: hours[day.id]?.active ? 1 : 0.5 }}>
-                <div style={{ fontWeight: 700, color: '#1e293b' }}>{day.label}</div>
-                <input 
-                  type="time" 
-                  value={hours[day.id]?.start || '08:00'} 
-                  disabled={!hours[day.id]?.active}
-                  onChange={e => setHours({...hours, [day.id]: {...(hours[day.id] || {}), start: e.target.value}})}
-                  style={{ padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600 }}
-                />
-                <input 
-                  type="time" 
-                  value={hours[day.id]?.end || '20:00'} 
-                  disabled={!hours[day.id]?.active}
-                  onChange={e => setHours({...hours, [day.id]: {...(hours[day.id] || {}), end: e.target.value}})}
-                  style={{ padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600 }}
-                />
-                <button 
-                  onClick={() => setHours({...hours, [day.id]: {...(hours[day.id] || {}), active: !hours[day.id]?.active}})}
-                  style={{ padding: '8px', borderRadius: '8px', border: 'none', background: hours[day.id]?.active ? '#fee2e2' : '#dcfce7', color: hours[day.id]?.active ? '#ef4444' : '#10b981', fontWeight: 800, fontSize: '0.7rem', cursor: 'pointer' }}
-                >
-                  {hours[day.id]?.active ? 'GESCHL.' : 'OFFEN'}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ marginTop: '16px', padding: '24px', background: '#f8fafc', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
-          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '16px' }}>Login-Sicherheit & Geofencing</label>
-          <div style={{ display: 'flex', gap: '24px' }}>
-            <button 
-              onClick={() => setHours({ ...hours, enforce_hours: true })}
-              style={{ 
-                flex: 1,
-                padding: '16px',
-                borderRadius: '16px',
-                border: `2px solid ${hours.enforce_hours !== false ? brandColor : '#e2e8f0'}`,
-                background: hours.enforce_hours !== false ? `${brandColor}05` : 'white',
-                cursor: 'pointer',
-                textAlign: 'left'
-              }}
-            >
-              <div style={{ fontWeight: 800, color: hours.enforce_hours !== false ? brandColor : '#1e293b', marginBottom: '4px' }}>Strikte Öffnungszeiten</div>
-              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Labor-Login mit Geotracking NUR innerhalb der Öffnungszeiten erlaubt.</div>
-            </button>
-            <button 
-              onClick={() => setHours({ ...hours, enforce_hours: false })}
-              style={{ 
-                flex: 1,
-                padding: '16px',
-                borderRadius: '16px',
-                border: `2px solid ${hours.enforce_hours === false ? brandColor : '#e2e8f0'}`,
-                background: hours.enforce_hours === false ? `${brandColor}05` : 'white',
-                cursor: 'pointer',
-                textAlign: 'left'
-              }}
-            >
-              <div style={{ fontWeight: 800, color: hours.enforce_hours === false ? brandColor : '#1e293b', marginBottom: '4px' }}>Flexible Öffnungszeiten</div>
-              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Labor-Login mit Geotracking AUCH außerhalb der Öffnungszeiten erlaubt.</div>
-            </button>
-          </div>
-        </div>
-
-        <button 
-          onClick={handleSave}
-          disabled={isSaving}
-          style={{ 
-            width: 'fit-content',
-            background: brandColor, 
-            color: 'white', 
-            border: 'none', 
-            padding: '14px 32px', 
-            borderRadius: '12px', 
-            fontWeight: 800, 
-            cursor: 'pointer',
-            opacity: isSaving ? 0.7 : 1
-          }}
-        >
-          {isSaving ? 'Speichere...' : 'Einstellungen speichern'}
-        </button>
-
-        <div style={{ marginTop: '48px', padding: '24px', background: '#fef2f2', borderRadius: '24px', border: '1px solid #fee2e2' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#ef4444', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <AlertCircle size={18} /> Systemwartung
-          </h3>
-          <p style={{ fontSize: '0.85rem', color: '#991b1b', marginBottom: '16px' }}>
-            Hier kannst du Datenleichen entfernen und die Datenbank konsistent halten.
-          </p>
-          <button 
-            onClick={onCleanupPlanning}
-            style={{ background: 'white', border: '1px solid #fee2e2', color: '#ef4444', padding: '10px 20px', borderRadius: '12px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s' }}
-            onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
-            onMouseLeave={e => e.currentTarget.style.background = 'white'}
-          >
-            Wochenplan bereinigen (Datenleichen entfernen)
-          </button>
-          <button 
-            onClick={onResetPlanning}
-            style={{ marginLeft: '12px', background: 'white', border: '1px solid #fee2e2', color: '#ef4444', padding: '10px 20px', borderRadius: '12px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s' }}
-            onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
-            onMouseLeave={e => e.currentTarget.style.background = 'white'}
-          >
-            Wochenplan komplett leeren
-          </button>
-          <button 
-            onClick={async () => {
-              if (window.confirm("Möchtest du die Übe-Statistik (eingeloggte Minuten) wirklich für alle Schüler zurücksetzen?")) {
-                setIsSaving(true);
-                const updatedHours = {
-                  ...hours,
-                  stats_reset_at: new Date().toISOString()
-                };
-                const { error } = await supabase
-                  .from('schools')
-                  .update({ opening_hours: updatedHours })
-                  .eq('id', school.id);
-                setIsSaving(false);
-                if (error) alert("Fehler: " + error.message);
-                else {
-                  setHours(updatedHours);
-                  alert("Statistiken erfolgreich zurückgesetzt!");
-                  onUpdate();
-                }
-              }
-            }}
-            style={{ marginLeft: '12px', background: 'white', border: '1px solid #fee2e2', color: '#ef4444', padding: '10px 20px', borderRadius: '12px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s' }}
-            onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
-            onMouseLeave={e => e.currentTarget.style.background = 'white'}
-          >
-            Übe-Statistiken zurücksetzen
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DeviceSetupScreen({ rooms, stations, brandColor }: { rooms: any[], stations: any[], brandColor: string }) {
-  const [selectedRoomId, setSelectedRoomId] = useState('');
-  const [selectedStationId, setSelectedStationId] = useState(() => localStorage.getItem('groovelab_station_id') || '');
-  const [isSaved, setIsSaved] = useState(false);
-
-  const handleSave = () => {
-    if (selectedStationId) {
-      localStorage.setItem('groovelab_station_id', selectedStationId);
-      setIsSaved(true);
-      setTimeout(() => setIsSaved(false), 3000);
-      window.location.reload(); // Reload to apply station mode
-    }
+  const getStationByNumber = (num: number) => {
+    return roomStations.find(s => {
+      const name = s.name.toLowerCase();
+      return name === `ipad ${num}` || name === `ipad${num}`;
+    });
   };
 
-  const currentStation = stations.find(s => s.id === selectedStationId);
+  const lehrerStation = roomStations.find(s => {
+    const name = s.name.toLowerCase();
+    return name.includes('lehrer') || name.includes('teacher');
+  });
 
-  return (
-    <div style={{ marginTop: '24px' }}>
-      <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#f8fafc', color: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e2e8f0' }}>
-            <Monitor size={24} />
-          </div>
-          <div>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b' }}>Geräte-Setup</h2>
-            <p style={{ fontSize: '0.875rem', color: '#64748b' }}>Konfiguriere dieses iPad als festen Groovelab-Arbeitsplatz.</p>
-          </div>
+  const renderStationCell = (station: any, defaultName: string, isLarge = false) => {
+    if (!station) {
+      return (
+        <div style={{
+          background: '#f8fafc',
+          border: '2px dashed #e2e8f0',
+          borderRadius: '16px',
+          padding: '12px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '80px',
+          color: '#94a3b8',
+          fontSize: '0.75rem',
+          fontWeight: 700
+        }}>
+          {defaultName} (inaktiv)
         </div>
-        
-        <div style={{ maxWidth: '600px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <div style={{ padding: '24px', borderRadius: '20px', border: '1px solid #f1f5f9', background: '#f8fafc' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Box size={18} color={brandColor} /> Standort auswählen
-            </h3>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>Raum</label>
-                <select 
-                  value={selectedRoomId} 
-                  onChange={e => setSelectedRoomId(e.target.value)}
-                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600 }}
-                >
-                  <option value="">Bitte Raum wählen...</option>
-                  {rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                </select>
+      );
+    }
+
+    const activeSession = activeSessions.find(s => s.station_id === station.id);
+    const isCurrentDevice = localStorage.getItem('groovelab_station_id') === station.id;
+
+    return (
+      <div style={{
+        background: 'white',
+        border: `2px solid ${isCurrentDevice ? brandColor : '#e2e8f0'}`,
+        borderRadius: '16px',
+        padding: '12px',
+        minHeight: '80px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        position: 'relative',
+        boxShadow: isCurrentDevice ? `0 10px 15px -3px ${brandColor}15` : '0 1px 3px rgba(0,0,0,0.05)',
+        transition: 'all 0.2s ease'
+      }}>
+        {isCurrentDevice && (
+          <span style={{
+            position: 'absolute',
+            top: '-8px',
+            right: '12px',
+            background: brandColor,
+            color: 'white',
+            fontSize: '0.55rem',
+            fontWeight: 900,
+            padding: '2px 8px',
+            borderRadius: '10px',
+            letterSpacing: '0.05em',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          }}>
+            DIESES GERÄT
+          </span>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+          <span style={{ fontWeight: 800, fontSize: '0.8rem', color: '#1e293b' }}>
+            {station.name}
+          </span>
+          <span style={{
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            background: activeSession ? '#10b981' : '#cbd5e1',
+            boxShadow: activeSession ? '0 0 6px #10b981' : 'none'
+          }} />
+        </div>
+
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', marginBottom: '6px' }}>
+          {activeSession ? (
+            <div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#334155' }}>
+                {activeSession.profiles?.first_name} {activeSession.profiles?.last_name}
               </div>
-
-              {selectedRoomId && (
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>iPad Station</label>
-                  <select 
-                    value={selectedStationId} 
-                    onChange={e => setSelectedStationId(e.target.value)}
-                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600 }}
-                  >
-                    <option value="">Bitte iPad wählen...</option>
-                    {stations.filter(s => s.room_id === selectedRoomId).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    <option value="skip">Keine feste Station (Mobil-Modus)</option>
-                  </select>
-                </div>
-              )}
+              <div style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 500 }}>
+                seit {new Date(activeSession.check_in_time).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr
+              </div>
             </div>
-          </div>
+          ) : (
+            <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700 }}>
+              Frei
+            </span>
+          )}
+        </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <button 
-              onClick={handleSave}
-              disabled={!selectedStationId}
-              style={{ 
+        <div style={{ display: 'flex', gap: '6px', width: '100%' }}>
+          {activeSession ? (
+            <button
+              onClick={async () => {
+                if (window.confirm(`${activeSession.profiles?.first_name} manuell ausbuchen?`)) {
+                  const { error } = await supabase
+                    .from('sessions')
+                    .update({ check_out_time: new Date().toISOString() })
+                    .eq('id', activeSession.id);
+                  if (error) alert("Fehler: " + error.message);
+                  else onUpdate();
+                }
+              }}
+              style={{
                 flex: 1,
-                background: isSaved ? '#10b981' : brandColor, 
-                color: 'white', 
-                border: 'none', 
-                padding: '16px', 
-                borderRadius: '16px', 
-                fontWeight: 800, 
-                fontSize: '1rem',
+                padding: '6px',
+                borderRadius: '8px',
+                border: 'none',
+                background: '#fee2e2',
+                color: '#ef4444',
+                fontSize: '0.65rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                textAlign: 'center'
+              }}
+            >
+              Ausbuchen
+            </button>
+          ) : (
+            <button
+              onClick={() => setBookingStationId(bookingStationId === station.id ? null : station.id)}
+              style={{
+                flex: 1,
+                padding: '6px',
+                borderRadius: '8px',
+                border: 'none',
+                background: `${brandColor}15`,
+                color: brandColor,
+                fontSize: '0.65rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                textAlign: 'center'
+              }}
+            >
+              {bookingStationId === station.id ? 'Abbrechen' : 'Einbuchen'}
+            </button>
+          )}
+
+          {!isCurrentDevice && (
+            <button
+              onClick={() => {
+                if (window.confirm(`Möchtest du dieses iPad fest als "${station.name}" konfigurieren?`)) {
+                  localStorage.setItem('groovelab_station_id', station.id);
+                  window.location.reload();
+                }
+              }}
+              title="Dieses iPad verknüpfen"
+              style={{
+                padding: '6px',
+                borderRadius: '8px',
+                border: '1px solid #e2e8f0',
+                background: 'white',
+                color: '#64748b',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '8px',
-                opacity: selectedStationId ? 1 : 0.5,
-                transition: 'all 0.3s'
+                width: '26px'
               }}
             >
-              {isSaved ? 'Gespeichert! ✓' : 'Konfiguration speichern'}
+              <Monitor size={12} />
             </button>
-            <button 
-              onClick={() => { localStorage.removeItem('groovelab_station_id'); window.location.reload(); }}
-              style={{ background: 'white', border: '1px solid #e2e8f0', padding: '16px', borderRadius: '16px', color: '#ef4444', fontWeight: 700, cursor: 'pointer' }}
-            >
-              Reset
-            </button>
-          </div>
-
-          {currentStation && (
-            <div style={{ marginTop: '16px', padding: '20px', borderRadius: '16px', background: '#f0fdf4', border: '1px solid #dcfce7', color: '#166534', fontSize: '0.875rem' }}>
-              <strong>Aktueller Modus:</strong> Dieses Gerät ist als <strong>{currentStation.name}</strong> konfiguriert und wird beim Scannen eines Schüler-QR-Codes automatisch diesen Platz belegen.
-            </div>
           )}
         </div>
+
+        {bookingStationId === station.id && (
+          <div style={{
+            position: 'absolute',
+            bottom: '42px',
+            left: 0,
+            right: 0,
+            background: 'white',
+            border: '1px solid #e2e8f0',
+            borderRadius: '12px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+            zIndex: 10,
+            padding: '6px',
+            maxHeight: '120px',
+            overflowY: 'auto'
+          }}>
+            <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px', padding: '0 4px' }}>
+              Schüler einbuchen
+            </div>
+            {students
+              .filter(st => !activeSessions.some(as => as.user_id === st.id))
+              .map(st => (
+                <button
+                  key={st.id}
+                  onClick={async () => {
+                    const { error } = await supabase
+                      .from('sessions')
+                      .insert({
+                        user_id: st.id,
+                        station_id: station.id,
+                        check_in_time: new Date().toISOString()
+                      });
+                    if (error) alert("Fehler: " + error.message);
+                    else {
+                      setBookingStationId(null);
+                      onUpdate();
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '5px 8px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: 'transparent',
+                    textAlign: 'left',
+                    fontSize: '0.7rem',
+                    fontWeight: 600,
+                    color: '#475569',
+                    cursor: 'pointer'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  {st.first_name} {st.last_name}
+                </button>
+              ))}
+            {students.filter(st => !activeSessions.some(as => as.user_id === st.id)).length === 0 && (
+              <div style={{ fontSize: '0.65rem', color: '#94a3b8', padding: '4px', fontStyle: 'italic' }}>
+                Keine freien Schüler
+              </div>
+            )}
+          </div>
+        )}
       </div>
+    );
+  };
+
+  return (
+    <div style={{ marginTop: '24px' }}>
+      {/* Premium sub-tab navigation */}
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', background: '#f1f5f9', padding: '6px', borderRadius: '16px', width: 'fit-content' }}>
+        <button
+          onClick={() => setActiveSubTab('device')}
+          style={{
+            padding: '10px 20px',
+            borderRadius: '12px',
+            border: 'none',
+            background: activeSubTab === 'device' ? 'white' : 'transparent',
+            color: activeSubTab === 'device' ? '#1e293b' : '#64748b',
+            fontWeight: 800,
+            fontSize: '0.85rem',
+            cursor: 'pointer',
+            boxShadow: activeSubTab === 'device' ? '0 4px 6px -1px rgba(0,0,0,0.05)' : 'none',
+            transition: 'all 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <Monitor size={16} /> Geräte-Setup
+        </button>
+        <button
+          onClick={() => setActiveSubTab('academy')}
+          style={{
+            padding: '10px 20px',
+            borderRadius: '12px',
+            border: 'none',
+            background: activeSubTab === 'academy' ? 'white' : 'transparent',
+            color: activeSubTab === 'academy' ? '#1e293b' : '#64748b',
+            fontWeight: 800,
+            fontSize: '0.85rem',
+            cursor: 'pointer',
+            boxShadow: activeSubTab === 'academy' ? '0 4px 6px -1px rgba(0,0,0,0.05)' : 'none',
+            transition: 'all 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <Shield size={16} /> Akademie-Einstellungen
+        </button>
+        <button
+          onClick={() => setActiveSubTab('maintenance')}
+          style={{
+            padding: '10px 20px',
+            borderRadius: '12px',
+            border: 'none',
+            background: activeSubTab === 'maintenance' ? 'white' : 'transparent',
+            color: activeSubTab === 'maintenance' ? '#1e293b' : '#64748b',
+            fontWeight: 800,
+            fontSize: '0.85rem',
+            cursor: 'pointer',
+            boxShadow: activeSubTab === 'maintenance' ? '0 4px 6px -1px rgba(0,0,0,0.05)' : 'none',
+            transition: 'all 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <AlertCircle size={16} /> Systemwartung
+        </button>
+      </div>
+
+      {/* Subtab 1: Geräte-Setup (Classroom grid kiosk view) */}
+      {activeSubTab === 'device' && (
+        <div className="glass-panel" style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <div>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Räumliche Kiosk-Übersicht</h2>
+              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '2px 0 0 0' }}>Manuelle Umbuchungen & Echtzeit-iPad-Platzierungen vornehmen.</p>
+            </div>
+            
+            {/* iPad local configuration reset */}
+            {localStorage.getItem('groovelab_station_id') && (
+              <button 
+                onClick={() => {
+                  if (window.confirm("Dieses Gerät wirklich entkoppeln und in den Mobil-Modus versetzen?")) {
+                    localStorage.removeItem('groovelab_station_id'); 
+                    window.location.reload(); 
+                  }
+                }}
+                style={{ 
+                  background: '#fee2e2', 
+                  border: 'none', 
+                  padding: '10px 18px', 
+                  borderRadius: '12px', 
+                  color: '#ef4444', 
+                  fontWeight: 800, 
+                  fontSize: '0.8rem',
+                  cursor: 'pointer' 
+                }}
+              >
+                Geräte-Kopplung aufheben
+              </button>
+            )}
+          </div>
+
+          {/* Room Selector Tab Bar */}
+          {rooms.length > 1 && (
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+              {rooms.map(r => (
+                <button
+                  key={r.id}
+                  onClick={() => setSelectedRoomId(r.id)}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: selectedRoomId === r.id ? brandColor : '#f1f5f9',
+                    color: selectedRoomId === r.id ? 'white' : '#64748b',
+                    fontWeight: 700,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {r.name}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Seating Layout Grid */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: '12px',
+            background: '#f8fafc',
+            padding: '16px',
+            borderRadius: '20px',
+            border: '1px solid #f1f5f9',
+            maxWidth: '900px',
+            margin: '0 auto'
+          }}>
+            {/* Row 1: iPads 3, 4, 5, 6 */}
+            {renderStationCell(getStationByNumber(3), 'iPad 3')}
+            {renderStationCell(getStationByNumber(4), 'iPad 4')}
+            {renderStationCell(getStationByNumber(5), 'iPad 5')}
+            {renderStationCell(getStationByNumber(6), 'iPad 6')}
+
+            {/* Row 2: iPad 2, Lehrer-iPad (spans 2 columns), iPad 7 */}
+            {renderStationCell(getStationByNumber(2), 'iPad 2')}
+            <div style={{ gridColumn: 'span 2' }}>
+              {renderStationCell(lehrerStation, 'Lehrer-iPad', true)}
+            </div>
+            {renderStationCell(getStationByNumber(7), 'iPad 7')}
+
+            {/* Mittelgang Divider */}
+            <div style={{
+              gridColumn: 'span 4',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '4px 0',
+              color: '#94a3b8',
+              fontSize: '0.7rem',
+              fontWeight: 800,
+              textTransform: 'uppercase',
+              letterSpacing: '0.25em',
+              borderTop: '1px dashed #e2e8f0',
+              borderBottom: '1px dashed #e2e8f0',
+              margin: '2px 0',
+              userSelect: 'none'
+            }}>
+              ↕ Mittelgang ↕
+            </div>
+
+            {/* Row 3: iPad 1, empty space (entrance), iPad 8 */}
+            {renderStationCell(getStationByNumber(1), 'iPad 1')}
+            <div style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 600 }}>
+              Eingang
+            </div>
+            {renderStationCell(getStationByNumber(8), 'iPad 8')}
+          </div>
+        </div>
+      )}
+
+      {/* Subtab 2: Akademie-Einstellungen */}
+      {activeSubTab === 'academy' && (
+        <div className="glass-panel" style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: `${brandColor}10`, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Shield size={20} />
+            </div>
+            <div>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Akademie-Einstellungen</h2>
+              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '2px 0 0 0' }}>Globaler Name und Betriebszeiten für dein Groovelab.</p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 100px', gap: '16px', alignItems: 'flex-end' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '6px' }}>Akademie Name</label>
+                <input 
+                  value={name} 
+                  onChange={e => setName(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600, fontSize: '0.9rem' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '6px' }}>Latitude</label>
+                <input 
+                  value={lat} 
+                  onChange={e => setLat(e.target.value)}
+                  placeholder="z.B. 47.567"
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600, fontSize: '0.9rem' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '6px' }}>Longitude</label>
+                <input 
+                  value={lng} 
+                  onChange={e => setLng(e.target.value)}
+                  placeholder="z.B. 7.796"
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600, fontSize: '0.9rem' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '6px' }}>Radius (m)</label>
+                <input 
+                  value={radius} 
+                  onChange={e => setRadius(e.target.value)}
+                  type="number"
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600, fontSize: '0.9rem' }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '12px' }}>Öffnungszeiten</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '600px' }}>
+                {days.map(day => (
+                  <div key={day.id} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 1fr 100px', alignItems: 'center', gap: '12px', padding: '8px 12px', background: hours[day.id]?.active ? '#f8fafc' : 'transparent', borderRadius: '10px', opacity: hours[day.id]?.active ? 1 : 0.5 }}>
+                    <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.85rem' }}>{day.label}</div>
+                    <input 
+                      type="time" 
+                      value={hours[day.id]?.start || '08:00'} 
+                      disabled={!hours[day.id]?.active}
+                      onChange={e => setHours({...hours, [day.id]: {...(hours[day.id] || {}), start: e.target.value}})}
+                      style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600, fontSize: '0.85rem' }}
+                    />
+                    <input 
+                      type="time" 
+                      value={hours[day.id]?.end || '20:00'} 
+                      disabled={!hours[day.id]?.active}
+                      onChange={e => setHours({...hours, [day.id]: {...(hours[day.id] || {}), end: e.target.value}})}
+                      style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600, fontSize: '0.85rem' }}
+                    />
+                    <button 
+                      onClick={() => setHours({...hours, [day.id]: {...(hours[day.id] || {}), active: !hours[day.id]?.active}})}
+                      style={{ padding: '6px', borderRadius: '8px', border: 'none', background: hours[day.id]?.active ? '#fee2e2' : '#dcfce7', color: hours[day.id]?.active ? '#ef4444' : '#10b981', fontWeight: 800, fontSize: '0.65rem', cursor: 'pointer' }}
+                    >
+                      {hours[day.id]?.active ? 'GESCHL.' : 'OFFEN'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+              <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '10px' }}>Login-Sicherheit & Geofencing</label>
+              <div style={{ display: 'flex', gap: '16px' }}>
+                <button 
+                  onClick={() => setHours({ ...hours, enforce_hours: true })}
+                  style={{ 
+                    flex: 1,
+                    padding: '12px',
+                    borderRadius: '12px',
+                    border: `2px solid ${hours.enforce_hours !== false ? brandColor : '#e2e8f0'}`,
+                    background: hours.enforce_hours !== false ? `${brandColor}05` : 'white',
+                    cursor: 'pointer',
+                    textAlign: 'left'
+                  }}
+                >
+                  <div style={{ fontWeight: 800, fontSize: '0.85rem', color: hours.enforce_hours !== false ? brandColor : '#1e293b', marginBottom: '2px' }}>Strikte Öffnungszeiten</div>
+                  <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Labor-Login mit Geotracking NUR innerhalb der Öffnungszeiten erlaubt.</div>
+                </button>
+                <button 
+                  onClick={() => setHours({ ...hours, enforce_hours: false })}
+                  style={{ 
+                    flex: 1,
+                    padding: '12px',
+                    borderRadius: '12px',
+                    border: `2px solid ${hours.enforce_hours === false ? brandColor : '#e2e8f0'}`,
+                    background: hours.enforce_hours === false ? `${brandColor}05` : 'white',
+                    cursor: 'pointer',
+                    textAlign: 'left'
+                  }}
+                >
+                  <div style={{ fontWeight: 800, fontSize: '0.85rem', color: hours.enforce_hours === false ? brandColor : '#1e293b', marginBottom: '2px' }}>Flexible Öffnungszeiten</div>
+                  <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Labor-Login mit Geotracking AUCH außerhalb der Öffnungszeiten erlaubt.</div>
+                </button>
+              </div>
+            </div>
+
+            <button 
+              onClick={handleSaveAcademy}
+              disabled={isSaving}
+              style={{ 
+                width: 'fit-content',
+                background: brandColor, 
+                color: 'white', 
+                border: 'none', 
+                padding: '12px 28px', 
+                borderRadius: '10px', 
+                fontWeight: 800, 
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                opacity: isSaving ? 0.7 : 1
+              }}
+            >
+              {isSaving ? 'Speichere...' : 'Einstellungen speichern'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Subtab 3: Systemwartung */}
+      {activeSubTab === 'maintenance' && (
+        <div className="glass-panel" style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#fee2e2', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <AlertCircle size={20} />
+            </div>
+            <div>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#ef4444', margin: 0 }}>Systemwartung & Bereinigung</h2>
+              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '2px 0 0 0' }}>Hier kannst du Datenleichen entfernen und die Datenbank konsistent halten.</p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b' }}>Wochenplan bereinigen</div>
+              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Entfernt inaktive Daten und synchronisiert Rosteinträge, um Dateileichen aus der Scheduler-Tabelle zu entfernen.</div>
+              <button 
+                onClick={onCleanupPlanning}
+                style={{ 
+                  width: 'fit-content',
+                  background: 'white', 
+                  border: '1px solid #fee2e2', 
+                  color: '#ef4444', 
+                  padding: '10px 18px', 
+                  borderRadius: '10px', 
+                  fontWeight: 700, 
+                  fontSize: '0.8rem', 
+                  cursor: 'pointer',
+                  transition: 'all 0.15s'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
+                onMouseLeave={e => e.currentTarget.style.background = 'white'}
+              >
+                Wochenplan bereinigen (Datenleichen entfernen)
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b' }}>Wochenplan komplett leeren</div>
+              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Versetzt den Scheduler für alle Schüler in den Ausgangszustand und löscht alle eingetragenen Zeitslots. Dieser Schritt kann nicht rückgängig gemacht werden!</div>
+              <button 
+                onClick={onResetPlanning}
+                style={{ 
+                  width: 'fit-content',
+                  background: 'white', 
+                  border: '1px solid #fee2e2', 
+                  color: '#ef4444', 
+                  padding: '10px 18px', 
+                  borderRadius: '10px', 
+                  fontWeight: 700, 
+                  fontSize: '0.8rem', 
+                  cursor: 'pointer',
+                  transition: 'all 0.15s'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
+                onMouseLeave={e => e.currentTarget.style.background = 'white'}
+              >
+                Wochenplan komplett leeren
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b' }}>Übe-Statistiken zurücksetzen</div>
+              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Setzt die aufgezeichneten Minuten und Übezeiten für alle Schülerprofile auf 0 zurück. Nützlich zum Beginn eines neuen Semesters.</div>
+              <button 
+                onClick={async () => {
+                  if (window.confirm("Möchtest du die Übe-Statistik (eingeloggte Minuten) wirklich für alle Schüler zurücksetzen?")) {
+                    setIsSaving(true);
+                    const updatedHours = {
+                      ...hours,
+                      stats_reset_at: new Date().toISOString()
+                    };
+                    const { error } = await supabase
+                      .from('schools')
+                      .update({ opening_hours: updatedHours })
+                      .eq('id', school.id);
+                    setIsSaving(false);
+                    if (error) alert("Fehler: " + error.message);
+                    else {
+                      setHours(updatedHours);
+                      alert("Statistiken erfolgreich zurückgesetzt!");
+                      onUpdate();
+                    }
+                  }
+                }}
+                style={{ 
+                  width: 'fit-content',
+                  background: 'white', 
+                  border: '1px solid #fee2e2', 
+                  color: '#ef4444', 
+                  padding: '10px 18px', 
+                  borderRadius: '10px', 
+                  fontWeight: 700, 
+                  fontSize: '0.8rem', 
+                  cursor: 'pointer',
+                  transition: 'all 0.15s'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
+                onMouseLeave={e => e.currentTarget.style.background = 'white'}
+              >
+                Übe-Statistiken zurücksetzen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
