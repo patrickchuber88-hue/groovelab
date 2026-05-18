@@ -1245,18 +1245,9 @@ function App() {
           
           const mySlot = (form.members || []).find((m: any) => m.user_id === user.id);
           if (mySlot) {
-            // Leader Logic: Sort members by created_at to find the first one who completed it
-            const sortedMembers = [...(form.members || [])].sort((a, b) => 
-              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-            );
-            const leader = sortedMembers[0];
-            const isLeader = leader?.user_id === user.id;
-
-            // Only trigger this founding dialog for the selected leader
-            if (!isLeader) {
-              console.log('[AutoTrigger] Current user is not the leader. Skipping popup for non-leader.');
-              continue;
-            }
+            // Leader Logic: The active member who reloads or loads the page first is designated as the leader!
+            const isLeader = true;
+            const leader = mySlot;
 
             // 1. Check if we already have a band for this song/group locally to avoid re-triggering
             const alreadyHaveBand = userBands.some((b: any) => 
@@ -2764,18 +2755,8 @@ function App() {
           .eq('formation_group', groupID);
           
         if (groupData && groupData.length > 0) {
-          // Identify the true leader (first one who completed it)
-          const sorted = [...groupData].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-          const actualLeaderId = sorted[0].user_id;
-
-          // If current user is NOT the leader, they shouldn't be founding it (double check)
-          if (actualLeaderId !== user.id) {
-            console.warn('[Founding] Non-leader tried to found band. Cancelling.');
-            setPendingFounding(null);
-            setSuggestingSkill(null);
-            setSelectedCoachId('');
-            return;
-          }
+           // The active user founding the band is the designated leader.
+           const actualLeaderId = user.id;
 
           formationMembers = groupData.map((d: any) => ({
             user_id: d.user_id,
@@ -4838,7 +4819,7 @@ function App() {
                                   new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
                                 );
                                 const leader = sortedMembers[0];
-                                const isLeader = leader?.user_id === user?.id;
+                                const isLeader = (form?.members || []).some((m: any) => m?.user_id === user?.id);
 
                                 const mySkill = userSongs.find(us => us.song_id === song.song_id && (us.difficulty_level || 'original') === song.level);
                                 const canJoin = mySkill && !isMySlot && !form.memberMap[mySkill.instrument] && !form.isComplete;
