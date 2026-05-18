@@ -6032,7 +6032,23 @@ function App() {
                     onClick={async () => {
                       try {
                         const newId = `form_${Math.random().toString(36).substr(2, 9)}`;
-                        // 1. Close modal instantly
+                        
+                        // 1. Close modal instantly and mark as ignored to prevent auto-retriggering!
+                        if (user) {
+                          const sId = suggestingSkill.song_id || suggestingSkill.songs?.id;
+                          if (sId) {
+                            localStorage.setItem(`groovelab_founding_ignored_${user.id}_${sId}`, 'true');
+                          }
+                          const skillRecordId = suggestingSkill.id || suggestingSkill.skill_id;
+                          if (skillRecordId) {
+                            const storageKey = `groovelab_prompted_${user.id}`;
+                            const promptedIds = JSON.parse(localStorage.getItem(storageKey) || '[]');
+                            if (!promptedIds.includes(skillRecordId)) {
+                              promptedIds.push(skillRecordId);
+                              localStorage.setItem(storageKey, JSON.stringify(promptedIds));
+                            }
+                          }
+                        }
                         setSuggestingSkill(null);
                         
                         // 2. Resolve skill record ID with database fallback
