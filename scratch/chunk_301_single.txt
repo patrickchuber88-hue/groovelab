@@ -1,0 +1,2 @@
+"function DeviceSetupScreen({ \n  rooms, \n  stations, \n  brandColor, \n  activeSessions, \n  students, \n  onUpdate \n}: { \n  rooms: any[], \n  stations: any[], \n  brandColor: string, \n  activeSessions: any[], \n  students: any[], \n  onUpdate: () => 
+<truncated 26567 bytes>

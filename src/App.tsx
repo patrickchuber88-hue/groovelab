@@ -4373,26 +4373,28 @@ function App() {
                 <Box size={20} /> Bands
               </button>
 
-              <button onClick={() => setActiveStudentTab('messages')} className={`sidebar-item ${activeStudentTab === 'messages' ? 'active' : ''}`} style={{ position: 'relative' }}>
-                <Megaphone size={20} /> Nachrichten
-                {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length > 0 && (
-                  <div style={{ 
-                    background: '#ef4444', 
-                    color: 'white', 
-                    borderRadius: '50%', 
-                    minWidth: '18px', 
-                    height: '18px', 
-                    padding: '0 5px',
-                    fontSize: '0.65rem', 
-                    fontWeight: 900, 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    marginLeft: 'auto',
-                    boxShadow: '0 2px 5px rgba(239, 68, 68, 0.4)'
-                  }}>{studentMessages.filter(m => !m.read_by?.includes(user?.id)).length}</div>
-                )}
-              </button>
+              {user?.show_messages_menu !== false && (
+                <button onClick={() => setActiveStudentTab('messages')} className={`sidebar-item ${activeStudentTab === 'messages' ? 'active' : ''}`} style={{ position: 'relative' }}>
+                  <Megaphone size={20} /> Nachrichten
+                  {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length > 0 && (
+                    <div style={{ 
+                      background: '#ef4444', 
+                      color: 'white', 
+                      borderRadius: '50%', 
+                      minWidth: '18px', 
+                      height: '18px', 
+                      padding: '0 5px',
+                      fontSize: '0.65rem', 
+                      fontWeight: 900, 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      marginLeft: 'auto',
+                      boxShadow: '0 2px 5px rgba(239, 68, 68, 0.4)'
+                    }}>{studentMessages.filter(m => !m.read_by?.includes(user?.id)).length}</div>
+                  )}
+                </button>
+              )}
 
               <button onClick={() => setActiveStudentTab('profile')} className={`sidebar-item ${activeStudentTab === 'profile' ? 'active' : ''}`}>
                 <Shield size={20} /> Profil
@@ -5457,7 +5459,7 @@ function App() {
         )}
 
         {/* Messages Tab (Apple Mail style) */}
-        {activeStudentTab === 'messages' && (
+        {activeStudentTab === 'messages' && user?.show_messages_menu !== false && (
           user?.role?.toLowerCase() === 'student' ? (
             <ErrorBoundary>
               <div className="animation-slide-up" style={{ 
