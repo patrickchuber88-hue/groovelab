@@ -1579,9 +1579,14 @@ function App() {
     }
   }, [loggedInUserId, user, session]);
 
-  // Realtime Session Monitor (Single Login Rule)
+  // Realtime Session Monitor (Single Login Rule - Students only)
   useEffect(() => {
     if (!session?.id) return;
+
+    // Only students are subject to the automatic logout single-login rule!
+    // Teachers and admins must never be automatically logged out by this monitor.
+    const isStudent = user?.role?.toLowerCase() === 'student';
+    if (!isStudent) return;
 
     const channel = supabase
       .channel(`session_monitor_${session.id}`)
@@ -1602,7 +1607,7 @@ function App() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [session?.id]);
+  }, [session?.id, user?.role]);
 
   const fetchDashboardData = async (userId: string, isInitial: boolean = false) => {
     try {
@@ -2703,44 +2708,34 @@ function App() {
       setLoading(true);
       const groupID = target.formation_group;
       
-      const { data: alreadyFounded } = await supabase
-        .from('bands')
-        .select('id')
-        .eq('song_id', target.song_id || target.id)
-        .eq('formation_group', groupID)
-        .maybeSingle();
-        
-      if (alreadyFounded) {
-        setPendingFounding(null);
-        fetchDashboardData(user.id);
-        return;
-      }
-
-      console.log('[Founding] Founding Artist Gateway for:', target.title);
+      console.log('[Founding] Founding Artist Gateway for:', target.title || target.songs?.title);
       
       // 1. Determine members and coach BEFORE creating the band record
       let formationMembers: any[] = [];
       let calculatedCoachId = selectedCoachId || null;
 
-      // Idempotency check: Does a band for this formation group already exist?
+      // Self-healing: if an inconsistent/empty band exists for this group from a previous failed attempt, delete it.
+      // If a valid band exists, open the celebration gateway for it!
       if (groupID) {
         const { data: existingGroupBand } = await supabase
           .from('bands')
-          .select('id')
+          .select('id, band_members(id)')
           .eq('formation_group', groupID)
           .maybeSingle();
-        
-        if (existingGroupBand) {
-          console.log('[Founding] Band already exists for this group. Opening existing gateway.');
+
+        if (existingGroupBand && (!existingGroupBand.band_members || existingGroupBand.band_members.length === 0)) {
+          console.log('[Founding] Found empty/inconsistent band from a previous failed attempt. Deleting it to self-heal.');
+          await supabase.from('bands').delete().eq('id', existingGroupBand.id);
+        } else if (existingGroupBand) {
+          console.log('[Founding] Valid band already exists for this group. Opening existing gateway.');
           setPendingFounding(null);
           console.log('[DEBUG-Groovelab] setSuggestingSkill(null) in handleFoundBand (existing group)');
           setSuggestingSkill(null);
           setSelectedCoachId('');
           
-          // Fetch full details of the existing band to show the gateway
           const { data: fullBand } = await supabase
             .from('bands')
-            .select('*, band_songs(*, songs(*)), band_members(*, profiles:users(*)), band_song_slots(*)')
+            .select('*, band_songs(*, songs(*)), band_members(*, users!user_id(*)), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))')
             .eq('id', existingGroupBand.id)
             .single();
 
