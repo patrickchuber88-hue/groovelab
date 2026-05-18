@@ -6097,6 +6097,10 @@ function App() {
                           } else {
                             // 4. Background sync and navigate
                             if (user) await fetchDashboardData(user.id, false);
+                            
+                            // 5. Show beautiful visual success alert
+                            alert(`Erfolg! 🎉\n\nEin neuer, öffentlicher Matching-Slot für „${suggestingSkill.songs?.title || suggestingSkill.title || 'deinen Song'}“ wurde für dich geöffnet!\n\nDeine Teamkollegen können sich nun im Matching-Board eintragen.`);
+                            
                             setActiveStudentTab('matching');
                           }
                         } else {
@@ -6105,6 +6109,7 @@ function App() {
                         }
                       } catch (err: any) {
                         console.error('[Option 2] Error in new formation search:', err);
+                        alert('Ein Fehler ist aufgetreten: ' + err.message);
                       }
                     }}
                     style={{ 
