@@ -20,6 +20,35 @@ import { normalizeInstrument, renderInstrumentIcon } from './utils/instruments';
 import { getDistanceFromLatLonInM } from './utils/geo';
 import './App.css';
 
+// --- GLOBAL CAMERA KILL SWITCH ---
+// This guarantees that any third-party scanner library like react-qr-scanner
+// cannot keep the camera active after the user has logged in.
+if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+  const originalGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+  if (!(window as any)._cameraPatched) {
+    (window as any)._cameraPatched = true;
+    (window as any)._activeMediaStreams = [];
+    
+    navigator.mediaDevices.getUserMedia = async (constraints) => {
+      const stream = await originalGetUserMedia(constraints);
+      (window as any)._activeMediaStreams.push(stream);
+      return stream;
+    };
+    
+    (window as any).stopAllCameras = () => {
+      if ((window as any)._activeMediaStreams) {
+        (window as any)._activeMediaStreams.forEach((stream: MediaStream) => {
+          stream.getTracks().forEach(track => {
+            track.stop();
+            stream.removeTrack(track);
+          });
+        });
+        (window as any)._activeMediaStreams = [];
+      }
+    };
+  }
+}
+
 const APP_INSTRUMENT_ICONS: Record<string, any> = { 
   "Gitarre": renderInstrumentIcon("Gitarre"), 
   "Guitar": renderInstrumentIcon("Guitar"), 
@@ -1194,8 +1223,7 @@ function App() {
       setDeletedMessageIds([]);
     }
   }, [user?.id]);
-  const [showCamera, setShowCamera] = useState(false);
-  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+
   const [selectedTeacher, setSelectedTeacher] = useState<any>(null);
   const [selectedStudentProfile, setSelectedStudentProfile] = useState<any>(null);
 
@@ -1655,6 +1683,9 @@ function App() {
 
   useEffect(() => {
     if (loggedInUserId) {
+      if (typeof (window as any).stopAllCameras === 'function') {
+        (window as any).stopAllCameras();
+      }
       fetchDashboardData(loggedInUserId, true);
     }
   }, [loggedInUserId]);
@@ -3845,42 +3876,6 @@ function App() {
     }
   };
 
-
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
-      setCameraStream(stream);
-      setShowCamera(true);
-    } catch (err) {
-      alert('Kamera konnte nicht gestartet werden.');
-    }
-  };
-
-  const stopCamera = () => {
-    if (cameraStream) {
-      cameraStream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
-      setCameraStream(null);
-    }
-    setShowCamera(false);
-  };
-
-  const capturePhoto = async () => {
-    const video = document.getElementById('camera-video') as HTMLVideoElement;
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.drawImage(video, 0, 0);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-      setUser({ ...user, photo_url: dataUrl });
-      await supabase.from('users').update({ photo_url: dataUrl }).eq('id', user.id);
-      stopCamera();
-    }
-  };
-
-
-
   const handleLogout = async (updateDb = true) => {
     try {
       if (loggedInUserId) {
@@ -3934,6 +3929,12 @@ function App() {
       .from('users')
       .update({ last_seen: new Date().toISOString() })
       .eq('id', userId);
+      
+    // Force a hard reload to absolutely guarantee that any lingering camera 
+    // media streams from the browser are destroyed.
+    setTimeout(() => {
+      window.location.reload();
+    }, 50);
   };
 
   useEffect(() => {
@@ -4611,7 +4612,7 @@ function App() {
                         display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', boxShadow: '0 10px 20px rgba(0,0,0,0.2)' 
                       }}
                     >
-                      <Camera size={16} /> PROFILBILD ÄNDERN
+                      <User size={16} /> PROFILBILD ÄNDERN
                     </button>
                   </div>
                 </div>
@@ -8104,33 +8105,6 @@ function App() {
       {showQR && user?.qr_token && (
         <QRCodeModal user={user} onClose={() => setShowQR(false)} />
       )}
-      {/* Camera Modal */}
-      {showCamera && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 4000, background: 'black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <video 
-            id="camera-video"
-            autoPlay 
-            playsInline 
-            ref={v => { if (v) v.srcObject = cameraStream; }} 
-            style={{ width: '100%', maxHeight: '70vh', objectFit: 'cover' }}
-          />
-          <div style={{ position: 'absolute', bottom: '40px', display: 'flex', gap: '20px' }}>
-            <button 
-              onClick={stopCamera}
-              style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', cursor: 'pointer' }}
-            >
-              <X size={30} />
-            </button>
-            <button 
-              onClick={capturePhoto}
-              style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'white', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 0 20px rgba(255,255,255,0.5)' }}
-            >
-              <div style={{ width: '60px', height: '60px', borderRadius: '50%', border: '2px solid black' }}></div>
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Mobile Bottom Navigation */}
       <nav className="mobile-nav" style={{ gap: '4px', padding: '12px 8px 32px 8px', justifyContent: 'space-around' }}>
         {/* Live Lab (special highlighted button, not a standard menu point) */}

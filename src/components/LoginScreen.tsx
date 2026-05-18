@@ -173,6 +173,25 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     setLoading(true);
     setError(null);
 
+    // 0. Force kill camera immediately upon scan
+    try {
+      document.querySelectorAll('video').forEach(video => {
+        const stream = video.srcObject as MediaStream;
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+          video.srcObject = null;
+        }
+      });
+      
+      // Secondary fallback to kill any global media streams
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+           stream.getTracks().forEach(t => t.stop());
+        }).catch(e => { /* Ignore */ });
+    } catch (e) {
+      console.warn("Could not kill camera", e);
+    }
+
     try {
       console.log('[Login] Starting scan for token:', qrToken);
 
@@ -335,6 +354,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               const val = result?.[0]?.rawValue;
               if (val) handleScan(val);
             }}
+            paused={loading}
             components={{ finder: true }}
             styles={{
               container: { width: '100%', height: '100%' },
