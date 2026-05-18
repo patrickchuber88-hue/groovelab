@@ -4571,7 +4571,7 @@ function DeviceSetupScreen({
   onCleanupPlanning: () => void,
   onResetPlanning: () => void
 }) {
-  const [activeSubTab, setActiveSubTab] = useState<'academy' | 'device' | 'maintenance'>('device');
+  const [activeSubTab, setActiveSubTab] = useState<'academy' | 'device' | 'maintenance'>('academy');
   const [selectedRoomId, setSelectedRoomId] = useState(() => rooms[0]?.id || '');
   const [bookingStationId, setBookingStationId] = useState<string | null>(null);
 
@@ -4867,26 +4867,6 @@ function DeviceSetupScreen({
       {/* Premium sub-tab navigation */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', background: '#f1f5f9', padding: '6px', borderRadius: '16px', width: 'fit-content' }}>
         <button
-          onClick={() => setActiveSubTab('device')}
-          style={{
-            padding: '10px 20px',
-            borderRadius: '12px',
-            border: 'none',
-            background: activeSubTab === 'device' ? 'white' : 'transparent',
-            color: activeSubTab === 'device' ? '#1e293b' : '#64748b',
-            fontWeight: 800,
-            fontSize: '0.85rem',
-            cursor: 'pointer',
-            boxShadow: activeSubTab === 'device' ? '0 4px 6px -1px rgba(0,0,0,0.05)' : 'none',
-            transition: 'all 0.2s',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-        >
-          <Monitor size={16} /> Geräte-Setup
-        </button>
-        <button
           onClick={() => setActiveSubTab('academy')}
           style={{
             padding: '10px 20px',
@@ -4905,6 +4885,26 @@ function DeviceSetupScreen({
           }}
         >
           <Shield size={16} /> Akademie-Einstellungen
+        </button>
+        <button
+          onClick={() => setActiveSubTab('device')}
+          style={{
+            padding: '10px 20px',
+            borderRadius: '12px',
+            border: 'none',
+            background: activeSubTab === 'device' ? 'white' : 'transparent',
+            color: activeSubTab === 'device' ? '#1e293b' : '#64748b',
+            fontWeight: 800,
+            fontSize: '0.85rem',
+            cursor: 'pointer',
+            boxShadow: activeSubTab === 'device' ? '0 4px 6px -1px rgba(0,0,0,0.05)' : 'none',
+            transition: 'all 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <Monitor size={16} /> Geräte-Setup
         </button>
         <button
           onClick={() => setActiveSubTab('maintenance')}
