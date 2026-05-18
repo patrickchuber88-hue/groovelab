@@ -1848,30 +1848,33 @@ function App() {
         const timeSinceLastWrite = Date.now() - lastWriteTimeRef.current;
         const isRecentlyWritten = timeSinceLastWrite < 15000;
         
-        // Map existing ones and keep their local progress to prevent visual jumps
-        const merged = prev.map(localSong => {
-          const remoteSong = uniqueCombined.find(r => 
-            r.song_id === localSong.song_id && 
-            (r.instrument || '').toLowerCase() === (localSong.instrument || '').toLowerCase() &&
-            (r.part_number || 1) === (localSong.part_number || 1) &&
-            (r.difficulty_level || 'starter') === (localSong.difficulty_level || 'starter')
-          );
-          if (remoteSong) {
-            const isStageReadyChanged = remoteSong.is_stage_ready !== localSong.is_stage_ready;
-            const isApprovalChanged = remoteSong.is_pending_approval !== localSong.is_pending_approval;
-            
-            // We only adopt the remote progress if:
-            // 1. We did not write recently (meaning the DB is settled and holds the truth)
-            // 2. OR the remote progress is higher (e.g. updated from teacher or another device)
-            // 3. OR the stage-ready status or approval status changed
-            if (!isRecentlyWritten || remoteSong.progress > localSong.progress || isStageReadyChanged || isApprovalChanged) {
-              return remoteSong;
+        // Map existing ones and keep their local progress to prevent visual jumps.
+        // We only retain items that still exist in the remote uniqueCombined array (i.e. not deleted!).
+        const merged = prev
+          .map(localSong => {
+            const remoteSong = uniqueCombined.find(r => 
+              r.song_id === localSong.song_id && 
+              (r.instrument || '').toLowerCase() === (localSong.instrument || '').toLowerCase() &&
+              (r.part_number || 1) === (localSong.part_number || 1) &&
+              (r.difficulty_level || 'starter') === (localSong.difficulty_level || 'starter')
+            );
+            if (remoteSong) {
+              const isStageReadyChanged = remoteSong.is_stage_ready !== localSong.is_stage_ready;
+              const isApprovalChanged = remoteSong.is_pending_approval !== localSong.is_pending_approval;
+              
+              // We only adopt the remote progress if:
+              // 1. We did not write recently (meaning the DB is settled and holds the truth)
+              // 2. OR the remote progress is higher (e.g. updated from teacher or another device)
+              // 3. OR the stage-ready status or approval status changed
+              if (!isRecentlyWritten || remoteSong.progress > localSong.progress || isStageReadyChanged || isApprovalChanged) {
+                return remoteSong;
+              }
+              // Protect local optimistic progress from being overwritten by stale remote poll
+              return { ...remoteSong, progress: localSong.progress };
             }
-            // Protect local optimistic progress from being overwritten by stale remote poll
-            return { ...remoteSong, progress: localSong.progress };
-          }
-          return localSong;
-        });
+            return null;
+          })
+          .filter((song): song is any => song !== null);
 
         // Add any new remote songs that are not in the local prev array
         uniqueCombined.forEach(r => {
