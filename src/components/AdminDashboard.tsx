@@ -298,25 +298,74 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
   const handleAddMember = async (bandId: string, userId: string | null, instrument: string, extName?: string) => {
     try {
-      const { error } = await supabase.from('band_members').insert({
+      const insertData: any = {
         band_id: bandId,
         user_id: userId,
         instrument: instrument,
-        external_name: extName,
         confetti_seen: true
-      });
-      if (error) throw error;
+      };
+      if (extName) {
+        insertData.external_name = extName;
+      }
+
+      let { error } = await supabase.from('band_members').insert(insertData);
+      if (error && error.message.includes('external_name')) {
+        if (!userId) {
+          throw new Error("Der Server unterstützt keine externen Mitglieder. Bitte führen Sie die SQL-Migration aus.");
+        }
+        const fallbackData = { ...insertData };
+        delete fallbackData.external_name;
+        const { error: retryErr } = await supabase.from('band_members').insert(fallbackData);
+        if (retryErr) throw retryErr;
+      } else if (error) {
+        throw error;
+      }
       
       const { data: bandSongs } = await supabase.from('band_songs').select('id').eq('band_id', bandId);
       if (bandSongs && bandSongs.length > 0) {
-         const slotsToInsert = bandSongs.map((bs: any) => ({
-            band_song_id: bs.id,
-            user_id: userId,
-            instrument: instrument,
-            status: 'joined',
-            external_name: extName || null
-         }));
-         await supabase.from('band_song_slots').insert(slotsToInsert);
+         // Fetch existing slots to dynamically calculate non-conflicting part_number
+         const songIds = bandSongs.map((bs: any) => bs.id);
+         const { data: existingSlots } = await supabase
+            .from('band_song_slots')
+            .select('band_song_id, instrument, part_number')
+            .in('band_song_id', songIds);
+
+         const slotsToInsert = bandSongs.map((bs: any) => {
+            const matchingSlots = (existingSlots || []).filter(
+               (s: any) => s.band_song_id === bs.id && s.instrument === instrument
+            );
+            const maxPart = matchingSlots.reduce((max: number, s: any) => Math.max(max, s.part_number || 1), 0);
+            const nextPart = maxPart + 1;
+
+            const slotObj: any = {
+               band_song_id: bs.id,
+               user_id: userId,
+               instrument: instrument,
+               part_number: nextPart,
+               status: 'joined'
+            };
+            if (extName) {
+               slotObj.external_name = extName;
+            }
+            return slotObj;
+         });
+
+         let { error: slotErr } = await supabase.from('band_song_slots').insert(slotsToInsert);
+         if (slotErr && slotErr.message.includes('external_name')) {
+            if (!userId) {
+               console.error("Failed to insert slots for external member:", slotErr);
+            } else {
+               const cleanedSlots = slotsToInsert.map((s: any) => {
+                  const copy = { ...s };
+                  delete copy.external_name;
+                  return copy;
+               });
+               const { error: retrySlotErr } = await supabase.from('band_song_slots').insert(cleanedSlots);
+               if (retrySlotErr) throw retrySlotErr;
+            }
+         } else if (slotErr) {
+            throw slotErr;
+         }
       }
       
       // Recalculate coach if not manual
@@ -470,6 +519,22 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           .order('name');
         if (bandsData) {
           setAllBands(bandsData); 
+          if (editingBand) {
+            const updated = bandsData.find((b: any) => b.id === editingBand.id);
+            if (updated) {
+              setEditingBand((prev: any) => {
+                if (!prev) return null;
+                return {
+                  ...updated,
+                  name: prev.name,
+                  bio: prev.bio,
+                  genre: prev.genre,
+                  coach_id: prev.coach_id,
+                  coach_is_manual: prev.coach_is_manual
+                };
+              });
+            }
+          }
         }
         // Also fetch students for the search function in band edit
         const { data: studentsData } = await supabase
@@ -822,20 +887,36 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
     // 3. Add Members
     // First, the coach
-    await supabase.from('band_members').insert({ 
+    const coachInsertData: any = { 
       band_id: band.id, 
       user_id: newBand.coach_id || userId, 
       role: 'coach',
       instrument: 'Coach'
-    });
+    };
+    const { error: coachErr } = await supabase.from('band_members').insert(coachInsertData);
+    if (coachErr && coachErr.message.includes('role')) {
+       const fallbackCoach = { ...coachInsertData };
+       delete fallbackCoach.role;
+       await supabase.from('band_members').insert(fallbackCoach);
+    } else if (coachErr) {
+       console.error("Fehler beim Hinzufügen des Coachs:", coachErr);
+    }
     
     for (const m of selectedMembers) {
-       await supabase.from('band_members').insert({
+       const memberInsertData: any = {
          band_id: band.id,
          user_id: m.user_id,
          role: 'member',
          instrument: m.instrument
-       });
+       };
+       const { error: memErr } = await supabase.from('band_members').insert(memberInsertData);
+       if (memErr && memErr.message.includes('role')) {
+          const fallbackMember = { ...memberInsertData };
+          delete fallbackMember.role;
+          await supabase.from('band_members').insert(fallbackMember);
+       } else if (memErr) {
+          console.error("Fehler beim Hinzufügen des Mitglieds:", memErr);
+       }
     }
 
     setShowAddBand(false);

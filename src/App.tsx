@@ -2483,9 +2483,31 @@ function App() {
         return;
       }
 
+      // 2. Hole alle Profile der Schule für den in-memory Join
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('users')
+        .select('id, first_name, role')
+        .eq('school_id', schoolId);
+
+      if (profilesError) {
+        console.error('[Planning] Profiles Fetch Error:', profilesError);
+      }
+
       if (planningData) {
-        setGlobalPlannedSlots(planningData);
-        const mySlots = planningData.filter((s: any) => s.user_id === currentUserId).map((s: any) => `${s.day}-${s.time}`);
+        const profilesMap: Record<string, any> = {};
+        if (profilesData) {
+          profilesData.forEach((p: any) => {
+            profilesMap[p.id] = p;
+          });
+        }
+
+        const enrichedPlanningData = planningData.map((item: any) => ({
+          ...item,
+          profiles: profilesMap[item.user_id] || null
+        }));
+
+        setGlobalPlannedSlots(enrichedPlanningData);
+        const mySlots = enrichedPlanningData.filter((s: any) => s.user_id === currentUserId).map((s: any) => `${s.day}-${s.time}`);
         setPlannedSlots(mySlots);
       }
     } catch (err) {
@@ -3719,6 +3741,82 @@ function App() {
     return matchesSearch && matchesAlpha;
   });
 
+  const getTeacherPresenceList = () => {
+    const teacherSlots = globalPlannedSlots.filter((s: any) => 
+      s.profiles?.role?.toLowerCase() === 'teacher' || 
+      s.profiles?.role?.toLowerCase() === 'admin'
+    );
+    
+    if (teacherSlots.length === 0) return [];
+
+    const teacherGroups: { [userId: string]: { name: string; slots: { day: string; time: string }[] } } = {};
+    
+    teacherSlots.forEach((slot: any) => {
+      const userId = slot.user_id;
+      const name = slot.profiles?.first_name || 'Lehrer';
+      if (!teacherGroups[userId]) {
+        teacherGroups[userId] = { name, slots: [] };
+      }
+      teacherGroups[userId].slots.push({ day: slot.day, time: slot.time });
+    });
+
+    const presenceList: { teacherName: string; day: string; rangeStr: string; sortKey: number }[] = [];
+    const dayOrder: { [day: string]: number } = { 'Mo': 1, 'Di': 2, 'Mi': 3, 'Do': 4, 'Fr': 5, 'Sa': 6, 'So': 7 };
+
+    Object.values(teacherGroups).forEach(group => {
+      const slotsByDay: { [day: string]: string[] } = {};
+      group.slots.forEach(s => {
+        if (!slotsByDay[s.day]) slotsByDay[s.day] = [];
+        slotsByDay[s.day].push(s.time);
+      });
+
+      Object.entries(slotsByDay).forEach(([day, times]) => {
+        times.sort();
+
+        const add15 = (t: string) => {
+          let [h, m] = t.split(':').map(Number);
+          m += 15;
+          if (m >= 60) { h += 1; m = 0; }
+          return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+        };
+
+        const toMin = (t: string) => {
+          const [h, m] = t.split(':').map(Number);
+          return h * 60 + m;
+        };
+
+        const ranges: { start: string; end: string }[] = [];
+        let currentRange: { start: string; end: string } | null = null;
+
+        times.forEach(t => {
+          if (!currentRange) {
+            currentRange = { start: t, end: add15(t) };
+          } else {
+            if (toMin(t) === toMin(currentRange.end)) {
+              currentRange.end = add15(t);
+            } else {
+              ranges.push(currentRange);
+              currentRange = { start: t, end: add15(t) };
+            }
+          }
+        });
+        if (currentRange) ranges.push(currentRange);
+
+        ranges.forEach(r => {
+          presenceList.push({
+            teacherName: group.name,
+            day,
+            rangeStr: `${r.start} Uhr - ${r.end} Uhr`,
+            sortKey: (dayOrder[day] || 99) * 10000 + toMin(r.start)
+          });
+        });
+      });
+    });
+
+    presenceList.sort((a, b) => a.sortKey - b.sortKey);
+    return presenceList;
+  };
+
   return (
     <div className="app-layout">
       <style>{`
@@ -4109,13 +4207,24 @@ function App() {
                           <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: 0 }}>Plane deine Sessions & vermeide Stoßzeiten.</p>
                         </div>
                         {/* Legend */}
-                        <div style={{ display: 'flex', gap: '12px', background: '#f8fafc', padding: '10px 16px', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
+                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', background: '#f8fafc', padding: '10px 16px', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
-                            <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: brandColor }}></div> Deine Zeit
+                            <div style={{ 
+                              width: '10px', 
+                              height: '10px', 
+                              borderRadius: '3px', 
+                              border: '1px solid #cbd5e1', 
+                              background: '#f8fafc', 
+                              position: 'relative', 
+                              overflow: 'hidden' 
+                            }}>
+                              <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '3px', background: '#f59e0b' }}></div>
+                            </div> Deine Zeit
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
-                            <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: 'rgba(79, 70, 229, 0.3)' }}></div> Lab voll
+                            <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: 'rgba(79, 70, 229, 0.4)' }}></div> Lab voll
                           </div>
+                          
                         </div>
                       </div>
 
@@ -4151,109 +4260,189 @@ function App() {
                           if (maxH < 1) maxH = 20;
 
                           return (
-                            <div style={{ display: 'grid', gridTemplateColumns: `60px repeat(${activeDays.length}, 1fr)`, gap: '6px', border: '1px solid #f1f5f9', background: '#f8fafc', padding: '12px', borderRadius: '24px' }}>
-                              <div style={{ textAlign: 'center', fontSize: '0.8rem', fontWeight: 800, color: '#cbd5e1' }}></div>
-                              {activeDays.map(d => (
-                                <div key={d.id} style={{ textAlign: 'center', fontSize: '0.8rem', fontWeight: 800, color: '#64748b' }}>{d.id}</div>
-                              ))}
+                            <>
+                              <div style={{ display: 'grid', gridTemplateColumns: `60px repeat(${activeDays.length}, 1fr)`, gap: '6px', border: '1px solid #f1f5f9', background: '#f8fafc', padding: '12px', borderRadius: '24px' }}>
+                                <div style={{ textAlign: 'center', fontSize: '0.8rem', fontWeight: 800, color: '#cbd5e1' }}></div>
+                                {activeDays.map(d => (
+                                  <div key={d.id} style={{ textAlign: 'center', fontSize: '0.8rem', fontWeight: 800, color: '#64748b' }}>{d.id}</div>
+                                ))}
 
+                                {(() => {
+                                  let minTime = "23:59";
+                                  let maxTime = "00:00";
+                                  activeDays.forEach(d => {
+                                    const h = hours[d.key];
+                                    if (h?.active && h.start && h.start < minTime) minTime = h.start;
+                                    if (h?.active && h.end && h.end > maxTime) maxTime = h.end;
+                                  });
+
+                                  if (minTime === "23:59") minTime = "16:00";
+                                  if (maxTime === "00:00") maxTime = "20:00";
+
+                                  const timeRows = [];
+                                  let current = minTime;
+
+                                  // Helper to add 15 minutes to HH:mm string
+                                  const add15 = (t: string) => {
+                                    let [h, m] = t.split(':').map(Number);
+                                    m += 15;
+                                    if (m >= 60) { h += 1; m = 0; }
+                                    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                                  };
+
+                                  while (current < maxTime) {
+                                    const time = current;
+                                    timeRows.push(
+                                      <React.Fragment key={time}>
+                                        <div style={{ fontSize: '0.6rem', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '8px', fontWeight: 600 }}>{time}</div>
+                                        {activeDays.map(day => {
+                                          const key = `${day.id}-${time}`;
+                                          const isPlanned = plannedSlots.includes(key);
+                                          
+                                          // Exclude teachers from student count
+                                          const totalCount = globalPlannedSlots.filter(s => 
+                                            s.day === day.id && 
+                                            s.time === time && 
+                                            s.profiles?.role?.toLowerCase() !== 'teacher' && 
+                                            s.profiles?.role?.toLowerCase() !== 'admin'
+                                          ).length;
+
+                                          const teachersInSlot = globalPlannedSlots.filter(s => 
+                                            s.day === day.id && 
+                                            s.time === time && 
+                                            (s.profiles?.role?.toLowerCase() === 'teacher' || s.profiles?.role?.toLowerCase() === 'admin')
+                                          );
+                                          const hasTeacher = teachersInSlot.length > 0;
+
+                                          const dayHours = hours[day.key];
+                                          const isOpen = dayHours?.active && time >= dayHours.start && time < dayHours.end;
+
+                                          let bgColor = 'white';
+                                          let textColor = '#64748b';
+                                          let border = '1px solid #f1f5f9';
+                                          let cursor = 'pointer';
+                                          let content: any = '';
+
+                                          if (!isOpen) {
+                                            bgColor = '#f1f5f9';
+                                            textColor = '#cbd5e1';
+                                            cursor = 'not-allowed';
+                                            content = <span style={{ opacity: 0.3, fontSize: '0.6rem' }}>✕</span>;
+                                          } else {
+                                            // 1. Determine Background, Border, and Text Color based strictly on heatmap density and coach presence
+                                            if (isPlanned) {
+                                              // Solid brand gold-amber für eigene geplante Zeiten — durchgehend kräftig, leuchtend und einheitlich!
+                                              bgColor = '#f59e0b';
+                                              textColor = 'white';
+                                              border = '1px solid #d97706';
+                                            } else {
+                                              // Soft transparent purple/blue heatmap for other slots — linear progressive up to 8 stations!
+                                              if (totalCount > 0) {
+                                                const maxCapacity = 8;
+                                                const minOpacity = 0.08;
+                                                const maxOpacity = 0.68;
+                                                const count = Math.min(totalCount, maxCapacity);
+                                                const opacity = count <= 1 ? minOpacity : minOpacity + (count - 1) * ((maxOpacity - minOpacity) / (maxCapacity - 1));
+                                                bgColor = `rgba(79, 70, 229, ${opacity})`;
+                                                textColor = opacity >= 0.35 ? 'white' : '#4f46e5';
+                                                border = `1px solid rgba(79, 70, 229, ${opacity + 0.1})`;
+                                              }
+                                              
+                                              if (hasTeacher) {
+                                                border = '1px solid #f59e0b';
+                                                if (totalCount === 0) {
+                                                  bgColor = '#fffbeb';
+                                                }
+                                              }
+                                            }
+                                            
+                                            
+
+                                            // 2. Determine Inner Content (Student Count + Coach Badge)
+                                            
+
+                                            if (totalCount > 0) {
+                                              content = (
+                                                <span style={{ fontSize: '0.75rem', fontWeight: 900 }}>
+                                                  {totalCount}
+                                                </span>
+                                              );
+                                            }
+                                          }
+
+                                          return (
+                                            <button 
+                                              key={`${day.id}-${time}`}
+                                              onClick={() => {
+                                                if (isOpen) toggleSlot(day.id, time);
+                                              }}
+                                              style={{ 
+                                                cursor: cursor, 
+                                                height: '24px', 
+                                                background: bgColor,
+                                                borderRadius: '5px', 
+                                                border: border,
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                justifyContent: 'center', 
+                                                color: textColor,
+                                                fontSize: '0.65rem', 
+                                                fontWeight: 900, 
+                                                transition: 'all 0.1s',
+                                                boxShadow: isPlanned ? `0 2px 8px ${bgColor}50` : 'none',
+                                                opacity: isOpen ? 1 : 0.6,
+                                                padding: 0,
+                                                width: '100%',
+                                                position: 'relative',
+                                                zIndex: 10,
+                                                pointerEvents: 'auto'
+                                              }}>
+                                              {content}
+                                            </button>
+                                          );
+                                        })}
+                                      </React.Fragment>
+                                    );
+                                    current = add15(current);
+                                  }
+                                  return timeRows;
+                                })()}
+                              </div>
+
+                              {/* Teachers presence list under the grid */}
                               {(() => {
-                                let minTime = "23:59";
-                                let maxTime = "00:00";
-                                activeDays.forEach(d => {
-                                  const h = hours[d.key];
-                                  if (h?.active && h.start && h.start < minTime) minTime = h.start;
-                                  if (h?.active && h.end && h.end > maxTime) maxTime = h.end;
-                                });
-
-                                if (minTime === "23:59") minTime = "16:00";
-                                if (maxTime === "00:00") maxTime = "20:00";
-
-                                const timeRows = [];
-                                let current = minTime;
-
-                                // Helper to add 15 minutes to HH:mm string
-                                const add15 = (t: string) => {
-                                  let [h, m] = t.split(':').map(Number);
-                                  m += 15;
-                                  if (m >= 60) { h += 1; m = 0; }
-                                  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-                                };
-
-                                while (current < maxTime) {
-                                  const time = current;
-                                  timeRows.push(
-                                    <React.Fragment key={time}>
-                                      <div style={{ fontSize: '0.6rem', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '8px', fontWeight: 600 }}>{time}</div>
-                                      {activeDays.map(day => {
-                                        const key = `${day.id}-${time}`;
-                                        const isPlanned = plannedSlots.includes(key);
-                                        const totalCount = globalPlannedSlots.filter(s => s.day === day.id && s.time === time).length;
-                                        const dayHours = hours[day.key];
-                                        
-                                        const isOpen = dayHours?.active && time >= dayHours.start && time < dayHours.end;
-
-                                        let bgColor = 'white';
-                                        let textColor = '#64748b';
-                                        let border = '1px solid #f1f5f9';
-                                        let cursor = 'pointer';
-                                        let content: any = isOpen && totalCount > 0 ? totalCount : '';
-
-                                        if (!isOpen) {
-                                          bgColor = '#f1f5f9';
-                                          textColor = '#cbd5e1';
-                                          cursor = 'not-allowed';
-                                          content = <span style={{ opacity: 0.3, fontSize: '0.6rem' }}>✕</span>;
-                                        } else if (isPlanned) {
-                                          bgColor = brandColor;
-                                          textColor = 'white';
-                                          border = 'none';
-                                        } else if (totalCount > 0) {
-                                          if (totalCount >= 5) bgColor = 'rgba(79, 70, 229, 0.6)';
-                                          else if (totalCount >= 3) bgColor = 'rgba(79, 70, 229, 0.3)';
-                                          else bgColor = 'rgba(79, 70, 229, 0.1)';
-                                          textColor = '#4f46e5';
-                                          border = '1px solid rgba(79, 70, 229, 0.2)';
-                                        }
-
-                                        return (
-                                          <button 
-                                            key={`${day.id}-${time}`}
-                                            onClick={() => {
-                                              if (isOpen) toggleSlot(day.id, time);
-                                            }}
-                                            style={{ 
-                                              cursor: cursor, 
-                                              height: '24px', 
-                                              background: bgColor,
-                                              borderRadius: '5px', 
-                                              border: border,
-                                              display: 'flex', 
-                                              alignItems: 'center', 
-                                              justifyContent: 'center', 
-                                              color: textColor,
-                                              fontSize: '0.65rem', 
-                                              fontWeight: 900, 
-                                              transition: 'all 0.1s',
-                                              boxShadow: isPlanned ? `0 4px 10px ${brandColor}40` : 'none',
-                                              opacity: isOpen ? 1 : 0.6,
-                                              padding: 0,
-                                              width: '100%',
-                                              position: 'relative',
-                                              zIndex: 10,
-                                              pointerEvents: 'auto'
-                                            }}>
-                                            {content}
-                                          </button>
-                                        );
-                                      })}
-                                    </React.Fragment>
-                                  );
-                                  current = add15(current);
-                                }
-                                return timeRows;
+                                const teacherPresences = getTeacherPresenceList();
+                                if (teacherPresences.length === 0) return null;
+                                return (
+                                  <div style={{ marginTop: '24px', borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
+                                    <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <span style={{ fontSize: '1.1rem' }}>👨‍🏫</span>
+                                      Anwesende Coaches diese Woche:
+                                    </h4>
+                                    <div style={{ display: 'flex', flexDirection: 'row', gap: '8px', flexWrap: 'nowrap' }}>
+                                      {teacherPresences.map((pres, idx) => (
+                                        <div key={idx} style={{ 
+                                          display: 'flex', 
+                                          alignItems: 'center', 
+                                          gap: '8px', 
+                                          background: '#f8fafc', 
+                                          border: '1px solid #f1f5f9', 
+                                          padding: '8px 12px', 
+                                          borderRadius: '12px',
+                                          flex: '1 1 0px',
+                                          minWidth: '0'
+                                        }}>
+                                          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#f59e0b', flexShrink: 0 }}></div>
+                                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`${pres.teacherName} — ${pres.day}. ${pres.rangeStr}`}>
+                                            <span style={{ color: '#1e293b', fontWeight: 900 }}>{pres.teacherName}</span> — {pres.day}. {pres.rangeStr}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
                               })()}
-                            </div>
+                            </>
                           );
                         })()}
                     </div>
@@ -4412,6 +4601,345 @@ function App() {
                             </button>
                           ))
                         )}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+              {user.role !== 'student' && (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: width < 1024 ? '1fr' : '1.5fr 1fr', gap: '24px', paddingBottom: '32px' }}>
+                    {/* Wochen-Planner */}
+                    <div className="glass-panel" style={{ background: 'white', borderRadius: '32px', padding: '32px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+                        <div>
+                          <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ color: '#f59e0b' }}><Clock size={24} /></div>
+                            Wochen-Planner
+                            {((user as any)?.role?.toLowerCase() === 'admin' || (user as any)?.role?.toLowerCase() === 'teacher') && (
+                              <button 
+                                onClick={async () => {
+                                  if (window.confirm('VORSICHT: Möchtest du wirklich ALLE Wochenplan-Einträge für diese Schule löschen?')) {
+                                    const schoolData = Array.isArray((user as any)?.schools) ? (user as any)?.schools[0] : (user as any)?.schools;
+                                    if (!schoolData?.id) return;
+                                    const { error } = await supabase.from('lab_planning').delete().eq('school_id', schoolData.id);
+                                    if (error) alert('Fehler: ' + error.message);
+                                    else {
+                                      alert('Wochenplan wurde auf 0 zurückgesetzt! ✅');
+                                      fetchPlanningData(schoolData.id);
+                                    }
+                                  }
+                                }}
+                                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', opacity: 0.6 }}
+                                title="Wochenplan komplett leeren (Admin)"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            )}
+                          </h3>
+                          <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: 0 }}>Trage deine Präsenzzeiten ein, damit Schüler dich im Lab antreffen.</p>
+                        </div>
+                        {/* Legend */}
+                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', background: '#f8fafc', padding: '10px 16px', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
+                            <div style={{ 
+                              width: '10px', 
+                              height: '10px', 
+                              borderRadius: '3px', 
+                              border: '1px solid #cbd5e1', 
+                              background: '#f8fafc', 
+                              position: 'relative', 
+                              overflow: 'hidden' 
+                            }}>
+                              <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '3px', background: '#f59e0b' }}></div>
+                            </div> Deine Zeit
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
+                            <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: 'rgba(79, 70, 229, 0.4)' }}></div> Lab voll
+                          </div>
+                          
+                        </div>
+                      </div>
+
+                       {(() => {
+                          const schoolData = Array.isArray((user as any)?.schools) ? (user as any)?.schools[0] : (user as any)?.schools;
+                          const hours = schoolData?.opening_hours || {};
+                          
+                          const dayConfigs = [
+                            { id: 'Mo', key: 'monday' },
+                            { id: 'Di', key: 'tuesday' },
+                            { id: 'Mi', key: 'wednesday' },
+                            { id: 'Do', key: 'thursday' },
+                            { id: 'Fr', key: 'friday' },
+                            { id: 'Sa', key: 'saturday' },
+                            { id: 'So', key: 'sunday' }
+                          ];
+
+                          const activeDays = dayConfigs.filter(d => hours[d.key]?.active);
+                          
+                          if (activeDays.length === 0) {
+                            return <div style={{ textAlign: 'center', padding: '24px', color: '#94a3b8', fontSize: '0.8rem' }}>Keine Öffnungszeiten im Setup hinterlegt.</div>;
+                          }
+
+                          let minH = 22;
+                          let maxH = 0;
+                          activeDays.forEach(d => {
+                            const h = hours[d.key];
+                            if (h?.start) minH = Math.min(minH, parseInt(h.start.split(':')[0]));
+                            if (h?.end) maxH = Math.max(maxH, parseInt(h.end.split(':')[0]));
+                          });
+
+                          if (minH > 21) minH = 8;
+                          if (maxH < 1) maxH = 20;
+
+                          return (
+                            <>
+                              <div style={{ display: 'grid', gridTemplateColumns: `60px repeat(${activeDays.length}, 1fr)`, gap: '6px', border: '1px solid #f1f5f9', background: '#f8fafc', padding: '12px', borderRadius: '24px' }}>
+                                <div style={{ textAlign: 'center', fontSize: '0.8rem', fontWeight: 800, color: '#cbd5e1' }}></div>
+                                {activeDays.map(d => (
+                                  <div key={d.id} style={{ textAlign: 'center', fontSize: '0.8rem', fontWeight: 800, color: '#64748b' }}>{d.id}</div>
+                                ))}
+
+                                {(() => {
+                                  let minTime = "23:59";
+                                  let maxTime = "00:00";
+                                  activeDays.forEach(d => {
+                                    const h = hours[d.key];
+                                    if (h?.active && h.start && h.start < minTime) minTime = h.start;
+                                    if (h?.active && h.end && h.end > maxTime) maxTime = h.end;
+                                  });
+
+                                  if (minTime === "23:59") minTime = "16:00";
+                                  if (maxTime === "00:00") maxTime = "20:00";
+
+                                  const timeRows = [];
+                                  let current = minTime;
+
+                                  // Helper to add 15 minutes to HH:mm string
+                                  const add15 = (t: string) => {
+                                    let [h, m] = t.split(':').map(Number);
+                                    m += 15;
+                                    if (m >= 60) { h += 1; m = 0; }
+                                    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                                  };
+
+                                  while (current < maxTime) {
+                                    const time = current;
+                                    timeRows.push(
+                                      <React.Fragment key={time}>
+                                        <div style={{ fontSize: '0.6rem', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '8px', fontWeight: 600 }}>{time}</div>
+                                        {activeDays.map(day => {
+                                          const key = `${day.id}-${time}`;
+                                          const isPlanned = plannedSlots.includes(key);
+                                          
+                                          // Exclude teachers from student count
+                                          const totalCount = globalPlannedSlots.filter(s => 
+                                            s.day === day.id && 
+                                            s.time === time && 
+                                            s.profiles?.role?.toLowerCase() !== 'teacher' && 
+                                            s.profiles?.role?.toLowerCase() !== 'admin'
+                                          ).length;
+
+                                          const teachersInSlot = globalPlannedSlots.filter(s => 
+                                            s.day === day.id && 
+                                            s.time === time && 
+                                            (s.profiles?.role?.toLowerCase() === 'teacher' || s.profiles?.role?.toLowerCase() === 'admin')
+                                          );
+                                          const hasTeacher = teachersInSlot.length > 0;
+
+                                          const dayHours = hours[day.key];
+                                          const isOpen = dayHours?.active && time >= dayHours.start && time < dayHours.end;
+
+                                          let bgColor = 'white';
+                                          let textColor = '#64748b';
+                                          let border = '1px solid #f1f5f9';
+                                          let cursor = 'pointer';
+                                          let content: any = '';
+
+                                          if (!isOpen) {
+                                            bgColor = '#f1f5f9';
+                                            textColor = '#cbd5e1';
+                                            cursor = 'not-allowed';
+                                            content = <span style={{ opacity: 0.3, fontSize: '0.6rem' }}>✕</span>;
+                                          } else {
+                                            // 1. Determine Background, Border, and Text Color based strictly on heatmap density and coach presence
+                                            if (isPlanned) {
+                                              // Solid brand gold-amber für eigene geplante Zeiten — durchgehend kräftig, leuchtend und einheitlich!
+                                              bgColor = '#f59e0b';
+                                              textColor = 'white';
+                                              border = '1px solid #d97706';
+                                            } else {
+                                              // Soft transparent purple/blue heatmap for other slots — linear progressive up to 8 stations!
+                                              if (totalCount > 0) {
+                                                const maxCapacity = 8;
+                                                const minOpacity = 0.08;
+                                                const maxOpacity = 0.68;
+                                                const count = Math.min(totalCount, maxCapacity);
+                                                const opacity = count <= 1 ? minOpacity : minOpacity + (count - 1) * ((maxOpacity - minOpacity) / (maxCapacity - 1));
+                                                bgColor = `rgba(79, 70, 229, ${opacity})`;
+                                                textColor = opacity >= 0.35 ? 'white' : '#4f46e5';
+                                                border = `1px solid rgba(79, 70, 229, ${opacity + 0.1})`;
+                                              }
+                                              
+                                            }
+                                            
+                                            if (hasTeacher) {
+                                              border = '1px solid #f59e0b';
+                                              if (totalCount === 0) {
+                                                bgColor = '#fffbeb';
+                                              }
+                                            }
+
+                                            // 2. Determine Inner Content (Student Count + Coach Badge)
+                                            
+
+                                            if (totalCount > 0) {
+                                              content = (
+                                                <span style={{ fontSize: '0.75rem', fontWeight: 900 }}>
+                                                  {totalCount}
+                                                </span>
+                                              );
+                                            }
+                                          }
+
+                                          return (
+                                            <button 
+                                              key={`${day.id}-${time}`}
+                                              onClick={() => {
+                                                if (isOpen) toggleSlot(day.id, time);
+                                              }}
+                                              style={{ 
+                                                cursor: cursor, 
+                                                height: '24px', 
+                                                background: bgColor,
+                                                borderRadius: '5px', 
+                                                border: border,
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                justifyContent: 'center', 
+                                                color: textColor,
+                                                fontSize: '0.65rem', 
+                                                fontWeight: 900, 
+                                                transition: 'all 0.1s',
+                                                boxShadow: isPlanned ? `0 2px 8px ${bgColor}50` : 'none',
+                                                opacity: isOpen ? 1 : 0.6,
+                                                padding: 0,
+                                                width: '100%',
+                                                position: 'relative',
+                                                zIndex: 10,
+                                                pointerEvents: 'auto'
+                                              }}>
+                                              {content}
+                                            </button>
+                                          );
+                                        })}
+                                      </React.Fragment>
+                                    );
+                                    current = add15(current);
+                                  }
+                                  return timeRows;
+                                })()}
+                              </div>
+
+                              {/* Teachers presence list under the grid */}
+                              {(() => {
+                                const teacherPresences = getTeacherPresenceList();
+                                if (teacherPresences.length === 0) return null;
+                                return (
+                                  <div style={{ marginTop: '24px', borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
+                                    <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <span style={{ fontSize: '1.1rem' }}>👨‍🏫</span>
+                                      Anwesende Coaches diese Woche:
+                                    </h4>
+                                    <div style={{ display: 'flex', flexDirection: 'row', gap: '8px', flexWrap: 'nowrap' }}>
+                                      {teacherPresences.map((pres, idx) => (
+                                        <div key={idx} style={{ 
+                                          display: 'flex', 
+                                          alignItems: 'center', 
+                                          gap: '8px', 
+                                          background: '#f8fafc', 
+                                          border: '1px solid #f1f5f9', 
+                                          padding: '8px 12px', 
+                                          borderRadius: '12px',
+                                          flex: '1 1 0px',
+                                          minWidth: '0'
+                                        }}>
+                                          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#f59e0b', flexShrink: 0 }}></div>
+                                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`${pres.teacherName} — ${pres.day}. ${pres.rangeStr}`}>
+                                            <span style={{ color: '#1e293b', fontWeight: 900 }}>{pres.teacherName}</span> — {pres.day}. {pres.rangeStr}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                            </>
+                          );
+                        })()}
+                    </div>
+
+                    {/* Coached Bands */}
+                    <div className="glass-panel" style={{ background: 'white', borderRadius: '32px', padding: '32px' }}>
+                      <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: '0 0 24px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ color: '#ec4899' }}><Users size={24} /></div>
+                        Meine betreuten Bands
+                      </h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        {(() => {
+                          const coachedBands = (allBands || []).filter((b: any) => b.coach_id === user.id);
+                          if (coachedBands.length === 0) {
+                            return <div style={{ textAlign: 'center', padding: '40px 0', color: '#cbd5e1' }}>Du betreust aktuell keine Bands.</div>;
+                          }
+                          return coachedBands.map((b: any) => (
+                            <button 
+                              key={b.id} 
+                              className="hover-card" 
+                              onClick={() => {
+                                setSelectedBandForProfile(b);
+                                setShowBandProfile(true);
+                              }}
+                              style={{ width: '100%', textAlign: 'left', cursor: 'pointer', padding: '24px', background: '#fff', borderRadius: '24px', border: '1px solid #f1f5f9', display: 'flex', gap: '20px', alignItems: 'center', transition: 'all 0.2s' }}>
+                              {renderBandAvatar(b.name, b.photo_url, '64px', '18px')}
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b' }}>{b.name}</div>
+                                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b', marginTop: '2px' }}>
+                                  {b.songs?.title || b.band_songs?.[0]?.songs?.title || b.genre || 'Jam Session'}
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                                  <div style={{ display: 'flex', gap: '0' }}>
+                                    {b.band_members?.slice(0, 5).map((m: any, idx: number) => {
+                                      const u = Array.isArray(m.users) ? m.users[0] : m.users;
+                                      return (
+                                        <div key={idx} style={{ 
+                                          width: '28px', 
+                                          height: '28px', 
+                                          borderRadius: '50%', 
+                                          border: '2px solid white', 
+                                          marginLeft: idx === 0 ? 0 : '-10px', 
+                                          overflow: 'hidden', 
+                                          background: m.user_id ? '#f1f5f9' : '#000000',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          zIndex: 5 - idx
+                                        }}>
+                                          {m.user_id ? (
+                                            <StudioAvatar src={u?.photo_url} />
+                                          ) : (
+                                            <span style={{ color: 'white', fontSize: '0.6rem', fontWeight: 900 }}>{m.external_name?.[0] || 'E'}</span>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                            </button>
+                          ));
+                        })()}
                       </div>
                     </div>
                   </div>

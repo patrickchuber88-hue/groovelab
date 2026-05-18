@@ -1102,22 +1102,82 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
   };
 
   const handleAddMember = async (bandId: string, uId: string | null, instrument: string, extName?: string) => {
-    await supabase.from('band_members').insert({ band_id: bandId, user_id: uId, instrument, external_name: extName, confetti_seen: true });
-    
-    const { data: bandSongs } = await supabase.from('band_songs').select('id').eq('band_id', bandId);
-    if (bandSongs && bandSongs.length > 0) {
-       const slotsToInsert = bandSongs.map((bs: any) => ({
-          band_song_id: bs.id,
-          user_id: uId,
-          instrument: instrument,
-          status: 'joined',
-          external_name: extName || null
-       }));
-       await supabase.from('band_song_slots').insert(slotsToInsert);
+    try {
+      const insertData: any = {
+        band_id: bandId,
+        user_id: uId,
+        instrument: instrument,
+        confetti_seen: true
+      };
+      if (extName) {
+        insertData.external_name = extName;
+      }
+
+      let { error } = await supabase.from('band_members').insert(insertData);
+      if (error && error.message.includes('external_name')) {
+        if (!uId) {
+          throw new Error("Der Server unterstützt keine externen Mitglieder. Bitte führen Sie die SQL-Migration aus.");
+        }
+        const fallbackData = { ...insertData };
+        delete fallbackData.external_name;
+        const { error: retryErr } = await supabase.from('band_members').insert(fallbackData);
+        if (retryErr) throw retryErr;
+      } else if (error) {
+        throw error;
+      }
+      
+      const { data: bandSongs } = await supabase.from('band_songs').select('id').eq('band_id', bandId);
+      if (bandSongs && bandSongs.length > 0) {
+         // Fetch existing slots to dynamically calculate non-conflicting part_number
+         const songIds = bandSongs.map((bs: any) => bs.id);
+         const { data: existingSlots } = await supabase
+            .from('band_song_slots')
+            .select('band_song_id, instrument, part_number')
+            .in('band_song_id', songIds);
+
+         const slotsToInsert = bandSongs.map((bs: any) => {
+            const matchingSlots = (existingSlots || []).filter(
+               (s: any) => s.band_song_id === bs.id && s.instrument === instrument
+            );
+            const maxPart = matchingSlots.reduce((max: number, s: any) => Math.max(max, s.part_number || 1), 0);
+            const nextPart = maxPart + 1;
+
+            const slotObj: any = {
+               band_song_id: bs.id,
+               user_id: uId,
+               instrument: instrument,
+               part_number: nextPart,
+               status: 'joined'
+            };
+            if (extName) {
+               slotObj.external_name = extName;
+            }
+            return slotObj;
+         });
+
+         let { error: slotErr } = await supabase.from('band_song_slots').insert(slotsToInsert);
+         if (slotErr && slotErr.message.includes('external_name')) {
+            if (!uId) {
+               console.error("Failed to insert slots for external member:", slotErr);
+            } else {
+               const cleanedSlots = slotsToInsert.map((s: any) => {
+                  const copy = { ...s };
+                  delete copy.external_name;
+                  return copy;
+               });
+               const { error: retrySlotErr } = await supabase.from('band_song_slots').insert(cleanedSlots);
+               if (retrySlotErr) throw retrySlotErr;
+            }
+         } else if (slotErr) {
+            throw slotErr;
+         }
+      }
+      
+      setShowAddMember(null);
+      fetchData();
+    } catch (err: any) {
+      alert('Fehler beim Hinzufügen: ' + err.message);
     }
-    
-    setShowAddMember(null);
-    fetchData();
   };
 
   const handleApproveSubmission = async (subId: string) => {

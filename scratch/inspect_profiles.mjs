@@ -1,26 +1,43 @@
-import { createClient } from '@supabase/supabase-js'
-import fs from 'fs'
+import { createClient } from '@supabase/supabase-js';
+import fs from 'fs';
 
-const env = fs.readFileSync('.env.local', 'utf-8');
-const url = env.match(/VITE_SUPABASE_URL=(.*)/)[1].trim().replace(/['"]/g, '');
-const key = env.match(/VITE_SUPABASE_ANON_KEY=(.*)/)[1].trim().replace(/['"]/g, '');
-const supabase = createClient(url, key);
+// Parse .env.local manually
+const envPath = './.env.local';
+const envContent = fs.readFileSync(envPath, 'utf8');
+const env = {};
+envContent.split(/\r?\n/).forEach(line => {
+  const parts = line.split('=');
+  if (parts.length >= 2) {
+    const key = parts[0].trim();
+    const val = parts.slice(1).join('=').trim().replace(/^['"]|['"]$/g, '');
+    env[key] = val;
+  }
+});
+
+const supabaseUrl = env.VITE_SUPABASE_URL || '';
+const supabaseKey = env.VITE_SUPABASE_ANON_KEY || '';
+
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function main() {
-  const schoolId = '11111111-1111-1111-1111-111111111111';
-  const { data: formingBands } = await supabase
-    .from('bands')
-    .select('*, band_members(*, profiles:users(id, first_name, photo_url)), band_songs(*, band_song_slots(*, profiles:users!band_song_slots_user_id_fkey(id, first_name, photo_url)))')
-    .eq('school_id', schoolId)
-    .eq('status', 'forming');
-
-  console.log("formingBands:");
-  formingBands.forEach(b => {
-    console.log(`Band Name: ${b.name}`);
-    b.band_members.forEach(bm => {
-      console.log(`  bm.user_id: ${bm.user_id}, bm.instrument: ${bm.instrument}, typeof bm.profiles:`, typeof bm.profiles, "isArray:", Array.isArray(bm.profiles), "profiles:", bm.profiles);
-    });
-  });
+  const ids = [
+    "336f009c-fe9d-462f-abcc-24a1dc840f68",
+    "3e94f08d-200c-4b84-af0a-2a98c508cfd4",
+    "55555555-5555-5555-5555-555555555555"
+  ];
+  
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, first_name, role')
+    .in('id', ids);
+    
+  if (error) {
+    console.error("Error fetching profiles:", error);
+    return;
+  }
+  
+  console.log("Profiles details:");
+  console.log(JSON.stringify(data, null, 2));
 }
 
 main();
