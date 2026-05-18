@@ -3920,7 +3920,24 @@ function App() {
           <ErrorBoundary>
             <div className="animation-slide-up" style={{ width: '100%', padding: '0px 48px 48px 48px' }}>
               <h1 style={{ fontSize: '2rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.04em', marginBottom: '8px', marginTop: '16px' }}>Live Lab</h1>
-              <TeacherDashboard userId={user.id} hideHeader={true} viewMode="student" />
+              <TeacherDashboard 
+                userId={user.id} 
+                hideHeader={true} 
+                viewMode="student" 
+                onTabChange={setActiveStudentTab}
+                onFoundBand={(form, mySlot) => {
+                  setSuggestingSkill({
+                    ...mySlot,
+                    isLeader: true,
+                    leaderName: 'Du',
+                    song_id: form.song?.id || form.song_id,
+                    songs: { id: form.song?.id || form.song_id, title: form.song?.title },
+                    formation_group: form.groupKey || form.id,
+                    members: form.members
+                  });
+                  setFoundingName(generateRandomBandName());
+                }}
+              />
             </div>
           </ErrorBoundary>
         )}

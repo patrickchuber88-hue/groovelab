@@ -307,9 +307,10 @@ interface TeacherDashboardProps {
   viewMode?: 'admin' | 'student';
   onTabChange?: (tab: string) => void;
   onOpenBandProfile?: (band: any) => void;
+  onFoundBand?: (form: any, mySlot: any) => void;
 }
 
-export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideHeader = false, viewMode = 'admin', onTabChange, onOpenBandProfile }: TeacherDashboardProps) {
+export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideHeader = false, viewMode = 'admin', onTabChange, onOpenBandProfile, onFoundBand }: TeacherDashboardProps) {
   const [teacher, setTeacher] = useState<any>(null);
   const [stations, setStations] = useState<any[]>([]);
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
@@ -1606,18 +1607,56 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
                                 GESUCHT: {form.missingInstruments.join(', ').toUpperCase()}
                               </div>
                             ) : (
-                              <div style={{ 
-                                fontSize: '0.75rem', 
-                                fontWeight: 1000, 
-                                color: '#166534', 
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.08em',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px'
-                              }}>
-                                <span>✨</span> BEREIT FÜR BAND-GRÜNDUNG! 🎸
-                              </div>
+                             (() => {
+                               const mySlot = viewMode === 'student' && form.members?.find((m: any) => m.user_id === userId);
+                               if (mySlot) {
+                                 return (
+                                   <button
+                                     onClick={(e) => {
+                                       e.stopPropagation();
+                                       if (onFoundBand) {
+                                         onFoundBand(form, mySlot);
+                                       }
+                                     }}
+                                     className="hero-cta-artistic"
+                                     style={{
+                                       width: '100%',
+                                       background: 'linear-gradient(135deg, #10b981, #059669)',
+                                       border: 'none',
+                                       padding: '12px 18px',
+                                       borderRadius: '14px',
+                                       fontSize: '0.85rem',
+                                       fontWeight: 900,
+                                       color: 'white',
+                                       cursor: 'pointer',
+                                       display: 'flex',
+                                       alignItems: 'center',
+                                       justifyContent: 'center',
+                                       gap: '6px',
+                                       boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
+                                       transition: 'all 0.2s',
+                                       marginTop: '8px'
+                                     }}
+                                   >
+                                     <Zap size={14} fill="white" /> JETZT BAND GRÜNDEN 🚀
+                                   </button>
+                                 );
+                               }
+                               return (
+                                 <div style={{ 
+                                   fontSize: '0.75rem', 
+                                   fontWeight: 1000, 
+                                   color: '#166534', 
+                                   textTransform: 'uppercase',
+                                   letterSpacing: '0.08em',
+                                   display: 'flex',
+                                   alignItems: 'center',
+                                   gap: '6px'
+                                 }}>
+                                   <span>✨</span> BEREIT FÜR BAND-GRÜNDUNG! 🎸
+                                 </div>
+                               );
+                             })()
                             )}
                           </div>
                        );
