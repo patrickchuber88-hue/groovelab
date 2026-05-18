@@ -3240,7 +3240,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       acc[key].instruments.push({
         name: s.instrument,
         part_number: s.part_number || 1,
-        progress: s.progress_percent || 0,
+        progress: s.is_stage_ready ? 100 : (s.progress_percent || 0),
         is_stage_ready: s.is_stage_ready
       });
       return acc;
