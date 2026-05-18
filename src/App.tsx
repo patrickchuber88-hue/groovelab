@@ -5893,12 +5893,34 @@ function App() {
                 <div style={{ marginTop: '20px', fontSize: '0.75rem', color: brandColor, fontWeight: 800, letterSpacing: '0.05em' }} className="animate-pulse">
                   BITTE KURZ WARTEN...
                 </div>
+
+                <button 
+                  onClick={() => dismissSuggestion(suggestingSkill.id || suggestingSkill.skill_id)}
+                  style={{ 
+                    marginTop: '24px',
+                    width: '100%', 
+                    background: brandColor, 
+                    border: 'none', 
+                    padding: '16px 24px', 
+                    borderRadius: '16px', 
+                    fontSize: '1rem', 
+                    fontWeight: 900, 
+                    color: 'white', 
+                    cursor: 'pointer',
+                    boxShadow: `0 8px 20px ${brandColor}20`,
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
+                  onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                >
+                  ZURÜCK ZUM DASHBOARD
+                </button>
               </div>
             )}
 
             {/* Cancel Button */}
             <button 
-              onClick={() => dismissSuggestion(suggestingSkill.id)}
+              onClick={() => dismissSuggestion(suggestingSkill.id || suggestingSkill.skill_id)}
               style={{ width: '100%', background: 'transparent', border: 'none', padding: '12px', fontSize: '0.9rem', fontWeight: 700, color: '#94a3b8', cursor: 'pointer', marginTop: '16px' }}
             >
               Abbrechen

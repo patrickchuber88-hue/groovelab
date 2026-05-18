@@ -258,7 +258,30 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
           })}
         </div>
 
-        <div style={{ marginTop: '80px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '40px' }}>
+        <div style={{ marginTop: '50px', display: 'flex', justifyContent: 'center' }}>
+          <button 
+            onClick={onClose}
+            style={{ 
+              background: 'linear-gradient(135deg, #10b981, #059669)', 
+              border: 'none', 
+              padding: '18px 45px', 
+              borderRadius: '20px', 
+              fontSize: '1.15rem', 
+              fontWeight: 900, 
+              color: 'white', 
+              cursor: 'pointer', 
+              boxShadow: '0 10px 30px rgba(16, 185, 129, 0.4)',
+              transition: 'all 0.2s',
+              letterSpacing: '0.02em'
+            }}
+            onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'}
+            onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+          >
+            BÜHNE FREI – ZUM DASHBOARD 🚀
+          </button>
+        </div>
+
+        <div style={{ marginTop: '50px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '30px' }}>
            <p style={{ color: 'rgba(255,255,255,0.3)', fontStyle: 'italic', fontSize: '1rem', maxWidth: '500px', margin: '0 auto', lineHeight: 1.6 }}>
              "Der Künstler ist nichts ohne die Gabe, aber die Gabe ist nichts ohne die Arbeit."
            </p>
