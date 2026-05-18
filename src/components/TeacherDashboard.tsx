@@ -938,9 +938,9 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
           });
         });
 
-        // Combine and sort (Limit to 2 for the dashboard widget, prioritizing most complete, but hiding complete formations)
+        // Combine and sort (Limit to 2 for the dashboard widget, prioritizing most complete, including complete formations so they can be founded)
         const allMatching = [...bandFormations, ...poolFormations]
-          .filter(f => f.openSlots > 0)
+          .filter(f => f.openSlots >= 0)
           .sort((a, b) => a.openSlots - b.openSlots)
           .slice(0, 2);
 
