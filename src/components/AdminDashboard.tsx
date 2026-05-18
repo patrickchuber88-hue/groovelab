@@ -524,7 +524,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           .eq('school_id', adminData.school_id)
           .order('name');
         if (bandsData) {
-          setAllBands(bandsData); 
+          const filteredBands = bandsData.filter((b: any) => b.name !== '__SYSTEM_ANNOUNCEMENTS__');
+          setAllBands(filteredBands); 
           if (editingBand) {
             const updated = bandsData.find((b: any) => b.id === editingBand.id);
             if (updated) {

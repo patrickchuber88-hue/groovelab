@@ -4404,16 +4404,9 @@ function App() {
             </>
           ) : (
             <>
-              <button onClick={() => setActiveStudentTab('live')} className={`sidebar-item ${activeStudentTab === 'live' ? 'active' : ''}`} style={{
-                background: activeStudentTab === 'live' ? 'white' : 'transparent',
-                color: activeStudentTab === 'live' ? '#1e293b' : '#64748b',
-                borderRadius: '16px',
-                padding: '14px 16px',
-                marginBottom: '8px',
-                boxShadow: activeStudentTab === 'live' ? '0 4px 15px rgba(0,0,0,0.05)' : 'none',
-                border: activeStudentTab === 'live' ? '1px solid #f1f5f9' : 'none'
-              }}>
-                <Monitor size={20} color={activeStudentTab === 'live' ? '#1e293b' : '#64748b'} /> Live Lab
+              <button onClick={() => setActiveStudentTab('live')} className={`sidebar-item ${activeStudentTab === 'live' ? 'active' : ''}`} style={{ position: 'relative' }}>
+                <Monitor size={20} /> Live Lab
+                <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 6px #ef4444', marginLeft: 'auto', flexShrink: 0 }} className="animate-pulse"></div>
               </button>
               <button onClick={() => setActiveStudentTab('messages')} className={`sidebar-item ${activeStudentTab === 'messages' ? 'active' : ''}`}>
                 <Mail size={20} /> Nachrichten
