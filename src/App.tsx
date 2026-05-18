@@ -1121,6 +1121,7 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
 function App() {
   const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => sessionStorage.getItem('groovelab_user_id'));
   const [loading, setLoading] = useState(false);
+  const [isSchoolPaused, setIsSchoolPaused] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [session, setSession] = useState<any>(null);
   const [totalPresenceMins, setTotalPresenceMins] = useState(0);
@@ -1806,6 +1807,18 @@ function App() {
         setUser(userData);
         setLoading(false);
         return;
+      }
+
+      const schoolData = Array.isArray(userData.schools) ? userData.schools[0] : userData.schools;
+      const isMaster = userData.is_master_admin === true;
+      if (schoolData?.is_paused && !isMaster) {
+        console.warn('[Dashboard] School is paused!');
+        setIsSchoolPaused(true);
+        setUser(userData);
+        setLoading(false);
+        return;
+      } else {
+        setIsSchoolPaused(false);
       }
 
       const bandIds = (membershipsRes?.data || []).map((m: any) => m.bands?.id).filter(Boolean);
@@ -4122,6 +4135,79 @@ function App() {
   // 2.5 MASTER ADMIN PORTAL BYPASS
   if (user.is_master_admin) {
     return <MasterAdminDashboard onLogout={handleLogout} />;
+  }
+
+  // 2.6 DEACTIVATED / PAUSED SCHOOL CHECK
+  if (isSchoolPaused) {
+    return (
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        background: '#09090b',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#ffffff',
+        padding: '24px',
+        textAlign: 'center',
+        fontFamily: '"Outfit", "Inter", sans-serif',
+        zIndex: 9999
+      }}>
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.03)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          padding: '48px 32px',
+          borderRadius: '32px',
+          maxWidth: '480px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+        }}>
+          <div style={{
+            width: '80px',
+            height: '80px',
+            borderRadius: '24px',
+            background: 'rgba(239, 68, 68, 0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: '24px',
+            border: '1px solid rgba(239, 68, 68, 0.2)'
+          }}>
+            <Clock size={40} color="#ef4444" className="animate-pulse" />
+          </div>
+          <h1 style={{ fontSize: '1.8rem', fontWeight: 900, margin: '0 0 16px 0', letterSpacing: '-0.02em', color: '#f8fafc' }}>
+            Zugang pausiert
+          </h1>
+          <p style={{ color: '#94a3b8', fontSize: '0.95rem', lineHeight: '1.6', margin: '0 0 32px 0' }}>
+            Diese Schule wurde vorübergehend deaktiviert. Schüler- und Lehrerprofile sind für die Dauer der Deaktivierung nicht nutzbar und es können keine Daten geladen oder gesendet werden.
+          </p>
+          <button
+            onClick={() => handleLogout(false)}
+            style={{
+              padding: '14px 28px',
+              borderRadius: '14px',
+              background: '#ffffff',
+              color: '#09090b',
+              border: 'none',
+              fontWeight: 800,
+              fontSize: '0.95rem',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(255,255,255,0.1)',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+            onMouseLeave={(e) => e.currentTarget.style.transform = 'none'}
+          >
+            Abmelden
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // If a normal student/teacher is logged in without a station, send to setup

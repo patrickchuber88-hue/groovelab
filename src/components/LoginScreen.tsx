@@ -138,6 +138,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const finalizeLogin = async (user: any, stationId: string | null, isWithinAnyRoom: boolean) => {
     try {
       setLoading(true);
+      const schoolData = Array.isArray(user.schools) ? user.schools[0] : user.schools;
+      const isMaster = user.is_master_admin === true;
+      if (schoolData?.is_paused && !isMaster) {
+        alert("Diese Schule ist vorübergehend pausiert/deaktiviert. Login derzeit nicht möglich.");
+        setLoading(false);
+        return;
+      }
       const now = new Date().toISOString();
       const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
       
@@ -173,7 +180,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       }
 
       // 1.5 Check opening hours for sessions (Students only)
-      const schoolData = Array.isArray((user as any).schools) ? (user as any).schools[0] : (user as any).schools;
       const openingHours = schoolData?.opening_hours;
       const withinHours = isWithinOpeningHours(openingHours);
       const enforceHours = openingHours?.enforce_hours !== false; // Default to true if not set

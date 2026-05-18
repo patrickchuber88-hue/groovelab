@@ -12,6 +12,7 @@ interface School {
   logo_url: string | null;
   primary_color: string;
   created_at?: string;
+  is_paused?: boolean;
 }
 
 interface MasterAdminDashboardProps {
@@ -204,6 +205,23 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
       alert('Fehler beim Löschen: ' + err.message);
     }
   };
+
+  const handleToggleSchoolPause = async (id: string, currentPaused: boolean | undefined) => {
+    const nextPaused = !currentPaused;
+    try {
+      const { error } = await supabase
+        .from('schools')
+        .update({ is_paused: nextPaused })
+        .eq('id', id);
+
+      if (error) throw error;
+      fetchSchoolsAndStats();
+    } catch (err: any) {
+      console.error('Fehler beim Ändern des Pause-Status:', err.message);
+      alert('Fehler beim Umschalten des Status: ' + err.message);
+    }
+  };
+
 
   const copyInviteLink = (schoolId: string) => {
     const inviteUrl = `${window.location.origin}?invite_school_id=${schoolId}&role=teacher`;
@@ -403,6 +421,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                   <tr style={{ borderBottom: '1.5px solid #f1f5f9' }}>
                     <th style={{ padding: '12px 16px', color: '#64748b', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schule</th>
                     <th style={{ padding: '12px 16px', color: '#64748b', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Primary Color</th>
+                    <th style={{ padding: '12px 16px', color: '#64748b', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</th>
                     <th style={{ padding: '12px 16px', color: '#64748b', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Lehrer Einladen</th>
                     <th style={{ padding: '12px 16px', color: '#64748b', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Aktionen</th>
                   </tr>
@@ -474,6 +493,46 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                             border: '1.5px solid rgba(0,0,0,0.05)'
                           }}></div>
                           <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: '#475569', fontWeight: 600 }}>{school.primary_color}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleSchoolPause(school.id, school.is_paused)}
+                            style={{
+                              position: 'relative',
+                              width: '46px',
+                              height: '24px',
+                              borderRadius: '12px',
+                              background: school.is_paused ? '#cbd5e1' : '#22c55e',
+                              border: 'none',
+                              cursor: 'pointer',
+                              padding: '0',
+                              transition: 'background-color 0.2s ease',
+                              display: 'flex',
+                              alignItems: 'center',
+                              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.1)'
+                            }}
+                          >
+                            <div style={{
+                              width: '18px',
+                              height: '18px',
+                              borderRadius: '50%',
+                              background: '#ffffff',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                              transition: 'transform 0.2s ease',
+                              transform: school.is_paused ? 'translateX(3px)' : 'translateX(25px)'
+                            }} />
+                          </button>
+                          <span style={{
+                            fontSize: '0.85rem',
+                            fontWeight: 700,
+                            color: school.is_paused ? '#64748b' : '#22c55e',
+                            minWidth: '55px'
+                          }}>
+                            {school.is_paused ? 'Pausiert' : 'Aktiv'}
+                          </span>
                         </div>
                       </td>
                       <td style={{ padding: '16px' }}>
