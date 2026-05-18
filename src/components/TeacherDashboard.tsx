@@ -1395,21 +1395,21 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
             )}
 
             {/* Bandprobe Vorschläge Widget */}
-            <div className="card" style={{ 
-              padding: '24px', 
-              background: 'linear-gradient(135deg, #f0fdf4 0%, #f0fdfa 100%)', 
-              border: '1px solid #dcfce7',
-              borderRadius: '32px',
-              boxShadow: '0 10px 30px rgba(22, 163, 74, 0.05)'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                <div style={{ background: '#22c55e', color: 'white', padding: '8px', borderRadius: '10px' }}>
-                  <Clock size={18} />
+            {rehearsalSuggestions.length > 0 && (
+              <div className="card" style={{ 
+                padding: '24px', 
+                background: 'linear-gradient(135deg, #f0fdf4 0%, #f0fdfa 100%)', 
+                border: '1px solid #dcfce7',
+                borderRadius: '32px',
+                boxShadow: '0 10px 30px rgba(22, 163, 74, 0.05)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                  <div style={{ background: '#22c55e', color: 'white', padding: '8px', borderRadius: '10px' }}>
+                    <Clock size={18} />
+                  </div>
+                  <h3 style={{ fontSize: '0.85rem', fontWeight: 1000, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>Bandprobe Vorschläge</h3>
                 </div>
-                <h3 style={{ fontSize: '0.85rem', fontWeight: 1000, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>Bandprobe Vorschläge</h3>
-              </div>
-              
-              {rehearsalSuggestions.length > 0 ? (
+                
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {rehearsalSuggestions.map((s, idx) => (
                     <div key={idx} style={{ 
@@ -1442,22 +1442,8 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
                     </div>
                   ))}
                 </div>
-              ) : (
-                <div style={{ 
-                  background: 'rgba(255,255,255,0.5)', 
-                  padding: '12px 16px', 
-                  borderRadius: '16px', 
-                  border: '1px dashed rgba(34, 197, 94, 0.2)',
-                  textAlign: 'center',
-                  fontSize: '0.75rem',
-                  color: '#166534',
-                  lineHeight: '1.4',
-                  fontWeight: 750
-                }}>
-                  {viewMode === 'student' ? 'Noch keine Probezeit-Übereinstimmungen. Trage deine Zeiten im Labor-Planer ein!' : 'Noch keine Probezeit-Übereinstimmungen für deine Band-Mitglieder vorhanden.'}
-                </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Band-Matching Section */}
             <div className="card" style={{ 
