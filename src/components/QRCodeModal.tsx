@@ -1,7 +1,7 @@
 import QRCode from 'react-qr-code';
 import { X, Download } from 'lucide-react';
 import { toJpeg } from 'html-to-image';
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 
 interface QRCodeModalProps {
   user: {
@@ -17,6 +17,70 @@ interface QRCodeModalProps {
 export function QRCodeModal({ user, onClose }: QRCodeModalProps) {
   const brandColor = 'var(--primary-color)';
   const cardRef = useRef<HTMLDivElement>(null);
+  const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const originalUrl = user.photo_url || '/avatar_ghost.jpg';
+    
+    if (originalUrl.startsWith('data:') || originalUrl.startsWith('blob:')) {
+      setAvatarDataUrl(originalUrl);
+      return;
+    }
+
+    const loadAndConvert = async () => {
+      try {
+        let url = new URL(originalUrl, window.location.origin).href;
+        
+        if (originalUrl !== '/avatar_ghost.jpg') {
+          const separator = url.includes('?') ? '&' : '?';
+          url = `${url}${separator}cb=${Date.now()}`;
+        }
+        
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Network response was not ok');
+        const blob = await response.blob();
+        
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          if (active) {
+            setAvatarDataUrl(reader.result as string);
+          }
+        };
+        reader.readAsDataURL(blob);
+      } catch (err) {
+        console.warn('Could not convert image to base64, using fallback URL:', err);
+        if (active) {
+          setAvatarDataUrl(originalUrl);
+        }
+      }
+    };
+
+    loadAndConvert();
+    return () => {
+      active = false;
+    };
+  }, [user.photo_url]);
+
+  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.src.startsWith('data:')) return;
+
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth || img.width || 120;
+      canvas.height = img.naturalHeight || img.height || 120;
+      
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg');
+        setAvatarDataUrl(dataUrl);
+      }
+    } catch (err) {
+      console.warn('OnLoad canvas conversion failed:', err);
+    }
+  };
 
   const downloadImage = async () => {
     if (cardRef.current === null) return;
@@ -123,7 +187,8 @@ export function QRCodeModal({ user, onClose }: QRCodeModalProps) {
               overflow: 'hidden'
             }}>
               <img 
-                src={user.photo_url || '/avatar_ghost.jpg'} 
+                src={avatarDataUrl || '/avatar_ghost.jpg'} 
+                onLoad={handleImageLoad}
                 crossOrigin="anonymous"
                 alt="Profile"
                 style={{ 

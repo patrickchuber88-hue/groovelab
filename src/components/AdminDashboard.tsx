@@ -176,6 +176,76 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [songAlphaFilter, setSongAlphaFilter] = useState<string | null>(null);
   
   const [selectedQRUser, setSelectedQRUser] = useState<any>(null);
+  const [qrAvatarDataUrl, setQrAvatarDataUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedQRUser) {
+      setQrAvatarDataUrl(null);
+      return;
+    }
+    
+    let active = true;
+    const originalUrl = selectedQRUser.photo_url || '/avatar_ghost.jpg';
+    
+    if (originalUrl.startsWith('data:') || originalUrl.startsWith('blob:')) {
+      setQrAvatarDataUrl(originalUrl);
+      return;
+    }
+
+    const loadAndConvert = async () => {
+      try {
+        let url = new URL(originalUrl, window.location.origin).href;
+        
+        if (originalUrl !== '/avatar_ghost.jpg') {
+          const separator = url.includes('?') ? '&' : '?';
+          url = `${url}${separator}cb=${Date.now()}`;
+        }
+        
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Network response was not ok');
+        const blob = await response.blob();
+        
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          if (active) {
+            setQrAvatarDataUrl(reader.result as string);
+          }
+        };
+        reader.readAsDataURL(blob);
+      } catch (err) {
+        console.warn('Could not convert image to base64, using fallback URL:', err);
+        if (active) {
+          setQrAvatarDataUrl(originalUrl);
+        }
+      }
+    };
+
+    loadAndConvert();
+    return () => {
+      active = false;
+    };
+  }, [selectedQRUser]);
+
+  const handleQRImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.src.startsWith('data:')) return;
+
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth || img.width || 120;
+      canvas.height = img.naturalHeight || img.height || 120;
+      
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg');
+        setQrAvatarDataUrl(dataUrl);
+      }
+    } catch (err) {
+      console.warn('QR OnLoad canvas conversion failed:', err);
+    }
+  };
+
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [studentDetails, setStudentDetails] = useState<any>(null);
   const [studentLabMins, setStudentLabMins] = useState(0);
@@ -3052,20 +3122,12 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const renderStudentDetailModal = () => {
     if (!selectedStudent) return null;
 
-    const calculateAge = (birthDate: string) => {
-      if (!birthDate) return null;
-      const birth = new Date(birthDate);
-      const now = new Date();
-      let age = now.getFullYear() - birth.getFullYear();
-      const m = now.getMonth() - birth.getMonth();
-      if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
-      return age;
-    };
+
 
     const memberSince = selectedStudent.created_at
       ? new Date(selectedStudent.created_at).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
       : '';
-    const age = calculateAge(selectedStudent.birth_date);
+
 
     // Instrument normalization helper
     const getInstrumentIcon = (name: string) => {
@@ -3150,11 +3212,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
                     <Calendar size={14} /> Member seit {memberSince}
                   </div>
-                  {(selectedStudent.age || age) && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
-                      <User size={14} /> {selectedStudent.age || age} Jahre
-                    </div>
-                  )}
+
                   <div style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', padding: '4px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 950, display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }}>
                     <Star size={12} fill="white" /> {(studentDetails || []).filter((s: any) => s.is_stage_ready).length * 100} XP
                   </div>
@@ -3654,20 +3712,24 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 border: `4px solid ${selectedQRUser.role === 'student' ? brandColor : '#f59e0b'}`,
                 padding: '4px',
                 background: 'white',
-                boxShadow: '0 8px 20px rgba(0,0,0,0.05)'
+                boxShadow: '0 8px 20px rgba(0,0,0,0.05)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden'
               }}>
-                <div style={{ 
-                  width: '100%', 
-                  height: '100%', 
-                  borderRadius: '50%', 
-                  overflow: 'hidden',
-                  backgroundImage: `url(${selectedQRUser.photo_url || '/avatar_ghost.jpg'})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                  backgroundRepeat: 'no-repeat',
-                  backgroundColor: '#f1f5f9'
-                }}>
-                </div>
+                <img 
+                  src={qrAvatarDataUrl || '/avatar_ghost.jpg'} 
+                  onLoad={handleQRImageLoad}
+                  crossOrigin="anonymous"
+                  alt="Profile"
+                  style={{ 
+                    width: '100%', 
+                    height: '100%', 
+                    objectFit: 'cover',
+                    borderRadius: '50%'
+                  }} 
+                />
               </div>
 
               {/* Identity */}

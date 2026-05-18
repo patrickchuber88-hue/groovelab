@@ -1561,7 +1561,7 @@ function App() {
       // 1. Dashboard Data Fetch (Interval)
       const dashboardInterval = setInterval(() => {
         fetchDashboardData(loggedInUserId);
-      }, 5000);
+      }, 15000);
 
       // 2. Continuous Geofence & Heartbeat Monitor (Students only)
       const heartbeatInterval = setInterval(async () => {
@@ -1684,40 +1684,104 @@ function App() {
       if (isInitial) setLoading(true);
       console.log(`[Dashboard] Fetching data for user: ${userId}`);
       
-      const [userRes, sessionRes, allSessionsRes, skillsRes, membershipsRes] = await Promise.all([
+      // Stage 1: Fetch user record, current session, and initial memberships (containing user's bands) in parallel
+      const [userRes, sessionRes, allSessionsRes, membershipsRes] = await Promise.all([
         supabase.from('users').select('*, schools(*)').eq('id', userId).maybeSingle(),
         supabase.from('sessions').select('*, stations(name)').eq('user_id', userId).is('check_out_time', null).order('check_in_time', { ascending: false }).limit(1).maybeSingle(),
         supabase.from('sessions').select('check_in_time, check_out_time').eq('user_id', userId),
-        supabase.from('user_song_skills').select(`
-          id, progress_percent, is_stage_ready, is_pending_approval, instrument, part_number, difficulty_level, is_favorite, verified_by_id,
-          songs (id, title, artist, media_link, tomplay_url, instrumentation, pdf_folder_url, guitar_pro_url, pdf_drums_url, pdf_guitar_url, pdf_bass_url, pdf_vocals_url, pdf_keys_url)
-        `).eq('user_id', userId),
         supabase.from('band_members').select('instrument, bands(id, name, school_id, song_id, status, photo_url, songs(*), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))))').eq('user_id', userId)
       ]).catch(err => {
-        console.error('[Dashboard] Critical Fetch Error:', err);
-        return [ {error: err}, {error: err}, {error: err}, {error: err}, {error: err} ] as any;
+        console.error('[Dashboard] Critical Fetch Error Stage 1:', err);
+        return [ {error: err}, {error: err}, {error: err}, {error: err} ] as any;
       });
 
       if (userRes.error) console.error('[Dashboard] User Fetch Error:', userRes.error);
-      if (skillsRes.error) console.error('[Dashboard] Skills Fetch Error:', skillsRes.error);
       if (membershipsRes.error) console.error('[Dashboard] Memberships Fetch Error:', membershipsRes.error);
 
       const userData = userRes.data;
-      
       if (!userData) {
         console.warn('[Dashboard] No user data found for ID:', userId);
         setLoading(false);
         return;
       }
 
-      if (!userData.school_id && userData.schools) {
-        userData.school_id = Array.isArray(userData.schools) ? userData.schools[0]?.id : userData.schools?.id;
+      const schoolId = userData.school_id || (Array.isArray(userData.schools) ? userData.schools[0]?.id : userData.schools?.id);
+      if (!schoolId) {
+        console.warn('[Dashboard] No school_id found. Board will be empty.');
+        setUser(userData);
+        setLoading(false);
+        return;
       }
-      
-      setUser(userData);
 
+      const bandIds = (membershipsRes?.data || []).map((m: any) => m.bands?.id).filter(Boolean);
+
+      // Stage 2: Fetch all detailed boards, library, school bands, teachers, active session metrics in a single parallel block
+      const [skillsRes, wallRes, membersRes, formingBandsRes, songsRes, userBandsRes, bandsRes, teachersRes, activeSessionsRes] = await Promise.all([
+        supabase.from('user_song_skills').select(`
+          id, progress_percent, is_stage_ready, is_pending_approval, instrument, part_number, difficulty_level, is_favorite, verified_by_id,
+          songs (id, title, artist, media_link, tomplay_url, instrumentation, pdf_folder_url, guitar_pro_url, pdf_drums_url, pdf_guitar_url, pdf_bass_url, pdf_vocals_url, pdf_keys_url)
+        `).eq('user_id', userId),
+        supabase.from('songs').select(`
+          id, artist, title, media_link, instrumentation,
+          user_song_skills (
+            id, song_id, instrument, part_number, difficulty_level, is_stage_ready, user_id, created_at, formation_group,
+            profiles:users!user_song_skills_user_id_fkey(first_name, photo_url, school_id)
+          ),
+          band_songs (
+            id, band_id, status, is_exclusive, difficulty_level,
+            bands (id, name, photo_url, school_id),
+            band_song_slots (
+              id, user_id, instrument, status,
+              profiles:users!band_song_slots_user_id_fkey(first_name, photo_url)
+            )
+          )
+        `).eq('school_id', schoolId),
+        supabase.from('band_members').select('user_id, bands!inner(id, status, song_id, school_id, band_songs(song_id, status))').eq('bands.school_id', schoolId),
+        supabase.from('bands').select('*, band_members(*, profiles:users(id, first_name, photo_url)), band_songs(*, band_song_slots(*, profiles:users!user_id(id, first_name, photo_url)))').eq('school_id', schoolId).in('status', ['forming', 'active']),
+        supabase.from('songs').select('*').eq('school_id', schoolId).order('level').order('artist'),
+        bandIds.length > 0
+          ? supabase.from('bands').select(`
+              *,
+              songs (*),
+              band_members (*, users(*)),
+              band_songs (*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))),
+              coach:users!coach_id (first_name, last_name, photo_url)
+            `).in('id', bandIds)
+          : Promise.resolve({ data: [], error: null }),
+        supabase.from('bands').select('*, songs(title, artist, instrumentation), band_members(*, users!user_id(*)), band_songs(*, songs(id, title, artist, instrumentation), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))), coach:users!coach_id (first_name, last_name, photo_url)').eq('school_id', schoolId).order('name', { ascending: true }),
+        supabase.from('users').select('*').eq('school_id', schoolId).in('role', ['teacher', 'admin']).order('first_name'),
+        supabase.from('sessions').select('user_id, station_id, users!inner(role, school_id, last_seen)').is('check_out_time', null).eq('users.school_id', schoolId)
+      ]).catch(err => {
+        console.error('[Dashboard] Critical Fetch Error Stage 2:', err);
+        return [ {error: err}, {error: err}, {error: err}, {error: err}, {error: err}, {error: err}, {error: err}, {error: err}, {error: err} ] as any;
+      });
+
+      if (skillsRes.error) console.error('[Dashboard] Skills Fetch Error:', skillsRes.error);
+      if (wallRes.error) console.error('[Dashboard] Songs query error:', wallRes.error);
+
+      setUser(userData);
       setSession(sessionRes.data);
       if (sessionRes.error) console.error('[Dashboard] Error fetching session:', sessionRes.error);
+
+      // Parse active sessions in parallel
+      if (activeSessionsRes.data) {
+        const count = activeSessionsRes.data.filter((s: any) => {
+          const u: any = Array.isArray(s.users) ? s.users[0] : s.users;
+          if (!u) return false;
+          return u.role?.toLowerCase() === 'student' && s.station_id;
+        }).length;
+        setActiveStudentsCount(count);
+      }
+
+      // Populate global library songs in parallel
+      if (songsRes.data) {
+        setGlobalSongs(songsRes.data);
+      }
+
+      // Populate school teachers in parallel
+      if (teachersRes.data) {
+        setTeachers(teachersRes.data);
+      }
 
       if (allSessionsRes.data) {
         const totalMins = allSessionsRes.data.reduce((acc: number, s: any) => {
@@ -1886,40 +1950,8 @@ function App() {
         return merged;
       });
 
-      const schoolId = userData.school_id || (Array.isArray(userData.schools) ? userData.schools[0]?.id : userData.schools?.id);
-      console.log(`[Dashboard] Using schoolId: ${schoolId} for user ${userId}`);
-
-      if (!schoolId) {
-        console.warn('[Dashboard] No school_id found. Board will be empty.');
-        setLoading(false);
-        return;
-      }
-
-      // 2. Parallelize wall data and band related fetches
-      const [wallRes, membersRes, formingBandsRes] = await Promise.all([
-        supabase.from('songs').select(`
-          id, artist, title, media_link, instrumentation,
-          user_song_skills (
-            id, song_id, instrument, part_number, difficulty_level, is_stage_ready, user_id, created_at, formation_group,
-            profiles:users!user_song_skills_user_id_fkey(first_name, photo_url, school_id)
-          ),
-          band_songs (
-            id, band_id, status, is_exclusive, difficulty_level,
-            bands (id, name, photo_url, school_id),
-            band_song_slots (
-              id, user_id, instrument, status,
-              profiles:users!band_song_slots_user_id_fkey(first_name, photo_url)
-            )
-          )
-        `).eq('school_id', schoolId),
-        supabase.from('band_members').select('user_id, bands!inner(id, status, song_id, school_id, band_songs(song_id, status))').eq('bands.school_id', schoolId),
-        supabase.from('bands').select('*, band_members(*, profiles:users(id, first_name, photo_url)), band_songs(*, band_song_slots(*, profiles:users!user_id(id, first_name, photo_url)))').eq('school_id', schoolId).in('status', ['forming', 'active'])
-      ]);
-      
       if (wallRes.data) console.log(`[Dashboard] wallRes returned ${wallRes.data.length} songs.`);
 
-      if (wallRes.error) console.error('[Dashboard] Error fetching wall data:', wallRes.error);
-      
       // Build a map of all school skills for easy lookup
       const schoolSkillsMap: Record<string, any[]> = {};
       (wallRes.data || []).forEach((song: any) => {
@@ -1929,10 +1961,6 @@ function App() {
         });
       });
 
-      if (wallRes.error) {
-        console.error('[Dashboard] Songs query error:', wallRes.error);
-        return;
-      }
       const wallData = wallRes.data || [];
       console.log('[Dashboard] Wall data fetched. Count:', wallData.length);
       const allMembers = membersRes.data || [];
@@ -1941,9 +1969,9 @@ function App() {
       // We no longer auto-set pendingFounding here to prevent unexpected popups.
       // Students trigger founding manually via the "JETZT BAND GRÜNDEN" button on the board.
 
-      // --- BAND PROJECT AUTO-FILLING ---
+      // --- BAND PROJECT AUTO-FILLING (Optimized: ONLY runs on initial full load to save heavy redundant DB operations!) ---
       const formingBands = formingBandsRes.data || [];
-      if (formingBands.length > 0) {
+      if (isInitial && formingBands.length > 0) {
         // Run auto-fill asynchronously to not block the main dashboard load
         (async () => {
           let currentMemberships = await supabase.from('band_members').select('user_id, bands(id, song_id)').then(r => r.data || []);
@@ -2360,40 +2388,9 @@ function App() {
       console.log('[Dashboard] fetchDashboardData complete.');
 
 
-      // Lade alle Songs der Schule für die Bibliothek
-      const { data: songsData, error: songsErr } = await supabase
-        .from('songs')
-        .select('*')
-        .eq('school_id', userData.school_id)
-        .order('level')
-        .order('artist');
-      
-      if (songsErr) console.error('[Dashboard] Error fetching library songs:', songsErr);
-      if (songsData) {
-        setGlobalSongs(songsData);
-      }
-
-      // 1. Finde alle Band-IDs, in denen der Nutzer Mitglied ist
-      const { data: myMembershipIds } = await supabase
-        .from('band_members')
-        .select('band_id')
-        .eq('user_id', userId);
-        
-      const bandIds = (myMembershipIds || []).map(m => m.band_id);
-      
-      // 2. Lade diese Bands mit VOLLSTÄNDIGEN Daten (allen Mitgliedern)
-      const { data: userBandsData, error: userBandsErr } = await supabase
-        .from('bands')
-        .select(`
-          *,
-          songs (*),
-          band_members (*, users(*)),
-          band_songs (*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))),
-          coach:users!coach_id (first_name, last_name, photo_url)
-        `)
-        .in('id', bandIds);
-        
-      if (userBandsErr) console.error('[Dashboard] Error fetching user bands:', userBandsErr);
+      // Library songs and user bands are already loaded in Stage 2!
+      const songsData = songsRes?.data || [];
+      const userBandsData = userBandsRes?.data || [];
       if (userBandsData) {
         const uniqueBands = userBandsData.map((band: any) => {
           const myMembership = (band.band_members || []).find((m: any) => m.user_id === userId);
@@ -2417,19 +2414,19 @@ function App() {
         
         // If a band profile is currently open, update its data too
         if (selectedBandForProfile) {
-          const updatedSelected = uniqueBands.find(b => b.id === selectedBandForProfile.id);
+          const updatedSelected = uniqueBands.find((b: any) => b.id === selectedBandForProfile.id);
           if (updatedSelected) {
             setSelectedBandForProfile(updatedSelected);
           }
         } else if (restoredBandId && showBandProfile) {
           // Restore from localStorage on initial load
-          const restored = uniqueBands.find(b => b.id === restoredBandId);
+          const restored = uniqueBands.find((b: any) => b.id === restoredBandId);
           if (restored) {
             setSelectedBandForProfile(restored);
           }
         }
         
-        const unseen = userBandsData.find(b => {
+        const unseen = userBandsData.find((b: any) => {
           const m = (b.band_members || []).find((m: any) => m.user_id === userId);
           return m && !m.confetti_seen;
         });
@@ -2439,14 +2436,9 @@ function App() {
         }
       }
 
-      // Parallelize last fetches
-      const [activeCountRes, bandsRes] = await Promise.all([
-        fetchActiveStudentCount(userData.school_id),
-        supabase.from('bands').select('*, songs(title, artist, instrumentation), band_members(*, users!user_id(*)), band_songs(*, songs(id, title, artist, instrumentation), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))), coach:users!coach_id (first_name, last_name, photo_url)').eq('school_id', userData.school_id).order('name', { ascending: true })
-      ]);
-      
-      const bandsData = bandsRes.data;
-      if (bandsRes.error) console.error('[Dashboard] Error fetching all school bands:', bandsRes.error);
+      // School bands and teachers are already loaded in Stage 2!
+      const bandsData = bandsRes?.data;
+      if (bandsRes?.error) console.error('[Dashboard] Error fetching all school bands:', bandsRes.error);
       if (bandsData) {
         // Enrich all members with skills
         bandsData.forEach((band: any) => {
@@ -2463,18 +2455,6 @@ function App() {
           return !!song;
         });
         setAllBands(validBands);
-      }
-
-      // Lade Lehrer der Schule
-      const { data: teachersData } = await supabase
-        .from('users')
-        .select('*')
-        .eq('school_id', userData.school_id)
-        .in('role', ['teacher', 'admin'])
-        .order('first_name');
-      
-      if (teachersData) {
-        setTeachers(teachersData);
       }
 
       // Lade die Wochenplan-Daten (mit kleiner Verzögerung für State-Stabilität)
@@ -3474,8 +3454,12 @@ function App() {
     sessionStorage.setItem('groovelab_user_id', userId);
     sessionStorage.setItem('groovelab_location_mode', mode);
 
-    // Immediate Heartbeat on Login
-    await supabase
+    // Always start with the Live Lab after login!
+    setActiveStudentTab('live');
+    localStorage.setItem('groovelab_active_tab', 'live');
+
+    // Immediate Heartbeat on Login (non-blocking for instantaneous login transition!)
+    supabase
       .from('users')
       .update({ last_seen: new Date().toISOString() })
       .eq('id', userId);
@@ -3483,12 +3467,8 @@ function App() {
 
   useEffect(() => {
     if (user && !localStorage.getItem('groovelab_active_tab')) {
-      const r = user.role?.toLowerCase();
-      if (r === 'admin' || r === 'teacher') {
-        setActiveStudentTab('live');
-      } else {
-        setActiveStudentTab('profile');
-      }
+      setActiveStudentTab('live');
+      localStorage.setItem('groovelab_active_tab', 'live');
     }
     // Realtime subscription for sessions (Active Student Count)
     const sessionsChannel = supabase
@@ -4052,9 +4032,7 @@ function App() {
                     <span style={{ background: '#f59e0b', color: 'white', padding: '4px 12px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pro Artist</span>
                     <span style={{ color: '#94a3b8', fontSize: '0.875rem', fontWeight: 700 }}>{user.schools?.name || 'Groovelab Academy'}</span>
                     <span style={{ color: '#94a3b8', fontSize: '0.875rem', fontWeight: 500 }}>• Mitglied seit {new Date(user.created_at).toLocaleDateString()}</span>
-                    {user.age && (
-                      <span style={{ background: '#f1f5f9', color: '#64748b', padding: '4px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800 }}>{user.age} Jahre</span>
-                    )}
+
                     <div style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', padding: '4px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 950, display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }}>
                       <Star size={12} fill="white" /> {userSongs.filter(s => s.progress === 100).length * 100} XP
                     </div>
@@ -6193,13 +6171,7 @@ function App() {
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Alter (optional)</label>
-                    <input type="number" min={1} max={99} placeholder="z.B. 12" value={editingProfile.age || ''} onChange={e => {
-                      const val = e.target.value === '' ? null : parseInt(e.target.value, 10);
-                      setEditingProfile({...editingProfile, age: val});
-                    }} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
-                  </div>
+
                 </>
               ) : (
                 <>

@@ -63,18 +63,10 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     fetchData();
   }, [student.id]);
 
-  const calculateAge = (birthDate: string) => {
-    if (!birthDate) return null;
-    const birth = new Date(birthDate);
-    const now = new Date();
-    let age = now.getFullYear() - birth.getFullYear();
-    const m = now.getMonth() - birth.getMonth();
-    if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
-    return age;
-  };
+
 
   const memberSince = new Date(student.created_at).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
-  const age = calculateAge(student.birth_date);
+
 
   // Grouping logic for songs
   const groupedSongs = skills.reduce((acc: any, s: any) => {
@@ -120,11 +112,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
                 <Calendar size={14} /> Member seit {memberSince}
               </div>
-              {(student.age || age) && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
-                  <User size={14} /> {student.age || age} Jahre
-                </div>
-              )}
+
               <div style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', padding: '4px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 950, display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }}>
                 <Star size={12} fill="white" /> {(skills.filter(s => {
                   const isVocal = (s.instrument || '').toLowerCase().includes('vocal') || (s.instrument || '').toLowerCase().includes('gesang');
