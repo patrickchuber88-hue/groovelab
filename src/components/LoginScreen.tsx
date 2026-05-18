@@ -72,7 +72,20 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         const { data: tStation } = await supabase.from('stations').select('id').eq('name', 'Lehrer iPad').maybeSingle();
         finalStationId = tStation?.id || null;
       } else {
-        finalStationId = stationId;
+        if (stationId) {
+          const { data: curStation } = await supabase.from('stations').select('name').eq('id', stationId).maybeSingle();
+          const stationName = curStation?.name?.toLowerCase() || '';
+          if (stationName.includes('lehrer') || stationName.includes('teacher')) {
+            console.log(`[Login] Student tried to log in on teacher station. Forcing Home mode.`);
+            alert("Hinweis: Schüler können sich nicht am Lehrer-iPad einloggen. Du wirst automatisch im Home-Modus angemeldet.");
+            isHome = true;
+            finalStationId = null;
+          } else {
+            finalStationId = stationId;
+          }
+        } else {
+          finalStationId = null;
+        }
       }
 
       // Geofence check
