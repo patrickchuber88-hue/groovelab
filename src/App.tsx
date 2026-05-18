@@ -1632,6 +1632,18 @@ function App() {
         return;
       }
 
+      // STRICT DB SESSION VERIFICATION (Closing the backdoor):
+      // If a student is in GrooveLab (Lab) mode, they MUST have an active checked-in session in the database.
+      // If there is no active session (sessionRes.data is null), they have bypassed the scanner or were checked out.
+      // We immediately force logout and wipe their tab state.
+      const isStudent = userData.role?.toLowerCase() === 'student';
+      if (isStudent && locationMode === 'lab' && !sessionRes.data) {
+        console.warn('[Dashboard] Student in Lab mode has no active database session! Force logout.');
+        setLoading(false);
+        handleLogout(false);
+        return;
+      }
+
       const schoolId = userData.school_id || (Array.isArray(userData.schools) ? userData.schools[0]?.id : userData.schools?.id);
       if (!schoolId) {
         console.warn('[Dashboard] No school_id found. Board will be empty.');

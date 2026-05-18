@@ -130,7 +130,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         console.log(`[Login] Home mode detected. No new session created.`);
       }
 
-      localStorage.setItem('groovelab_user_id', user.id);
+      sessionStorage.setItem('groovelab_user_id', user.id);
       setLoading(false);
       
       onLogin(user.id, isHome);
@@ -408,7 +408,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           {(!geoDebug.isWithinAnyRoom || !geoDebug.withinHours) && (
             <button 
               onClick={() => {
-                const uid = localStorage.getItem('groovelab_user_id');
+                const uid = sessionStorage.getItem('groovelab_user_id');
                 if (uid) {
                    supabase.from('users').select('*, schools(*)').eq('id', uid).single().then(({data}) => {
                      if (data) finalizeLogin(data, effectiveStationId, true);
