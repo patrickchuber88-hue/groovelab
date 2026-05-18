@@ -6013,19 +6013,57 @@ function App() {
                         // 1. Close modal instantly
                         setSuggestingSkill(null);
                         
-                        // 2. Open public formation slot
-                        const { error } = await supabase
-                          .from('user_song_skills')
-                          .update({ formation_group: newId })
-                          .eq('id', suggestingSkill.id);
+                        // 2. Resolve skill record ID with database fallback
+                        let skillRecordId = suggestingSkill.id || suggestingSkill.skill_id;
+                        const songId = suggestingSkill.song_id || suggestingSkill.songs?.id;
                         
-                        if (error) {
-                          console.error('[Option 2] Error opening slot:', error);
-                          alert('Fehler beim Öffnen des Matching-Slots: ' + error.message);
+                        if (!skillRecordId && user && songId) {
+                          const { data } = await supabase
+                            .from('user_song_skills')
+                            .select('id')
+                            .eq('user_id', user.id)
+                            .eq('song_id', songId)
+                            .maybeSingle();
+                          
+                          if (data) {
+                            skillRecordId = data.id;
+                          } else {
+                            const { data: newRecord } = await supabase
+                              .from('user_song_skills')
+                              .insert({
+                                user_id: user.id,
+                                song_id: songId,
+                                instrument: suggestingSkill.instrument || 'Gitarre',
+                                difficulty_level: suggestingSkill.difficulty_level || 'starter',
+                                progress_percent: 100,
+                                is_stage_ready: true
+                              })
+                              .select('id')
+                              .maybeSingle();
+                            if (newRecord) {
+                              skillRecordId = newRecord.id;
+                            }
+                          }
+                        }
+                        
+                        if (skillRecordId) {
+                          // 3. Open public formation slot
+                          const { error } = await supabase
+                            .from('user_song_skills')
+                            .update({ formation_group: newId })
+                            .eq('id', skillRecordId);
+                          
+                          if (error) {
+                            console.error('[Option 2] Error opening slot:', error);
+                            alert('Fehler beim Öffnen des Matching-Slots: ' + error.message);
+                          } else {
+                            // 4. Background sync and navigate
+                            if (user) await fetchDashboardData(user.id, false);
+                            setActiveStudentTab('matching');
+                          }
                         } else {
-                          // 3. Background sync and navigate
-                          if (user) await fetchDashboardData(user.id, false);
-                          setActiveStudentTab('matching');
+                          console.error('[Option 2] Could not resolve skill record ID');
+                          alert('Konnte keinen passenden Skill-Datensatz finden oder erstellen.');
                         }
                       } catch (err: any) {
                         console.error('[Option 2] Error in new formation search:', err);
