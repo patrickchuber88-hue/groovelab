@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Headphones, Guitar, Music, Heart } from 'lucide-react';
+import { renderInstrumentIcon } from '../utils/instruments';
 
 interface TeacherDetailModalProps {
   teacher: any;
@@ -8,12 +9,20 @@ interface TeacherDetailModalProps {
 
 export const TeacherDetailModal: React.FC<TeacherDetailModalProps> = ({ teacher, onClose }) => {
   const brandColor = '#eab308'; // GrooveLab Gold
-  const ADMIN_INSTRUMENT_ICONS: Record<string, string> = { 
-    "Gitarre": "🎸", "Guitar": "🎸", "E-Gitarre": "🎸",
-    "Bass": "🎸", "E-Bass": "🎸", 
-    "Drums": "🥁", "E-Drums": "🥁", 
-    "Vocals": "🎤", "Gesang": "🎤",
-    "Piano / Keys": "🎹", "Piano": "🎹", "E-Piano": "🎹", "Keys": "🎹"
+  const ADMIN_INSTRUMENT_ICONS: Record<string, any> = { 
+    "Gitarre": renderInstrumentIcon("Gitarre"), 
+    "Guitar": renderInstrumentIcon("Guitar"), 
+    "E-Gitarre": renderInstrumentIcon("E-Gitarre"),
+    "Bass": renderInstrumentIcon("Bass"), 
+    "E-Bass": renderInstrumentIcon("E-Bass"), 
+    "Drums": renderInstrumentIcon("Drums"), 
+    "E-Drums": renderInstrumentIcon("E-Drums"), 
+    "Vocals": renderInstrumentIcon("Vocals"), 
+    "Gesang": renderInstrumentIcon("Gesang"),
+    "Piano / Keys": renderInstrumentIcon("Keys"), 
+    "Piano": renderInstrumentIcon("Piano"), 
+    "E-Piano": renderInstrumentIcon("E-Piano"), 
+    "Keys": renderInstrumentIcon("Keys")
   };
 
   const parseArray = (val: any) => {

@@ -22,9 +22,14 @@ const ADMIN_INSTRUMENT_ICONS: Record<string, any> = {
   "E-Gitarre": renderInstrumentIcon("E-Gitarre"),
   "Bass": renderInstrumentIcon("Bass"), 
   "E-Bass": renderInstrumentIcon("E-Bass"), 
-  "Drums": "🥁", "E-Drums": "🥁", 
-  "Vocals": "🎤", "Gesang": "🎤",
-  "Piano / Keys": "🎹", "Piano": "🎹", "E-Piano": "🎹", "Keys": "🎹"
+  "Drums": renderInstrumentIcon("Drums"), 
+  "E-Drums": renderInstrumentIcon("E-Drums"), 
+  "Vocals": renderInstrumentIcon("Vocals"), 
+  "Gesang": renderInstrumentIcon("Gesang"),
+  "Piano / Keys": renderInstrumentIcon("Keys"), 
+  "Piano": renderInstrumentIcon("Piano"), 
+  "E-Piano": renderInstrumentIcon("E-Piano"), 
+  "Keys": renderInstrumentIcon("Keys")
 };
 const brandColor = "#eab308";
 // Removed unused import
@@ -3324,7 +3329,24 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       return acc;
     }, {});
 
-    const songsArray = Object.values(groupedSongs);
+    const songsArray = Object.values(groupedSongs).map((s: any) => {
+      const getBaseInst = (name: string) => {
+        const n = (name || '').toLowerCase();
+        if (n.includes('gitarre') || n.includes('guitar')) return 'Guitar';
+        if (n.includes('drums') || n.includes('schlagzeug')) return 'Drums';
+        if (n.includes('piano') || n.includes('keys')) return 'Piano';
+        if (n.includes('bass')) return 'Bass';
+        return name;
+      };
+      const orderMap: Record<string, number> = { 'Guitar': 1, 'Drums': 2, 'Piano': 3, 'Bass': 4 };
+      const sortedInstruments = [...s.instruments].sort((a, b) => {
+        const idxA = orderMap[getBaseInst(a.name)] || 99;
+        const idxB = orderMap[getBaseInst(b.name)] || 99;
+        if (idxA !== idxB) return idxA - idxB;
+        return (a.part_number || 1) - (b.part_number || 1);
+      });
+      return { ...s, instruments: sortedInstruments };
+    });
     const practiceBoard = songsArray.filter((s: any) => s.instruments.some((i: any) => i.progress > 0 && !i.is_stage_ready));
     const repertoire = songsArray.filter((s: any) => s.instruments.some((i: any) => i.is_stage_ready));
 
@@ -3383,7 +3405,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 
                 {/* Instrument Master Counters */}
                 <div style={{ display: 'flex', gap: '12px', marginTop: '12px', flexWrap: 'nowrap', alignItems: 'center' }}>
-                  {['Guitar', 'Keys', 'Drums', 'Bass', 'Vocals'].map(inst => {
+                  {['Guitar', 'Drums', 'Keys', 'Bass', 'Vocals'].map(inst => {
                     const count = (studentDetails || []).filter((s: any) => {
                       const sInst = s.instrument?.toLowerCase();
                       const target = inst.toLowerCase();

@@ -84,8 +84,44 @@ export const renderInstrumentIcon = (name: string, color?: string, size = 18): R
     );
   }
 
-  if (norm.includes('drum')) return '🥁';
-  if (norm.includes('piano') || norm.includes('keys') || norm.includes('klavier') || norm.includes('e-piano')) return '🎹';
-  if (norm.includes('vocal') || norm.includes('gesang') || norm.includes('stimme')) return '🎤';
+  if (norm.includes('drum') || norm.includes('schlagzeug')) {
+    return React.createElement(
+      'svg',
+      { xmlns: 'http://www.w3.org/2000/svg', viewBox: '0 0 36 36', width: size, height: size, style: { display: 'inline-block', verticalAlign: 'middle' } },
+      React.createElement('path', { fill: '#F18F26', d: 'M0 18h36v9H0z' }),
+      React.createElement('ellipse', { fill: '#F18F26', cx: '18', cy: '26', rx: '18', ry: '9' }),
+      React.createElement('ellipse', { fill: '#F18F26', cx: '18', cy: '27', rx: '18', ry: '9' }),
+      React.createElement('path', { fill: '#9D0522', d: 'M0 10v16h.117c.996 4.499 8.619 8 17.883 8s16.887-3.501 17.883-8H36V10H0z' }),
+      React.createElement('ellipse', { fill: '#F18F26', cx: '18', cy: '11', rx: '18', ry: '9' }),
+      React.createElement('ellipse', { fill: '#F18F26', cx: '18', cy: '12', rx: '18', ry: '9' }),
+      React.createElement('path', { fill: '#F18F26', d: 'M0 10h1v2H0zm35 0h1v2h-1z' }),
+      React.createElement('ellipse', { fill: '#FCAB40', cx: '18', cy: '10', rx: '18', ry: '9' }),
+      React.createElement('ellipse', { fill: '#F5F8FA', cx: '18', cy: '10', rx: '17', ry: '8' }),
+      React.createElement('path', { fill: '#FDD888', d: 'M18 3c9.03 0 16.395 3.316 16.946 7.5.022-.166.054-.331.054-.5 0-4.418-7.611-8-17-8S1 5.582 1 10c0 .169.032.334.054.5C1.605 6.316 8.97 3 18 3z' }),
+      React.createElement('path', { d: 'M28.601 2.599c.44-.33.53-.96.2-1.4l-.6-.8c-.33-.44-.96-.53-1.4-.2L14.157 10.243c-.774-.167-1.785.083-2.673.749-1.326.994-1.863 2.516-1.2 3.4s2.275.794 3.6-.2c.835-.626 1.355-1.461 1.462-2.215l13.255-9.378zm5.868 2.919l-.509-.861c-.28-.474-.896-.632-1.37-.352l-13.913 8.751c-.719-.141-1.626.023-2.472.524-1.426.843-2.127 2.297-1.565 3.248.562.951 2.174 1.039 3.6.196 1.005-.594 1.638-1.49 1.735-2.301l14.142-7.835c.474-.281.632-.897.352-1.37z', fill: '#AA695B' }),
+      React.createElement('path', { fill: '#DA2F47', d: 'M2 28c-.55 0-1-.45-1-1v-9c0-.55.45-1 1-1s1 .45 1 1v9c0 .55-.45 1-1 1zm9 4c-.55 0-1-.45-1-1v-9c0-.55.45-1 1-1s1 .45 1 1v9c0 .55-.45 1-1 1zm12 0c-.55 0-1-.45-1-1v-9c0-.55.45-1 1-1s1 .45 1 1v9c0 .55-.45 1-1 1zm11-4c-.55 0-1-.45-1-1v-9c0-.55.45-1 1-1s1 .45 1 1v9c0 .55-.45 1-1 1z' })
+    );
+  }
+
+  if (norm.includes('piano') || norm.includes('keys') || norm.includes('klavier') || norm.includes('e-piano')) {
+    return React.createElement(
+      'svg',
+      { xmlns: 'http://www.w3.org/2000/svg', viewBox: '0 0 36 36', width: size, height: size, style: { display: 'inline-block', verticalAlign: 'middle' } },
+      React.createElement('path', { fill: '#31373D', d: 'M2 36s-2 0-2-2V2s0-2 2-2h32.031C36 0 36 2 36 2v32s0 2-2 2H2z' }),
+      React.createElement('path', { d: 'M19 33s0 1 1 1h5c1 0 1-1 1-1V5h-7v28zm9-28v28s0 1 1 1h4c1 0 1-1 1-1V5h-6zM10 33s0 1 1 1h5c1 0 1-1 1-1V5h-7v28zm-8 0s0 1 1 1h4c1 0 1-1 1-1V5H2v28z', fill: '#E1E8ED' }),
+      React.createElement('path', { fill: '#31373D', d: 'M30 23s0 1-1 1h-4c-1 0-1-1-1-1V3h6v20zm-9 0s0 1-1 1h-4c-1 0-1-1-1-1V3h6v20zm-9 0s0 1-1 1H7c-1 0-1-1-1-1V3h6v20z' })
+    );
+  }
+
+  if (norm.includes('vocal') || norm.includes('gesang') || norm.includes('stimme')) {
+    return React.createElement(
+      'svg',
+      { xmlns: 'http://www.w3.org/2000/svg', viewBox: '0 0 36 36', width: size, height: size, style: { display: 'inline-block', verticalAlign: 'middle' } },
+      React.createElement('path', { fill: '#8899A6', d: 'M35.999 11.917c0 3.803-3.082 6.885-6.885 6.885-3.802 0-6.884-3.082-6.884-6.885 0-3.802 3.082-6.884 6.884-6.884 3.803 0 6.885 3.082 6.885 6.884z' }),
+      React.createElement('path', { fill: '#31373D', d: 'M32.81 18.568c-.336.336-.881.336-1.217 0L22.466 9.44c-.336-.336-.336-.881 0-1.217l1.217-1.217c.336-.336.881-.336 1.217 0l9.127 9.128c.336.336.336.881 0 1.217l-1.217 1.217zm-6.071.136l-4.325-4.327c-.778-.779-1.995-.733-2.719.101l-9.158 10.574c-1.219 1.408-1.461 3.354-.711 4.73l-4.911 4.912 1.409 1.409 4.877-4.877c1.381.84 3.411.609 4.862-.648l10.575-9.157c.834-.723.881-1.94.101-2.717z' }),
+      React.createElement('path', { fill: '#55ACEE', d: 'M4 6v8.122C3.686 14.047 3.352 14 3 14c-1.657 0-3 .896-3 2s1.343 2 3 2 3-.896 3-2V9.889l5 2.222v5.011c-.314-.075-.648-.122-1-.122-1.657 0-3 .896-3 2s1.343 2 3 2 2.999-.896 3-2v-9L4 6zm14-5v8.123C17.685 9.048 17.353 9 17 9c-1.657 0-3 .895-3 2 0 1.104 1.343 2 3 2 1.656 0 3-.896 3-2V1h-2z' })
+    );
+  }
+
   return '🎵';
 };

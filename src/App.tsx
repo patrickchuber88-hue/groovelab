@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Music, AlertCircle, Play, Library, Shield, LogOut, Award, Users, User, Monitor, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube } from 'lucide-react';
+import { Music, AlertCircle, Play, Library, Shield, LogOut, Award, Users, User, Monitor, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail } from 'lucide-react';
 import { 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer,
   BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell
@@ -15,6 +15,7 @@ import { DeviceSetupScreen } from './components/DeviceSetupScreen';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
 import { TeacherDetailModal } from './components/TeacherDetailModal';
+import { StudentDetailModal } from './components/StudentDetailModal';
 import { normalizeInstrument, renderInstrumentIcon } from './utils/instruments';
 import { getDistanceFromLatLonInM } from './utils/geo';
 import './App.css';
@@ -25,9 +26,14 @@ const APP_INSTRUMENT_ICONS: Record<string, any> = {
   "E-Gitarre": renderInstrumentIcon("E-Gitarre"),
   "Bass": renderInstrumentIcon("Bass"), 
   "E-Bass": renderInstrumentIcon("E-Bass"), 
-  "Drums": "🥁", "E-Drums": "🥁", 
-  "Vocals": "🎤", "Gesang": "🎤",
-  "Piano / Keys": "🎹", "Piano": "🎹", "E-Piano": "🎹", "Keys": "🎹",
+  "Drums": renderInstrumentIcon("Drums"), 
+  "E-Drums": renderInstrumentIcon("E-Drums"), 
+  "Vocals": renderInstrumentIcon("Vocals"), 
+  "Gesang": renderInstrumentIcon("Gesang"),
+  "Piano / Keys": renderInstrumentIcon("Keys"), 
+  "Piano": renderInstrumentIcon("Piano"), 
+  "E-Piano": renderInstrumentIcon("E-Piano"), 
+  "Keys": renderInstrumentIcon("Keys"),
   "Musik": "🎼"
 };
 const APP_INSTRUMENT_COLORS: Record<string, string> = { 
@@ -40,10 +46,37 @@ const APP_INSTRUMENT_COLORS: Record<string, string> = {
 const brandColor = "#f59e0b"; // Orange (matched with legend)
 
 // --- ANTI-FLICKER AVATAR SYSTEM ---
-const StudioAvatar = React.memo(({ src, style, className }: { src: string | null | undefined, style?: React.CSSProperties, className?: string }) => {
+const StudioAvatar = React.memo(({ src, style, className, user, userId, onClick }: { src: string | null | undefined, style?: React.CSSProperties, className?: string, user?: any, userId?: string, onClick?: () => void }) => {
   const [isLoaded, setIsLoaded] = useState(false);
+  
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onClick) {
+      onClick();
+      return;
+    }
+    const target = user || userId;
+    if (target && (window as any).openUserProfile) {
+      (window as any).openUserProfile(target);
+    }
+  };
+
+  const hasAction = !!(onClick || user || userId);
+
   return (
-    <div style={{ width: '100%', height: '100%', background: '#f1f5f9', position: 'relative', overflow: 'hidden', ...style }} className={className}>
+    <div 
+      onClick={hasAction ? handleClick : undefined}
+      style={{ 
+        width: '100%', 
+        height: '100%', 
+        background: '#f1f5f9', 
+        position: 'relative', 
+        overflow: 'hidden', 
+        cursor: hasAction ? 'pointer' : 'default',
+        ...style 
+      }} 
+      className={`studio-avatar-wrapper ${hasAction ? 'hover-scale-mini' : ''} ${className || ''}`}
+    >
       <img 
         src={src || '/avatar_ghost.jpg'} 
         onLoad={() => setIsLoaded(true)}
@@ -62,7 +95,7 @@ const StudioAvatar = React.memo(({ src, style, className }: { src: string | null
       />
     </div>
   );
-}, (prev, next) => prev.src === next.src);
+}, (prev, next) => prev.src === next.src && prev.user?.id === next.user?.id && prev.userId === next.userId);
 
 const renderBandAvatar = (name: string, photoUrl?: string | null, size: string = '64px', borderRadius: string = '18px') => {
   if (photoUrl) {
@@ -971,7 +1004,7 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
                         }}>
                           <div style={{ width: '38px', height: '38px', borderRadius: '50%', overflow: 'hidden', background: '#f1f5f9', flexShrink: 0 }}>
                             {member.user_id ? (
-                               <StudioAvatar src={u?.photo_url} />
+                               <StudioAvatar src={u?.photo_url} user={u} />
                             ) : (
                                <div style={{ width: '100%', height: '100%', background: '#1e293b', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', fontWeight: 900 }}>{member.external_name?.[0] || 'E'}</div>
                             )}
@@ -1139,9 +1172,78 @@ function App() {
   const [locationMode, setLocationMode] = useState<'lab' | 'home'>(() => (sessionStorage.getItem('groovelab_location_mode') as 'lab' | 'home') || 'home');
   const [personalRejections] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
+  const [studentMessages, setStudentMessages] = useState<any[]>([]);
+  const [studentMessagesLoading, setStudentMessagesLoading] = useState(false);
+  const [selectedStudentMessage, setSelectedStudentMessage] = useState<any>(null);
+  const [studentMessagesFilter, setStudentMessagesFilter] = useState<'all' | 'school' | 'band'>('all');
+  const [deletedMessageIds, setDeletedMessageIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (user?.id) {
+      const stored = localStorage.getItem(`groovelab_deleted_messages_${user.id}`);
+      if (stored) {
+        try {
+          setDeletedMessageIds(JSON.parse(stored));
+        } catch (e) {
+          setDeletedMessageIds([]);
+        }
+      } else {
+        setDeletedMessageIds([]);
+      }
+    } else {
+      setDeletedMessageIds([]);
+    }
+  }, [user?.id]);
   const [showCamera, setShowCamera] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [selectedTeacher, setSelectedTeacher] = useState<any>(null);
+  const [selectedStudentProfile, setSelectedStudentProfile] = useState<any>(null);
+
+  const openUserProfile = async (userIdOrUser: any) => {
+    if (!userIdOrUser) return;
+    
+    if (typeof userIdOrUser === 'object') {
+      if (userIdOrUser.role === 'teacher' || userIdOrUser.role === 'admin') {
+        setSelectedTeacher(userIdOrUser);
+      } else {
+        setSelectedStudentProfile(userIdOrUser);
+      }
+      return;
+    }
+    
+    if (typeof userIdOrUser === 'string') {
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', userIdOrUser)
+          .single();
+          
+        if (error) {
+          console.error('Error fetching user profile:', error);
+          return;
+        }
+        
+        if (data) {
+          if (data.role === 'teacher' || data.role === 'admin') {
+            setSelectedTeacher(data);
+          } else {
+            setSelectedStudentProfile(data);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load user profile:', err);
+      }
+    }
+  };
+
+  useEffect(() => {
+    (window as any).openUserProfile = openUserProfile;
+    return () => {
+      delete (window as any).openUserProfile;
+    };
+  }, []);
+
   const [studentActivity, setStudentActivity] = useState<any[]>([]);
   const [showBandNaming, setShowBandNaming] = useState(false);
   const [namingTarget, setNamingTarget] = useState<{song: any, form: any} | null>(null);
@@ -1182,6 +1284,18 @@ function App() {
   const gatewayJustClosed = useRef<boolean>(false);
   const lastWriteTimeRef = useRef<number>(0);
   
+  const [annBandId, setAnnBandId] = useState<string | null>(null);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [announcementTitle, setAnnouncementTitle] = useState('');
+  const [announcementMessage, setAnnouncementMessage] = useState('');
+  const [announcementTarget, setAnnouncementTarget] = useState<'all' | 'students' | 'teachers' | 'specific'>('all');
+  const [selectedTargetUserIds, setSelectedTargetUserIds] = useState<string[]>([]);
+  const [recipientSearchText, setRecipientSearchText] = useState('');
+  const [activeAnnouncement, setActiveAnnouncement] = useState<any>(null);
+  const [schoolUsers, setSchoolUsers] = useState<any[]>([]);
+  const [selectedMailMessage, setSelectedMailMessage] = useState<any>(null);
+  const [isMailComposing, setIsMailComposing] = useState(false);
+  
   // Removed redundant FAILSAFE effect to prevent loop conflicts.
   // The detection logic is now centralized in fetchDashboardData for better control.
 
@@ -1208,6 +1322,13 @@ function App() {
     setSuggestingSkill(null);
     setSelectedCoachId('');
   };
+
+  // Load student messages when they view the tab
+  useEffect(() => {
+    if (activeStudentTab === 'messages' && user?.role?.toLowerCase() === 'student') {
+      fetchStudentMessages();
+    }
+  }, [activeStudentTab, userBands, user?.id]);
 
   // Auto-trigger Band Founding Modal when formation is complete
   useEffect(() => {
@@ -2426,7 +2547,22 @@ function App() {
       setStudentActivity(last7);
 
 
-      // --- ANNOUNCEMENT DETECTION (Disabled to prevent Gateway popups) ---
+      // --- ANNOUNCEMENT & SHOUTBOX INITIALIZATION ---
+      checkAnnouncements(schoolId, userData);
+      if (userData.role !== 'student') {
+        fetchAnnouncements(schoolId);
+        
+        const { data: allUsers } = await supabase
+          .from('users')
+          .select('id, first_name, last_name, role, photo_url')
+          .eq('school_id', schoolId)
+          .order('first_name');
+        if (allUsers) {
+          setSchoolUsers(allUsers);
+        }
+      } else {
+        fetchStudentMessagesBackground(schoolId, userId, bandIds);
+      }
 
     } catch (error: any) {
       console.error('[Dashboard] UNCAUGHT ERROR in fetchDashboardData:', error);
@@ -2570,6 +2706,358 @@ function App() {
     } catch (err) {
       console.error('[Planning] Kritischer Fehler beim Toggeln:', err);
       await fetchPlanningData(schoolId);
+    }
+  };
+
+  const checkAnnouncements = async (schoolId: string, currentUser: any) => {
+    if (!schoolId || !currentUser) return;
+    try {
+      const { data: annBands } = await supabase
+        .from('bands')
+        .select('id')
+        .eq('school_id', schoolId)
+        .eq('name', '__SYSTEM_ANNOUNCEMENTS__');
+        
+      if (!annBands || annBands.length === 0) return;
+      const bandIds = annBands.map(b => b.id);
+      
+      const { data: messages } = await supabase
+        .from('band_shoutbox')
+        .select('*, users(first_name, last_name, photo_url)')
+        .in('band_id', bandIds)
+        .order('created_at', { ascending: false });
+        
+      if (!messages || messages.length === 0) return;
+      
+      const unread = messages.find((msg: any) => {
+        let parsed;
+        try {
+          parsed = JSON.parse(msg.content);
+        } catch (e) {
+          parsed = {
+            title: 'Wichtige Mitteilung',
+            target_type: 'all',
+            target_user_ids: [],
+            message: msg.content
+          };
+        }
+        
+        let targetsUser = false;
+        if (parsed.target_type === 'all') targetsUser = true;
+        else if (parsed.target_type === 'students' && currentUser.role === 'student') targetsUser = true;
+        else if (parsed.target_type === 'teachers' && (currentUser.role === 'teacher' || currentUser.role === 'admin')) targetsUser = true;
+        else if (parsed.target_type === 'specific' && parsed.target_user_ids?.includes(currentUser.id)) targetsUser = true;
+        
+        if (!targetsUser) return false;
+        
+        const hasRead = msg.read_by && msg.read_by.includes(currentUser.id);
+        return !hasRead;
+      });
+      
+      if (unread) {
+        setActiveAnnouncement(unread);
+      }
+    } catch (err) {
+      console.error('Error checking announcements:', err);
+    }
+  };
+
+  const fetchAnnouncements = async (schoolId: string) => {
+    if (!schoolId) return;
+    try {
+      const { data: annBands } = await supabase
+        .from('bands')
+        .select('id')
+        .eq('school_id', schoolId)
+        .eq('name', '__SYSTEM_ANNOUNCEMENTS__');
+        
+      let bandIds: string[] = [];
+      if (!annBands || annBands.length === 0) {
+        const { data: newBand } = await supabase
+          .from('bands')
+          .insert({
+            name: '__SYSTEM_ANNOUNCEMENTS__',
+            status: 'active',
+            school_id: schoolId,
+            genre: 'System',
+            photo_url: '/logo.png'
+          })
+          .select();
+        if (newBand && newBand[0]) {
+          bandIds = [newBand[0].id];
+          setAnnBandId(newBand[0].id);
+        }
+      } else {
+        bandIds = annBands.map(b => b.id);
+        setAnnBandId(annBands[0].id);
+      }
+      
+      if (bandIds.length === 0) return;
+      
+      const { data: messages } = await supabase
+        .from('band_shoutbox')
+        .select('*, users(first_name, last_name, photo_url)')
+        .in('band_id', bandIds)
+        .order('created_at', { ascending: false });
+        
+      if (messages) {
+        setAnnouncements(messages);
+      }
+    } catch (err) {
+      console.error('[Announcements] Error fetching history:', err);
+    }
+  };
+
+  const fetchStudentMessagesBackground = async (schoolId: string, userId: string, bandIds: string[]) => {
+    try {
+      // 1. Fetch school announcements
+      const { data: annBands } = await supabase
+        .from('bands')
+        .select('id')
+        .eq('school_id', schoolId)
+        .eq('name', '__SYSTEM_ANNOUNCEMENTS__');
+      
+      let schoolMessages: any[] = [];
+      if (annBands && annBands.length > 0) {
+        const { data } = await supabase
+          .from('band_shoutbox')
+          .select('*, users(first_name, last_name, role, photo_url)')
+          .in('band_id', annBands.map(b => b.id))
+          .order('created_at', { ascending: false });
+        if (data) schoolMessages = data;
+      }
+
+      // 2. Fetch band shoutbox messages
+      let bandMessages: any[] = [];
+      if (bandIds && bandIds.length > 0) {
+        const { data } = await supabase
+          .from('band_shoutbox')
+          .select('*, users(first_name, last_name, role, photo_url), bands(id, name)')
+          .in('band_id', bandIds)
+          .order('created_at', { ascending: false });
+        if (data) bandMessages = data;
+      }
+
+      // 3. Process school
+      const processedSchool = schoolMessages.map(msg => {
+        let parsed;
+        try {
+          parsed = JSON.parse(msg.content);
+        } catch (e) {
+          parsed = {
+            title: 'Wichtige Mitteilung',
+            target_type: 'all',
+            target_user_ids: [],
+            message: msg.content
+          };
+        }
+        
+        let targetsUser = false;
+        if (parsed.target_type === 'all') targetsUser = true;
+        else if (parsed.target_type === 'students') targetsUser = true;
+        else if (parsed.target_type === 'specific' && parsed.target_user_ids?.includes(userId)) targetsUser = true;
+        
+        if (!targetsUser) return null;
+        
+        return {
+          id: msg.id,
+          type: 'school',
+          title: parsed.title || 'Wichtige Mitteilung',
+          content: parsed.message || '',
+          sender: msg.users || { first_name: 'Academy', last_name: 'Coach', photo_url: '/logo.png' },
+          created_at: msg.created_at,
+          read_by: msg.read_by || []
+        };
+      }).filter(Boolean);
+
+      // 4. Process band
+      const processedBand = bandMessages.map(msg => {
+        return {
+          id: msg.id,
+          type: 'band',
+          title: `Neuigkeiten aus ${msg.bands?.name || 'deiner Band'}`,
+          content: msg.content || '',
+          sender: msg.users || { first_name: 'Mitglied', last_name: '', photo_url: '/avatar_ghost.jpg' },
+          created_at: msg.created_at,
+          read_by: msg.read_by || [],
+          bandName: msg.bands?.name
+        };
+      });
+
+      const combined = [...processedSchool, ...processedBand].filter(Boolean).sort(
+        (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      
+      setStudentMessages(combined);
+    } catch (err) {
+      console.error('[StudentMessagesBackground] Error:', err);
+    }
+  };
+
+  const fetchStudentMessages = async () => {
+    if (!user || user.role !== 'student' || !user.school_id) return;
+    setStudentMessagesLoading(true);
+    const bandIds = userBands.map(b => b.id);
+    await fetchStudentMessagesBackground(user.school_id, user.id, bandIds);
+    setStudentMessagesLoading(false);
+  };
+
+  const handleAcknowledgeStudentMessage = async (msg: any) => {
+    if (!user) return;
+    const currentReadBy = msg.read_by || [];
+    if (currentReadBy.includes(user.id)) return;
+    
+    const newReadBy = [...currentReadBy, user.id];
+    
+    // Optimistic update of local states
+    setStudentMessages(prev => prev.map(m => m.id === msg.id ? { ...m, read_by: newReadBy } : m));
+    setSelectedStudentMessage((prev: any) => prev && prev.id === msg.id ? { ...prev, read_by: newReadBy } : prev);
+    
+    try {
+      await supabase
+        .from('band_shoutbox')
+        .update({ read_by: newReadBy })
+        .eq('id', msg.id);
+    } catch (err) {
+      console.error('Error acknowledging student message:', err);
+    }
+  };
+
+  const handleDeleteMessageForSelf = (msgId: string) => {
+    if (!user) return;
+    if (!window.confirm('Möchtest du diese Nachricht wirklich für dich aus deiner Mailbox löschen?')) return;
+    
+    const newDeleted = [...deletedMessageIds, msgId];
+    setDeletedMessageIds(newDeleted);
+    localStorage.setItem(`groovelab_deleted_messages_${user.id}`, JSON.stringify(newDeleted));
+    
+    // Auto-select the next or first available message after deletion
+    const remaining = studentMessages.filter(m => {
+      if (newDeleted.includes(m.id)) return false;
+      if (studentMessagesFilter === 'school') return m.type === 'school';
+      if (studentMessagesFilter === 'band') return m.type === 'band';
+      return true;
+    });
+    
+    setSelectedStudentMessage(remaining.length > 0 ? remaining[0] : null);
+  };
+
+  const handleAcknowledgeAnnouncement = async (msg: any) => {
+    if (!user) return;
+    const currentReadBy = msg.read_by || [];
+    if (currentReadBy.includes(user.id)) {
+      setActiveAnnouncement(null);
+      return;
+    }
+    const newReadBy = [...currentReadBy, user.id];
+    
+    setActiveAnnouncement(null);
+    
+    try {
+      await supabase
+        .from('band_shoutbox')
+        .update({ read_by: newReadBy })
+        .eq('id', msg.id);
+    } catch (err) {
+      console.error('Error acknowledging announcement:', err);
+    }
+  };
+
+  const handlePostAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !user.school_id) return;
+    if (!announcementTitle.trim() || !announcementMessage.trim()) {
+      alert('Bitte Betreff und Nachricht ausfüllen.');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      let bandId = annBandId;
+      if (!bandId) {
+        const { data: annBands } = await supabase
+          .from('bands')
+          .select('id')
+          .eq('school_id', user.school_id)
+          .eq('name', '__SYSTEM_ANNOUNCEMENTS__');
+          
+        if (!annBands || annBands.length === 0) {
+          const { data: newBand } = await supabase
+            .from('bands')
+            .insert({
+              name: '__SYSTEM_ANNOUNCEMENTS__',
+              status: 'active',
+              school_id: user.school_id,
+              genre: 'System',
+              photo_url: '/logo.png'
+            })
+            .select();
+          if (newBand && newBand[0]) {
+            bandId = newBand[0].id;
+            setAnnBandId(bandId);
+          }
+        } else {
+          bandId = annBands[0].id;
+          setAnnBandId(bandId);
+        }
+      }
+      
+      if (!bandId) {
+        alert('Fehler beim Erstellen der System-Band.');
+        setLoading(false);
+        return;
+      }
+      
+      const payload = {
+        title: announcementTitle.trim(),
+        message: announcementMessage.trim(),
+        target_type: announcementTarget,
+        target_user_ids: announcementTarget === 'specific' ? selectedTargetUserIds : []
+      };
+      
+      const { error } = await supabase.from('band_shoutbox').insert({
+        band_id: bandId,
+        user_id: user.id,
+        content: JSON.stringify(payload),
+        read_by: [user.id]
+      });
+      
+      if (error) {
+        alert('Fehler beim Senden: ' + error.message);
+      } else {
+        setAnnouncementTitle('');
+        setAnnouncementMessage('');
+        setAnnouncementTarget('all');
+        setSelectedTargetUserIds([]);
+        setRecipientSearchText('');
+        
+        await fetchAnnouncements(user.school_id);
+        alert('Nachricht wurde erfolgreich gesendet!');
+      }
+    } catch (err: any) {
+      console.error('[Announcements] Error posting:', err);
+      alert('Unerwarteter Fehler: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteAnnouncement = async (msgId: string) => {
+    if (!window.confirm('Möchtest du diese Mitteilung wirklich unwiderruflich löschen? Sie wird dann für alle Empfänger entfernt.')) return;
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('band_shoutbox').delete().eq('id', msgId);
+      if (error) {
+        alert('Fehler beim Löschen: ' + error.message);
+      } else {
+        if (user?.school_id) {
+          await fetchAnnouncements(user.school_id);
+        }
+      }
+    } catch (err: any) {
+      console.error('[Announcements] Error deleting:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -3820,8 +4308,8 @@ function App() {
   return (
     <div className="app-layout">
       <style>{`
-        .hover-scale { transition: all 0.2s ease !important; }
-        .hover-scale:hover { 
+        .sidebar-nav .hover-scale { transition: all 0.2s ease !important; }
+        .sidebar-nav .hover-scale:hover { 
           transform: translateX(4px); 
           background: rgba(255,255,255,0.03) !important;
           border-color: rgba(255,255,255,0.05) !important;
@@ -3884,6 +4372,27 @@ function App() {
                 <Box size={20} /> Bands
               </button>
 
+              <button onClick={() => setActiveStudentTab('messages')} className={`sidebar-item ${activeStudentTab === 'messages' ? 'active' : ''}`} style={{ position: 'relative' }}>
+                <Megaphone size={20} /> Nachrichten
+                {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length > 0 && (
+                  <div style={{ 
+                    background: '#ef4444', 
+                    color: 'white', 
+                    borderRadius: '50%', 
+                    minWidth: '18px', 
+                    height: '18px', 
+                    padding: '0 5px',
+                    fontSize: '0.65rem', 
+                    fontWeight: 900, 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    marginLeft: 'auto',
+                    boxShadow: '0 2px 5px rgba(239, 68, 68, 0.4)'
+                  }}>{studentMessages.filter(m => !m.read_by?.includes(user?.id)).length}</div>
+                )}
+              </button>
+
               <button onClick={() => setActiveStudentTab('profile')} className={`sidebar-item ${activeStudentTab === 'profile' ? 'active' : ''}`}>
                 <Shield size={20} /> Profil
               </button>
@@ -3904,6 +4413,9 @@ function App() {
                 border: activeStudentTab === 'live' ? '1px solid #f1f5f9' : 'none'
               }}>
                 <Monitor size={20} color={activeStudentTab === 'live' ? '#1e293b' : '#64748b'} /> Live Lab
+              </button>
+              <button onClick={() => setActiveStudentTab('messages')} className={`sidebar-item ${activeStudentTab === 'messages' ? 'active' : ''}`}>
+                <Mail size={20} /> Nachrichten
               </button>
               <button onClick={() => setActiveStudentTab('students')} className={`sidebar-item ${activeStudentTab === 'students' ? 'active' : ''}`}>
                 <Users size={20} /> Schüler
@@ -3938,7 +4450,7 @@ function App() {
              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ position: 'relative' }}>
                   <div style={{ width: '44px', height: '44px', borderRadius: '12px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                    <StudioAvatar src={user.photo_url} />
+                    <StudioAvatar src={user.photo_url} user={user} />
                   </div>
                   {session && <div style={{ position: 'absolute', bottom: -2, right: -2, width: '10px', height: '10px', background: '#ef4444', borderRadius: '50%', border: '2px solid white' }}></div>}
                 </div>
@@ -4079,7 +4591,7 @@ function App() {
               {/* Top: Massive Hero Card */}
               <div className="glass-panel" style={{ background: 'white', borderRadius: '32px', display: 'flex', overflow: 'hidden', minHeight: '340px' }}>
                 <div style={{ flex: '0 0 40%', background: '#f8fafc', position: 'relative', overflow: 'hidden' }}>
-                  <StudioAvatar src={user.photo_url} style={{ display: user.photo_url || !user.first_name ? 'block' : 'none' }} />
+                  <StudioAvatar src={user.photo_url} user={user} style={{ display: user.photo_url || !user.first_name ? 'block' : 'none' }} />
                   {!user.photo_url && user.first_name && (
                     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '5rem', color: 'white', background: brandColor, fontWeight: 800 }}>
                       {user.first_name?.[0]}
@@ -4120,7 +4632,7 @@ function App() {
 
                   {/* Instrument Master Counters */}
                   <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
-                    {['Guitar', 'Keys', 'Drums', 'Bass', 'Vocals'].map(inst => {
+                    {['Guitar', 'Drums', 'Keys', 'Bass', 'Vocals'].map(inst => {
                       const count = userSongs.filter(s => {
                         const sInst = s.instrument?.toLowerCase();
                         const target = inst.toLowerCase();
@@ -4348,12 +4860,7 @@ function App() {
                                                 border = `1px solid rgba(79, 70, 229, ${opacity + 0.1})`;
                                               }
                                               
-                                              if (hasTeacher) {
-                                                border = '1px solid #f59e0b';
-                                                if (totalCount === 0) {
-                                                  bgColor = '#fffbeb';
-                                                }
-                                              }
+                                              // Teacher slots are not highlighted in student planner as requested
                                             }
                                             
                                             
@@ -4588,7 +5095,7 @@ function App() {
                                           zIndex: 5 - idx
                                         }}>
                                           {m.user_id ? (
-                                            <StudioAvatar src={u?.photo_url} />
+                                            <StudioAvatar src={u?.photo_url} user={u} />
                                           ) : (
                                             <span style={{ color: 'white', fontSize: '0.6rem', fontWeight: 900 }}>{m.external_name?.[0] || 'E'}</span>
                                           )}
@@ -4763,8 +5270,8 @@ function App() {
                                             content = <span style={{ opacity: 0.3, fontSize: '0.6rem' }}>✕</span>;
                                           } else {
                                             // 1. Determine Background, Border, and Text Color based strictly on heatmap density and coach presence
-                                            if (isPlanned) {
-                                              // Solid brand gold-amber für eigene geplante Zeiten — durchgehend kräftig, leuchtend und einheitlich!
+                                            if (isPlanned || hasTeacher) {
+                                              // Solid brand gold-amber für eigene geplante Zeiten und andere Coaches (eine Farbe uni)
                                               bgColor = '#f59e0b';
                                               textColor = 'white';
                                               border = '1px solid #d97706';
@@ -4780,19 +5287,9 @@ function App() {
                                                 textColor = opacity >= 0.35 ? 'white' : '#4f46e5';
                                                 border = `1px solid rgba(79, 70, 229, ${opacity + 0.1})`;
                                               }
-                                              
-                                            }
-                                            
-                                            if (hasTeacher) {
-                                              border = '1px solid #f59e0b';
-                                              if (totalCount === 0) {
-                                                bgColor = '#fffbeb';
-                                              }
                                             }
 
-                                            // 2. Determine Inner Content (Student Count + Coach Badge)
-                                            
-
+                                            // 2. Determine Inner Content (Student Count)
                                             if (totalCount > 0) {
                                               content = (
                                                 <span style={{ fontSize: '0.75rem', fontWeight: 900 }}>
@@ -4927,7 +5424,7 @@ function App() {
                                           zIndex: 5 - idx
                                         }}>
                                           {m.user_id ? (
-                                            <StudioAvatar src={u?.photo_url} />
+                                            <StudioAvatar src={u?.photo_url} user={u} />
                                           ) : (
                                             <span style={{ color: 'white', fontSize: '0.6rem', fontWeight: 900 }}>{m.external_name?.[0] || 'E'}</span>
                                           )}
@@ -4965,6 +5462,887 @@ function App() {
           </ErrorBoundary>
         )}
 
+        {/* Messages Tab (Apple Mail style) */}
+        {activeStudentTab === 'messages' && (
+          user?.role?.toLowerCase() === 'student' ? (
+            <ErrorBoundary>
+              <div className="animation-slide-up" style={{ 
+                padding: '32px', 
+                display: 'flex', 
+                gap: '24px', 
+                height: 'calc(100vh - 140px)', 
+                minHeight: '700px' 
+              }}>
+                {/* Left Column: Inbox Message List (1/3rd width) */}
+                <div className="glass-panel" style={{ 
+                  background: 'white', 
+                  borderRadius: '24px', 
+                  width: '380px', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  overflow: 'hidden', 
+                  border: '1px solid #f1f5f9',
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.02)',
+                  flexShrink: 0
+                }}>
+                  {/* Header of Mailbox */}
+                  <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', gap: '16px', background: '#f8fafc' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: '0' }}>Nachrichten</h3>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>
+                          {studentMessages.filter(m => !deletedMessageIds.includes(m.id)).length} Mitteilungen
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Filter Segmented Controls */}
+                    <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '12px', padding: '3px', gap: '2px' }}>
+                      <button 
+                        onClick={() => {
+                          setStudentMessagesFilter('all');
+                          const filtered = studentMessages.filter(m => !deletedMessageIds.includes(m.id));
+                          setSelectedStudentMessage(filtered.length > 0 ? filtered[0] : null);
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '8px',
+                          border: 'none',
+                          background: studentMessagesFilter === 'all' ? 'white' : 'transparent',
+                          color: studentMessagesFilter === 'all' ? '#1e293b' : '#64748b',
+                          borderRadius: '9px',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          boxShadow: studentMessagesFilter === 'all' ? '0 2px 6px rgba(0,0,0,0.04)' : 'none',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        📣 Alle
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setStudentMessagesFilter('school');
+                          const filtered = studentMessages.filter(m => m.type === 'school' && !deletedMessageIds.includes(m.id));
+                          setSelectedStudentMessage(filtered.length > 0 ? filtered[0] : null);
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '8px',
+                          border: 'none',
+                          background: studentMessagesFilter === 'school' ? 'white' : 'transparent',
+                          color: studentMessagesFilter === 'school' ? '#1e293b' : '#64748b',
+                          borderRadius: '9px',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          boxShadow: studentMessagesFilter === 'school' ? '0 2px 6px rgba(0,0,0,0.04)' : 'none',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        🏫 Schule
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setStudentMessagesFilter('band');
+                          const filtered = studentMessages.filter(m => m.type === 'band' && !deletedMessageIds.includes(m.id));
+                          setSelectedStudentMessage(filtered.length > 0 ? filtered[0] : null);
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '8px',
+                          border: 'none',
+                          background: studentMessagesFilter === 'band' ? 'white' : 'transparent',
+                          color: studentMessagesFilter === 'band' ? '#1e293b' : '#64748b',
+                          borderRadius: '9px',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          boxShadow: studentMessagesFilter === 'band' ? '0 2px 6px rgba(0,0,0,0.04)' : 'none',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        🎸 Bands
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* List Area */}
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }} className="custom-scrollbar">
+                    {studentMessagesLoading ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '200px', gap: '12px', color: '#94a3b8' }}>
+                        <div className="animate-spin" style={{ width: '28px', height: '28px', border: '3px solid #e2e8f0', borderTopColor: '#3b82f6', borderRadius: '50%' }}></div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>Lade Nachrichten...</div>
+                      </div>
+                    ) : (() => {
+                      const filtered = studentMessages.filter(m => {
+                        if (deletedMessageIds.includes(m.id)) return false;
+                        if (studentMessagesFilter === 'school') return m.type === 'school';
+                        if (studentMessagesFilter === 'band') return m.type === 'band';
+                        return true;
+                      });
+
+                      if (filtered.length === 0) {
+                        return (
+                          <div style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8' }}>
+                            <div style={{ fontSize: '2.5rem', marginBottom: '16px' }}>✉️</div>
+                            <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#64748b' }}>Keine Nachrichten</div>
+                            <div style={{ fontSize: '0.75rem', marginTop: '6px', color: '#94a3b8' }}>
+                              {studentMessagesFilter === 'school' ? 'Keine Ankündigungen der Musikschule.' : studentMessagesFilter === 'band' ? 'Keine Nachrichten aus deinen Bands.' : 'Du bist auf dem neuesten Stand!'}
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return filtered.map((msg: any) => {
+                        const isRead = msg.read_by?.includes(user?.id);
+                        const isSelected = selectedStudentMessage?.id === msg.id;
+                        
+                        return (
+                          <div 
+                            key={msg.id}
+                            onClick={() => {
+                              setSelectedStudentMessage(msg);
+                              if (!isRead) {
+                                handleAcknowledgeStudentMessage(msg);
+                              }
+                            }}
+                            className="hover-scale"
+                            style={{
+                              padding: '16px',
+                              borderRadius: '16px',
+                              background: isSelected ? 'linear-gradient(135deg, #eff6ff, #dbeafe)' : 'transparent',
+                              border: isSelected ? '1px solid #bfdbfe' : '1px solid transparent',
+                              cursor: 'pointer',
+                              marginBottom: '8px',
+                              transition: 'all 0.2s',
+                              position: 'relative',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '8px'
+                            }}
+                          >
+                            {!isRead && (
+                              <div style={{
+                                position: 'absolute',
+                                top: '18px',
+                                right: '18px',
+                                width: '8px',
+                                height: '8px',
+                                borderRadius: '50%',
+                                background: '#3b82f6',
+                                boxShadow: '0 0 8px #3b82f6'
+                              }} />
+                            )}
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingRight: '12px' }}>
+                              <span style={{
+                                fontSize: '0.65rem',
+                                fontWeight: 900,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.05em',
+                                background: msg.type === 'school' ? '#fee2e2' : '#dcfce7',
+                                color: msg.type === 'school' ? '#ef4444' : '#22c55e',
+                                padding: '3px 8px',
+                                borderRadius: '6px'
+                              }}>
+                                {msg.type === 'school' ? 'Schule' : 'Band'}
+                              </span>
+                              <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#94a3b8', marginLeft: 'auto' }}>
+                                {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                              </span>
+                            </div>
+
+                            <h4 style={{
+                              fontSize: '0.9rem',
+                              fontWeight: isRead ? 700 : 900,
+                              color: isSelected ? '#1e3a8a' : '#1e293b',
+                              margin: '0',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              paddingRight: '16px'
+                            }}>
+                              {msg.title}
+                            </h4>
+
+                            <p style={{
+                              fontSize: '0.75rem',
+                              color: isSelected ? '#1e40af' : '#64748b',
+                              margin: '0',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 1,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                              lineHeight: '1.4',
+                              fontWeight: isRead ? 500 : 700
+                            }}>
+                              {msg.content}
+                            </p>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                              <img 
+                                src={msg.sender?.photo_url || '/avatar_ghost.jpg'} 
+                                alt=""
+                                style={{ width: '18px', height: '18px', borderRadius: '50%', objectFit: 'cover' }}
+                              />
+                              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: isSelected ? '#1d4ed8' : '#475569' }}>
+                                {msg.sender?.first_name} {msg.sender?.last_name || ''}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+
+                {/* Right Column: Message Details (2/3rds width) */}
+                <div className="glass-panel" style={{ 
+                  flex: 1, 
+                  background: 'white', 
+                  borderRadius: '24px', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  overflow: 'hidden', 
+                  border: '1px solid #f1f5f9',
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.02)'
+                }}>
+                  {selectedStudentMessage ? (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
+                      
+                      {/* Message Header */}
+                      <div style={{ padding: '32px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <img 
+                          src={selectedStudentMessage.sender?.photo_url || '/avatar_ghost.jpg'} 
+                          alt=""
+                          style={{ width: '48px', height: '48px', borderRadius: '50%', border: '2px solid white', boxShadow: '0 4px 10px rgba(0,0,0,0.05)', objectFit: 'cover' }}
+                        />
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: '0' }}>
+                              {selectedStudentMessage.sender?.first_name} {selectedStudentMessage.sender?.last_name || ''}
+                            </h4>
+                            <span style={{
+                              fontSize: '0.65rem',
+                              fontWeight: 900,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                              background: selectedStudentMessage.type === 'school' ? '#fee2e2' : '#dcfce7',
+                              color: selectedStudentMessage.type === 'school' ? '#ef4444' : '#22c55e',
+                              padding: '2px 6px',
+                              borderRadius: '5px'
+                            }}>
+                              {selectedStudentMessage.type === 'school' ? 'Coach' : 'Bandmitglied'}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginTop: '2px' }}>
+                            Gesendet am {new Date(selectedStudentMessage.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} um {new Date(selectedStudentMessage.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Message Content Area */}
+                      <div style={{ flex: 1, padding: '40px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '24px' }} className="custom-scrollbar">
+                        <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b', margin: '0', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                          {selectedStudentMessage.title}
+                        </h2>
+                        
+                        <div style={{ 
+                          fontSize: '1rem', 
+                          color: '#334155', 
+                          lineHeight: '1.6', 
+                          fontWeight: 500,
+                          whiteSpace: 'pre-wrap',
+                          background: '#f8fafc',
+                          padding: '24px',
+                          borderRadius: '16px',
+                          border: '1px solid #f1f5f9'
+                        }}>
+                          {selectedStudentMessage.content}
+                        </div>
+                      </div>
+
+                      {/* Message Footer / Acknowledge Action */}
+                      <div style={{ padding: '24px 32px', borderTop: '1px solid #f1f5f9', background: '#f8fafc', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <button
+                          onClick={() => handleDeleteMessageForSelf(selectedStudentMessage.id)}
+                          className="hover-scale"
+                          style={{
+                            background: 'transparent',
+                            color: '#ef4444',
+                            border: '1px solid #fee2e2',
+                            padding: '12px 20px',
+                            borderRadius: '14px',
+                            fontSize: '0.85rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            marginRight: 'auto',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#fef2f2';
+                            e.currentTarget.style.borderColor = '#fca5a5';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'transparent';
+                            e.currentTarget.style.borderColor = '#fee2e2';
+                          }}
+                        >
+                          <Trash2 size={16} /> Für mich löschen
+                        </button>
+
+                        {selectedStudentMessage.read_by?.includes(user?.id) ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#16a34a', fontSize: '0.85rem', fontWeight: 700, padding: '10px 16px', background: '#dcfce7', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
+                            <Check size={16} strokeWidth={3} /> Nachricht gelesen & verstanden
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleAcknowledgeStudentMessage(selectedStudentMessage)}
+                            className="hover-scale"
+                            style={{
+                              background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                              color: 'white',
+                              border: 'none',
+                              padding: '12px 24px',
+                              borderRadius: '14px',
+                              fontSize: '0.85rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              boxShadow: '0 4px 15px rgba(22, 163, 74, 0.2)'
+                            }}
+                          >
+                            <CheckCircle size={18} /> Als gelesen markieren
+                          </button>
+                        )}
+                      </div>
+                      
+                    </div>
+                  ) : (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', padding: '40px' }}>
+                      <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📬</div>
+                      <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#64748b', margin: '0' }}>Keine Nachricht ausgewählt</h4>
+                      <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: '8px 0 0 0', textAlign: 'center' }}>
+                        Wähle links eine Nachricht aus der Liste aus, um die Details zu lesen.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </ErrorBoundary>
+          ) : (
+            <ErrorBoundary>
+              <div className="animation-slide-up" style={{  
+              padding: '32px', 
+              display: 'flex', 
+              gap: '24px', 
+              height: 'calc(100vh - 140px)', 
+              minHeight: '700px' 
+            }}>
+              
+              {/* Left Column: Inbox Message List (1/3rd width) */}
+              <div className="glass-panel" style={{ 
+                background: 'white', 
+                borderRadius: '24px', 
+                width: '380px', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                overflow: 'hidden', 
+                border: '1px solid #f1f5f9',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.02)',
+                flexShrink: 0
+              }}>
+                {/* Header of Mailbox */}
+                <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
+                  <div>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: '0' }}>Nachrichten</h3>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>{announcements.length} Mitteilungen</div>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setIsMailComposing(true);
+                      setSelectedMailMessage(null);
+                    }}
+                    style={{ 
+                      background: '#3b82f6', 
+                      color: 'white', 
+                      border: 'none', 
+                      width: '40px', 
+                      height: '40px', 
+                      borderRadius: '12px', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 12px rgba(59,130,246,0.2)'
+                    }}
+                    className="hover-scale"
+                    title="Neue Mitteilung schreiben"
+                  >
+                    <Plus size={20} />
+                  </button>
+                </div>
+                
+                {/* Scrollable list of mails */}
+                <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {announcements.length === 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, padding: '40px 20px', color: '#94a3b8', textAlign: 'center' }}>
+                      <Mail size={40} style={{ strokeWidth: 1.5, color: '#cbd5e1', marginBottom: '12px' }} />
+                      <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#64748b' }}>Posteingang leer</div>
+                      <div style={{ fontSize: '0.75rem', color: '#cbd5e1', marginTop: '4px' }}>Erstelle deine erste Mitteilung mit dem Plus-Button!</div>
+                    </div>
+                  ) : (
+                    announcements.map((ann: any) => {
+                      let parsed;
+                      try {
+                        parsed = JSON.parse(ann.content);
+                      } catch (e) {
+                        parsed = {
+                          title: 'Mitteilung',
+                          message: ann.content,
+                          target_type: 'all',
+                          target_user_ids: []
+                        };
+                      }
+
+                      let totalTarget = 0;
+                      if (parsed.target_type === 'all') totalTarget = schoolUsers.length;
+                      else if (parsed.target_type === 'students') totalTarget = schoolUsers.filter(u => u.role === 'student').length;
+                      else if (parsed.target_type === 'teachers') totalTarget = schoolUsers.filter(u => u.role === 'teacher' || u.role === 'admin').length;
+                      else if (parsed.target_type === 'specific') totalTarget = parsed.target_user_ids?.length || 0;
+
+                      const readCount = ann.read_by?.length || 0;
+                      const isSelected = selectedMailMessage?.id === ann.id;
+
+                      return (
+                        <button
+                          key={ann.id}
+                          onClick={() => {
+                            setSelectedMailMessage(ann);
+                            setIsMailComposing(false);
+                          }}
+                          style={{
+                            background: isSelected ? 'linear-gradient(135deg, #3b82f615 0%, #1d4ed808 100%)' : '#f8fafc',
+                            border: isSelected ? '2px solid #3b82f6' : '2px solid transparent',
+                            borderRadius: '16px',
+                            padding: '16px',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px',
+                            transition: 'all 0.2s',
+                            boxShadow: isSelected ? '0 4px 12px rgba(59,130,246,0.05)' : 'none',
+                            position: 'relative',
+                            width: '100%'
+                          }}
+                          className="hover-scale"
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', gap: '8px' }}>
+                            <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                              {parsed.title}
+                            </div>
+                            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', flexShrink: 0 }}>
+                              {new Date(ann.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                            </div>
+                          </div>
+                          
+                          <div style={{ 
+                            fontSize: '0.8rem', 
+                            fontWeight: 600, 
+                            color: '#64748b', 
+                            display: '-webkit-box', 
+                            WebkitLineClamp: 2, 
+                            WebkitBoxOrient: 'vertical', 
+                            overflow: 'hidden',
+                            lineHeight: 1.4
+                          }}>
+                            {parsed.message}
+                          </div>
+                          
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', width: '100%' }}>
+                            <span style={{ 
+                              fontSize: '0.65rem', 
+                              fontWeight: 800, 
+                              padding: '2px 8px', 
+                              borderRadius: '6px', 
+                              background: parsed.target_type === 'all' ? '#e0f2fe' : parsed.target_type === 'students' ? '#dbeafe' : parsed.target_type === 'teachers' ? '#dcfce7' : '#f3e8ff',
+                              color: parsed.target_type === 'all' ? '#0369a1' : parsed.target_type === 'students' ? '#1d4ed8' : parsed.target_type === 'teachers' ? '#15803d' : '#7e22ce'
+                            }}>
+                              {parsed.target_type === 'all' ? 'Alle' : parsed.target_type === 'students' ? 'Schüler' : parsed.target_type === 'teachers' ? 'Lehrer' : 'Auswahl'}
+                            </span>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              👁️ {readCount}{totalTarget > 0 ? `/${totalTarget}` : ''}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column: Mail Details / Composer (2/3rds width) */}
+              <div className="glass-panel" style={{ 
+                background: 'white', 
+                borderRadius: '24px', 
+                flex: 1, 
+                display: 'flex', 
+                flexDirection: 'column', 
+                overflow: 'hidden', 
+                border: '1px solid #f1f5f9',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.02)'
+              }}>
+                {isMailComposing ? (
+                  /* COMPOSE MODE */
+                  <form 
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      await handlePostAnnouncement(e);
+                      setIsMailComposing(false);
+                      setSelectedMailMessage(null);
+                    }} 
+                    style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
+                  >
+                    {/* Compose Header */}
+                    <div style={{ padding: '24px 32px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
+                      <div>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: '0' }}>Neue Mitteilung verfassen</h3>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>Sende eine Benachrichtigung an deine Groovelab Community</div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            setIsMailComposing(false);
+                            setAnnouncementTitle('');
+                            setAnnouncementMessage('');
+                            setAnnouncementTarget('all');
+                            setSelectedTargetUserIds([]);
+                          }}
+                          style={{ 
+                            background: '#f1f5f9', 
+                            color: '#475569', 
+                            border: 'none', 
+                            padding: '10px 20px', 
+                            borderRadius: '12px', 
+                            fontWeight: 800, 
+                            cursor: 'pointer' 
+                          }}
+                          className="hover-scale"
+                        >
+                          Verwerfen
+                        </button>
+                        <button 
+                          type="submit" 
+                          style={{ 
+                            background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', 
+                            color: 'white', 
+                            border: 'none', 
+                            padding: '10px 24px', 
+                            borderRadius: '12px', 
+                            fontWeight: 800, 
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            boxShadow: '0 4px 12px rgba(59,130,246,0.2)'
+                          }}
+                          className="hover-scale"
+                        >
+                          <Zap size={16} />
+                          Absenden
+                        </button>
+                      </div>
+                    </div>
+                    
+                    {/* Compose Fields Container */}
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                      {/* Recipient Field */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>An (Empfänger)</label>
+                        <select 
+                          value={announcementTarget} 
+                          onChange={e => {
+                            setAnnouncementTarget(e.target.value as any);
+                            setSelectedTargetUserIds([]);
+                          }}
+                          style={{ padding: '14px 18px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 850, fontSize: '0.9rem', cursor: 'pointer', outline: 'none' }}
+                        >
+                          <option value="all">Alle Schüler & Lehrer</option>
+                          <option value="students">Nur Schüler</option>
+                          <option value="teachers">Nur Lehrer</option>
+                          <option value="specific">Einzelne Profile auswählen...</option>
+                        </select>
+                      </div>
+
+                      {/* Specific target profiles */}
+                      {announcementTarget === 'specific' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: '#f8fafc', padding: '20px', borderRadius: '18px', border: '1px solid #f1f5f9' }}>
+                          <div style={{ position: 'relative' }}>
+                            <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                            <input 
+                              placeholder="Empfänger suchen..." 
+                              value={recipientSearchText} 
+                              onChange={e => setRecipientSearchText(e.target.value)}
+                              style={{ width: '100%', padding: '12px 14px 12px 42px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.85rem', fontWeight: 600, outline: 'none' }}
+                            />
+                          </div>
+                          <div style={{ maxHeight: '200px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
+                            {schoolUsers
+                              .filter(u => {
+                                const fullName = `${u.first_name || ''} ${u.last_name || ''}`.toLowerCase();
+                                return fullName.includes(recipientSearchText.toLowerCase()) && u.id !== user.id;
+                              })
+                              .map(u => {
+                                const isChecked = selectedTargetUserIds.includes(u.id);
+                                return (
+                                  <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', padding: '8px', borderRadius: '10px', background: isChecked ? '#3b82f608' : 'transparent', border: isChecked ? '1px solid #3b82f620' : '1px solid transparent', transition: 'all 0.2s' }}>
+                                    <input 
+                                      type="checkbox" 
+                                      checked={isChecked}
+                                      onChange={() => {
+                                        if (isChecked) {
+                                          setSelectedTargetUserIds(selectedTargetUserIds.filter(id => id !== u.id));
+                                        } else {
+                                          setSelectedTargetUserIds([...selectedTargetUserIds, u.id]);
+                                        }
+                                      }}
+                                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                    />
+                                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', overflow: 'hidden', background: '#e2e8f0', flexShrink: 0 }}>
+                                      {u.photo_url ? <StudioAvatar src={u.photo_url} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: '0.75rem', fontWeight: 900, color: '#64748b' }}>{u.first_name?.[0] || 'U'}</div>}
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                      <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>{u.first_name} {u.last_name || ''}</div>
+                                      <div style={{ fontSize: '0.7rem', fontWeight: 700, color: u.role === 'student' ? '#3b82f6' : '#10b981', textTransform: 'uppercase' }}>
+                                        {u.role === 'student' ? 'Schüler' : 'Lehrer'}
+                                      </div>
+                                    </div>
+                                  </label>
+                                );
+                              })}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textAlign: 'right' }}>
+                            {selectedTargetUserIds.length} ausgewählt
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Subject Field */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Betreff</label>
+                        <input 
+                          required 
+                          placeholder="Betreffzeile eintragen..." 
+                          value={announcementTitle} 
+                          onChange={e => setAnnouncementTitle(e.target.value)} 
+                          style={{ padding: '14px 18px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700, fontSize: '0.95rem', outline: 'none' }} 
+                        />
+                      </div>
+
+                      {/* Message Body Field */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Inhalt</label>
+                        <textarea 
+                          required 
+                          placeholder="Schreibe deine Nachricht hier..." 
+                          value={announcementMessage} 
+                          onChange={e => setAnnouncementMessage(e.target.value)} 
+                          style={{ 
+                            padding: '18px', 
+                            borderRadius: '14px', 
+                            border: '1px solid #e2e8f0', 
+                            background: '#f8fafc', 
+                            fontWeight: 600, 
+                            fontSize: '0.95rem', 
+                            resize: 'none',
+                            flex: 1,
+                            outline: 'none',
+                            lineHeight: 1.6
+                          }} 
+                        />
+                      </div>
+                    </div>
+                  </form>
+                ) : selectedMailMessage ? (
+                  /* MAIL VIEW MODE */
+                  (() => {
+                    let parsed;
+                    try {
+                      parsed = JSON.parse(selectedMailMessage.content);
+                    } catch (e) {
+                      parsed = {
+                        title: 'Mitteilung',
+                        message: selectedMailMessage.content,
+                        target_type: 'all',
+                        target_user_ids: []
+                      };
+                    }
+
+                    let totalTarget = 0;
+                    if (parsed.target_type === 'all') totalTarget = schoolUsers.length;
+                    else if (parsed.target_type === 'students') totalTarget = schoolUsers.filter(u => u.role === 'student').length;
+                    else if (parsed.target_type === 'teachers') totalTarget = schoolUsers.filter(u => u.role === 'teacher' || u.role === 'admin').length;
+                    else if (parsed.target_type === 'specific') totalTarget = parsed.target_user_ids?.length || 0;
+
+                    const readCount = selectedMailMessage.read_by?.length || 0;
+                    const dateFormatted = new Date(selectedMailMessage.created_at).toLocaleDateString('de-DE', {
+                      weekday: 'long',
+                      day: '2-digit',
+                      month: 'long',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    });
+
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                        {/* Mail View Header */}
+                        <div style={{ padding: '24px 32px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <span style={{ 
+                              fontSize: '0.7rem', 
+                              fontWeight: 900, 
+                              padding: '4px 10px', 
+                              borderRadius: '8px', 
+                              background: parsed.target_type === 'all' ? '#e0f2fe' : parsed.target_type === 'students' ? '#dbeafe' : parsed.target_type === 'teachers' ? '#dcfce7' : '#f3e8ff',
+                              color: parsed.target_type === 'all' ? '#0369a1' : parsed.target_type === 'students' ? '#1d4ed8' : parsed.target_type === 'teachers' ? '#15803d' : '#7e22ce'
+                            }}>
+                              {parsed.target_type === 'all' ? 'ALLE' : parsed.target_type === 'students' ? 'SCHÜLER' : parsed.target_type === 'teachers' ? 'LEHRER' : 'EINZELNE'}
+                            </span>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              👁️ Gelesen von {readCount} von {totalTarget}
+                            </span>
+                          </div>
+                          
+                          <button
+                            onClick={async () => {
+                              if (window.confirm('Möchtest du diese Mitteilung wirklich unwiderruflich löschen?')) {
+                                await handleDeleteAnnouncement(selectedMailMessage.id);
+                                setSelectedMailMessage(null);
+                              }
+                            }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#ef4444',
+                              cursor: 'pointer',
+                              padding: '8px',
+                              borderRadius: '8px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              fontWeight: 800,
+                              fontSize: '0.85rem'
+                            }}
+                            className="hover-scale"
+                          >
+                            <Trash2 size={16} /> Mitteilung löschen
+                          </button>
+                        </div>
+                        
+                        {/* Mail View Content Card */}
+                        <div style={{ flex: 1, overflowY: 'auto', padding: '40px' }}>
+                          <h1 style={{ fontSize: '1.8rem', fontWeight: 900, color: '#1e293b', margin: '0 0 24px 0', lineHeight: 1.2 }}>
+                            {parsed.title}
+                          </h1>
+                          
+                          {/* Sender Row */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', borderBottom: '1px solid #f1f5f9', paddingBottom: '24px', marginBottom: '32px' }}>
+                            <div style={{ width: '48px', height: '48px', borderRadius: '50%', overflow: 'hidden', background: '#e2e8f0', flexShrink: 0 }}>
+                              <StudioAvatar src={user?.photo_url} user={user} />
+                            </div>
+                            <div>
+                              <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1e293b' }}>
+                                {user.first_name} {user.last_name || ''}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>
+                                {dateFormatted}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Mail Text Body */}
+                          <div style={{ 
+                            fontSize: '1.05rem', 
+                            lineHeight: 1.8, 
+                            color: '#334155', 
+                            whiteSpace: 'pre-wrap', 
+                            fontWeight: 500,
+                            letterSpacing: '-0.01em'
+                          }}>
+                            {parsed.message}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()
+                ) : (
+                  /* EMPTY PLACEHOLDER STATE */
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, padding: '40px', textAlign: 'center', background: '#f8fafc' }}>
+                    <div style={{ 
+                      width: '80px', 
+                      height: '80px', 
+                      borderRadius: '50%', 
+                      background: 'white', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      boxShadow: '0 10px 25px rgba(0,0,0,0.03)',
+                      marginBottom: '24px'
+                    }}>
+                      <Mail size={36} style={{ strokeWidth: 1.5, color: '#3b82f6' }} />
+                    </div>
+                    <h3 style={{ fontSize: '1.3rem', fontWeight: 900, color: '#1e293b', marginBottom: '8px' }}>Willkommen im Postfach</h3>
+                    <p style={{ fontSize: '0.95rem', color: '#64748b', maxWidth: '360px', lineHeight: 1.6, margin: '0 0 24px 0' }}>
+                      Wähle eine Mitteilung aus der Liste aus, um die Lesedetails anzuzeigen, oder schreibe eine neue Nachricht an deine Community.
+                    </p>
+                    <button
+                      onClick={() => setIsMailComposing(true)}
+                      style={{
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '12px 24px',
+                        borderRadius: '12px',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        boxShadow: '0 4px 12px rgba(59,130,246,0.2)'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Plus size={16} /> Neue Mitteilung verfassen
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+            </ErrorBoundary>
+          )
+        )}
+
         {/* Practice Tab */}
         {activeStudentTab === 'practice' && (
           <ErrorBoundary>
@@ -4981,7 +6359,7 @@ function App() {
                 boxShadow: '0 4px 20px rgba(0,0,0,0.02)',
                 flexWrap: 'wrap'
               }}>
-                {['Guitar', 'Keys', 'Drums', 'Bass'].map(inst => {
+                {['Guitar', 'Drums', 'Keys', 'Bass'].map(inst => {
                   const skills = userSongs.filter(s => {
                     const sInst = (s.instrument || '').toLowerCase().trim();
                     const target = inst.toLowerCase();
@@ -4998,7 +6376,7 @@ function App() {
                   return (
                     <div key={inst} style={{ textAlign: 'center' }}>
                       <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>
-                        {inst === 'Guitar' ? 'E-GITARRE' : inst === 'Keys' ? 'E-PIANO' : inst === 'Drums' ? 'E-DRUMS' : 'E-BASS'}
+                        {inst === 'Guitar' ? 'E-GITARRE' : inst === 'Drums' ? 'E-DRUMS' : inst === 'Keys' ? 'E-PIANO' : 'E-BASS'}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
                         <div style={{ fontSize: '1.75rem', fontWeight: 900, color: APP_INSTRUMENT_COLORS[inst] || brandColor }}>
@@ -5886,7 +7264,7 @@ function App() {
                                       <div key={i} style={{ width: '28px', height: '28px', borderRadius: '50%', border: '2px solid #f8fafc', background: '#f1f5f9', overflow: 'hidden', willChange: 'transform' }}>
                                         {v ? (() => {
                                           const u = v.profiles || (Array.isArray(v.users) ? v.users[0] : v.users);
-                                          return <StudioAvatar src={u?.photo_url} />;
+                                          return <StudioAvatar src={u?.photo_url} user={u} />;
                                         })() : (
                                           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1' }}><Plus size={12} /></div>
                                         )}
@@ -6202,7 +7580,7 @@ function App() {
 
                       <div style={{ position: 'relative', zIndex: 1 }}>
                         <div style={{ width: '110px', height: '110px', borderRadius: '40px', margin: '0 auto 20px auto', border: '5px solid white', overflow: 'hidden', boxShadow: '0 8px 20px rgba(0,0,0,0.1)' }}>
-                          <StudioAvatar src={t.photo_url} />
+                          <StudioAvatar src={t.photo_url} user={t} />
                         </div>
                         
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '4px' }}>
@@ -6828,10 +8206,109 @@ function App() {
           <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Team</span>
         </button>
       </nav>
+      {/* Announcement Notification Modal */}
+      {activeAnnouncement && (() => {
+        let parsed;
+        try {
+          parsed = JSON.parse(activeAnnouncement.content);
+        } catch (e) {
+          parsed = {
+            title: 'Wichtige Mitteilung',
+            target_type: 'all',
+            target_user_ids: [],
+            message: activeAnnouncement.content
+          };
+        }
+        const senderName = activeAnnouncement.users ? `${activeAnnouncement.users.first_name || ''} ${activeAnnouncement.users.last_name || ''}`.trim() : 'GrooveLab';
+        const senderPhoto = activeAnnouncement.users?.photo_url;
+        
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 6000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(10px)' }}>
+            <div className="glass-panel animation-slide-up" style={{ background: 'white', padding: '40px', borderRadius: '32px', maxWidth: '600px', width: '100%', boxShadow: '0 25px 50px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#3b82f615', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Megaphone size={24} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mitteilung</div>
+                  <h2 style={{ fontSize: '1.5rem', fontWeight: 950, color: '#1e293b', margin: 0, lineHeight: 1.2 }}>{parsed.title}</h2>
+                </div>
+              </div>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: '#f8fafc', borderRadius: '20px', border: '1px solid #f1f5f9' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '50%', overflow: 'hidden', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {senderPhoto ? <StudioAvatar src={senderPhoto} user={activeAnnouncement.users} /> : <User size={20} style={{ color: '#94a3b8' }} />}
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>{senderName}</div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8' }}>
+                    {new Date(activeAnnouncement.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })} Uhr
+                  </div>
+                </div>
+              </div>
+              
+              <div style={{ 
+                fontSize: '1rem', 
+                fontWeight: 650, 
+                color: '#475569', 
+                lineHeight: 1.6, 
+                whiteSpace: 'pre-wrap', 
+                maxHeight: '40vh', 
+                overflowY: 'auto', 
+                paddingRight: '8px' 
+              }}>
+                {parsed.message}
+              </div>
+              
+              <button 
+                type="button" 
+                onClick={() => handleAcknowledgeAnnouncement(activeAnnouncement)} 
+                style={{ 
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', 
+                  color: 'white', 
+                  border: 'none', 
+                  padding: '18px 24px', 
+                  borderRadius: '20px', 
+                  fontSize: '1rem', 
+                  fontWeight: 850, 
+                  cursor: 'pointer', 
+                  boxShadow: '0 8px 20px rgba(59,130,246,0.3)', 
+                  transition: 'all 0.2s', 
+                  textAlign: 'center',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+                className="hover-scale"
+              >
+                <CheckCircle size={20} />
+                Gelesen & Schließen
+              </button>
+              
+            </div>
+          </div>
+        );
+      })()}
+
       {selectedTeacher && (
         <TeacherDetailModal 
           teacher={selectedTeacher} 
           onClose={() => setSelectedTeacher(null)} 
+        />
+      )}
+
+      {selectedStudentProfile && (
+        <StudentDetailModal 
+          student={selectedStudentProfile} 
+          onClose={() => setSelectedStudentProfile(null)} 
+          onOpenBandProfile={(band) => {
+            setSelectedBandForProfile(band);
+            setBandProfileView('public');
+            setShowBandProfile(true);
+            setSelectedStudentProfile(null);
+          }}
         />
       )}
 

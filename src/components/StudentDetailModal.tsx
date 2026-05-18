@@ -6,7 +6,8 @@ import {
   RadarChart, PolarGrid, PolarAngleAxis, Radar
 } from 'recharts';
 
-const STUDENT_MODAL_INSTRUMENT_ICONS: Record<string, string> = { Guitar: '🎸', Keys: '🎹', Drums: '🥁', Bass: '🎸', Vocals: '🎤' };
+import { renderInstrumentIcon } from '../utils/instruments';
+
 const brandColor = 'var(--primary-color)';
 
 interface StudentDetailModalProps {
@@ -14,16 +15,6 @@ interface StudentDetailModalProps {
   onClose: () => void;
   onOpenBandProfile?: (band: any) => void;
 }
-
-const getInstrumentIcon = (name: string) => {
-  const n = (name || '').toLowerCase();
-  if (n.includes('gitarre') || n.includes('guitar')) return '🎸';
-  if (n.includes('bass')) return '🎸';
-  if (n.includes('drums') || n.includes('schlagzeug')) return '🥁';
-  if (n.includes('keys') || n.includes('piano') || n.includes('klavier')) return '🎹';
-  if (n.includes('vocals') || n.includes('gesang') || n.includes('sing')) return '🎤';
-  return '🎵';
-};
 
 export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student, onClose, onOpenBandProfile }) => {
   const [skills, setSkills] = useState<any[]>([]);
@@ -194,7 +185,24 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     return acc;
   }, {});
 
-  const songsArray = Object.values(groupedSongs);
+  const songsArray = Object.values(groupedSongs).map((s: any) => {
+    const getBaseInst = (name: string) => {
+      const n = (name || '').toLowerCase();
+      if (n.includes('gitarre') || n.includes('guitar')) return 'Guitar';
+      if (n.includes('drums') || n.includes('schlagzeug')) return 'Drums';
+      if (n.includes('piano') || n.includes('keys')) return 'Piano';
+      if (n.includes('bass')) return 'Bass';
+      return name;
+    };
+    const orderMap: Record<string, number> = { 'Guitar': 1, 'Drums': 2, 'Piano': 3, 'Bass': 4 };
+    const sortedInstruments = [...s.instruments].sort((a, b) => {
+      const idxA = orderMap[getBaseInst(a.name)] || 99;
+      const idxB = orderMap[getBaseInst(b.name)] || 99;
+      if (idxA !== idxB) return idxA - idxB;
+      return (a.part_number || 1) - (b.part_number || 1);
+    });
+    return { ...s, instruments: sortedInstruments };
+  });
   const practiceBoard = songsArray.filter((s: any) => s.instruments.some((i: any) => i.progress > 0 && !i.is_stage_ready));
   const repertoire = songsArray.filter((s: any) => s.instruments.some((i: any) => i.is_stage_ready));
 
@@ -253,7 +261,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
               
               {/* Instrument Master Counters */}
               <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'nowrap' }}>
-                {['Guitar', 'Keys', 'Drums', 'Bass', 'Vocals'].map(inst => {
+                {['Guitar', 'Drums', 'Keys', 'Bass', 'Vocals'].map(inst => {
                   let count = 0;
                   if (inst === 'Vocals') {
                     count = vocalsSongIds.size;
@@ -273,7 +281,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
                   return (
                     <div key={inst} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', padding: '6px 10px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
-                      <span style={{ fontSize: '1rem' }}>{STUDENT_MODAL_INSTRUMENT_ICONS[inst] || '🎵'}</span>
+                      <span style={{ fontSize: '1rem' }}>{renderInstrumentIcon(inst, undefined, 16)}</span>
                       <span style={{ fontSize: '0.85rem', fontWeight: 900, color: count > 0 ? brandColor : '#94a3b8' }}>{count}</span>
                     </div>
                   );
@@ -343,7 +351,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                             cursor: 'help'
                           }}
                         >
-                          <span>{getInstrumentIcon(inst.name)}</span>
+                          <span>{renderInstrumentIcon(inst.name, undefined, 14)}</span>
                           <span>{inst.progress}%</span>
                         </div>
                       ))}
@@ -392,7 +400,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                             cursor: 'help'
                           }}
                         >
-                          <span>{getInstrumentIcon(inst.name)}</span>
+                          <span>{renderInstrumentIcon(inst.name, undefined, 14)}</span>
                           <span>100%</span>
                         </div>
                       ))}

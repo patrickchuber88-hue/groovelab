@@ -8,9 +8,9 @@ import { renderInstrumentIcon } from '../utils/instruments';
 const TEACHER_INSTRUMENT_ICONS: Record<string, any> = { 
   Guitar: renderInstrumentIcon('Guitar'), 
   Bass: renderInstrumentIcon('Bass'), 
-  Drums: '🥁', 
-  Keys: '🎹', 
-  Vocals: '🎤' 
+  Drums: renderInstrumentIcon('Drums'), 
+  Keys: renderInstrumentIcon('Keys'), 
+  Vocals: renderInstrumentIcon('Vocals') 
 };
 const INSTRUMENT_COLORS: Record<string, string> = { 
   Guitar: '#ef4444', 
@@ -72,7 +72,7 @@ const renderBandAvatar = (name: string, photoUrl?: string | null, size: string =
 const brandColor = 'var(--primary-color)';
 
 // --- ANTI-FLICKER AVATAR SYSTEM ---
-const AvatarImage = React.memo(({ src, style, className }: { src: string | null, style?: React.CSSProperties, className?: string }) => {
+const AvatarImage = React.memo(({ src, style, className, user, userId, onClick }: { src: string | null, style?: React.CSSProperties, className?: string, user?: any, userId?: string, onClick?: () => void }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
 
@@ -81,8 +81,34 @@ const AvatarImage = React.memo(({ src, style, className }: { src: string | null,
     return src;
   }, [src, hasError]);
 
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onClick) {
+      onClick();
+      return;
+    }
+    const target = user || userId;
+    if (target && (window as any).openUserProfile) {
+      (window as any).openUserProfile(target);
+    }
+  };
+
+  const hasAction = !!(onClick || user || userId);
+
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative', background: '#f1f5f9', overflow: 'hidden', ...style }} className={className}>
+    <div 
+      onClick={hasAction ? handleClick : undefined}
+      style={{ 
+        width: '100%', 
+        height: '100%', 
+        position: 'relative', 
+        background: '#f1f5f9', 
+        overflow: 'hidden', 
+        cursor: hasAction ? 'pointer' : 'default',
+        ...style 
+      }} 
+      className={`avatar-image-wrapper ${hasAction ? 'hover-scale-mini' : ''} ${className || ''}`}
+    >
       <img 
         src={displaySrc}
         onLoad={() => setIsLoaded(true)}
@@ -210,7 +236,7 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
               marginBottom: '6px',
               transition: 'all 0.3s ease'
             }}>
-              <AvatarImage src={sess.users?.photo_url} />
+              <AvatarImage src={sess.users?.photo_url} user={sess.users} />
             </div>
             <div style={{ textAlign: 'center', minWidth: 0, width: '100%' }}>
               <div style={{ 
@@ -281,7 +307,7 @@ const CoachesNode = React.memo(({ coaches, onProfileSelect }: { coaches: any[], 
               }}
             >
               <div style={{ width: '84px', height: '84px', borderRadius: '50%', border: '4px solid white', boxShadow: '0 8px 20px rgba(0,0,0,0.15)', overflow: 'hidden' }}>
-                <AvatarImage src={c.users?.photo_url} />
+                <AvatarImage src={c.users?.photo_url} user={c.users} />
               </div>
               <div style={{ marginTop: '8px', background: 'white', padding: '5px 12px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', textAlign: 'center', minWidth: '90px' }}>
                 <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '0.8rem' }}>{c.users?.first_name} {c.users?.last_name?.[0]}.</div>
@@ -1446,7 +1472,7 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
                         gap: '12px'
                       }}>
                         <div style={{ width: '40px', height: '40px', borderRadius: '12px', overflow: 'hidden', border: '2px solid #fff1f2' }}>
-                          <AvatarImage src={reqUser?.photo_url} />
+                          <AvatarImage src={reqUser?.photo_url} user={reqUser} />
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 900, fontSize: '0.85rem', color: '#1e293b' }}>{reqUser?.first_name}</div>
@@ -1937,7 +1963,7 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <div style={{ width: '44px', height: '44px', borderRadius: '14px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
-                            <AvatarImage src={sub.users?.photo_url} />
+                            <AvatarImage src={sub.users?.photo_url} user={sub.users} />
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
 
@@ -2564,7 +2590,7 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
                     </div>
                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                      <div style={{ width: '56px', height: '56px', borderRadius: '18px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 8px 16px rgba(0,0,0,0.05)' }}>
-                       <AvatarImage src={sub.users?.photo_url} />
+                       <AvatarImage src={sub.users?.photo_url} user={sub.users} />
                      </div>
                      <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>

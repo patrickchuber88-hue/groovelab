@@ -1186,7 +1186,17 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                   }}>
                                     {u ? (
                                       <div style={{ position: 'relative', width: '100%', height: '100%', filter: isPendingOffer ? 'opacity(0.7) grayscale(30%)' : 'none' }}>
-                                        <img src={u?.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        <img 
+                                          src={u?.photo_url || '/avatar_ghost.jpg'} 
+                                          style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} 
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if ((window as any).openUserProfile) {
+                                              (window as any).openUserProfile(u);
+                                            }
+                                          }}
+                                          className="hover-scale-mini"
+                                        />
                                         {isMastered && !isPendingOffer && (
                                           <div style={{ position: 'absolute', bottom: '1px', right: '1px', background: '#22c55e', color: 'white', borderRadius: '50%', width: '14px', height: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid white', zIndex: 10 }}>
                                             <CheckCircle size={8} strokeWidth={4} />
@@ -1282,7 +1292,17 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                       return (now.getTime() - msgDate.getTime()) < (24 * 60 * 60 * 1000);
                     }).map((msg: any) => (
                       <div key={msg.id} style={{ display: "flex", gap: "10px", background: "#1a1a1a", padding: "12px", borderRadius: "14px", border: '1px solid rgba(255,255,255,0.06)' }}>
-                        <img src={msg.author?.photo_url || "/avatar_ghost.jpg"} style={{ width: "28px", height: "28px", borderRadius: "8px", objectFit: 'cover' }} />
+                        <img 
+                          src={msg.author?.photo_url || "/avatar_ghost.jpg"} 
+                          style={{ width: "28px", height: "28px", borderRadius: "8px", objectFit: 'cover', cursor: 'pointer' }} 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if ((window as any).openUserProfile) {
+                              (window as any).openUserProfile(msg.author);
+                            }
+                          }}
+                          className="hover-scale-mini"
+                        />
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: "0.7rem", fontWeight: 950, color: "white", marginBottom: '2px' }}>{msg.author?.first_name}</div>
                           <div style={{ fontSize: "0.8rem", color: "white", lineHeight: 1.3, opacity: 0.9 }}>{msg.content}</div>
@@ -1617,7 +1637,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                     padding: "12px", 
                                     background: "rgba(255,255,255,0.03)", 
                                     borderRadius: "18px", 
-                                    border: "1px solid rgba(255,255,255,0.02)",
+                                     border: "1px solid rgba(255,255,255,0.02)",
                                     transition: 'transform 0.4s cubic-bezier(0.2, 1, 0.3, 1)',
                                     willChange: 'transform',
                                     position: 'relative'
@@ -1630,8 +1650,16 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                        height: "48px", 
                                        borderRadius: "14px", 
                                        border: "2px solid rgba(255,255,255,0.05)",
-                                       objectFit: 'cover'
+                                       objectFit: 'cover',
+                                       cursor: u ? 'pointer' : 'default'
                                      }} 
+                                     onClick={u ? (e) => {
+                                       e.stopPropagation();
+                                       if ((window as any).openUserProfile) {
+                                         (window as any).openUserProfile(u);
+                                       }
+                                     } : undefined}
+                                     className={u ? "hover-scale-mini" : ""}
                                    />
                                    <div style={{ flex: 1 }}>
                                       <div style={{ fontSize: "0.9rem", fontWeight: 950, color: "white", marginBottom: "2px" }}>{u?.first_name || m.external_name}</div>
