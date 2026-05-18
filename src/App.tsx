@@ -15,13 +15,16 @@ import { DeviceSetupScreen } from './components/DeviceSetupScreen';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
 import { TeacherDetailModal } from './components/TeacherDetailModal';
-import { normalizeInstrument } from './utils/instruments';
+import { normalizeInstrument, renderInstrumentIcon } from './utils/instruments';
 import { getDistanceFromLatLonInM } from './utils/geo';
 import './App.css';
 
-const APP_INSTRUMENT_ICONS: Record<string, string> = { 
-  "Gitarre": "🎸", "Guitar": "🎸", "E-Gitarre": "🎸",
-  "Bass": "🎸", "E-Bass": "🎸", 
+const APP_INSTRUMENT_ICONS: Record<string, any> = { 
+  "Gitarre": renderInstrumentIcon("Gitarre"), 
+  "Guitar": renderInstrumentIcon("Guitar"), 
+  "E-Gitarre": renderInstrumentIcon("E-Gitarre"),
+  "Bass": renderInstrumentIcon("Bass"), 
+  "E-Bass": renderInstrumentIcon("E-Bass"), 
   "Drums": "🥁", "E-Drums": "🥁", 
   "Vocals": "🎤", "Gesang": "🎤",
   "Piano / Keys": "🎹", "Piano": "🎹", "E-Piano": "🎹", "Keys": "🎹",
@@ -292,7 +295,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode, fallbac
   }
 }
 
-function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isBandReady, onDelete, userBands = [], userId, isExpanded, onToggle }: any) {
+function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isBandReady, onDelete, userBands = [], userId, isExpanded, onToggle, onOpenPdfViewer }: any) {
   const { width } = useWindowSize();
   const [activeDifficulty, setActiveDifficulty] = useState('starter'); // 'starter' | 'original'
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
@@ -675,33 +678,66 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
           <div style={{ display: 'flex', gap: '48px', alignItems: 'flex-start', flexWrap: 'wrap' }} onClick={(e) => e.stopPropagation()}>
             
             <div style={{ flex: 2, minWidth: '300px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
-                <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#1e293b' }}>Schwierigkeitsgrad:</div>
-                <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '14px', padding: '5px' }}>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); setActiveDifficulty('starter'); }} 
-                    style={{ 
-                      background: activeDifficulty === 'starter' ? 'white' : 'transparent', 
-                      color: activeDifficulty === 'starter' ? '#10b981' : '#64748b', 
-                      border: 'none', padding: '8px 20px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', 
-                      boxShadow: activeDifficulty === 'starter' ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
-                      transition: 'all 0.3s'
-                    }}
-                  >
-                    Starter
-                  </button>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); setActiveDifficulty('original'); }} 
-                    style={{ 
-                      background: activeDifficulty === 'original' ? 'white' : 'transparent', 
-                      color: activeDifficulty === 'original' ? '#f59e0b' : '#64748b', 
-                      border: 'none', padding: '8px 20px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', 
-                      boxShadow: activeDifficulty === 'original' ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
-                      transition: 'all 0.3s'
-                    }}
-                  >
-                    Pro
-                  </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '24px', marginBottom: '24px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#1e293b' }}>Schwierigkeitsgrad:</div>
+                  <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '14px', padding: '5px' }}>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); setActiveDifficulty('starter'); }} 
+                      style={{ 
+                        background: activeDifficulty === 'starter' ? 'white' : 'transparent', 
+                        color: activeDifficulty === 'starter' ? '#10b981' : '#64748b', 
+                        border: 'none', padding: '8px 20px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', 
+                        boxShadow: activeDifficulty === 'starter' ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
+                        transition: 'all 0.3s'
+                      }}
+                    >
+                      Starter
+                    </button>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); setActiveDifficulty('original'); }} 
+                      style={{ 
+                        background: activeDifficulty === 'original' ? 'white' : 'transparent', 
+                        color: activeDifficulty === 'original' ? '#f59e0b' : '#64748b', 
+                        border: 'none', padding: '8px 20px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', 
+                        boxShadow: activeDifficulty === 'original' ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
+                        transition: 'all 0.3s'
+                      }}
+                    >
+                      Pro
+                    </button>
+                  </div>
+                </div>
+
+                {/* Cloud Link Buttons */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  {(songGroup.pdf_folder_url || songGroup.pdf_guitar_url || songGroup.pdf_bass_url || songGroup.pdf_drums_url || songGroup.pdf_keys_url || songGroup.pdf_vocals_url) && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenPdfViewer?.(songGroup, songGroup.pdf_folder_url);
+                      }}
+                      className="cloud-link-btn noten-btn"
+                    >
+                      <Library size={15} className="icon-main" style={{ strokeWidth: 2.5 }} />
+                      Noten
+                      <Lock size={11} style={{ opacity: 0.6, marginLeft: '2px' }} />
+                    </button>
+                  )}
+
+                  {songGroup.guitar_pro_url && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.open(songGroup.guitar_pro_url, '_blank');
+                      }}
+                      className="cloud-link-btn gp-btn"
+                    >
+                      <Music size={15} className="icon-main" style={{ strokeWidth: 2.5 }} />
+                      GP
+                      <ExternalLink size={12} style={{ opacity: 0.6 }} />
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -854,26 +890,35 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
             const missing: string[] = [];
             let isFullyStaffed = true;
             
-            const order = ['E-Gitarre', 'E-Drums', 'E-Piano', 'E-Bass'];
-            order.forEach(targetInst => {
-              const matchingEntries = Object.entries(required).filter(([inst]) => {
-                const norm = normalize(inst);
-                const normTarget = normalize(targetInst);
-                return norm === normTarget;
-              });
+            const bandSong = matchingBand.band_songs?.find((bs: any) => bs.song_id === songGroup.song_id);
+            const isSongActive = 
+              (matchingBand.songs?.id === songGroup.song_id) || 
+              (bandSong?.status === 'active');
 
-              matchingEntries.forEach(([inst, count]) => {
-                const normTarget = normalize(inst);
-                if (normTarget === 'Vocals') return;
-                
-                const needed = count as number;
-                const current = filled[normTarget] || 0;
-                if (current < needed) {
-                  isFullyStaffed = false;
-                  for(let i=0; i < (needed-current); i++) missing.push(inst);
-                }
+            if (isSongActive) {
+              isFullyStaffed = true;
+            } else {
+              const order = ['E-Gitarre', 'E-Drums', 'E-Piano', 'E-Bass'];
+              order.forEach(targetInst => {
+                const matchingEntries = Object.entries(required).filter(([inst]) => {
+                  const norm = normalize(inst);
+                  const normTarget = normalize(targetInst);
+                  return norm === normTarget;
+                });
+
+                matchingEntries.forEach(([inst, count]) => {
+                  const normTarget = normalize(inst);
+                  if (normTarget === 'Vocals') return;
+                  
+                  const needed = count as number;
+                  const current = filled[normTarget] || 0;
+                  if (current < needed) {
+                    isFullyStaffed = false;
+                    for(let i=0; i < (needed-current); i++) missing.push(inst);
+                  }
+                });
               });
-            });
+            }
 
             return (
               <div style={{ marginTop: '32px', padding: '24px', background: isFullyStaffed ? 'linear-gradient(135deg, #f8fafc, #f1f5f9)' : '#f8fafc', borderRadius: '24px', border: isFullyStaffed ? '2px solid #eab308' : '1px solid #e2e8f0' }}>
@@ -1080,6 +1125,8 @@ function App() {
   const [bandSearchLetter, setBandSearchLetter] = useState<string | null>(null);
   const [expandedMatchingSong, setExpandedMatchingSong] = useState<string | null>(null);
   const [showQR, setShowQR] = useState(false);
+  const [activePdfFolderUrl, setActivePdfFolderUrl] = useState<string | null>(null);
+  const [activePdfSong, setActivePdfSong] = useState<any>(null);
   const [showConfetti, setShowConfetti] = useState<any>(null);
   const [selectedEqCat, setSelectedEqCat] = useState('E-Gitarre');
   const [practiceSearchQuery, setPracticeSearchQuery] = useState('');
@@ -1643,7 +1690,7 @@ function App() {
         supabase.from('sessions').select('check_in_time, check_out_time').eq('user_id', userId),
         supabase.from('user_song_skills').select(`
           id, progress_percent, is_stage_ready, is_pending_approval, instrument, part_number, difficulty_level, is_favorite, verified_by_id,
-          songs (id, title, artist, media_link, tomplay_url, instrumentation)
+          songs (id, title, artist, media_link, tomplay_url, instrumentation, pdf_folder_url, guitar_pro_url, pdf_drums_url, pdf_guitar_url, pdf_bass_url, pdf_vocals_url, pdf_keys_url)
         `).eq('user_id', userId),
         supabase.from('band_members').select('instrument, bands(id, name, school_id, song_id, status, photo_url, songs(*), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))))').eq('user_id', userId)
       ]).catch(err => {
@@ -1695,7 +1742,11 @@ function App() {
             instrument: p.instrument, difficulty_level: p.difficulty_level || 'original',
             part_number: p.part_number || 1,
             is_stage_ready: !!p.is_stage_ready, is_favorite: !!p.is_favorite, locked: !p.is_stage_ready,
-            is_pending_approval: !!p.is_pending_approval, media_link: song.media_link, tomplay_url: song.tomplay_url, instrumentation: song.instrumentation
+            is_pending_approval: !!p.is_pending_approval, media_link: song.media_link, tomplay_url: song.tomplay_url, instrumentation: song.instrumentation,
+            pdf_folder_url: song.pdf_folder_url, guitar_pro_url: song.guitar_pro_url,
+            pdf_guitar_url: song.pdf_guitar_url, pdf_bass_url: song.pdf_bass_url,
+            pdf_drums_url: song.pdf_drums_url, pdf_keys_url: song.pdf_keys_url,
+            pdf_vocals_url: song.pdf_vocals_url
           };
       }).filter(Boolean);
 
@@ -1725,7 +1776,11 @@ function App() {
               id: `vocal_proj_${bs.id}_${s.id}`, song_id: s.id, user_id: userId, title: s.title || '...', artist: s.artist || '...',
               progress: 100, instrument: 'Vocals', difficulty_level: bs.difficulty_level || 'original',
               is_stage_ready: true, is_favorite: false, locked: false, is_pending_approval: false,
-              media_link: s.media_link, tomplay_url: s.tomplay_url, instrumentation: s.instrumentation
+              media_link: s.media_link, tomplay_url: s.tomplay_url, instrumentation: s.instrumentation,
+              pdf_folder_url: s.pdf_folder_url, guitar_pro_url: s.guitar_pro_url,
+              pdf_guitar_url: s.pdf_guitar_url, pdf_bass_url: s.pdf_bass_url,
+              pdf_drums_url: s.pdf_drums_url, pdf_keys_url: s.pdf_keys_url,
+              pdf_vocals_url: s.pdf_vocals_url
             });
             addedSongIds.add(s.id);
           }
@@ -1762,7 +1817,11 @@ function App() {
               id: `vocal_${band.id}_${bSong.id}`, song_id: bSong.id, user_id: userId, title: bSong.title || '...', artist: bSong.artist || '...',
               progress: 100, instrument: 'Vocals', difficulty_level: 'original',
               is_stage_ready: true, is_favorite: false, locked: false, is_pending_approval: false,
-              media_link: bSong.media_link, tomplay_url: bSong.tomplay_url, instrumentation: bSong.instrumentation
+              media_link: bSong.media_link, tomplay_url: bSong.tomplay_url, instrumentation: bSong.instrumentation,
+              pdf_folder_url: bSong.pdf_folder_url, guitar_pro_url: bSong.guitar_pro_url,
+              pdf_guitar_url: bSong.pdf_guitar_url, pdf_bass_url: bSong.pdf_bass_url,
+              pdf_drums_url: bSong.pdf_drums_url, pdf_keys_url: bSong.pdf_keys_url,
+              pdf_vocals_url: bSong.pdf_vocals_url
             });
           }
         }
@@ -3665,6 +3724,13 @@ function App() {
         artist: skill.artist || 'Unbekannter Künstler',
         media_link: skill.media_link,
         tomplay_url: skill.tomplay_url,
+        pdf_folder_url: skill.pdf_folder_url,
+        guitar_pro_url: skill.guitar_pro_url,
+        pdf_guitar_url: skill.pdf_guitar_url,
+        pdf_bass_url: skill.pdf_bass_url,
+        pdf_drums_url: skill.pdf_drums_url,
+        pdf_keys_url: skill.pdf_keys_url,
+        pdf_vocals_url: skill.pdf_vocals_url,
         instrumentation: skill.instrumentation,
         isBandReady: wallMatch?.isComplete || false,
         isBandSong: isBandSong,
@@ -4560,6 +4626,10 @@ function App() {
                       onDelete={handleDeleteSong}
                       userBands={userBands}
                       userId={user?.id}
+                      onOpenPdfViewer={(song: any, folderUrl: string) => {
+                        setActivePdfSong(song);
+                        setActivePdfFolderUrl(folderUrl);
+                      }}
                     />
 
                   </div>
@@ -4816,16 +4886,8 @@ function App() {
                                            </div>
                                          </div>
                                       </div>
-                                      <span style={{ fontSize: '1.75rem' }}>
-                                        {(() => {
-                                          const norm = (myInstrument || '').toLowerCase();
-                                          if (norm.includes('guitar') || norm.includes('gitarre')) return '🎸';
-                                          if (norm.includes('bass')) return '🎸';
-                                          if (norm.includes('drum') || norm.includes('schlagzeug')) return '🥁';
-                                          if (norm.includes('piano') || norm.includes('keyboard') || norm.includes('klavier')) return '🎹';
-                                          if (norm.includes('vocal') || norm.includes('gesang')) return '🎤';
-                                          return '🎸';
-                                        })()}
+                                      <span style={{ fontSize: '1.75rem', display: 'inline-flex', alignItems: 'center' }}>
+                                        {renderInstrumentIcon(myInstrument || 'Guitar', undefined, 24)}
                                       </span>
                                     </div>
                                   )}
@@ -5980,6 +6042,18 @@ function App() {
         </div>
       )}
 
+      {/* Modal: Sicherer PDF-Viewer */}
+      {activePdfFolderUrl && activePdfSong && (
+        <SecurePdfViewerModal 
+          song={activePdfSong} 
+          folderUrl={activePdfFolderUrl} 
+          onClose={() => {
+            setActivePdfFolderUrl(null);
+            setActivePdfSong(null);
+          }} 
+        />
+      )}
+
       {/* Modal: QR Code anzeigen */}
       {showQR && user?.qr_token && (
         <QRCodeModal user={user} onClose={() => setShowQR(false)} />
@@ -6571,3 +6645,710 @@ function App() {
 }
 
 export default App;
+
+interface SecurePdfViewerModalProps {
+  song: any;
+  folderUrl: string;
+  onClose: () => void;
+}
+
+const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folderUrl, onClose }) => {
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [showCopyAlert, setShowCopyAlert] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [selectedLevel, setSelectedLevel] = useState<'starter' | 'pro'>('starter');
+
+  const getPdfSlides = () => {
+    const slides: { id: string; label: string; icon: string; desc: string }[] = [];
+    const insts = song.instrumentation || {};
+    
+    const isWebspace = folderUrl && 
+      !folderUrl.includes('dropbox.com') && 
+      !folderUrl.includes('drive.google.com') && 
+      !folderUrl.includes('onedrive.live.com') && 
+      !folderUrl.includes('1drv.ms');
+      
+    const hasAnyDirectPdf = !!(song.pdf_guitar_url || song.pdf_bass_url || song.pdf_drums_url || song.pdf_keys_url || song.pdf_vocals_url);
+    
+    if (insts['E-Gitarre'] > 0) {
+      if (!hasAnyDirectPdf || !!song.pdf_guitar_url || isWebspace) {
+        slides.push({ id: 'guitar', label: 'E-Gitarre', icon: '🎸', desc: 'Stimme für E-Gitarre (Starter & Pro)' });
+      }
+    }
+    if (insts['E-Bass'] > 0) {
+      if (!hasAnyDirectPdf || !!song.pdf_bass_url || isWebspace) {
+        slides.push({ id: 'bass', label: 'E-Bass', icon: '🎸', desc: 'Stimme für E-Bass (Starter & Pro)' });
+      }
+    }
+    if (insts['E-Drums'] > 0) {
+      if (!hasAnyDirectPdf || !!song.pdf_drums_url || isWebspace) {
+        slides.push({ id: 'drums', label: 'E-Drums', icon: '🥁', desc: 'Stimme für E-Drums / Schlagzeug' });
+      }
+    }
+    if (insts['E-Piano'] > 0) {
+      if (!hasAnyDirectPdf || !!song.pdf_keys_url || isWebspace) {
+        slides.push({ id: 'keys', label: 'E-Piano', icon: '🎹', desc: 'Stimme für Keyboard & E-Piano' });
+      }
+    }
+    
+    if (!hasAnyDirectPdf || !!song.pdf_vocals_url || isWebspace) {
+      slides.push({ id: 'vocals', label: 'Gesang / Lyrics', icon: '🎤', desc: 'Songtext, Gesangspart und Vocal-Harmonien' });
+    }
+    
+    return slides;
+  };
+
+  const slides = getPdfSlides();
+
+  // Keyboard shortcut listener to prevent Copy, Save, and Print
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+      if (
+        (isCmdOrCtrl && e.key.toLowerCase() === 'p') || // Print
+        (isCmdOrCtrl && e.key.toLowerCase() === 's') || // Save
+        (isCmdOrCtrl && e.key.toLowerCase() === 'c') || // Copy
+        e.key === 'PrintScreen'
+      ) {
+        e.preventDefault();
+        setShowCopyAlert(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (showCopyAlert) {
+      const timer = setTimeout(() => setShowCopyAlert(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showCopyAlert]);
+
+  const getActiveUrl = () => {
+    const activeSlideId = slides[activeSlide]?.id;
+    let url = '';
+    
+    if (activeSlideId === 'guitar') url = song.pdf_guitar_url;
+    else if (activeSlideId === 'bass') url = song.pdf_bass_url;
+    else if (activeSlideId === 'drums') url = song.pdf_drums_url;
+    else if (activeSlideId === 'keys') url = song.pdf_keys_url;
+    else if (activeSlideId === 'vocals') url = song.pdf_vocals_url;
+    
+    if (url) return url;
+    
+    // Falls kein spezifischer Link da ist: Prüfen, ob folderUrl ein Webspace/Direkt-Pfad ist
+    if (folderUrl && !folderUrl.includes('dropbox.com') && !folderUrl.includes('drive.google.com') && !folderUrl.includes('onedrive.live.com') && !folderUrl.includes('1drv.ms')) {
+      let base = folderUrl;
+      if (!base.endsWith('/')) base += '/';
+      
+      const suffix = selectedLevel === 'pro' ? '_pro' : '_starter';
+      
+      if (activeSlideId === 'guitar') return base + `gitarre${suffix}.pdf`;
+      if (activeSlideId === 'bass') return base + `bass${suffix}.pdf`;
+      if (activeSlideId === 'drums') return base + `drums${suffix}.pdf`;
+      if (activeSlideId === 'keys') return base + `piano${suffix}.pdf`;
+      if (activeSlideId === 'vocals') return base + 'gesang.pdf';
+    }
+    
+    return folderUrl;
+  };
+
+  const activeUrl = getActiveUrl();
+  
+  useEffect(() => {
+    if (activeUrl) {
+      setPdfLoading(true);
+    }
+  }, [activeUrl]);
+
+  const isDropbox = activeUrl && activeUrl.includes('dropbox.com');
+  const isGoogleDrive = activeUrl && activeUrl.includes('drive.google.com');
+  const isOneDrive = activeUrl && (activeUrl.includes('onedrive.live.com') || activeUrl.includes('1drv.ms'));
+
+  // We only show the Dropbox folder block screen if it's NOT a direct file URL. Direct files render beautifully!
+  const isDropboxFolder = isDropbox && 
+    (activeUrl.includes('/scl/fo/') || activeUrl.includes('/sh/') || 
+     !(activeUrl.includes('.pdf') || activeUrl.includes('/scl/fi/') || activeUrl.includes('/s/')));
+
+  // Adjust OneDrive/Dropbox/GoogleDrive URL to be optimized for embed
+  const getSecureEmbedUrl = () => {
+    let url = activeUrl;
+    if (!url) return '';
+    
+    if (isGoogleDrive) {
+      // Direct file preview
+      const fileIdMatch = url.match(/\/file\/d\/([a-zA-Z0-9-_]+)/);
+      if (fileIdMatch && fileIdMatch[1]) {
+        return `https://drive.google.com/file/d/${fileIdMatch[1]}/preview`;
+      }
+      
+      const folderIdMatch = url.match(/\/folders\/([a-zA-Z0-9-_]+)/);
+      if (folderIdMatch && folderIdMatch[1]) {
+        return `https://drive.google.com/embeddedfolderview?id=${folderIdMatch[1]}#list`;
+      }
+    }
+    
+    if (isOneDrive) {
+      if (url.includes('1drv.ms')) {
+        return url.replace('/f/', '/embed/');
+      }
+      return url.replace('redir?', 'embed?').replace('view.aspx', 'embed.aspx');
+    }
+
+    if (isDropbox) {
+      const isFile = (url.includes('.pdf') || url.includes('/scl/fi/') || url.includes('/s/')) && 
+        !url.includes('/scl/fo/') && !url.includes('/sh/');
+      if (isFile) {
+        let embedUrl = url;
+        if (embedUrl.includes('?')) {
+          embedUrl = embedUrl.replace(/[?&]dl=[01]/, '').replace(/[?&]raw=[01]/, '');
+          embedUrl += (embedUrl.includes('?') ? '&' : '?') + 'raw=1';
+        } else {
+          embedUrl += '?raw=1';
+        }
+        return embedUrl + '#toolbar=0';
+      }
+    }
+    
+    // For standard self-hosted PDF links
+    if (url.toLowerCase().endsWith('.pdf') || url.includes('.pdf?')) {
+      if (!url.includes('#toolbar=')) {
+        return url + '#toolbar=0';
+      }
+    }
+    
+    return url;
+  };
+
+  const nextSlide = () => {
+    setActiveSlide((prev) => (prev + 1) % slides.length);
+  };
+
+  const prevSlide = () => {
+    setActiveSlide((prev) => (prev - 1 + slides.length) % slides.length);
+  };
+
+  return (
+    <div 
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 5000,
+        background: 'rgba(15, 23, 42, 0.95)',
+        backdropFilter: 'blur(20px)',
+        display: 'flex',
+        flexDirection: 'column',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setShowCopyAlert(true);
+      }}
+    >
+      {/* Alert Banner for Copy Prevention */}
+      {showCopyAlert && (
+        <div style={{
+          position: 'fixed',
+          top: '24px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'linear-gradient(135deg, #ef4444, #b91c1c)',
+          color: 'white',
+          padding: '16px 28px',
+          borderRadius: '16px',
+          fontWeight: 800,
+          fontSize: '0.95rem',
+          boxShadow: '0 10px 25px rgba(239, 68, 68, 0.4)',
+          zIndex: 6000,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          border: '1px solid rgba(255,255,255,0.2)',
+          animation: 'shake 0.5s cubic-bezier(.36,.07,.19,.97) both'
+        }}>
+          <Lock size={18} />
+          Sicherer GrooveLab-Modus: Kopieren, Speichern und Drucken ist deaktiviert! 🔒
+        </div>
+      )}
+
+      {/* Sleek, Ultra-Compact Unified Header (Single Row to Maximize PDF Space) */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '10px 24px',
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        background: 'rgba(15, 23, 42, 0.9)',
+        height: '56px',
+        minHeight: '56px',
+        zIndex: 10
+      }}>
+        {/* Left Side: Compact Title & Security */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flexShrink: 1 }}>
+          <div style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '8px',
+            background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <Library size={16} color="white" />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <h2 style={{ 
+              fontSize: '0.95rem', 
+              fontWeight: 900, 
+              color: 'white', 
+              margin: 0, 
+              whiteSpace: 'nowrap', 
+              overflow: 'hidden', 
+              textOverflow: 'ellipsis' 
+            }}>
+              {song.title} <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600 }}>({song.artist})</span>
+            </h2>
+          </div>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            background: 'rgba(239, 68, 68, 0.15)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            padding: '2px 8px',
+            borderRadius: '20px',
+            fontSize: '0.65rem',
+            fontWeight: 900,
+            color: '#f87171',
+            flexShrink: 0
+          }}>
+            <span className="flashing-dot" style={{
+              width: '5px',
+              height: '5px',
+              borderRadius: '50%',
+              background: '#ef4444'
+            }} />
+            SCHUTZ
+          </div>
+        </div>
+
+        {/* Center Side: Compact Tabs Selector & Dynamic Level Switcher */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }}>
+          <div style={{
+            display: 'flex',
+            background: 'rgba(30, 41, 59, 0.8)',
+            borderRadius: '12px',
+            padding: '3px',
+            border: '1px solid rgba(255,255,255,0.08)',
+            overflowX: 'auto',
+            maxWidth: '400px'
+          }}>
+            {slides.map((slide, index) => {
+              const isActive = index === activeSlide;
+              
+              const isWebspace = folderUrl && 
+                !folderUrl.includes('dropbox.com') && 
+                !folderUrl.includes('drive.google.com') && 
+                !folderUrl.includes('onedrive.live.com') && 
+                !folderUrl.includes('1drv.ms');
+                
+              let hasSpecificUrl = isWebspace;
+              if (slide.id === 'guitar') hasSpecificUrl = hasSpecificUrl || !!song.pdf_guitar_url;
+              else if (slide.id === 'bass') hasSpecificUrl = hasSpecificUrl || !!song.pdf_bass_url;
+              else if (slide.id === 'drums') hasSpecificUrl = hasSpecificUrl || !!song.pdf_drums_url;
+              else if (slide.id === 'keys') hasSpecificUrl = hasSpecificUrl || !!song.pdf_keys_url;
+              else if (slide.id === 'vocals') hasSpecificUrl = hasSpecificUrl || !!song.pdf_vocals_url;
+
+              return (
+                <button
+                  key={slide.id}
+                  onClick={() => setActiveSlide(index)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: isActive ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'transparent',
+                    color: isActive ? 'white' : '#94a3b8',
+                    border: 'none',
+                    padding: '6px 14px',
+                    borderRadius: '9px',
+                    fontSize: '0.8rem',
+                    fontWeight: isActive ? 900 : 700,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    boxShadow: isActive ? '0 3px 8px rgba(59, 130, 246, 0.2)' : 'none',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <span>{slide.icon}</span>
+                  <span>{slide.label}</span>
+                  {hasSpecificUrl && (
+                    <span style={{
+                      fontSize: '0.6rem',
+                      background: isActive ? 'rgba(255,255,255,0.25)' : 'rgba(34, 197, 94, 0.15)',
+                      color: isActive ? 'white' : '#22c55e',
+                      padding: '1px 5px',
+                      borderRadius: '6px',
+                      fontWeight: 900,
+                      marginLeft: '4px'
+                    }}>
+                      Direkt
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Premium Segmented Level Switcher (Only visible for actual instruments) */}
+          {slides[activeSlide]?.id !== 'vocals' && (
+            <div style={{
+              display: 'flex',
+              background: 'rgba(30, 41, 59, 0.9)',
+              borderRadius: '10px',
+              padding: '2px',
+              border: '1px solid rgba(255,255,255,0.08)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              flexShrink: 0
+            }}>
+              <button
+                onClick={() => setSelectedLevel('starter')}
+                style={{
+                  background: selectedLevel === 'starter' ? 'linear-gradient(135deg, #fbbf24, #d97706)' : 'transparent',
+                  color: selectedLevel === 'starter' ? '#1e293b' : '#94a3b8',
+                  border: 'none',
+                  padding: '5px 12px',
+                  borderRadius: '7px',
+                  fontSize: '0.75rem',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  boxShadow: selectedLevel === 'starter' ? '0 2px 6px rgba(217, 119, 6, 0.3)' : 'none'
+                }}
+              >
+                Starter 🚀
+              </button>
+              <button
+                onClick={() => setSelectedLevel('pro')}
+                style={{
+                  background: selectedLevel === 'pro' ? 'linear-gradient(135deg, #ef4444, #b91c1c)' : 'transparent',
+                  color: selectedLevel === 'pro' ? 'white' : '#94a3b8',
+                  border: 'none',
+                  padding: '5px 12px',
+                  borderRadius: '7px',
+                  fontSize: '0.75rem',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  boxShadow: selectedLevel === 'pro' ? '0 2px 6px rgba(185, 28, 28, 0.3)' : 'none'
+                }}
+              >
+                Pro 🔥
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Right Side: Sleek Close Button */}
+        <button 
+          onClick={onClose}
+          className="hover-scale"
+          style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '50%',
+            background: 'rgba(255,255,255,0.08)',
+            border: 'none',
+            color: '#cbd5e1',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s',
+            flexShrink: 0
+          }}
+        >
+          <X size={16} />
+        </button>
+      </div>
+
+      {/* Main protected document workspace */}
+      <div style={{
+        flex: 1,
+        position: 'relative',
+        background: '#0f172a',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden'
+      }}>
+        
+        {/* Info panel for current active slide */}
+        <div style={{
+          position: 'absolute',
+          top: '16px',
+          background: 'rgba(15, 23, 42, 0.8)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          padding: '8px 20px',
+          borderRadius: '20px',
+          color: '#cbd5e1',
+          fontSize: '0.8rem',
+          fontWeight: 700,
+          zIndex: 100,
+          backdropFilter: 'blur(10px)',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.2)'
+        }}>
+          💡 Stimme: <span style={{ color: '#60a5fa', fontWeight: 900 }}>{slides[activeSlide]?.label}</span> — {slides[activeSlide]?.desc}
+        </div>
+
+        {/* SECURE OVERLAYS LAYER */}
+        <div 
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 4,
+            pointerEvents: 'none',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            padding: '12px',
+            border: '2px dashed rgba(239, 68, 68, 0.15)',
+            borderRadius: '8px',
+            margin: '8px'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.7rem', fontWeight: 800, color: 'rgba(239, 68, 68, 0.3)' }}>
+            <span>🔒 GrooveLab Secure DRM Platform</span>
+            <span>ID: {song.song_id || 'SecureSong'}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.7rem', fontWeight: 800, color: 'rgba(239, 68, 68, 0.3)' }}>
+            <span>🔒 Schreibgeschützt - Kein Download</span>
+            <span>Dateizugriff gesichert</span>
+          </div>
+        </div>
+
+        {/* DIAGONAL WATERMARK */}
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          zIndex: 3,
+          pointerEvents: 'none',
+          overflow: 'hidden',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gridTemplateRows: 'repeat(4, 1fr)',
+          opacity: 0.04,
+          userSelect: 'none'
+        }}>
+          {Array.from({ length: 16 }).map((_, idx) => (
+            <div key={idx} style={{
+              transform: 'rotate(-30deg)',
+              fontSize: '1rem',
+              fontWeight: 900,
+              color: '#ef4444',
+              textAlign: 'center',
+              alignSelf: 'center',
+              whiteSpace: 'nowrap'
+            }}>
+              GROOVELAB SECURE VIEW 🔒 COPY PROTECTED
+            </div>
+          ))}
+        </div>
+
+        {/* IFRAME WORKSPACE CONTAINER */}
+        <div style={{
+          width: '100%',
+          height: '100%',
+          background: isDropboxFolder ? '#1e293b' : 'white',
+          overflow: 'hidden',
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          {isDropboxFolder ? (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              padding: '40px',
+              maxWidth: '600px',
+              color: 'white'
+            }}>
+              {/* Beautiful Dropbox Icon Simulation */}
+              <div style={{
+                width: '96px',
+                height: '96px',
+                borderRadius: '24px',
+                background: 'linear-gradient(135deg, #0061ff, #0045b5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 10px 30px rgba(0, 97, 255, 0.3)',
+                marginBottom: '28px'
+              }}>
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="white">
+                  <path d="M6 2l6 4-6 4-6-4 6-4zm12 0l6 4-6 4-6-4 6-4zM6 14l6-4-6-4-6 4 6 4zm12 0l6-4-6-4-6 4 6 4zM12 13l6 4-6 4-6-4 6-4z" />
+                </svg>
+              </div>
+
+              <h3 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: '12px', color: 'white' }}>
+                Sicherer Dropbox-Notenständer 🔒
+              </h3>
+              
+              <p style={{ fontSize: '0.95rem', color: '#94a3b8', lineHeight: '1.6', marginBottom: '32px' }}>
+                Dropbox blockiert aus Datenschutzgründen das direkte Einbetten von Ordnern innerhalb von Fremd-Apps. 
+                Dein schreibgeschützter Noten-Ordner kann jedoch mit einem Klick in einem sicheren Browser-Tab geöffnet werden.
+              </p>
+
+              <button
+                onClick={() => window.open(activeUrl, '_blank')}
+                className="hover-scale"
+                style={{
+                  background: 'linear-gradient(135deg, #0061ff, #0045b5)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '16px 36px',
+                  borderRadius: '16px',
+                  fontWeight: 900,
+                  fontSize: '1rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 8px 20px rgba(0, 97, 255, 0.25)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  transition: 'all 0.25s ease'
+                }}
+              >
+                <span>Ordner in Dropbox öffnen</span>
+                <ExternalLink size={18} />
+              </button>
+
+              <div style={{
+                marginTop: '48px',
+                padding: '16px 24px',
+                borderRadius: '14px',
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.05)',
+                fontSize: '0.8rem',
+                color: '#64748b',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                <span>💡</span>
+                <span style={{ textAlign: 'left' }}>
+                  <strong>Tipp für Lehrer:</strong> Um Notenblätter <strong>direkt</strong> anzuzeigen, trage einfach einen <strong>direkten Dropbox-Dateilink</strong> oder Google Drive/OneDrive Link für das jeweilige Instrument in den Song-Einstellungen ein!
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              width: '100%',
+              height: '100%',
+              overflowY: 'auto',
+              background: 'white',
+              position: 'relative'
+            }}>
+              {/* PDF CONTENT INNER WRAPPER WITH DIRECT INTERACTION PROTECTION */}
+              <div style={{
+                position: 'relative',
+                width: '100%',
+                height: '3200px', // Full height to render multiple pages of sheet music inline
+                background: 'white'
+              }}>
+                {/* 100% TRANSPARENT SECURITY SHIELD */}
+                <div 
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setShowCopyAlert(true);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    background: 'transparent',
+                    zIndex: 99,
+                    pointerEvents: 'auto',
+                    cursor: 'default'
+                  }}
+                />
+                
+                <iframe 
+                  src={getSecureEmbedUrl()}
+                  onLoad={() => setPdfLoading(false)}
+                  scrolling="no"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    border: 'none',
+                    pointerEvents: 'none' // Completely dead to Safari/Chrome native floating toolbars and click events!
+                  }}
+                />
+              </div>
+
+              {/* GORGEOUS PREMIUM PDF LOADING OVERLAY (Centered overlay) */}
+              {pdfLoading && (
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  background: 'rgba(15, 23, 42, 0.85)',
+                  backdropFilter: 'blur(8px)',
+                  WebkitBackdropFilter: 'blur(8px)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 100,
+                  transition: 'all 0.3s ease'
+                }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center', 
+                    gap: '24px',
+                    position: 'sticky',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    animation: 'pulse 2s infinite ease-in-out'
+                  }}>
+                    {/* Beautiful custom spinner */}
+                    <div className="custom-animate-spin" style={{
+                      width: '56px',
+                      height: '56px',
+                      borderRadius: '50%',
+                      border: '4px solid rgba(255, 255, 255, 0.1)',
+                      borderTop: '4px solid #3b82f6',
+                      boxShadow: '0 0 20px rgba(59, 130, 246, 0.3)'
+                    }} />
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                      <h3 style={{ margin: 0, color: 'white', fontSize: '1.15rem', fontWeight: 900, letterSpacing: '0.5px' }}>
+                        Notenblatt wird geladen
+                      </h3>
+                      <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>
+                        Sichere Verbindung wird hergestellt...
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};

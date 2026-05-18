@@ -310,3 +310,92 @@ body {
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24), 0 4px 10px rgba(0, 0, 0, 0.12);
   cursor: grabbing;
 }
+
+/* Premium Cloud Link Buttons in Üben Board */
+.cloud-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  color: #475569;
+  padding: 8px 16px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cloud-link-btn svg {
+  transition: transform 0.25s ease;
+}
+
+/* Specific styles for Noten (PDF) */
+.cloud-link-btn.noten-btn {
+  color: #475569;
+}
+.cloud-link-btn.noten-btn svg.icon-main {
+  color: #3b82f6; /* Beautiful royal blue */
+}
+.cloud-link-btn.noten-btn:hover {
+  background: #f0f7ff;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.08);
+  transform: translateY(-1px);
+}
+.cloud-link-btn.noten-btn:hover svg.icon-main {
+  transform: scale(1.1);
+}
+
+/* Specific styles for GP (Guitar Pro) */
+.cloud-link-btn.gp-btn {
+  color: #475569;
+}
+.cloud-link-btn.gp-btn svg.icon-main {
+  color: #d946ef; /* Vibrant fuchsia */
+}
+.cloud-link-btn.gp-btn:hover {
+  background: #fdf4ff;
+  border-color: #f0abfc;
+  color: #a21caf;
+  box-shadow: 0 4px 12px rgba(217, 70, 239, 0.08);
+  transform: translateY(-1px);
+}
+.cloud-link-btn.gp-btn:hover svg.icon-main {
+  transform: scale(1.1);
+}
+
+.cloud-link-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+/* Secure PDF Viewer Animations */
+@keyframes shake {
+  10%, 90% { transform: translate3d(-1px, -50%, 0) translateX(-50%); }
+  20%, 80% { transform: translate3d(2px, -50%, 0) translateX(-50%); }
+  30%, 50%, 70% { transform: translate3d(-4px, -50%, 0) translateX(-50%); }
+  40%, 60% { transform: translate3d(4px, -50%, 0) translateX(-50%); }
+}
+
+.flashing-dot {
+  animation: flash 1.5s infinite;
+}
+
+@keyframes flash {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
+
+/* Spinner Rotation Animation */
+@keyframes custom-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.custom-animate-spin {
+  animation: custom-spin 1s linear infinite;
+}

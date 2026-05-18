@@ -7,6 +7,7 @@ import {
   PieChart as RechartsPieChart, Pie,
   Radar, RadarChart, PolarGrid, PolarAngleAxis
 } from 'recharts';
+import { renderInstrumentIcon } from '../utils/instruments';
 
 const INSTRUMENT_COLORS: Record<string, string> = {
   "Guitar": "#ef4444", "E-Gitarre": "#ef4444",
@@ -15,9 +16,12 @@ const INSTRUMENT_COLORS: Record<string, string> = {
   "Vocals": "#22c55e", 
   "Piano": "#a855f7", "E-Piano": "#a855f7", "Keys": "#a855f7" 
 };
-const ADMIN_INSTRUMENT_ICONS: Record<string, string> = { 
-  "Gitarre": "🎸", "Guitar": "🎸", "E-Gitarre": "🎸",
-  "Bass": "🎸", "E-Bass": "🎸", 
+const ADMIN_INSTRUMENT_ICONS: Record<string, any> = { 
+  "Gitarre": renderInstrumentIcon("Gitarre"), 
+  "Guitar": renderInstrumentIcon("Guitar"), 
+  "E-Gitarre": renderInstrumentIcon("E-Gitarre"),
+  "Bass": renderInstrumentIcon("Bass"), 
+  "E-Bass": renderInstrumentIcon("E-Bass"), 
   "Drums": "🥁", "E-Drums": "🥁", 
   "Vocals": "🎤", "Gesang": "🎤",
   "Piano / Keys": "🎹", "Piano": "🎹", "E-Piano": "🎹", "Keys": "🎹"
@@ -165,7 +169,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [newStationColor, setNewStationColor] = useState('#e5e7eb');
   
   const [showAddSong, setShowAddSong] = useState(false);
-  const [newSong, setNewSong] = useState({ artist: '', title: '', level: 1, media_link: '', tomplay_url: '', pdf_folder_url: '', pdf_drums_url: '', pdf_guitar_url: '', pdf_bass_url: '', pdf_vocals_url: '', pdf_keys_url: '', guitar_pro_url: '', bypass_wlan_check: false, instrumentation: { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 } as Record<string, number> });
+  const [newSong, setNewSong] = useState({ artist: '', title: '', level: 1, media_link: '', tomplay_url: '', pdf_folder_url: '', guitar_pro_url: '', pdf_drums_url: '', pdf_guitar_url: '', pdf_bass_url: '', pdf_vocals_url: '', pdf_keys_url: '', bypass_wlan_check: false, instrumentation: { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 } as Record<string, number> });
   
   const [songSearch, setSongSearch] = useState('');
   const [songSearchType, setSongSearchType] = useState<'title' | 'artist'>('title');
@@ -1072,6 +1076,57 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     else fetchData();
   };
 
+  const handleAutoParseLinks = (text: string, isEditing: boolean) => {
+    const lines = text.split(/[\n,;]/);
+    const urls: Record<string, string> = {
+      pdf_guitar_url: '',
+      pdf_bass_url: '',
+      pdf_drums_url: '',
+      pdf_keys_url: '',
+      pdf_vocals_url: ''
+    };
+    
+    const current = isEditing ? editingSong : newSong;
+    if (!current) return;
+    urls.pdf_guitar_url = current.pdf_guitar_url || '';
+    urls.pdf_bass_url = current.pdf_bass_url || '';
+    urls.pdf_drums_url = current.pdf_drums_url || '';
+    urls.pdf_keys_url = current.pdf_keys_url || '';
+    urls.pdf_vocals_url = current.pdf_vocals_url || '';
+
+    lines.forEach(line => {
+      const trimmed = line.trim();
+      const urlMatch = trimmed.match(/(https?:\/\/[^\s"'><]+)/);
+      if (!urlMatch) return;
+      const url = urlMatch[1];
+      const lower = trimmed.toLowerCase();
+      
+      if (lower.includes('gitarre') || lower.includes('guitar') || lower.includes('git')) {
+        urls.pdf_guitar_url = url;
+      } else if (lower.includes('bass')) {
+        urls.pdf_bass_url = url;
+      } else if (lower.includes('drums') || lower.includes('drum') || lower.includes('schlagzeug') || lower.includes('schlag')) {
+        urls.pdf_drums_url = url;
+      } else if (lower.includes('piano') || lower.includes('keys') || lower.includes('keyboard') || lower.includes('tasten')) {
+        urls.pdf_keys_url = url;
+      } else if (lower.includes('vocals') || lower.includes('gesang') || lower.includes('lyrics') || lower.includes('text') || lower.includes('sing')) {
+        urls.pdf_vocals_url = url;
+      }
+    });
+
+    if (isEditing) {
+      setEditingSong({
+        ...editingSong,
+        ...urls
+      });
+    } else {
+      setNewSong({
+        ...newSong,
+        ...urls
+      });
+    }
+  };
+
   const handleAddSong = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!admin?.school_id) return;
@@ -1083,12 +1138,12 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       media_link: newSong.media_link,
       tomplay_url: newSong.tomplay_url,
       pdf_folder_url: newSong.pdf_folder_url || '',
+      guitar_pro_url: newSong.guitar_pro_url || '',
       pdf_drums_url: newSong.pdf_drums_url || '',
       pdf_guitar_url: newSong.pdf_guitar_url || '',
       pdf_bass_url: newSong.pdf_bass_url || '',
       pdf_vocals_url: newSong.pdf_vocals_url || '',
       pdf_keys_url: newSong.pdf_keys_url || '',
-      guitar_pro_url: newSong.guitar_pro_url || '',
       bypass_wlan_check: !!newSong.bypass_wlan_check,
       instrumentation: newSong.instrumentation
     }).select().single();
@@ -1096,7 +1151,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     else if (data) { 
       setSongs([...songs, data]); 
       setShowAddSong(false); 
-      setNewSong({ artist: '', title: '', level: 1, media_link: '', tomplay_url: '', pdf_folder_url: '', pdf_drums_url: '', pdf_guitar_url: '', pdf_bass_url: '', pdf_vocals_url: '', pdf_keys_url: '', guitar_pro_url: '', bypass_wlan_check: false, instrumentation: { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 } }); 
+      setNewSong({ artist: '', title: '', level: 1, media_link: '', tomplay_url: '', pdf_folder_url: '', guitar_pro_url: '', pdf_drums_url: '', pdf_guitar_url: '', pdf_bass_url: '', pdf_vocals_url: '', pdf_keys_url: '', bypass_wlan_check: false, instrumentation: { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 } }); 
     }
   };
 
@@ -1110,12 +1165,12 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       media_link: editingSong.media_link,
       tomplay_url: editingSong.tomplay_url,
       pdf_folder_url: editingSong.pdf_folder_url || '',
+      guitar_pro_url: editingSong.guitar_pro_url || '',
       pdf_drums_url: editingSong.pdf_drums_url || '',
       pdf_guitar_url: editingSong.pdf_guitar_url || '',
       pdf_bass_url: editingSong.pdf_bass_url || '',
       pdf_vocals_url: editingSong.pdf_vocals_url || '',
       pdf_keys_url: editingSong.pdf_keys_url || '',
-      guitar_pro_url: editingSong.guitar_pro_url || '',
       bypass_wlan_check: !!editingSong.bypass_wlan_check,
       instrumentation: editingSong.instrumentation
     }).eq('id', editingSong.id);
@@ -2506,35 +2561,44 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               </div>
             </div>
 
-            <div style={{ padding: '24px', background: '#eff6ff', borderRadius: '20px', border: '1px solid #bfdbfe', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1e3a8a', margin: 0 }}>Instrumenten-spezifische PDFs (Direktanzeige in App)</h4>
-                <p style={{ fontSize: '0.8rem', color: '#3b82f6', margin: 0, fontWeight: 600 }}>🌟 Tipp: Kopiere hier direkte Dropbox/OneDrive Links zu den einzelnen PDF-Dateien. Diese werden für Schüler nahtlos direkt in der App geöffnet!</p>
+            {/* Instrument-specific direct PDF links */}
+            <div style={{ padding: '20px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>📄</span> Instrumenten-spezifische PDF-Dateien (Direktes Laden ohne Dropbox-Block)
               </div>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                Gib hier die direkten Dropbox/OneDrive-Freigabelinks zu den einzelnen PDF-Dateien ein, um sie direkt im schreibgeschützten Notenständer anzuzeigen.
+              </p>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e3a8a' }}>🎸 PDF E-Gitarre</label>
-                  <input placeholder="https://..." value={newSong.pdf_guitar_url || ''} onChange={e => setNewSong({...newSong, pdf_guitar_url: e.target.value})} style={{ padding: '12px', borderRadius: '10px', border: '1px solid #bfdbfe', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                  <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b' }}>🎸 E-Gitarre PDF Link</label>
+                  <input placeholder="https://www.dropbox.com/.../guitar.pdf?dl=0" value={newSong.pdf_guitar_url || ''} onChange={e => setNewSong({...newSong, pdf_guitar_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e3a8a' }}>🎸 PDF E-Bass</label>
-                  <input placeholder="https://..." value={newSong.pdf_bass_url || ''} onChange={e => setNewSong({...newSong, pdf_bass_url: e.target.value})} style={{ padding: '12px', borderRadius: '10px', border: '1px solid #bfdbfe', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e3a8a' }}>🥁 PDF E-Drums</label>
-                  <input placeholder="https://..." value={newSong.pdf_drums_url || ''} onChange={e => setNewSong({...newSong, pdf_drums_url: e.target.value})} style={{ padding: '12px', borderRadius: '10px', border: '1px solid #bfdbfe', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e3a8a' }}>🎹 PDF E-Piano / Keys</label>
-                  <input placeholder="https://..." value={newSong.pdf_keys_url || ''} onChange={e => setNewSong({...newSong, pdf_keys_url: e.target.value})} style={{ padding: '12px', borderRadius: '10px', border: '1px solid #bfdbfe', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                  <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b' }}>🎸 E-Bass PDF Link</label>
+                  <input placeholder="https://www.dropbox.com/.../bass.pdf?dl=0" value={newSong.pdf_bass_url || ''} onChange={e => setNewSong({...newSong, pdf_bass_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
                 </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e3a8a' }}>🎤 PDF Gesang / Vocals</label>
-                <input placeholder="https://..." value={newSong.pdf_vocals_url || ''} onChange={e => setNewSong({...newSong, pdf_vocals_url: e.target.value})} style={{ padding: '12px', borderRadius: '10px', border: '1px solid #bfdbfe', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b' }}>🥁 E-Drums PDF Link</label>
+                  <input placeholder="https://www.dropbox.com/.../drums.pdf?dl=0" value={newSong.pdf_drums_url || ''} onChange={e => setNewSong({...newSong, pdf_drums_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b' }}>🎹 E-Piano PDF Link</label>
+                  <input placeholder="https://www.dropbox.com/.../keys.pdf?dl=0" value={newSong.pdf_keys_url || ''} onChange={e => setNewSong({...newSong, pdf_keys_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxWidth: '50%' }}>
+                <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b' }}>🎤 Gesang / Lyrics PDF Link</label>
+                <input placeholder="https://www.dropbox.com/.../vocals.pdf?dl=0" value={newSong.pdf_vocals_url || ''} onChange={e => setNewSong({...newSong, pdf_vocals_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
               </div>
             </div>
+
+
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: '#fffbeb', borderRadius: '16px', border: '1px solid #fef3c7' }}>
               <input type="checkbox" id="add-bypass-wlan" checked={!!newSong.bypass_wlan_check} onChange={e => setNewSong({...newSong, bypass_wlan_check: e.target.checked})} style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: brandColor }} />
@@ -2601,35 +2665,44 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               </div>
             </div>
 
-            <div style={{ padding: '24px', background: '#f0f9ff', borderRadius: '20px', border: '1px solid #bae6fd', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 900, color: '#0369a1', margin: 0 }}>Instrumenten-spezifische PDFs (Direktanzeige in App)</h4>
-                <p style={{ fontSize: '0.8rem', color: '#0284c7', margin: 0, fontWeight: 600 }}>🌟 Tipp: Kopiere hier direkte Dropbox/OneDrive Links zu den einzelnen PDF-Dateien. Diese werden für Schüler nahtlos direkt in der App geöffnet!</p>
+            {/* Instrument-specific direct PDF links */}
+            <div style={{ padding: '20px', background: 'white', borderRadius: '16px', border: '1px solid #bae6fd', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0369a1', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>📄</span> Instrumenten-spezifische PDF-Dateien (Direktes Laden ohne Dropbox-Block)
               </div>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                Gib hier die direkten Dropbox/OneDrive-Freigabelinks zu den einzelnen PDF-Dateien ein, um sie direkt im schreibgeschützten Notenständer anzuzeigen.
+              </p>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0369a1' }}>🎸 PDF E-Gitarre</label>
-                  <input placeholder="https://..." value={editingSong.pdf_guitar_url || ''} onChange={e => setEditingSong({...editingSong, pdf_guitar_url: e.target.value})} style={{ padding: '12px', borderRadius: '10px', border: '1px solid #bae6fd', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                  <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b' }}>🎸 E-Gitarre PDF Link</label>
+                  <input placeholder="https://www.dropbox.com/.../guitar.pdf?dl=0" value={editingSong.pdf_guitar_url || ''} onChange={e => setEditingSong({...editingSong, pdf_guitar_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0369a1' }}>🎸 PDF E-Bass</label>
-                  <input placeholder="https://..." value={editingSong.pdf_bass_url || ''} onChange={e => setEditingSong({...editingSong, pdf_bass_url: e.target.value})} style={{ padding: '12px', borderRadius: '10px', border: '1px solid #bae6fd', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0369a1' }}>🥁 PDF E-Drums</label>
-                  <input placeholder="https://..." value={editingSong.pdf_drums_url || ''} onChange={e => setEditingSong({...editingSong, pdf_drums_url: e.target.value})} style={{ padding: '12px', borderRadius: '10px', border: '1px solid #bae6fd', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0369a1' }}>🎹 PDF E-Piano / Keys</label>
-                  <input placeholder="https://..." value={editingSong.pdf_keys_url || ''} onChange={e => setEditingSong({...editingSong, pdf_keys_url: e.target.value})} style={{ padding: '12px', borderRadius: '10px', border: '1px solid #bae6fd', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                  <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b' }}>🎸 E-Bass PDF Link</label>
+                  <input placeholder="https://www.dropbox.com/.../bass.pdf?dl=0" value={editingSong.pdf_bass_url || ''} onChange={e => setEditingSong({...editingSong, pdf_bass_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
                 </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0369a1' }}>🎤 PDF Gesang / Vocals</label>
-                <input placeholder="https://..." value={editingSong.pdf_vocals_url || ''} onChange={e => setEditingSong({...editingSong, pdf_vocals_url: e.target.value})} style={{ padding: '12px', borderRadius: '10px', border: '1px solid #bae6fd', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b' }}>🥁 E-Drums PDF Link</label>
+                  <input placeholder="https://www.dropbox.com/.../drums.pdf?dl=0" value={editingSong.pdf_drums_url || ''} onChange={e => setEditingSong({...editingSong, pdf_drums_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b' }}>🎹 E-Piano PDF Link</label>
+                  <input placeholder="https://www.dropbox.com/.../keys.pdf?dl=0" value={editingSong.pdf_keys_url || ''} onChange={e => setEditingSong({...editingSong, pdf_keys_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxWidth: '50%' }}>
+                <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b' }}>🎤 Gesang / Lyrics PDF Link</label>
+                <input placeholder="https://www.dropbox.com/.../vocals.pdf?dl=0" value={editingSong.pdf_vocals_url || ''} onChange={e => setEditingSong({...editingSong, pdf_vocals_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
               </div>
             </div>
+
+
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: '#fffbeb', borderRadius: '16px', border: '1px solid #fef3c7' }}>
               <input type="checkbox" id="edit-bypass-wlan" checked={!!editingSong.bypass_wlan_check} onChange={e => setEditingSong({...editingSong, bypass_wlan_check: e.target.checked})} style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: brandColor }} />
@@ -2996,16 +3069,16 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
     // Instrument normalization helper
     const getInstrumentIcon = (name: string) => {
-      const lower = (name || '').toLowerCase();
-      if (lower.includes('gitarre') || lower.includes('guitar')) return '🎸';
-      if (lower.includes('bass')) return '🎸';
-      if (lower.includes('drum')) return '🥁';
-      if (lower.includes('keys') || lower.includes('piano')) return '🎹';
-      if (lower.includes('vocals') || lower.includes('gesang') || lower.includes('sing')) return '🎤';
-      return '🎵';
+      return renderInstrumentIcon(name);
     };
 
-    const STUDENT_MODAL_INSTRUMENT_ICONS: Record<string, string> = { Guitar: '🎸', Keys: '🎹', Drums: '🥁', Bass: '🎸', Vocals: '🎤' };
+    const STUDENT_MODAL_INSTRUMENT_ICONS: Record<string, any> = { 
+      Guitar: renderInstrumentIcon('Guitar'), 
+      Keys: '🎹', 
+      Drums: '🥁', 
+      Bass: renderInstrumentIcon('Bass'), 
+      Vocals: '🎤' 
+    };
 
     // Grouping logic for songs
     const groupedSongs = (studentDetails || []).reduce((acc: any, s: any) => {

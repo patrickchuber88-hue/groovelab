@@ -3,8 +3,15 @@ import { supabase } from '../lib/supabase';
 import { Monitor, Music, Award, Box, Plus, AlertCircle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
+import { renderInstrumentIcon } from '../utils/instruments';
 
-const TEACHER_INSTRUMENT_ICONS: Record<string, string> = { Guitar: '🎸', Bass: '🎸', Drums: '🥁', Keys: '🎹', Vocals: '🎤' };
+const TEACHER_INSTRUMENT_ICONS: Record<string, any> = { 
+  Guitar: renderInstrumentIcon('Guitar'), 
+  Bass: renderInstrumentIcon('Bass'), 
+  Drums: '🥁', 
+  Keys: '🎹', 
+  Vocals: '🎤' 
+};
 const INSTRUMENT_COLORS: Record<string, string> = { 
   Guitar: '#ef4444', 
   Bass: '#eab308', 
@@ -1489,12 +1496,7 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
                        });
 
                        const getIcon = (inst: string) => {
-                         const low = inst.toLowerCase();
-                         if (low.includes('guitar') || low.includes('gitarre')) return '🎸';
-                         if (low.includes('drum')) return '🥁';
-                         if (low.includes('bass')) return '🎸';
-                         if (low.includes('piano') || low.includes('keys')) return '🎹';
-                         return '🎵';
+                         return renderInstrumentIcon(inst);
                        };
 
                        return (
@@ -2219,12 +2221,7 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
                             });
 
                             const getIcon = (inst: string) => {
-                              const low = inst.toLowerCase();
-                              if (low.includes('guitar') || low.includes('gitarre')) return '🎸';
-                              if (low.includes('drum')) return '🥁';
-                              if (low.includes('bass')) return '🎸';
-                              if (low.includes('piano') || low.includes('keys')) return '🎹';
-                              return '🎵';
+                              return renderInstrumentIcon(inst);
                             };
 
                             const isPro = form.band_song?.difficulty_level === 'original' || form.band_song?.difficulty_level === 'pro';
