@@ -204,7 +204,7 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
               height: '88px', 
               borderRadius: '22px', 
               overflow: 'hidden', 
-              border: `3px solid ${color}`, 
+              border: `2px solid ${color}`, 
               boxShadow: `0 10px 28px ${color}25`, 
               flexShrink: 0, 
               marginBottom: '6px',
@@ -1240,7 +1240,16 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
   return (
     <div style={{ padding: hideHeader ? '0' : '20px 40px', width: '100%', maxWidth: '1800px', margin: '0 auto', background: hideHeader ? 'transparent' : '#f8fafc', minHeight: '100vh' }}>
       {selectedCoachProfile && <TeacherDetailModal teacher={selectedCoachProfile} onClose={() => setSelectedCoachProfile(null)} />}
-      {selectedStudentProfile && <StudentDetailModal student={selectedStudentProfile} onClose={() => setSelectedStudentProfile(null)} />}
+      {selectedStudentProfile && (
+        <StudentDetailModal 
+          student={selectedStudentProfile} 
+          onClose={() => setSelectedStudentProfile(null)} 
+          onOpenBandProfile={(band) => {
+            setEditingBand(band);
+            setSelectedStudentProfile(null);
+          }}
+        />
+      )}
       
       {!hideHeader && (
         <header style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

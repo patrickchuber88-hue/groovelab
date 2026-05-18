@@ -399,3 +399,14 @@ body {
 .custom-animate-spin {
   animation: custom-spin 1s linear infinite;
 }
+
+/* Clickable Band Items in Student Details Modal */
+.clickable-band-item {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.clickable-band-item:hover {
+  transform: translateY(-2px) scale(1.02);
+  background: #fbcfe8 !important; /* Slightly stronger pink on hover */
+  border-color: #ec4899 !important; /* Pink border */
+  box-shadow: 0 10px 25px -5px rgba(236, 72, 153, 0.25);
+}

@@ -253,6 +253,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [editingStudent, setEditingStudent] = useState<any>(null);
   const [studentSearch, setStudentSearch] = useState('');
   const [studentSessions, setStudentSessions] = useState<any[]>([]);
+  const [studentPlanning, setStudentPlanning] = useState<any[]>([]);
   const [studentRejections, setStudentRejections] = useState<any[]>([]);
   const qrCardRef = React.useRef<HTMLDivElement>(null);
   const [editingTeacher, setEditingTeacher] = useState<any>(null);
@@ -1388,6 +1389,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
   const [studentBands, setStudentBands] = useState<any[]>([]);
   const [studentDetailTab, setStudentDetailTab] = useState<'profile' | 'logbook'>('profile');
+  const [showFullPhoto, setShowFullPhoto] = useState(false);
 
   const fetchStudentProfile = async (student: any) => {
     setSelectedStudent(student);
@@ -1396,7 +1398,19 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     // Fetch student's bands and filter out duplicates
     const { data: bandsData } = await supabase
       .from('band_members')
-      .select('bands(*)')
+      .select(`
+        bands (
+          *,
+          band_members (
+            *,
+            users (*)
+          ),
+          band_songs (
+            *,
+            songs (*)
+          )
+        )
+      `)
       .eq('user_id', student.id);
     
     const uniqueBandsList: any[] = [];
@@ -1498,6 +1512,12 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         streak: weeks.size
       };
     }
+
+    const { data: planning } = await supabase
+      .from('lab_planning')
+      .select('*')
+      .eq('user_id', student.id);
+    setStudentPlanning(planning || []);
   };
 
   if (!admin) {
@@ -3209,6 +3229,64 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       ? new Date(selectedStudent.created_at).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
       : '';
 
+    const weekSessions = (() => {
+      if (!studentPlanning || studentPlanning.length === 0) return [];
+
+      const dayOrder: { [day: string]: number } = { 'Mo': 1, 'Di': 2, 'Mi': 3, 'Do': 4, 'Fr': 5, 'Sa': 6, 'So': 7 };
+      const slotsByDay: { [day: string]: string[] } = {};
+      
+      studentPlanning.forEach(s => {
+        if (!slotsByDay[s.day]) slotsByDay[s.day] = [];
+        slotsByDay[s.day].push(s.time);
+      });
+
+      const presenceList: { dayStr: string; rangeStr: string; sortKey: number }[] = [];
+
+      Object.entries(slotsByDay).forEach(([day, times]) => {
+        times.sort();
+
+        const add15 = (t: string) => {
+          let [h, m] = t.split(':').map(Number);
+          m += 15;
+          if (m >= 60) { h += 1; m = 0; }
+          return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+        };
+
+        const toMin = (t: string) => {
+          const [h, m] = t.split(':').map(Number);
+          return h * 60 + m;
+        };
+
+        const ranges: { start: string; end: string }[] = [];
+        let currentRange: { start: string; end: string } | null = null;
+
+        times.forEach(t => {
+          if (!currentRange) {
+            currentRange = { start: t, end: add15(t) };
+          } else {
+            if (toMin(t) === toMin(currentRange.end)) {
+              currentRange.end = add15(t);
+            } else {
+              ranges.push(currentRange);
+              currentRange = { start: t, end: add15(t) };
+            }
+          }
+        });
+        if (currentRange) ranges.push(currentRange);
+
+        ranges.forEach(r => {
+          presenceList.push({
+            dayStr: day,
+            rangeStr: `${r.start} Uhr - ${r.end} Uhr`,
+            sortKey: (dayOrder[day] || 99) * 10000 + toMin(r.start)
+          });
+        });
+      });
+
+      presenceList.sort((a, b) => a.sortKey - b.sortKey);
+      return presenceList;
+    })();
+
 
     // Instrument normalization helper
     const getInstrumentIcon = (name: string) => {
@@ -3274,7 +3352,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
     return (
       <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-        <div className="glass-panel animation-slide-up" style={{ background: 'white', padding: '32px', borderRadius: '32px', maxWidth: '800px', width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
+        <div className="glass-panel animation-slide-up" style={{ background: 'white', padding: '32px', borderRadius: '32px', maxWidth: '920px', width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
           
           {/* Close button */}
           <button onClick={() => setSelectedStudent(null)} style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(0,0,0,0.05)', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s', zIndex: 10 }}>
@@ -3284,7 +3362,11 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           {/* Student Profile Header */}
           <div style={{ display: 'flex', gap: '24px', marginBottom: '32px', alignItems: 'center', width: '100%' }}>
             <div style={{ display: 'flex', gap: '24px', alignItems: 'center', flexShrink: 0 }}>
-              <div style={{ width: '100px', height: '100px', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', border: '4px solid white', background: '#f1f5f9', flexShrink: 0 }}>
+              <div 
+                onClick={() => setShowFullPhoto(true)}
+                style={{ width: '100px', height: '100px', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', border: '4px solid white', background: '#f1f5f9', flexShrink: 0, cursor: 'pointer', transition: 'all 0.2s ease' }}
+                className="hover-scale"
+              >
                 <img src={selectedStudent.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               </div>
               <div>
@@ -3325,27 +3407,26 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 </div>
                 {/* Instrument Badge - One line below */}
                 <div style={{ marginTop: '10px' }}>
-                  <div style={{ display: 'inline-block', background: '#f1f5f9', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <div style={{ display: 'inline-block', background: '#f1f5f9', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', height: 'fit-content' }}>
                     {selectedStudent.instrument || 'Multi-Talent'}
                   </div>
                 </div>
+
               </div>
             </div>
 
             {/* Skill Radar centered dynamically in the empty space */}
             <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', minWidth: '240px' }}>
               <div style={{ width: '240px', height: '165px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'transparent' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart cx="50%" cy="50%" outerRadius="75%" data={studentRadarData}>
-                    <PolarGrid stroke="#e2e8f0" />
-                    <PolarAngleAxis dataKey="instrument" tick={({ x, y, payload }) => (
-                      <text x={x} y={y} textAnchor="middle" dominantBaseline="central" style={{ fontSize: 10, fontWeight: 900, fill: '#94a3b8' }}>
-                        {payload.value}
-                      </text>
-                    )} />
-                    <Radar name="XP" dataKey="xp" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.4} />
-                  </RadarChart>
-                </ResponsiveContainer>
+                <RadarChart cx="50%" cy="50%" outerRadius="75%" width={240} height={165} data={studentRadarData}>
+                  <PolarGrid stroke="#e2e8f0" />
+                  <PolarAngleAxis dataKey="instrument" tick={({ x, y, payload }) => (
+                    <text x={x} y={y} textAnchor="middle" dominantBaseline="central" style={{ fontSize: 10, fontWeight: 900, fill: '#94a3b8' }}>
+                      {payload.value}
+                    </text>
+                  )} />
+                  <Radar name="XP" dataKey="xp" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.4} />
+                </RadarChart>
               </div>
             </div>
           </div>
@@ -3420,8 +3501,25 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                         </div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                           {s.instruments.map((inst: any, idx: number) => (
-                            <div key={idx} style={{ fontSize: '0.75rem', fontWeight: 700, padding: '4px 8px', borderRadius: '8px', background: 'white', border: '1px solid #e2e8f0', color: inst.progress === 100 ? '#10b981' : (inst.progress > 0 ? brandColor : '#94a3b8') }}>
-                              {getInstrumentIcon(inst.name)} {inst.name}{inst.part_number > 1 || (s.instruments.filter((i:any) => i.name === inst.name).length > 1) ? ` ${inst.part_number}` : ''}: {inst.progress}%
+                            <div 
+                              key={idx} 
+                              title={`${inst.name}${inst.part_number > 1 || (s.instruments.filter((i:any) => i.name === inst.name).length > 1) ? ` ${inst.part_number}` : ''}`}
+                              style={{ 
+                                fontSize: '0.8rem', 
+                                fontWeight: 800, 
+                                padding: '4px 8px', 
+                                borderRadius: '8px', 
+                                background: 'white', 
+                                border: '1px solid #e2e8f0', 
+                                color: inst.progress === 100 ? '#10b981' : (inst.progress > 0 ? brandColor : '#94a3b8'),
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                cursor: 'help'
+                              }}
+                            >
+                              <span>{getInstrumentIcon(inst.name)}</span>
+                              <span>{inst.progress}%</span>
                             </div>
                           ))}
                         </div>
@@ -3452,8 +3550,25 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                         </div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                           {s.instruments.filter((i: any) => i.is_stage_ready).map((inst: any, idx: number) => (
-                            <div key={idx} style={{ fontSize: '0.75rem', fontWeight: 700, padding: '4px 8px', borderRadius: '8px', background: 'white', border: '1px solid #bbf7d0', color: '#10b981' }}>
-                              {getInstrumentIcon(inst.name)} {inst.name}{inst.part_number > 1 || (s.instruments.filter((i:any) => i.name === inst.name).length > 1) ? ` ${inst.part_number}` : ''}
+                            <div 
+                              key={idx} 
+                              title={`${inst.name}${inst.part_number > 1 || (s.instruments.filter((i:any) => i.name === inst.name).length > 1) ? ` ${inst.part_number}` : ''}`}
+                              style={{ 
+                                fontSize: '0.8rem', 
+                                fontWeight: 800, 
+                                padding: '4px 8px', 
+                                borderRadius: '8px', 
+                                background: 'white', 
+                                border: '1px solid #bbf7d0', 
+                                color: '#10b981',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                cursor: 'help'
+                              }}
+                            >
+                              <span>{getInstrumentIcon(inst.name)}</span>
+                              <span>100%</span>
                             </div>
                           ))}
                         </div>
@@ -3474,7 +3589,24 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   </h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {studentBands.map((b: any) => (
-                      <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: '#fdf2f8', borderRadius: '20px', border: '1px solid #fbcfe8' }}>
+                      <div 
+                        key={b.id} 
+                        onClick={() => {
+                          setEditingBand(b);
+                          setSelectedStudent(null);
+                        }}
+                        className="clickable-band-item"
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '12px', 
+                          padding: '12px 16px', 
+                          background: '#fdf2f8', 
+                          borderRadius: '20px', 
+                          border: '1px solid #fbcfe8',
+                          cursor: 'pointer'
+                        }}
+                      >
                         <div style={{ width: '44px', height: '44px', borderRadius: '12px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
                           <img src={b.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         </div>
@@ -3483,6 +3615,37 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     ))}
                     {studentBands.length === 0 && (
                       <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', padding: '8px 0' }}>In keiner Band aktiv.</div>
+                    )}
+                  </div>
+                </section>
+
+                {/* Wochenplan-Zeiten */}
+                <section style={{ marginTop: '16px' }}>
+                  <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#f59e0b', letterSpacing: '0.1em', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Calendar size={16} /> Wochenplan-Zeiten
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {weekSessions.map((pres, idx) => (
+                      <div key={idx} style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '10px', 
+                        background: '#fffbeb', 
+                        border: '1px solid #fef3c7', 
+                        padding: '12px 14px', 
+                        borderRadius: '16px',
+                        fontSize: '0.85rem',
+                        fontWeight: 700,
+                        color: '#b45309'
+                      }}>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', flexShrink: 0 }}></div>
+                        <div>
+                          {pres.dayStr}. {pres.rangeStr}
+                        </div>
+                      </div>
+                    ))}
+                    {weekSessions.length === 0 && (
+                      <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', background: '#f8fafc', padding: '12px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>Keine reservierten Zeiten diese Woche.</div>
                     )}
                   </div>
                 </section>
@@ -3716,6 +3879,33 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             </div>
           )}
         </div>
+        {showFullPhoto && (
+          <div 
+            onClick={() => setShowFullPhoto(false)}
+            style={{ 
+              position: 'fixed', 
+              inset: 0, 
+              zIndex: 4000, 
+              background: 'rgba(0,0,0,0.85)', 
+              backdropFilter: 'blur(20px)', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              cursor: 'zoom-out'
+            }}
+          >
+            <img 
+              src={selectedStudent.photo_url || '/avatar_ghost.jpg'} 
+              style={{ 
+                maxWidth: '90%', 
+                maxHeight: '90%', 
+                borderRadius: '24px', 
+                boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+                border: '4px solid white'
+              }} 
+            />
+          </div>
+        )}
       </div>
     );
   };
