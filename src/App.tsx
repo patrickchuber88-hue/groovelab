@@ -1056,7 +1056,7 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
 }
 
 function App() {
-  const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => localStorage.getItem('groovelab_user_id'));
+  const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => sessionStorage.getItem('groovelab_user_id'));
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [session, setSession] = useState<any>(null);
@@ -1136,7 +1136,7 @@ function App() {
   const [libraryAlphaFilter, setLibraryAlphaFilter] = useState<string | null>(null);
   const [librarySearchType, setLibrarySearchType] = useState<'title' | 'artist'>('title');
   const [activeStudentsCount, setActiveStudentsCount] = useState(0);
-  const [locationMode, setLocationMode] = useState<'lab' | 'home'>(() => (localStorage.getItem('groovelab_location_mode') as 'lab' | 'home') || 'home');
+  const [locationMode, setLocationMode] = useState<'lab' | 'home'>(() => (sessionStorage.getItem('groovelab_location_mode') as 'lab' | 'home') || 'home');
   const [personalRejections] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [showCamera, setShowCamera] = useState(false);
@@ -1161,12 +1161,12 @@ function App() {
   const [pendingFounding, setPendingFounding] = useState<any | null>(null);
   const [showFoundingModal, setShowFoundingModal] = useState(false);
   const [foundingName, setFoundingName] = useState('');
-  const [lastAutoTriggeredFormId, setLastAutoTriggeredFormId] = useState<string | null>(localStorage.getItem('groovelab_last_form_id'));
+  const [lastAutoTriggeredFormId, setLastAutoTriggeredFormId] = useState<string | null>(sessionStorage.getItem('groovelab_last_form_id'));
   
   const updateAutoTriggerId = (id: string | null) => {
     setLastAutoTriggeredFormId(id);
-    if (id) localStorage.setItem('groovelab_last_form_id', id);
-    else localStorage.removeItem('groovelab_last_form_id');
+    if (id) sessionStorage.setItem('groovelab_last_form_id', id);
+    else sessionStorage.removeItem('groovelab_last_form_id');
   };
   
   useEffect(() => {
@@ -2444,7 +2444,7 @@ function App() {
   };
 
   const fetchPlanningData = async (schoolId: string, userIdArg?: string) => {
-    const currentUserId = userIdArg || loggedInUserId || localStorage.getItem('groovelab_user_id');
+    const currentUserId = userIdArg || loggedInUserId || sessionStorage.getItem('groovelab_user_id');
     console.log(`[Planning] Fetching for School: ${schoolId}, User: ${currentUserId}`);
     if (!currentUserId || !schoolId) {
       console.warn('[Planning] Missing userId or schoolId', { currentUserId, schoolId });
@@ -3358,8 +3358,8 @@ function App() {
     setLoggedInUserId(null);
     setUser(null);
     setSession(null);
-    localStorage.removeItem('groovelab_user_id');
-    localStorage.removeItem('groovelab_location_mode');
+    sessionStorage.removeItem('groovelab_user_id');
+    sessionStorage.removeItem('groovelab_location_mode');
     localStorage.removeItem('groovelab_active_tab');
   };
 
@@ -3378,8 +3378,8 @@ function App() {
 
     setLoggedInUserId(userId);
     setLocationMode(mode);
-    localStorage.setItem('groovelab_user_id', userId);
-    localStorage.setItem('groovelab_location_mode', mode);
+    sessionStorage.setItem('groovelab_user_id', userId);
+    sessionStorage.setItem('groovelab_location_mode', mode);
 
     // Always start with the Live Lab after login!
     setActiveStudentTab('live');
