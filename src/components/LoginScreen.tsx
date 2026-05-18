@@ -485,37 +485,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             🔓 ADMIN BYPASS (LOCAL ONLY)
           </button>
           
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
-            {[
-              { num: 1, token: '1d7d3cd1-ace9-4f88-abcb-53643b925e77' },
-              { num: 2, token: 'aab6fef4-5dca-45f5-a8b2-2009a20628bb' },
-              { num: 3, token: '8b1c79ce-f504-47c9-a664-417c7ceacb66' },
-              { num: 4, token: '8752290c-3e39-470d-b8fa-0c0aa0489920' },
-              { num: 5, token: '617a3cfc-84ac-42e9-9a20-d86eb82ac1bb' }
-            ].map(stud => (
-              <button
-                key={stud.num}
-                onClick={async () => {
-                  const { data: u } = await supabase.from('users').select('id').eq('qr_token', stud.token).maybeSingle();
-                  if (u) onLogin(u.id, true);
-                  else alert(`Schüler ${stud.num} nicht gefunden!`);
-                }}
-                style={{
-                  padding: '10px 4px',
-                  background: '#eff6ff',
-                  border: '1.5px solid #bfdbfe',
-                  borderRadius: '12px',
-                  color: '#1e40af',
-                  fontWeight: 800,
-                  fontSize: '0.72rem',
-                  cursor: 'pointer',
-                  textAlign: 'center'
-                }}
-              >
-                S{stud.num}
-              </button>
-            ))}
-          </div>
         </div>
       )}
 

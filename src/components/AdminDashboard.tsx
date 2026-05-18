@@ -416,6 +416,13 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         if (teachersData) setTeachers(teachersData);
       } else if (activeTab === 'stats') {
         fetchStats(adminData.school_id);
+        const { data: teachersData } = await supabase
+          .from('users')
+          .select('*')
+          .eq('school_id', adminData.school_id)
+          .in('role', ['teacher', 'admin'])
+          .order('first_name');
+        if (teachersData) setTeachers(teachersData);
       } else if (activeTab === 'gallery') {
         const { data: allUsers } = await supabase.from('users').select('*').eq('school_id', adminData.school_id).order('first_name');
         if (allUsers) {
@@ -447,14 +454,59 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const fetchStats = async (schoolId: string) => {
     const { count: studentCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('school_id', schoolId).eq('role', 'student');
     const { count: songCount } = await supabase.from('songs').select('*', { count: 'exact', head: true }).eq('school_id', schoolId);
-    const { data: sessions } = await supabase.from('sessions').select('check_in_time, check_out_time, station_id').not('check_out_time', 'is', null);
-    const { data: skills } = await supabase.from('user_song_skills').select('progress_percent, instrument');
+    
+    // Fetch sessions filtered by school's students
+    const { data: sessions } = await supabase
+      .from('sessions')
+      .select('check_in_time, check_out_time, station_id, users!inner(school_id)')
+      .eq('users.school_id', schoolId)
+      .not('check_out_time', 'is', null);
+
+    // Fetch skills filtered by school's students
+    const { data: skills } = await supabase
+      .from('user_song_skills')
+      .select('user_id, progress_percent, instrument, is_stage_ready, student:users!user_song_skills_user_id_fkey!inner(school_id), songs(title, artist)')
+      .eq('student.school_id', schoolId);
+
+    // Get school opening hours & reset stats timestamp
+    const openingHours = admin?.schools?.opening_hours;
+    const resetDateStr = openingHours?.stats_reset_at;
+    const resetDate = resetDateStr ? new Date(resetDateStr) : null;
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
     let totalMins = 0;
     let labMins = 0;
     let homeMins = 0;
     
-    sessions?.forEach(s => {
+    const filteredSessions = (sessions || []).filter((s: any) => {
+      const checkInDate = new Date(s.check_in_time);
+      
+      // 1. Filter by stats reset date
+      if (resetDate && checkInDate < resetDate) return false;
+      
+      // 2. Check if within opening hours (enforce active day and custom hours if at station)
+      if (s.station_id && openingHours) {
+        const dayConfig = openingHours[dayNames[checkInDate.getDay()]];
+        if (!dayConfig || !dayConfig.active) return false;
+        
+        const startStr = dayConfig.start || "08:00";
+        const endStr = dayConfig.end || "20:00";
+        const [startH, startM] = startStr.split(':').map(Number);
+        const [endH, endM] = endStr.split(':').map(Number);
+        
+        const sessionH = checkInDate.getHours();
+        const sessionM = checkInDate.getMinutes();
+        
+        const sessionTime = sessionH * 60 + sessionM;
+        const startTime = startH * 60 + startM;
+        const endTime = endH * 60 + endM;
+        
+        if (sessionTime < startTime || sessionTime > endTime) return false;
+      }
+      return true;
+    });
+
+    filteredSessions.forEach((s: any) => {
       const start = new Date(s.check_in_time);
       const end = new Date(s.check_out_time!);
       const mins = Math.max(0, Math.floor((end.getTime() - start.getTime()) / 60000));
@@ -463,40 +515,78 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       else homeMins += mins;
     });
 
+    // Mastered challenges count per instrument
+    const stageReadyPerInst = { guitar: 0, keys: 0, drums: 0, bass: 0, vocals: 0 };
+    skills?.forEach((s: any) => {
+      if (s.is_stage_ready) {
+        const inst = (s.instrument || '').toLowerCase().trim();
+        if (inst === 'guitar' || inst === 'e-gitarre' || inst === 'gitarre') stageReadyPerInst.guitar++;
+        else if (inst === 'keys' || inst === 'piano' || inst === 'e-piano' || inst === 'piano / keys') stageReadyPerInst.keys++;
+        else if (inst === 'drums' || inst === 'e-drums' || inst === 'schlagzeug') stageReadyPerInst.drums++;
+        else if (inst === 'bass' || inst === 'e-bass') stageReadyPerInst.bass++;
+        else if (inst === 'vocals' || inst === 'gesang' || inst.includes('vocal')) stageReadyPerInst.vocals++;
+      }
+    });
+
+    // Top Songs: count unique students practicing each song
+    const songUniqueUsers: Record<string, Set<string>> = {};
+    skills?.forEach((s: any) => {
+      const title = s.songs?.title;
+      const artist = s.songs?.artist;
+      const userId = s.user_id;
+      if (title && userId) {
+        const key = `${title} - ${artist}`;
+        if (!songUniqueUsers[key]) {
+          songUniqueUsers[key] = new Set();
+        }
+        songUniqueUsers[key].add(userId);
+      }
+    });
+    const topSongs = Object.entries(songUniqueUsers)
+      .map(([name, userSet]) => ({ name, count: userSet.size }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 3);
+
+    // Leaderboard
+    const { data: studentsWithSkills } = await supabase
+      .from('users')
+      .select('*, skills:user_song_skills!user_song_skills_user_id_fkey(progress_percent, is_stage_ready)')
+      .eq('school_id', schoolId)
+      .eq('role', 'student');
+
+    const leaderboard = (studentsWithSkills || []).map((student: any) => {
+      const xp = (student.skills || [])
+        .filter((s: any) => s.progress_percent === 100 || s.is_stage_ready)
+        .length * 100;
+      return {
+        id: student.id,
+        first_name: student.first_name,
+        last_name: student.last_name,
+        photo_url: student.photo_url,
+        xp
+      };
+    })
+    .sort((a, b) => b.xp - a.xp)
+    .slice(0, 5);
+
     const levelDist = { level1: 0, level2: 0, level3: 0 };
-    const { data: songsData } = await supabase.from('songs').select('level');
+    const { data: songsData } = await supabase.from('songs').select('level').eq('school_id', schoolId);
     songsData?.forEach(s => {
       if (s.level === 1) levelDist.level1++;
       if (s.level === 2) levelDist.level2++;
       if (s.level === 3) levelDist.level3++;
     });
 
-    const instUsage: any = {};
-    const instXp: any = {};
-    skills?.forEach(s => {
-      instUsage[s.instrument] = (instUsage[s.instrument] || 0) + 1;
-      const xp = s.progress_percent * 2;
-      instXp[s.instrument] = (instXp[s.instrument] || 0) + xp;
-    });
-
     const days = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
     const weekdayData = days.map((day, idx) => {
-      const mins = sessions?.filter(s => new Date(s.check_in_time).getDay() === idx)
-        .reduce((acc, s) => {
+      const mins = filteredSessions.filter((s: any) => new Date(s.check_in_time).getDay() === idx)
+        .reduce((acc: number, s: any) => {
           const start = new Date(s.check_in_time);
           const end = new Date(s.check_out_time!);
           return acc + Math.max(0, Math.floor((end.getTime() - start.getTime()) / 60000));
-        }, 0) || 0;
+        }, 0);
       return { day, mins: Math.round(mins / 60) };
     });
-
-    const { data: bandWallData } = await supabase.from('user_song_skills').select('song_id, instrument').eq('is_stage_ready', true);
-    const songStatus: any = {};
-    bandWallData?.forEach(s => {
-      if (!songStatus[s.song_id]) songStatus[s.song_id] = new Set();
-      songStatus[s.song_id].add(s.instrument);
-    });
-    const bandReadyCount = Object.values(songStatus).filter((set: any) => set.size >= 3).length;
 
     setStats({
       studentCount,
@@ -505,33 +595,13 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       labMins,
       homeMins,
       levelDist,
-      instUsage,
-      instXp: Object.entries(instXp).map(([name, value]) => ({ name, value })),
       weekdayData,
-      bandReadyCount,
-      avgLabSessionMins: (sessions?.filter(s => s.station_id).length || 0) > 0 
-        ? Math.round(labMins / (sessions?.filter(s => s.station_id).length || 1)) 
-        : 0,
-      avgHomeMinsPerWeek: (() => {
-        const allDates = sessions?.map(s => new Date(s.check_in_time).getTime()) || [];
-        if (allDates.length === 0) return 0;
-        const minDate = Math.min(...allDates);
-        const maxDate = Math.max(...allDates);
-        const weeks = Math.max(1, Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24 * 7)));
-        return Math.round(homeMins / weeks);
-      })(),
-      hourlyAttendance: (() => {
-        const hourly = Array.from({ length: 15 }, (_, i) => ({ hour: `${i + 8}:00`, count: 0 })); // 8:00 to 22:00
-        sessions?.filter(s => s.station_id).forEach(s => {
-          const hr = new Date(s.check_in_time).getHours();
-          if (hr >= 8 && hr <= 22) {
-            hourly[hr - 8].count++;
-          }
-        });
-        return hourly;
-      })()
+      stageReadyPerInst,
+      topSongs,
+      leaderboard,
+      resetDateStr
     });
-  };
+  };;
 
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2666,27 +2736,226 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     </div>
   );
 
-  const renderStatsTab = () => (
-    <div style={{ marginTop: '24px' }}>
-      <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '24px' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b', marginBottom: '24px' }}>Akademie-Statistik</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
-          {[
-            { label: 'Schüler Gesamt', value: students.length, icon: Users, color: brandColor },
-            { label: 'Aktive Übeplätze', value: stations.length, icon: Tablet, color: '#3b82f6' },
-            { label: 'Songs in Library', value: songs.length, icon: Music, color: '#10b981' },
-            { label: 'Team-Mitglieder', value: teachers.length, icon: Shield, color: '#8b5cf6' }
-          ].map((stat, idx) => (
-            <div key={idx} style={{ padding: '24px', background: `${stat.color}08`, borderRadius: '24px', border: `1px solid ${stat.color}15` }}>
-              <stat.icon size={24} color={stat.color} style={{ marginBottom: '12px' }} />
-              <div style={{ fontSize: '2rem', fontWeight: 900, color: stat.color }}>{stat.value}</div>
-              <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginTop: '4px' }}>{stat.label}</div>
+  const renderStatsTab = () => {
+    if (!stats) return (
+      <div style={{ textAlign: 'center', padding: '60px' }}>
+        <div style={{ fontSize: '1.2rem', color: '#64748b', fontWeight: 600 }}>Lade Statistiken...</div>
+      </div>
+    );
+
+    // Format minutes to hours/minutes
+    const formatMins = (mins: number) => {
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      if (h === 0) return `${m} Min.`;
+      return `${h} Std. ${m} Min.`;
+    };
+
+    // Formatted reset date
+    const resetFormatted = stats.resetDateStr 
+      ? new Date(stats.resetDateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      : null;
+
+    return (
+      <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+        {/* Top Header Card */}
+        <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: `${brandColor}15`, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <TrendingUp size={24} />
             </div>
-          ))}
+            <div>
+              <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Akademie-Statistiken</h2>
+              <p style={{ color: '#64748b', margin: 0, fontWeight: 600, fontSize: '0.9rem' }}>Echtzeit-Einblicke in die Übe-Aktivität und Repertoire-Erfolge deiner Schule.</p>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
+            {[
+              { label: 'Schüler Gesamt', value: stats.studentCount, icon: Users, color: '#10b981', bg: '#f0fdf4' },
+              { label: 'Songs in Library', value: stats.songCount, icon: Music, color: '#3b82f6', bg: '#eff6ff' },
+              { label: 'Team-Mitglieder', value: teachers.length, icon: Shield, color: '#8b5cf6', bg: '#f5f3ff' },
+              { 
+                label: 'Übe-Zeit (Lab)', 
+                value: formatMins(stats.labMins), 
+                icon: Clock, 
+                color: '#f59e0b', 
+                bg: '#fffbeb', 
+                subText: resetFormatted ? `Seit Reset: ${resetFormatted}` : 'Seit Installation' 
+              }
+            ].map((stat, idx) => (
+              <div key={idx} style={{ padding: '24px', background: stat.bg, borderRadius: '24px', border: `1px solid ${stat.color}15`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '130px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{stat.label}</span>
+                  <div style={{ padding: '8px', borderRadius: '10px', background: 'white', color: stat.color, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.02)' }}>
+                    <stat.icon size={18} />
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '1.75rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', marginTop: '12px' }}>{stat.value}</div>
+                  {stat.subText && (
+                    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#a1a1aa', marginTop: '4px' }}>{stat.subText}</div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Middle: Challenges & Wochentage Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '32px' }}>
+          
+          {/* Left: Challenges per Instrument */}
+          <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>🏆</span> Gemeisterte Challenges (Stage Ready)
+            </h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: 1, justifyContent: 'center' }}>
+              {[
+                { name: 'E-Gitarre', value: stats.stageReadyPerInst?.guitar || 0, icon: '🎸', color: '#ef4444' }, // Red
+                { name: 'E-Piano / Keys', value: stats.stageReadyPerInst?.keys || 0, icon: '🎹', color: '#a855f7' }, // Purple
+                { name: 'E-Drums', value: stats.stageReadyPerInst?.drums || 0, icon: '🥁', color: '#3b82f6' }, // Blue
+                { name: 'E-Bass', value: stats.stageReadyPerInst?.bass || 0, icon: '🎸', color: '#eab308' }, // Yellow
+                { name: 'Vocals / Gesang', value: stats.stageReadyPerInst?.vocals || 0, icon: '🎤', color: '#ec4899' } // Pink
+              ].map((inst, idx) => {
+                const maxVal = Math.max(...Object.values(stats.stageReadyPerInst || {}).map(Number), 1);
+                const percent = Math.round((inst.value / maxVal) * 100);
+                
+                return (
+                  <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem', fontWeight: 800, color: '#334155' }}>
+                        <span style={{ fontSize: '1.1rem' }}>{inst.icon}</span>
+                        <span>{inst.name}</span>
+                      </div>
+                      <span style={{ background: `${inst.color}15`, color: inst.color, padding: '2px 10px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 900 }}>
+                        {inst.value} Meister
+                      </span>
+                    </div>
+                    <div style={{ width: '100%', height: '10px', background: '#f1f5f9', borderRadius: '5px', overflow: 'hidden' }}>
+                      <div style={{ width: `${Math.max(3, percent)}%`, height: '100%', background: inst.color, borderRadius: '5px', transition: 'width 1s ease-out' }}></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Right: Weekday Attendance */}
+          <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>📅</span> Auslastung nach Wochentag
+            </h3>
+            
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '220px', padding: '0 10px 10px 10px', borderBottom: '1px solid #e2e8f0' }}>
+              {(stats.weekdayData || []).map((dayData: any, idx: number) => {
+                const maxMins = Math.max(...(stats.weekdayData || []).map((d: any) => d.mins), 1);
+                const heightPercent = Math.round((dayData.mins / maxMins) * 100);
+
+                return (
+                  <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', width: '40px' }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: brandColor }}>
+                      {dayData.mins}h
+                    </div>
+                    <div style={{ 
+                      width: '100%', 
+                      height: `${Math.max(6, heightPercent * 1.5)}px`, 
+                      maxHeight: '150px',
+                      background: `linear-gradient(180deg, ${brandColor} 0%, ${brandColor}60 100%)`, 
+                      borderRadius: '8px 8px 0 0',
+                      transition: 'all 0.5s ease'
+                    }}></div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>
+                      {dayData.day}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#94a3b8', textAlign: 'center', marginTop: '12px', fontWeight: 600 }}>
+              Übe-Stunden aufgeteilt nach Wochentagen.
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom: Leaderboard & Popular Songs */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
+          
+          {/* XP Leaderboard */}
+          <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>🔥</span> XP Leaderboard (Top 5 Schüler)
+            </h3>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {(stats.leaderboard || []).map((user: any, idx: number) => (
+                <div key={user.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 900, color: idx === 0 ? '#f59e0b' : idx === 1 ? '#94a3b8' : idx === 2 ? '#b45309' : '#64748b', width: '20px' }}>
+                      #{idx + 1}
+                    </div>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '12px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 8px rgba(0,0,0,0.05)' }}>
+                      <img src={user.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                    </div>
+                    <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.9rem' }}>
+                      {user.first_name} {user.last_name}
+                    </div>
+                  </div>
+                  <div style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 950, display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 4px 10px rgba(245, 158, 11, 0.2)' }}>
+                    <Star size={12} fill="white" /> {user.xp} XP
+                  </div>
+                </div>
+              ))}
+              {(stats.leaderboard || []).length === 0 && (
+                <div style={{ textAlign: 'center', padding: '24px', color: '#94a3b8', fontWeight: 600, fontSize: '0.85rem' }}>
+                  Noch keine XP gesammelt.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Popular Songs */}
+          <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>🎵</span> Beliebteste Songs (Repertoire-Hits)
+            </h3>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {(stats.topSongs || []).map((song: any, idx: number) => {
+                const parts = song.name.split(' - ');
+                const title = parts[0];
+                const artist = parts[1] || 'Unbekannt';
+
+                return (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                      <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: `${brandColor}10`, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '1rem' }}>
+                        {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.9rem' }}>{title}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>{artist}</div>
+                      </div>
+                    </div>
+                    <div style={{ background: '#eff6ff', color: '#2563eb', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 850, border: '1px solid #dbeafe' }}>
+                      🔥 {song.count} Schüler üben
+                    </div>
+                  </div>
+                );
+              })}
+              {(stats.topSongs || []).length === 0 && (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontWeight: 600, fontSize: '0.85rem' }}>
+                  Noch keine Songs im Schüler-Repertoire.
+                </div>
+              )}
+            </div>
+          </div>
+
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderIDGalleryTab = () => (
     <div style={{ marginTop: '24px' }}>
@@ -3998,6 +4267,33 @@ function AcademySetup({
             onMouseLeave={e => e.currentTarget.style.background = 'white'}
           >
             Wochenplan komplett leeren
+          </button>
+          <button 
+            onClick={async () => {
+              if (window.confirm("Möchtest du die Übe-Statistik (eingeloggte Minuten) wirklich für alle Schüler zurücksetzen?")) {
+                setIsSaving(true);
+                const updatedHours = {
+                  ...hours,
+                  stats_reset_at: new Date().toISOString()
+                };
+                const { error } = await supabase
+                  .from('schools')
+                  .update({ opening_hours: updatedHours })
+                  .eq('id', school.id);
+                setIsSaving(false);
+                if (error) alert("Fehler: " + error.message);
+                else {
+                  setHours(updatedHours);
+                  alert("Statistiken erfolgreich zurückgesetzt!");
+                  onUpdate();
+                }
+              }
+            }}
+            style={{ marginLeft: '12px', background: 'white', border: '1px solid #fee2e2', color: '#ef4444', padding: '10px 20px', borderRadius: '12px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s' }}
+            onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
+            onMouseLeave={e => e.currentTarget.style.background = 'white'}
+          >
+            Übe-Statistiken zurücksetzen
           </button>
         </div>
       </div>

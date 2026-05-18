@@ -297,6 +297,7 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
   const [activeDifficulty, setActiveDifficulty] = useState('starter'); // 'starter' | 'original'
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [isChallengeHovered, setIsChallengeHovered] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   
   const currentLevelSkills = songGroup.skills.filter((s: any) => s.difficulty_level === activeDifficulty);
@@ -471,11 +472,22 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
     }
   }, [activeDifficulty, displaySkills]);
 
-  const activeSkill = displaySkills.find((s: any) => s?.id === activeSlotId) || displaySkills[0] || { progress: 0 };
+  const activeSkill = displaySkills.find((s: any) => s?.id === activeSlotId) || (() => {
+    if (activeSlotId && activeSlotId.startsWith('mock::')) {
+      const parts = activeSlotId.split('::');
+      const inst = parts[2];
+      const partNum = parseInt(parts[3]) || 1;
+      return displaySkills.find((s: any) => s.instrument === inst && (s.part_number || 1) === partNum);
+    }
+    return null;
+  })() || displaySkills[0] || { progress: 0 };
+
   const [localProgress, setLocalProgress] = useState(activeSkill.progress);
   useEffect(() => {
-    setLocalProgress(activeSkill.progress);
-  }, [activeSkill.id, activeSkill.progress]);
+    if (!isDragging) {
+      setLocalProgress(activeSkill.progress);
+    }
+  }, [activeSkill.id, activeSkill.progress, isDragging]);
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '32px', marginBottom: '16px', position: 'relative' }}>
@@ -594,7 +606,7 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
                     fontWeight: 900, 
                     color: (s.id === activeSlotId || s.progress > 0) ? (APP_INSTRUMENT_COLORS[s.instrument] || brandColor) : '#94a3b8' 
                   }}>
-                    {s.progress}%
+                    {s.id === activeSlotId ? localProgress : s.progress}%
                   </span>
                 </div>
               ))}
@@ -750,28 +762,33 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
                       type="range" 
                       min="0" max="90" step="5"
                       value={localProgress} 
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onMouseDown={(e) => e.stopPropagation()}
+                      onPointerDown={(e) => { e.stopPropagation(); setIsDragging(true); }}
                       onClick={(e) => e.stopPropagation()}
                       onChange={(e) => {
                         const val = parseInt(e.target.value);
                         setLocalProgress(val);
                       }}
-                      onPointerUp={() => {
-                        onUpdateProgress(activeSkill.id, localProgress, activeSkill.isMock ? { 
+                      onPointerUp={(e) => {
+                        setIsDragging(false);
+                        const finalVal = parseInt(e.currentTarget.value);
+                        setLocalProgress(finalVal);
+                        onUpdateProgress(activeSkill.id, finalVal, { 
                           songId: activeSkill.song_id, 
                           instrument: activeSkill.instrument, 
                           difficulty: activeSkill.difficulty_level,
-                          partNumber: activeSkill.part_number
-                        } : undefined);
+                          partNumber: activeSkill.part_number || 1
+                        });
                       }}
-                      onMouseUp={() => {
-                        onUpdateProgress(activeSkill.id, localProgress, activeSkill.isMock ? { 
+                      onPointerCancel={(e) => {
+                        setIsDragging(false);
+                        const finalVal = parseInt(e.currentTarget.value);
+                        setLocalProgress(finalVal);
+                        onUpdateProgress(activeSkill.id, finalVal, { 
                           songId: activeSkill.song_id, 
                           instrument: activeSkill.instrument, 
                           difficulty: activeSkill.difficulty_level,
-                          partNumber: activeSkill.part_number
-                        } : undefined);
+                          partNumber: activeSkill.part_number || 1
+                        });
                       }}
                       style={{ 
                         width: '100%', 
@@ -1115,6 +1132,7 @@ function App() {
 
   const ignoredFoundingIds = useRef<string[]>([]);
   const gatewayJustClosed = useRef<boolean>(false);
+  const lastWriteTimeRef = useRef<number>(0);
   
   // Removed redundant FAILSAFE effect to prevent loop conflicts.
   // The detection logic is now centralized in fetchDashboardData for better control.
@@ -1751,20 +1769,63 @@ function App() {
         return songs;
       });
 
-      // De-duplicate combined list by (song_id, instrument) to ensure bulletproof UI counts
+      // De-duplicate combined list by (song_id, instrument, part_number, difficulty_level) to ensure bulletproof UI counts
       const combinedSongs = [...instrumentalSongs, ...vocalSongs];
       const uniqueCombined: any[] = [];
       const seenCombinedKeys = new Set<string>();
 
       combinedSongs.forEach((song: any) => {
-        const key = `${song.song_id}_${(song.instrument || '').toLowerCase()}`;
+        const key = `${song.song_id}_${(song.instrument || '').toLowerCase()}_${song.part_number || 1}_${song.difficulty_level || 'starter'}`;
         if (!seenCombinedKeys.has(key)) {
           seenCombinedKeys.add(key);
           uniqueCombined.push(song);
         }
       });
 
-      setUserSongs(uniqueCombined);
+      setUserSongs(prev => {
+        const timeSinceLastWrite = Date.now() - lastWriteTimeRef.current;
+        const isRecentlyWritten = timeSinceLastWrite < 15000;
+        
+        // Map existing ones and keep their local progress to prevent visual jumps
+        const merged = prev.map(localSong => {
+          const remoteSong = uniqueCombined.find(r => 
+            r.song_id === localSong.song_id && 
+            (r.instrument || '').toLowerCase() === (localSong.instrument || '').toLowerCase() &&
+            (r.part_number || 1) === (localSong.part_number || 1) &&
+            (r.difficulty_level || 'starter') === (localSong.difficulty_level || 'starter')
+          );
+          if (remoteSong) {
+            const isStageReadyChanged = remoteSong.is_stage_ready !== localSong.is_stage_ready;
+            const isApprovalChanged = remoteSong.is_pending_approval !== localSong.is_pending_approval;
+            
+            // We only adopt the remote progress if:
+            // 1. We did not write recently (meaning the DB is settled and holds the truth)
+            // 2. OR the remote progress is higher (e.g. updated from teacher or another device)
+            // 3. OR the stage-ready status or approval status changed
+            if (!isRecentlyWritten || remoteSong.progress > localSong.progress || isStageReadyChanged || isApprovalChanged) {
+              return remoteSong;
+            }
+            // Protect local optimistic progress from being overwritten by stale remote poll
+            return { ...remoteSong, progress: localSong.progress };
+          }
+          return localSong;
+        });
+
+        // Add any new remote songs that are not in the local prev array
+        uniqueCombined.forEach(r => {
+          const exists = prev.some(l => 
+            l.song_id === r.song_id && 
+            (l.instrument || '').toLowerCase() === (r.instrument || '').toLowerCase() &&
+            (l.part_number || 1) === (r.part_number || 1) &&
+            (l.difficulty_level || 'starter') === (r.difficulty_level || 'starter')
+          );
+          if (!exists) {
+            merged.push(r);
+          }
+        });
+
+        return merged;
+      });
 
       const schoolId = userData.school_id || (Array.isArray(userData.schools) ? userData.schools[0]?.id : userData.schools?.id);
       console.log(`[Dashboard] Using schoolId: ${schoolId} for user ${userId}`);
@@ -2528,44 +2589,108 @@ function App() {
   };
 
   const updateProgress = async (skillId: string, newProgress: number, meta?: { songId: string, instrument: string, difficulty: string, partNumber?: number }) => {
-    // If it is a simulated row that does not exist yet, insert it to DB
-    if (skillId.startsWith('mock-') && meta && user) {
-      const { error } = await supabase
-        .from('user_song_skills')
-        .insert({
-          user_id: user.id,
-          song_id: meta.songId,
-          instrument: meta.instrument,
-          difficulty_level: meta.difficulty,
-          part_number: meta.partNumber || 1,
-          progress_percent: newProgress,
-          is_stage_ready: false
-        });
-        
-      if (!error) {
-        fetchDashboardData(user.id); // Reload to get real skill ID
-      }
+    lastWriteTimeRef.current = Date.now();
+
+    // 1. Resolve slot metadata with absolute certainty
+    let songId = '';
+    let instrument = '';
+    let difficulty = 'starter';
+    let partNumber = 1;
+
+    if (meta) {
+      songId = meta.songId;
+      instrument = meta.instrument;
+      difficulty = meta.difficulty;
+      partNumber = meta.partNumber || 1;
+    }
+
+    if (!songId || !instrument || !user) {
+      console.warn('[Dashboard] Cannot update progress: Missing songId, instrument or user context.', { skillId, meta });
       return;
     }
 
-    // Normal update for existing rows
-    setUserSongs(userSongs.map((song: any) => {
-      if (song.id === skillId) {
-        const clampedProgress = song.locked ? Math.min(newProgress, 90) : newProgress;
-        return { ...song, progress: clampedProgress };
-      }
-      return song;
-    }));
+    const songInfo = (globalSongs || []).find((s: any) => s.id === songId) || {};
 
-    const song = userSongs.find((s: any) => s.id === skillId);
-    const clampedProgress = song?.locked ? Math.min(newProgress, 90) : newProgress;
-    
-    await supabase
-      .from('user_song_skills')
-      .update({ 
-        progress_percent: clampedProgress
-      })
-      .eq('id', skillId);
+    // 2. Perform concurrent-safe, optimistic UI update inside functional state updater
+    setUserSongs(prev => {
+      // Find slot in local state by matching natural keys, avoiding UUID mismatches
+      const existing = prev.find(s => 
+        s.song_id === songId && 
+        (s.instrument || '').toLowerCase() === instrument.toLowerCase() && 
+        (s.part_number || 1) === partNumber &&
+        s.difficulty_level === difficulty
+      );
+
+      const isLocked = existing ? !!existing.locked : true;
+      const clamped = isLocked ? Math.min(newProgress, 90) : newProgress;
+
+      // Construct the updated/optimistic skill state
+      const updatedSkill = existing ? {
+        ...existing,
+        progress: clamped
+      } : {
+        id: skillId,
+        user_id: user.id,
+        song_id: songId,
+        instrument: instrument,
+        difficulty_level: difficulty,
+        part_number: partNumber,
+        progress: clamped,
+        is_stage_ready: false,
+        is_pending_approval: false,
+        title: songInfo.title || 'Unbenannter Song',
+        artist: songInfo.artist || 'Unbekannter Künstler',
+        media_link: songInfo.media_link,
+        tomplay_url: songInfo.tomplay_url,
+        instrumentation: songInfo.instrumentation
+      };
+
+      // 3. Trigger unified, bulletproof DB UPSERT in the background
+      supabase
+        .from('user_song_skills')
+        .upsert({
+          user_id: user.id,
+          song_id: songId,
+          instrument: instrument,
+          difficulty_level: difficulty,
+          part_number: partNumber,
+          progress_percent: clamped,
+          is_stage_ready: existing ? !!existing.is_stage_ready : false
+        }, {
+          onConflict: 'user_id,song_id,instrument,difficulty_level,part_number'
+        })
+        .select()
+        .then(({ data, error }) => {
+          if (!error && data && data.length > 0) {
+            const realSkill = {
+              ...data[0],
+              progress: data[0].is_stage_ready ? 100 : Math.min(90, data[0].progress_percent || 0),
+              title: songInfo.title || 'Unbenannter Song',
+              artist: songInfo.artist || 'Unbekannter Künstler',
+              media_link: songInfo.media_link,
+              tomplay_url: songInfo.tomplay_url,
+              instrumentation: songInfo.instrumentation
+            };
+            
+            // Atomically replace local state with database row by matching natural keys
+            setUserSongs(current => current.map(s => 
+              (s.song_id === songId && 
+               (s.instrument || '').toLowerCase() === instrument.toLowerCase() && 
+               (s.part_number || 1) === partNumber &&
+               s.difficulty_level === difficulty) ? realSkill : s
+            ));
+          } else if (error) {
+            console.error('[Dashboard] Error saving skill progress:', error);
+          }
+        });
+
+      // Update state locally
+      if (existing) {
+        return prev.map(s => s.id === existing.id ? updatedSkill : s);
+      } else {
+        return [...prev, updatedSkill];
+      }
+    });
   };
 
 
@@ -5473,7 +5598,7 @@ function App() {
 
 
         {/* Team Tab */}
-        {activeStudentTab === 'team' && (
+        {user.role?.toLowerCase() === 'student' && activeStudentTab === 'team' && (
           <ErrorBoundary>
             <div className="tab-content animation-slide-up" style={{ padding: '20px 0' }}>
               <div className="stats-panel-premium" style={{ background: 'transparent', boxShadow: 'none', padding: 0 }}>

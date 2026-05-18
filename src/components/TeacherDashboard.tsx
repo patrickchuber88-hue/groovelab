@@ -1325,6 +1325,68 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
           </div>
 
           <aside style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* Help Requests Section */}
+            {helpRequests.length > 0 && (
+              <div className="glass-panel" style={{ 
+                background: '#fff1f2', 
+                padding: '24px', 
+                borderRadius: '32px',
+                border: '1px solid #fecdd3',
+                boxShadow: '0 10px 30px rgba(225, 29, 72, 0.05)',
+                animation: 'pulse-red 2s infinite'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                  <div style={{ background: '#e11d48', color: 'white', padding: '6px', borderRadius: '10px', boxShadow: '0 4px 12px rgba(225, 29, 72, 0.2)' }}>
+                    <AlertCircle size={18} />
+                  </div>
+                  <h3 style={{ 
+                    fontSize: '0.8rem', 
+                    fontWeight: 950, 
+                    color: '#9f1239', 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.1em', 
+                    margin: 0 
+                  }}>
+                    Hilfe benötigt!
+                  </h3>
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {helpRequests.map(req => {
+                    const reqUser = Array.isArray(req.users) ? req.users[0] : req.users;
+                    return (
+                      <div key={req.id} style={{ 
+                        background: 'white', 
+                        padding: '16px', 
+                        borderRadius: '24px', 
+                        border: '1px solid #fecdd3',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px'
+                      }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '12px', overflow: 'hidden', border: '2px solid #fff1f2' }}>
+                          <AvatarImage src={reqUser?.photo_url} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 900, fontSize: '0.85rem', color: '#1e293b' }}>{reqUser?.first_name}</div>
+                          <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#e11d48' }}>Station {(stations.find(s => s.id === req.station_id)?.name || '').replace('iPad ', '')}</div>
+                        </div>
+                        <button 
+                          onClick={() => handleResolveHelp(req.id)}
+                          style={{ 
+                            background: '#f1f5f9', color: '#64748b', border: 'none', width: '32px', height: '32px', borderRadius: '10px', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                          }}
+                        >
+                          <Check size={18} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Bandprobe Vorschläge Widget */}
             <div className="card" style={{ 
               padding: '24px', 
@@ -1587,7 +1649,131 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
                     </div>
                   </div>
                 )}
-            </div>
+              </div>
+
+
+
+            {/* Band News */}
+            {unreadShouts.length > 0 && (
+              <div className="glass-panel" style={{ 
+                background: '#f1f5f9', // Clean app-surface background
+                padding: '24px', 
+                borderRadius: '32px',
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.03)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                    <div style={{ background: '#3b82f6', color: 'white', padding: '6px', borderRadius: '10px', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)', flexShrink: 0 }}>
+                      <Bell size={18} />
+                    </div>
+                    <h3 style={{ 
+                      fontSize: '0.8rem', 
+                      fontWeight: 950, 
+                      color: '#1e293b', 
+                      textTransform: 'uppercase', 
+                      letterSpacing: '0.1em', 
+                      margin: 0,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      Band News
+                    </h3>
+                  </div>
+                  {unreadShouts.length > 0 && (
+                    <button 
+                      onClick={handleMarkAllAsRead}
+                      style={{ 
+                        background: 'white', color: '#64748b', border: '1px solid #e2e8f0', padding: '6px 14px', borderRadius: '12px', 
+                        fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer', textTransform: 'uppercase',
+                        boxShadow: '0 2px 5px rgba(0,0,0,0.02)', transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                    >
+                      Alle lesen
+                    </button>
+                  )}
+                </div>
+                {unreadShouts.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {unreadShouts.slice(0, 5).map(shout => (
+                      <div key={shout.id} className="animation-slide-up" style={{ 
+                        background: 'white', 
+                        padding: '20px', 
+                        borderRadius: '24px', 
+                        border: '1px solid #e2e8f0',
+                        boxShadow: '0 4px 15px rgba(0,0,0,0.02)',
+                        position: 'relative',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ width: '40px', height: '40px', borderRadius: '50%', overflow: 'hidden', border: '2px solid #f1f5f9', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
+                            <img src={shout.users?.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ 
+                              fontWeight: 950, 
+                              fontSize: '0.9rem', 
+                              color: '#1e293b', 
+                              lineHeight: 1.1,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
+                            }}>
+                              {shout.users?.first_name}
+                            </div>
+                            <div style={{ 
+                              fontSize: '0.6rem', 
+                              fontWeight: 800, 
+                              color: '#3b82f6', 
+                              textTransform: 'uppercase', 
+                              marginTop: '2px', 
+                              overflow: 'hidden', 
+                              textOverflow: 'ellipsis', 
+                              whiteSpace: 'nowrap' 
+                            }}>
+                              {shout.bands?.name}
+                            </div>
+                          </div>
+                          <button 
+                            onClick={() => handleMarkAsRead(shout.id)}
+                            style={{ 
+                              background: '#f0f9ff', color: '#3b82f6', border: 'none', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                            }}
+                            title="Gelesen"
+                          >
+                            <Check size={18} />
+                          </button>
+                        </div>
+                        
+                        <div style={{ 
+                          fontSize: '0.9rem', 
+                          color: '#334155', 
+                          fontWeight: 500, 
+                          lineHeight: 1.5,
+                          background: '#f8fafc',
+                          padding: '12px 16px',
+                          borderRadius: '16px',
+                          border: '1px solid #f1f5f9',
+                          position: 'relative'
+                        }}>
+                          {shout.content}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '32px 20px', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 700 }}>
+                     Keine neuen Nachrichten
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Challenge Pipeline Section (Only for Admins) */}
             {viewMode === 'admin' && (
@@ -1754,190 +1940,6 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
                     <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, lineHeight: 1.4 }}>Keine offenen Challenges. Alles unter Kontrolle!</div>
                   </div>
                 )}
-              </div>
-            )}
-
-            {/* Band News */}
-            {unreadShouts.length > 0 && (
-              <div className="glass-panel" style={{ 
-                background: '#f1f5f9', // Clean app-surface background
-                padding: '24px', 
-                borderRadius: '32px',
-                border: '1px solid #e2e8f0',
-                boxShadow: '0 10px 30px rgba(0,0,0,0.03)'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                    <div style={{ background: '#3b82f6', color: 'white', padding: '6px', borderRadius: '10px', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)', flexShrink: 0 }}>
-                      <Bell size={18} />
-                    </div>
-                    <h3 style={{ 
-                      fontSize: '0.8rem', 
-                      fontWeight: 950, 
-                      color: '#1e293b', 
-                      textTransform: 'uppercase', 
-                      letterSpacing: '0.1em', 
-                      margin: 0,
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis'
-                    }}>
-                      Band News
-                    </h3>
-                  </div>
-                  {unreadShouts.length > 0 && (
-                    <button 
-                      onClick={handleMarkAllAsRead}
-                      style={{ 
-                        background: 'white', color: '#64748b', border: '1px solid #e2e8f0', padding: '6px 14px', borderRadius: '12px', 
-                        fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer', textTransform: 'uppercase',
-                        boxShadow: '0 2px 5px rgba(0,0,0,0.02)', transition: 'all 0.2s'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
-                    >
-                      Alle lesen
-                    </button>
-                  )}
-                </div>
-                {unreadShouts.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {unreadShouts.slice(0, 5).map(shout => (
-                      <div key={shout.id} className="animation-slide-up" style={{ 
-                        background: 'white', 
-                        padding: '20px', 
-                        borderRadius: '24px', 
-                        border: '1px solid #e2e8f0',
-                        boxShadow: '0 4px 15px rgba(0,0,0,0.02)',
-                        position: 'relative',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '12px'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ width: '40px', height: '40px', borderRadius: '50%', overflow: 'hidden', border: '2px solid #f1f5f9', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
-                            <img src={shout.users?.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ 
-                              fontWeight: 950, 
-                              fontSize: '0.9rem', 
-                              color: '#1e293b', 
-                              lineHeight: 1.1,
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis'
-                            }}>
-                              {shout.users?.first_name}
-                            </div>
-                            <div style={{ 
-                              fontSize: '0.6rem', 
-                              fontWeight: 800, 
-                              color: '#3b82f6', 
-                              textTransform: 'uppercase', 
-                              marginTop: '2px', 
-                              overflow: 'hidden', 
-                              textOverflow: 'ellipsis', 
-                              whiteSpace: 'nowrap' 
-                            }}>
-                              {shout.bands?.name}
-                            </div>
-                          </div>
-                          <button 
-                            onClick={() => handleMarkAsRead(shout.id)}
-                            style={{ 
-                              background: '#f0f9ff', color: '#3b82f6', border: 'none', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                            }}
-                            title="Gelesen"
-                          >
-                            <Check size={18} />
-                          </button>
-                        </div>
-                        
-                        <div style={{ 
-                          fontSize: '0.9rem', 
-                          color: '#334155', 
-                          fontWeight: 500, 
-                          lineHeight: 1.5,
-                          background: '#f8fafc',
-                          padding: '12px 16px',
-                          borderRadius: '16px',
-                          border: '1px solid #f1f5f9',
-                          position: 'relative'
-                        }}>
-                          {shout.content}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{ textAlign: 'center', padding: '32px 20px', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 700 }}>
-                     Keine neuen Nachrichten
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Help Requests Section */}
-            {helpRequests.length > 0 && (
-              <div className="glass-panel" style={{ 
-                background: '#fff1f2', 
-                padding: '24px', 
-                borderRadius: '32px',
-                border: '1px solid #fecdd3',
-                boxShadow: '0 10px 30px rgba(225, 29, 72, 0.05)',
-                animation: 'pulse-red 2s infinite'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                  <div style={{ background: '#e11d48', color: 'white', padding: '6px', borderRadius: '10px', boxShadow: '0 4px 12px rgba(225, 29, 72, 0.2)' }}>
-                    <AlertCircle size={18} />
-                  </div>
-                  <h3 style={{ 
-                    fontSize: '0.8rem', 
-                    fontWeight: 950, 
-                    color: '#9f1239', 
-                    textTransform: 'uppercase', 
-                    letterSpacing: '0.1em', 
-                    margin: 0 
-                  }}>
-                    Hilfe benötigt!
-                  </h3>
-                </div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {helpRequests.map(req => {
-                    const reqUser = Array.isArray(req.users) ? req.users[0] : req.users;
-                    return (
-                      <div key={req.id} style={{ 
-                        background: 'white', 
-                        padding: '16px', 
-                        borderRadius: '24px', 
-                        border: '1px solid #fecdd3',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px'
-                      }}>
-                        <div style={{ width: '40px', height: '40px', borderRadius: '12px', overflow: 'hidden', border: '2px solid #fff1f2' }}>
-                          <AvatarImage src={reqUser?.photo_url} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 900, fontSize: '0.85rem', color: '#1e293b' }}>{reqUser?.first_name}</div>
-                          <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#e11d48' }}>Station {(stations.find(s => s.id === req.station_id)?.name || '').replace('iPad ', '')}</div>
-                        </div>
-                        <button 
-                          onClick={() => handleResolveHelp(req.id)}
-                          style={{ 
-                            background: '#f1f5f9', color: '#64748b', border: 'none', width: '32px', height: '32px', borderRadius: '10px', cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center'
-                          }}
-                        >
-                          <Check size={18} />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
               </div>
             )}
 

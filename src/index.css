@@ -248,6 +248,7 @@ body {
 /* Custom Touch-Optimized Range Slider for iPad */
 .custom-range-slider {
   -webkit-appearance: none;
+  appearance: none;
   width: 100%;
   height: 40px;
   background: transparent;
