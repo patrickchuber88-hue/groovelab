@@ -1204,6 +1204,7 @@ function App() {
        localStorage.setItem(`groovelab_founding_ignored_${user.id}_${suggestingSkill.songs.id}`, 'true');
     }
 
+    console.log('[DEBUG-Groovelab] setSuggestingSkill(null) in dismissSuggestion');
     setSuggestingSkill(null);
     setSelectedCoachId('');
   };
@@ -1228,6 +1229,7 @@ function App() {
         
         if (!alreadyInBand) {
           console.log('[AutoTrigger] Suggesting skill to band:', skill.title);
+          console.log('[DEBUG-Groovelab] setSuggestingSkill (suggest to band) in auto-trigger', skill.title);
           setSuggestingSkill({
             ...skill,
             songs: { id: skill.song_id, title: skill.title }
@@ -1284,6 +1286,7 @@ function App() {
             }
 
             // Open naming modal
+            console.log('[DEBUG-Groovelab] setSuggestingSkill (band founding) in auto-trigger complete matching:', song.title);
             setSuggestingSkill({
               ...mySlot,
               isLeader,
@@ -1318,6 +1321,7 @@ function App() {
         );
         if (alreadyInBand) {
           console.log('[AutoTrigger] Automatically dismissing congratulations modal since song is already in band repertoire:', targetSongId);
+          console.log('[DEBUG-Groovelab] setSuggestingSkill(null) inside safety check effect!');
           setSuggestingSkill(null);
         }
       }
@@ -1950,7 +1954,7 @@ function App() {
                     // Check if they are already in the band_members table for this band with the correct instrument
                     const isAlreadyMember = (band.band_members || []).some((m: any) => m.user_id === candidate.user_id && normalizeInstrument(m.instrument) === normalizeInstrument(inst));
                     if (!isAlreadyMember) {
-                      await supabase.from('band_members').insert({ band_id: band.id, user_id: candidate.user_id, instrument: inst, role: 'member' });
+                      await supabase.from('band_members').insert({ band_id: band.id, user_id: candidate.user_id, instrument: inst });
                     }
                     await supabase.from('band_song_slots').insert({ band_song_id: bandSong.id, user_id: candidate.user_id, instrument: inst, status: 'joined' });
                     currentMemberships.push({ user_id: candidate.user_id, bands: { id: band.id, song_id: band.song_id } } as any);
@@ -2729,6 +2733,7 @@ function App() {
         if (existingGroupBand) {
           console.log('[Founding] Band already exists for this group. Opening existing gateway.');
           setPendingFounding(null);
+          console.log('[DEBUG-Groovelab] setSuggestingSkill(null) in handleFoundBand (existing group)');
           setSuggestingSkill(null);
           setSelectedCoachId('');
           
@@ -2855,7 +2860,6 @@ function App() {
         band_id: newBand.id,
         user_id: m.user_id,
         instrument: m.instrument,
-        role: m.user_id === user.id ? 'leader' : 'member',
         confetti_seen: m.user_id === user.id ? true : false
       }));
 
@@ -2864,7 +2868,8 @@ function App() {
         user_id: m.user_id,
         instrument: m.instrument,
         part_number: m.part_number || 1,
-        status: m.user_id === user.id ? 'accepted' : 'joined'
+        status: m.user_id === user.id ? 'accepted' : 'joined',
+        is_founder: m.user_id === user.id
       }));
 
       // Bulk Insert Members
@@ -2905,6 +2910,7 @@ function App() {
       setShowFoundingModal(false);
       setPendingFounding(null);
       setFoundingName('');
+      console.log('[DEBUG-Groovelab] setSuggestingSkill(null) at the end of handleFoundBand');
       setSuggestingSkill(null); // Close the congrats modal immediately
       setSelectedCoachId(''); // Clear selected coach!
       
@@ -3956,6 +3962,7 @@ function App() {
                 viewMode="student" 
                 onTabChange={setActiveStudentTab}
                 onFoundBand={(form, mySlot) => {
+                  console.log('[DEBUG-Groovelab] setSuggestingSkill (manual click) in TeacherDashboard onFoundBand');
                   setSuggestingSkill({
                     ...mySlot,
                     isLeader: true,
@@ -5051,6 +5058,7 @@ function App() {
                                   <button 
                                     onClick={() => {
                                       // Open naming modal
+                                      console.log('[DEBUG-Groovelab] setSuggestingSkill (Matching Board click) in App.tsx');
                                       setSuggestingSkill({
                                         ...mySlot,
                                         isLeader,
@@ -6077,6 +6085,7 @@ function App() {
                             }
                           }
                         }
+                        console.log('[DEBUG-Groovelab] setSuggestingSkill(null) in handleSuggestToBand');
                         setSuggestingSkill(null);
                         
                         // 2. Resolve skill record ID with database fallback
