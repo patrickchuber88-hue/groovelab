@@ -1161,6 +1161,7 @@ function App() {
   const [pendingFounding, setPendingFounding] = useState<any | null>(null);
   const [showFoundingModal, setShowFoundingModal] = useState(false);
   const [foundingName, setFoundingName] = useState('');
+  const [selectedCoachId, setSelectedCoachId] = useState<string>('');
   const [lastAutoTriggeredFormId, setLastAutoTriggeredFormId] = useState<string | null>(sessionStorage.getItem('groovelab_last_form_id'));
   
   const updateAutoTriggerId = (id: string | null) => {
@@ -1204,6 +1205,7 @@ function App() {
     }
 
     setSuggestingSkill(null);
+    setSelectedCoachId('');
   };
 
   // Auto-trigger Band Founding Modal when formation is complete
@@ -2722,7 +2724,7 @@ function App() {
       
       // 1. Determine members and coach BEFORE creating the band record
       let formationMembers: any[] = [];
-      let calculatedCoachId = null;
+      let calculatedCoachId = selectedCoachId || null;
 
       // Idempotency check: Does a band for this formation group already exist?
       if (groupID) {
@@ -2736,6 +2738,7 @@ function App() {
           console.log('[Founding] Band already exists for this group. Opening existing gateway.');
           setPendingFounding(null);
           setSuggestingSkill(null);
+          setSelectedCoachId('');
           
           // Fetch full details of the existing band to show the gateway
           const { data: fullBand } = await supabase
@@ -2761,7 +2764,7 @@ function App() {
           .eq('formation_group', groupID);
           
         if (groupData && groupData.length > 0) {
-          // Identify the true leader (first one who mastered it)
+          // Identify the true leader (first one who completed it)
           const sorted = [...groupData].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
           const actualLeaderId = sorted[0].user_id;
 
@@ -2770,6 +2773,7 @@ function App() {
             console.warn('[Founding] Non-leader tried to found band. Cancelling.');
             setPendingFounding(null);
             setSuggestingSkill(null);
+            setSelectedCoachId('');
             return;
           }
 
@@ -2781,12 +2785,14 @@ function App() {
             verified_by_id: d.verified_by_id
           }));
 
-          const coachCounts: Record<string, number> = {};
-          formationMembers.forEach(m => {
-            if (m.verified_by_id) coachCounts[m.verified_by_id] = (coachCounts[m.verified_by_id] || 0) + 1;
-          });
-          const sortedCoaches = Object.entries(coachCounts).sort((a, b) => b[1] - a[1]);
-          if (sortedCoaches.length > 0) calculatedCoachId = sortedCoaches[0][0];
+          if (!calculatedCoachId) {
+            const coachCounts: Record<string, number> = {};
+            formationMembers.forEach(m => {
+              if (m.verified_by_id) coachCounts[m.verified_by_id] = (coachCounts[m.verified_by_id] || 0) + 1;
+            });
+            const sortedCoaches = Object.entries(coachCounts).sort((a, b) => b[1] - a[1]);
+            if (sortedCoaches.length > 0) calculatedCoachId = sortedCoaches[0][0];
+          }
         }
       }
 
@@ -2889,6 +2895,7 @@ function App() {
       setPendingFounding(null);
       setFoundingName('');
       setSuggestingSkill(null); // Close the congrats modal immediately
+      setSelectedCoachId(''); // Clear selected coach!
       
       // 2. Open the gateway celebration UI IMMEDIATELY for the founder
       // We do this before the background sync to ensure the user sees the "WOW" effect instantly
@@ -5723,9 +5730,184 @@ function App() {
           <AlertCircle size={28} />
         </button>
       </div>
+      {/* Skill Suggestion & Band Founding Modals */}
+      {suggestingSkill && suggestingSkill.formation_group && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 6000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', background: 'rgba(2, 6, 23, 0.95)', backdropFilter: 'blur(16px)' }}>
+          <div className="animation-pop-in" style={{ 
+            background: 'white', 
+            padding: '50px', 
+            borderRadius: '40px', 
+            maxWidth: '550px', 
+            width: '100%', 
+            textAlign: 'center',
+            boxShadow: '0 40px 120px rgba(0,0,0,0.6)'
+          }}>
+            <div style={{ width: '100px', height: '100px', borderRadius: '35px', background: '#dcfce7', color: '#22c55e', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px auto', boxShadow: '0 10px 30px rgba(34, 197, 94, 0.2)' }}>
+              <Users size={50} />
+            </div>
+            
+            <h2 className="animation-glow-text" style={{ fontSize: '2.3rem', fontWeight: 1000, color: '#1e293b', marginBottom: '8px', letterSpacing: '-0.04em' }}>BAND GRÜNDEN 🎸</h2>
+            <p style={{ fontSize: '1.15rem', color: '#64748b', lineHeight: 1.5, marginBottom: '32px', fontWeight: 600 }}>
+              Eure Formation für <strong>{suggestingSkill.songs?.title || suggestingSkill.title}</strong> ist vollständig!
+            </p>
 
-      {/* Skill Suggestion Modal */}
-      {suggestingSkill && (
+            {suggestingSkill.isLeader ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', textAlign: 'left' }}>
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  
+                  {/* Band Name Section */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Wie soll eure Band heißen?
+                    </label>
+                    <div style={{ width: '100%', position: 'relative' }}>
+                      <input 
+                        type="text"
+                        value={foundingName}
+                        onChange={(e) => setFoundingName(e.target.value)}
+                        placeholder="Z.B. Die wilden Töne"
+                        style={{ 
+                          width: '100%', 
+                          padding: '16px 50px 16px 16px', 
+                          background: 'white', 
+                          border: '1px solid #cbd5e1', 
+                          borderRadius: '16px', 
+                          color: '#1e293b', 
+                          fontSize: '1rem', 
+                          fontWeight: 700,
+                          outline: 'none',
+                          transition: 'all 0.2s'
+                        }}
+                        onFocus={e => e.currentTarget.style.borderColor = brandColor}
+                        onBlur={e => e.currentTarget.style.borderColor = '#cbd5e1'}
+                      />
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setFoundingName(generateRandomBandName()); }}
+                        style={{ 
+                          position: 'absolute', 
+                          right: '8px', 
+                          top: '50%', 
+                          transform: 'translateY(-50%)', 
+                          background: '#f8fafc', 
+                          border: '1px solid #cbd5e1', 
+                          color: brandColor, 
+                          width: '36px', 
+                          height: '36px', 
+                          borderRadius: '10px', 
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        title="Neuen Namen würfeln"
+                      >
+                        <RotateCcw size={16} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Coach Selection Section */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Wähle euren Bandcoach (Lehrer): *
+                    </label>
+                    <select 
+                      value={selectedCoachId} 
+                      onChange={(e) => setSelectedCoachId(e.target.value)} 
+                      required
+                      style={{ 
+                        width: '100%', 
+                        padding: '16px', 
+                        background: 'white', 
+                        border: '1px solid #cbd5e1', 
+                        borderRadius: '16px', 
+                        color: '#1e293b', 
+                        fontSize: '1rem', 
+                        fontWeight: 700,
+                        outline: 'none',
+                        transition: 'all 0.2s'
+                      }}
+                      onFocus={e => e.currentTarget.style.borderColor = brandColor}
+                      onBlur={e => e.currentTarget.style.borderColor = '#cbd5e1'}
+                    >
+                      <option value="">-- Coach wählen * --</option>
+                      {teachers.length === 0 ? (
+                        <option value="" disabled>Keine Lehrer gefunden</option>
+                      ) : (
+                        teachers.map(t => (
+                          <option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>
+                        ))
+                      )}
+                    </select>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 0 0', lineHeight: 1.4 }}>
+                      💡 <em>Lehrer können den Bandcoach nachträglich jederzeit ändern.</em>
+                    </p>
+                  </div>
+
+                </div>
+
+                {/* Confirm Button */}
+                <button 
+                  onClick={() => {
+                    if (!selectedCoachId) {
+                      alert('Bitte wähle euren Bandcoach aus, um die Band zu gründen!');
+                      return;
+                    }
+                    handleFoundBand(suggestingSkill);
+                  }}
+                  className="hero-cta-artistic"
+                  style={{ 
+                    width: '100%', 
+                    background: `linear-gradient(135deg, ${brandColor}, #d97706)`, 
+                    border: 'none', 
+                    padding: '20px', 
+                    borderRadius: '18px', 
+                    fontSize: '1.1rem', 
+                    fontWeight: 900, 
+                    color: 'white', 
+                    cursor: 'pointer', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    gap: '8px',
+                    boxShadow: `0 10px 20px ${brandColor}25`,
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <Zap size={20} fill="white" /> EIGENE BAND GRÜNDEN 🚀
+                </button>
+              </div>
+            ) : (
+              <div style={{ 
+                background: '#f8fafc', 
+                padding: '30px', 
+                borderRadius: '24px', 
+                border: '1px solid #e2e8f0',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: '2rem', marginBottom: '12px' }}>🎸</div>
+                <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '1.05rem', marginBottom: '8px' }}>Eure Formation ist vollständig!</div>
+                <p style={{ fontSize: '0.9rem', color: '#64748b', lineHeight: 1.5, margin: 0 }}>
+                  Dein Teamkollege <span style={{ color: brandColor, fontWeight: 900 }}>{suggestingSkill.leaderName}</span> wurde als Bandleader ausgewählt und gründet gerade eure neue Band mit einem Coach.
+                </p>
+                <div style={{ marginTop: '20px', fontSize: '0.75rem', color: brandColor, fontWeight: 800, letterSpacing: '0.05em' }} className="animate-pulse">
+                  BITTE KURZ WARTEN...
+                </div>
+              </div>
+            )}
+
+            {/* Cancel Button */}
+            <button 
+              onClick={() => dismissSuggestion(suggestingSkill.id)}
+              style={{ width: '100%', background: 'transparent', border: 'none', padding: '12px', fontSize: '0.9rem', fontWeight: 700, color: '#94a3b8', cursor: 'pointer', marginTop: '16px' }}
+            >
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      )}
+
+      {suggestingSkill && !suggestingSkill.formation_group && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 6000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', background: 'rgba(2, 6, 23, 0.9)', backdropFilter: 'blur(12px)' }}>
           <div className="animation-pop-in" style={{ 
             background: 'white', 
@@ -5825,9 +6007,29 @@ function App() {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <button 
-                    onClick={() => {
-                      setActiveStudentTab('matching');
-                      setSuggestingSkill(null);
+                    onClick={async () => {
+                      try {
+                        const newId = `form_${Math.random().toString(36).substr(2, 9)}`;
+                        // 1. Close modal instantly
+                        setSuggestingSkill(null);
+                        
+                        // 2. Open public formation slot
+                        const { error } = await supabase
+                          .from('user_song_skills')
+                          .update({ formation_group: newId })
+                          .eq('id', suggestingSkill.id);
+                        
+                        if (error) {
+                          console.error('[Option 2] Error opening slot:', error);
+                          alert('Fehler beim Öffnen des Matching-Slots: ' + error.message);
+                        } else {
+                          // 3. Background sync and navigate
+                          if (user) await fetchDashboardData(user.id, false);
+                          setActiveStudentTab('matching');
+                        }
+                      } catch (err: any) {
+                        console.error('[Option 2] Error in new formation search:', err);
+                      }
                     }}
                     style={{ 
                       width: '100%', 
@@ -5851,102 +6053,6 @@ function App() {
                   >
                     <Users size={18} /> NEUE FORMATION SUCHEN
                   </button>
-
-                  {/* If formation completed, show founding actions */}
-                  {suggestingSkill.isLeader ? (
-                    <div style={{ marginTop: '12px', borderTop: '1px solid #e2e8f0', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>Deine Band gründen:</div>
-                      <div style={{ width: '100%', position: 'relative' }}>
-                        <input 
-                          type="text"
-                          value={foundingName}
-                          onChange={(e) => setFoundingName(e.target.value)}
-                          placeholder="Wie soll deine Band heißen?"
-                          style={{ 
-                            width: '100%', 
-                            padding: '16px 50px 16px 16px', 
-                            background: 'white', 
-                            border: '1px solid #cbd5e1', 
-                            borderRadius: '16px', 
-                            color: '#1e293b', 
-                            fontSize: '1rem', 
-                            fontWeight: 700,
-                            textAlign: 'center',
-                            outline: 'none',
-                            transition: 'all 0.2s'
-                          }}
-                          onFocus={e => e.currentTarget.style.borderColor = brandColor}
-                          onBlur={e => e.currentTarget.style.borderColor = '#cbd5e1'}
-                        />
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); setFoundingName(generateRandomBandName()); }}
-                          style={{ 
-                            position: 'absolute', 
-                            right: '8px', 
-                            top: '50%', 
-                            transform: 'translateY(-50%)', 
-                            background: '#f8fafc', 
-                            border: '1px solid #cbd5e1', 
-                            color: brandColor, 
-                            width: '36px', 
-                            height: '36px', 
-                            borderRadius: '10px', 
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}
-                          title="Neuen Namen würfeln"
-                        >
-                          <RotateCcw size={16} />
-                        </button>
-                      </div>
-
-                      <button 
-                        onClick={() => {
-                          handleFoundBand(suggestingSkill);
-                        }}
-                        className="hero-cta-artistic"
-                        style={{ 
-                          width: '100%', 
-                          background: `linear-gradient(135deg, ${brandColor}, #d97706)`, 
-                          border: 'none', 
-                          padding: '18px', 
-                          borderRadius: '16px', 
-                          fontSize: '1.05rem', 
-                          fontWeight: 900, 
-                          color: 'white', 
-                          cursor: 'pointer', 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center', 
-                          gap: '8px',
-                          boxShadow: `0 10px 20px ${brandColor}25`,
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        <Zap size={20} fill="white" /> EIGENE BAND GRÜNDEN 🚀
-                      </button>
-                    </div>
-                  ) : suggestingSkill.leaderName ? (
-                    <div style={{ 
-                      marginTop: '12px',
-                      background: 'white', 
-                      padding: '20px', 
-                      borderRadius: '16px', 
-                      border: '1px solid #e2e8f0',
-                      textAlign: 'center'
-                    }}>
-                      <div style={{ fontSize: '1.5rem', marginBottom: '8px' }}>🎸</div>
-                      <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.95rem', marginBottom: '8px' }}>Formation vollständig!</div>
-                      <div style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: '1.5' }}>
-                        Dein Teamkollege <span style={{ color: brandColor, fontWeight: 900 }}>{suggestingSkill.leaderName}</span> wurde als Bandleader ausgewählt und gründet gerade eure neue Band.
-                      </div>
-                      <div style={{ marginTop: '12px', fontSize: '0.7rem', color: brandColor, fontWeight: 800, letterSpacing: '0.05em' }} className="animate-pulse">
-                        BITTE KURZ WARTEN...
-                      </div>
-                    </div>
-                  ) : null}
                 </div>
               </div>
 
@@ -5961,6 +6067,7 @@ function App() {
           </div>
         </div>
       )}
+
 
       {/* Modal: Sicherer PDF-Viewer */}
       {activePdfFolderUrl && activePdfSong && (
@@ -6267,7 +6374,8 @@ function App() {
               photo_url: editingBand.photo_url,
               soundcloud_links: editingBand.soundcloud_links || [],
               youtube_links: editingBand.youtube_links || [],
-              appointments: editingBand.appointments || []
+              appointments: editingBand.appointments || [],
+              coach_id: editingBand.coach_id
             }).eq('id', editingBand.id);
             if (error) alert(error.message);
             else {
@@ -6292,6 +6400,22 @@ function App() {
                 <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Bandname</label>
                 <input required value={editingBand.name} onChange={e => setEditingBand({...editingBand, name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
               </div>
+
+              {(user?.role === 'teacher' || user?.role === 'admin') && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Bandcoach (Lehrer)</label>
+                  <select 
+                    value={editingBand.coach_id || ''} 
+                    onChange={e => setEditingBand({...editingBand, coach_id: e.target.value || null})} 
+                    style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }}
+                  >
+                    <option value="">-- Kein Coach --</option>
+                    {teachers.map(t => (
+                      <option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Musikrichtung / Genre</label>
