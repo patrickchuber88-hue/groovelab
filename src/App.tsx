@@ -2808,28 +2808,44 @@ function App() {
       
       if (bsErr || !bSong) throw bsErr;
 
-      // 4. Finalize member list (add founder if missing)
+      // 4. Finalize member list
       if (formationMembers.length === 0) {
         formationMembers = target.members || [];
       }
 
-      // If no group found (e.g. practicing alone), use the target members or just the founder
-      if (formationMembers.length === 0) {
-        formationMembers = target.members || [];
-      }
+      // Ensure all members are flattened and have all necessary fields
+      const flatMembers = formationMembers.map((m: any) => {
+        const prof = m.profiles || m.users || m;
+        const firstName = m.first_name || prof?.first_name || 'Musiker';
+        const photoUrl = m.photo_url || prof?.photo_url || null;
+        return {
+          id: m.id || m.skill_id || null,
+          skill_id: m.skill_id || m.id || null,
+          user_id: m.user_id,
+          instrument: m.instrument,
+          part_number: m.part_number || 1,
+          first_name: firstName,
+          photo_url: photoUrl,
+          verified_by_id: m.verified_by_id || null
+        };
+      });
 
       // Final safety: The founder (current user) MUST be in the list
-      if (!formationMembers.some((m: any) => m.user_id === user.id)) {
-        formationMembers.unshift({
+      if (!flatMembers.some((m: any) => m.user_id === user.id)) {
+        flatMembers.unshift({
+          id: target.id || target.skill_id || null,
+          skill_id: target.skill_id || target.id || null,
           user_id: user.id,
           instrument: target.instrument || user.instrument || 'Musiker',
+          part_number: target.part_number || 1,
           first_name: user.first_name,
-          photo_url: user.photo_url
+          photo_url: user.photo_url,
+          verified_by_id: null
         });
       }
 
       // Deduplicate by user_id to be safe
-      const uniqueMembers = Array.from(new Map(formationMembers.map(m => [m.user_id, m])).values());
+      const uniqueMembers = Array.from(new Map(flatMembers.map(m => [m.user_id, m])).values());
       
       console.log('[Founding] Final member list to insert:', uniqueMembers.length);
 
@@ -2838,6 +2854,7 @@ function App() {
         band_id: newBand.id,
         user_id: m.user_id,
         instrument: m.instrument,
+        role: m.user_id === user.id ? 'leader' : 'member',
         confetti_seen: m.user_id === user.id ? true : false
       }));
 
@@ -2845,6 +2862,7 @@ function App() {
         band_song_id: bSong.id,
         user_id: m.user_id,
         instrument: m.instrument,
+        part_number: m.part_number || 1,
         status: m.user_id === user.id ? 'accepted' : 'joined'
       }));
 
@@ -2857,6 +2875,17 @@ function App() {
       if (slotErr) throw new Error('Song-Slots konnten nicht erstellt werden: ' + slotErr.message);
 
       const createdSlots = slotInserts;
+
+      // Also update the formation_group column for all these skills in the database to link them!
+      const skillIdsToUpdate = uniqueMembers
+        .map((m: any) => m.skill_id || m.id)
+        .filter(Boolean);
+      if (skillIdsToUpdate.length > 0 && groupID) {
+        await supabase
+          .from('user_song_skills')
+          .update({ formation_group: groupID })
+          .in('id', skillIdsToUpdate);
+      }
 
       // Also mark the specific skill record as prompted so the Glückwunsch modal doesn't re-appear
       const promptKey = `groovelab_prompted_${user.id}`;
