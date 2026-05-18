@@ -1307,8 +1307,9 @@ function App() {
 
   // Safety check: If suggestingSkill is set but userBands loads and indicates
   // that the song is already suggested or active in their band, dismiss the popup immediately.
+  // ONLY run this for individual suggestions (!suggestingSkill.formation_group), NOT for band founding!
   useEffect(() => {
-    if (suggestingSkill && user && userBands.length > 0) {
+    if (suggestingSkill && !suggestingSkill.formation_group && user && userBands.length > 0) {
       const targetSongId = suggestingSkill.song_id || suggestingSkill.songs?.id;
       if (targetSongId) {
         const alreadyInBand = userBands.some((b: any) => 
