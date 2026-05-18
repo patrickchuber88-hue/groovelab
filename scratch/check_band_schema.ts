@@ -3,8 +3,15 @@ import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 
 const env = fs.readFileSync('.env.local', 'utf-8');
-const url = env.match(/VITE_SUPABASE_URL=(.*)/)[1].trim().replace(/['"]/g, '');
-const key = env.match(/VITE_SUPABASE_ANON_KEY=(.*)/)[1].trim().replace(/['"]/g, '');
+const urlMatch = env.match(/VITE_SUPABASE_URL=(.*)/);
+const keyMatch = env.match(/VITE_SUPABASE_ANON_KEY=(.*)/);
+
+if (!urlMatch || !keyMatch) {
+  throw new Error('Supabase environment variables not found in .env.local');
+}
+
+const url = urlMatch[1].trim().replace(/['"]/g, '');
+const key = keyMatch[1].trim().replace(/['"]/g, '');
 
 const supabase = createClient(url, key);
 
