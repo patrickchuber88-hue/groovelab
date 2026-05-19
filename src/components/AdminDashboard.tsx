@@ -146,6 +146,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   
   const [bandSearch, setBandSearch] = useState('');
   const [bandLetter, setBandLetter] = useState<string | null>(null);
+  const [selectedCoachId, setSelectedCoachId] = useState<string>('all');
   const [editingBand, setEditingBand] = useState<any>(null);
   const [showAddMember, setShowAddMember] = useState<string | null>(null);
   const [memberSearch, setMemberSearch] = useState('');
@@ -520,7 +521,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       } else if (activeTab === 'bands') {
         const { data: bandsData } = await supabase
           .from('bands')
-          .select('*, songs(title, artist, instrumentation), band_members(*, users(*))')
+          .select('*, songs(title, artist, instrumentation), band_members(*, users(*)), coach:users!coach_id(id, first_name, last_name, photo_url), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))')
           .eq('school_id', adminData.school_id)
           .order('name');
         if (bandsData) {
@@ -1585,7 +1586,15 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     const filteredBands = allBands.filter(band => {
       const matchesSearch = band.name.toLowerCase().includes(bandSearch.toLowerCase());
       const matchesLetter = !bandLetter || band.name.toUpperCase().startsWith(bandLetter);
-      return matchesSearch && matchesLetter;
+      
+      let matchesCoach = true;
+      if (selectedCoachId === 'none') {
+        matchesCoach = !band.coach_id;
+      } else if (selectedCoachId !== 'all') {
+        matchesCoach = band.coach_id === selectedCoachId;
+      }
+      
+      return matchesSearch && matchesLetter && matchesCoach;
     });
 
     return (
@@ -1745,6 +1754,100 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             </form>
           )}
 
+          {/* Coach Filter Bar */}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', padding: '8px 12px', background: 'white', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginRight: '4px' }}>Coaches:</span>
+            <button 
+              onClick={() => setSelectedCoachId('all')}
+              style={{ 
+                padding: '6px 14px', 
+                borderRadius: '10px', 
+                background: selectedCoachId === 'all' ? brandColor : '#f8fafc', 
+                color: selectedCoachId === 'all' ? 'white' : '#64748b', 
+                fontWeight: 800, 
+                cursor: 'pointer', 
+                fontSize: '0.75rem',
+                boxShadow: selectedCoachId === 'all' ? `0 4px 12px ${brandColor}30` : 'none',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                border: '1px solid ' + (selectedCoachId === 'all' ? brandColor : '#e2e8f0')
+              }}
+              onMouseEnter={e => {
+                if (selectedCoachId !== 'all') e.currentTarget.style.borderColor = brandColor;
+              }}
+              onMouseLeave={e => {
+                if (selectedCoachId !== 'all') e.currentTarget.style.borderColor = '#e2e8f0';
+              }}
+            >
+              Alle Coaches
+            </button>
+            <button 
+              onClick={() => setSelectedCoachId('none')}
+              style={{ 
+                padding: '6px 14px', 
+                borderRadius: '10px', 
+                background: selectedCoachId === 'none' ? brandColor : '#f8fafc', 
+                color: selectedCoachId === 'none' ? 'white' : '#64748b', 
+                fontWeight: 800, 
+                cursor: 'pointer', 
+                fontSize: '0.75rem',
+                boxShadow: selectedCoachId === 'none' ? `0 4px 12px ${brandColor}30` : 'none',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                border: '1px solid ' + (selectedCoachId === 'none' ? brandColor : '#e2e8f0')
+              }}
+              onMouseEnter={e => {
+                if (selectedCoachId !== 'none') e.currentTarget.style.borderColor = brandColor;
+              }}
+              onMouseLeave={e => {
+                if (selectedCoachId !== 'none') e.currentTarget.style.borderColor = '#e2e8f0';
+              }}
+            >
+              Ohne Coach
+            </button>
+            {teachers.map(t => {
+              const isSelected = selectedCoachId === t.id;
+              return (
+                <button 
+                  key={t.id}
+                  onClick={() => setSelectedCoachId(isSelected ? 'all' : t.id)}
+                  style={{ 
+                    padding: '4px 14px 4px 6px', 
+                    borderRadius: '10px', 
+                    background: isSelected ? brandColor : '#f8fafc', 
+                    color: isSelected ? 'white' : '#475569', 
+                    fontWeight: 800, 
+                    cursor: 'pointer', 
+                    fontSize: '0.75rem',
+                    boxShadow: isSelected ? `0 4px 12px ${brandColor}30` : 'none',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    border: '1px solid ' + (isSelected ? brandColor : '#e2e8f0')
+                  }}
+                  onMouseEnter={e => {
+                    if (!isSelected) e.currentTarget.style.borderColor = brandColor;
+                  }}
+                  onMouseLeave={e => {
+                    if (!isSelected) e.currentTarget.style.borderColor = '#e2e8f0';
+                  }}
+                >
+                  <img 
+                    src={t.photo_url || '/avatar_ghost.jpg'} 
+                    style={{ width: '22px', height: '22px', borderRadius: '50%', objectFit: 'cover', border: isSelected ? '1px solid white' : '1px solid rgba(0,0,0,0.1)' }} 
+                    alt="" 
+                  />
+                  {t.first_name} {t.last_name || ''}
+                </button>
+              );
+            })}
+          </div>
+
           {/* Alphabet Bar */}
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', padding: '8px', background: 'white', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
             <button 
@@ -1788,7 +1891,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   onClick={() => onOpenBandProfile?.(band)}
                   style={{ 
                     background: 'white', borderRadius: '24px', padding: '20px 24px', border: '1px solid #f1f5f9', boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
-                    display: 'grid', gridTemplateColumns: 'auto 1fr auto auto', alignItems: 'center', gap: '24px', cursor: 'pointer', transition: 'all 0.2s'
+                    display: 'grid', gridTemplateColumns: 'auto 1fr auto auto auto', alignItems: 'center', gap: '24px', cursor: 'pointer', transition: 'all 0.2s'
                   }}
                   onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
                   onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
@@ -1803,11 +1906,36 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
                   <div>
                     <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', margin: '0 0 4px 0' }}>{band.name}</h3>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '0.75rem', fontWeight: 800, color: brandColor, textTransform: 'uppercase' }}>{band.genre || 'Bandprojekt'}</span>
                       <span style={{ color: '#cbd5e1' }}>•</span>
                       <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>{uniqueMembersList.length} Mitglieder</span>
                     </div>
+                  </div>
+
+                  {/* Dedicated Coach Column */}
+                  <div>
+                    {band.coach ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#f8fafc', padding: '6px 14px', borderRadius: '14px', border: '1px solid #e2e8f0' }} title={`Coach: ${band.coach.first_name} ${band.coach.last_name || ''}`}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '10px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', background: 'white' }}>
+                          <img src={band.coach.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontSize: '0.6rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Coach</span>
+                          <span style={{ fontSize: '0.85rem', color: '#1e293b', fontWeight: 850 }}>{band.coach.first_name} {band.coach.last_name ? band.coach.last_name[0] + '.' : ''}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#f8fafc', padding: '6px 14px', borderRadius: '14px', border: '1px dashed #cbd5e1', opacity: 0.7 }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#e2e8f0', color: '#64748b' }}>
+                          👤
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontSize: '0.6rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Coach</span>
+                          <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 800 }}>Kein Coach</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>

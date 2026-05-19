@@ -270,22 +270,41 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
     }
   }, [bandProfileView, selectedBandForProfile.id]);
 
-  // Helper to check if a song is fully occupied in its specific slots
-  const checkIfFull = (song: any) => {
-    const songId = song.id;
-    const songAssigns = songAssignments[songId] || {};
-    const instrumentation = song?.instrumentation || {};
+  // Helper to check if a song is fully mastered by all slot occupiers (100% progress)
+  const checkIfFullyMastered = (prop: any) => {
+    if (!prop || !prop.songs) return false;
+    const song = prop.songs;
+    const instrumentation = song.instrumentation || {};
+    const slots = prop.band_song_slots || [];
 
     return Object.entries(instrumentation).every(([inst, count]) => {
       const normReq = normalize(inst);
       if (normReq === 'Vocals') return true;
-      const players = songAssigns[normReq] || [];
-      return players.length >= (count as number);
+      const requiredCount = count as number;
+      if (requiredCount <= 0) return true;
+
+      // Find slots for this instrument that are occupied by users who have 100% mastery
+      const masteredSlots = slots.filter((slot: any) => {
+        if (!slot.user_id) return false;
+        if (normalize(slot.instrument) !== normReq) return false;
+
+        const slotUser = slot.users || slot.profiles;
+        const u = slotUser ? (Array.isArray(slotUser) ? slotUser[0] : slotUser) : null;
+        const skills = u?.user_song_skills || [];
+        
+        return skills.some((sk: any) => 
+          String(sk.song_id) === String(prop.song_id) &&
+          normalize(sk.instrument) === normReq &&
+          ((sk.progress_percent || 0) >= 100 || sk.is_stage_ready === true)
+        );
+      });
+
+      return masteredSlots.length >= requiredCount;
     });
   };
 
-  // Filtered repertoire: only songs where ALL required instrument slots are occupied
-  // OR explicitly active songs, or founding song
+  // Filtered repertoire: only songs where ALL required instrument slots are occupied and mastered to 100%
+  // (which means status is explicitly active in the database) OR founding song
   const repertoireSongs = useMemo(() => {
     return allSongs.filter(song => {
       // 1. Founding song is always in repertoire
@@ -295,12 +314,20 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
       const bandSong = bSongs.find((bs: any) => bs.song_id === song.id);
       if (bandSong?.status === 'active') return true;
 
-      // 3. Check if it's "full"
-      if (checkIfFull(song)) return true;
-
       return false;
     });
-  }, [allSongs, selectedBandForProfile.song_id, bSongs, songAssignments]);
+  }, [allSongs, selectedBandForProfile.song_id, bSongs]);
+
+  // Filtered proposals: only songs that are NOT the founding song AND are NOT active and fully mastered
+  const activeProposals = useMemo(() => {
+    return songProposals.filter(prop => {
+      // 1. Filter out if it is the founding song
+      if (prop.song_id && selectedBandForProfile.song_id && String(prop.song_id) === String(selectedBandForProfile.song_id)) return false;
+      // 2. Filter out if it is active and fully mastered
+      if (prop.status === 'active' && checkIfFullyMastered(prop)) return false;
+      return true;
+    });
+  }, [songProposals, selectedBandForProfile.song_id, checkIfFullyMastered]);
 
   const fetchShoutbox = async () => {
     try {
@@ -373,15 +400,25 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
           band_song_slots (*, users(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready)))
         `)
         .eq('band_id', selectedBandForProfile.id)
-        .in('status', ['proposal', 'planned']);
+        .in('status', ['proposal', 'planned', 'active']);
 
       if (!error && data) {
         setSongProposals(data);
         
-        // Auto-promote full proposals to active
+        // Auto-promote / demote based on mastery
         data.forEach(prop => {
-          if (prop.status !== 'active' && checkIfFull(prop.songs)) {
-            console.log(`[RepertoirePlaner] Auto-promoting "${prop.songs?.title}" to active as it is fully occupied.`);
+          const isFounding = prop.song_id && selectedBandForProfile.song_id && String(prop.song_id) === String(selectedBandForProfile.song_id);
+          if (isFounding) return; // founding song is always active/repertoire
+
+          const fullyMastered = checkIfFullyMastered(prop);
+          
+          if (prop.status === 'active' && !fullyMastered) {
+            console.log(`[RepertoirePlaner] Auto-demoting "${prop.songs?.title}" to proposal as it is not fully mastered.`);
+            supabase.from('band_songs').update({ status: 'proposal' }).eq('id', prop.id).then(() => {
+              if (onRefresh) onRefresh();
+            });
+          } else if (prop.status !== 'active' && fullyMastered) {
+            console.log(`[RepertoirePlaner] Auto-promoting "${prop.songs?.title}" to active as all slots are fully mastered.`);
             supabase.from('band_songs').update({ status: 'active' }).eq('id', prop.id).then(() => {
               if (onRefresh) onRefresh();
             });
@@ -495,32 +532,24 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
         }
       }
 
-      // 3. Fetch current status to check if full
+      // 3. Fetch current status with user skills to check if fully mastered
       const { data: currentProp } = await supabase
         .from('band_songs')
-        .select('*, songs(*), band_song_slots(*, users(id, first_name, photo_url))')
+        .select(`
+          *,
+          songs (*),
+          band_song_slots (*, users(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready)))
+        `)
         .eq('id', proposalId)
         .single();
 
       if (currentProp) {
-        const instrumentation = currentProp.songs?.instrumentation || {};
-        const slots = currentProp.band_song_slots || [];
-        
-        let isFull = true;
-        Object.entries(instrumentation).forEach(([inst, count]: [string, any]) => {
-          for (let i = 1; i <= (count as number); i++) {
-            if (!slots.find((s: any) => s.instrument === inst && s.part_number === i)) {
-              isFull = false;
-            }
-          }
-        });
-
-        if (isFull) {
+        if (checkIfFullyMastered(currentProp)) {
           await supabase.from('band_songs').update({ status: 'active' }).eq('id', proposalId);
           await supabase.from('band_shoutbox').insert({
             band_id: selectedBandForProfile.id,
             user_id: user.id,
-            content: `🔥 Juhu! Unsere Band ist für "${currentProp.songs?.title}" jetzt vollständig besetzt. Der Song ist ab sofort in unserem Repertoire!`
+            content: `🔥 Juhu! Alle Mitglieder haben ihre Instrumente für "${currentProp.songs?.title}" zu 100% gemeistert. Der Song ist ab sofort in unserem Repertoire! 🎸🚀`
           });
           if (onRefresh) onRefresh();
         }
@@ -1101,14 +1130,14 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                   </div>
                 </div>
                 
-                {songProposals.length === 0 ? (
+                {activeProposals.length === 0 ? (
                   <div style={{ padding: '40px 20px', textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '24px', border: '1px dashed rgba(255,255,255,0.1)' }}>
                     <div style={{ fontSize: '2rem', marginBottom: '12px' }}>🎵</div>
                     <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'white' }}>Noch keine Song-Vorschläge</div>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {songProposals.filter(prop => !checkIfFull(prop.songs)).map(prop => (
+                    {activeProposals.map(prop => (
                       <div key={prop.id} style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '24px', padding: '20px', border: '1px solid rgba(255,255,255,0.06)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>

@@ -459,7 +459,7 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
         setSubmissions(activeInLabSubs);
 
         // 6. Bands
-        const { data: bData } = await supabase.from('bands').select('*, band_members(*, users(*)), band_songs(songs(*))').eq('school_id', tData.school_id).order('name');
+        const { data: bData } = await supabase.from('bands').select('*, band_members(*, users(*)), coach:users!coach_id(id, first_name, last_name, photo_url), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))').eq('school_id', tData.school_id).order('name');
         setAllBands(bData || []);
 
         // 7. Students

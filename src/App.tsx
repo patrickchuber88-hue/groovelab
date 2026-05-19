@@ -1630,7 +1630,7 @@ function App() {
         try {
           const { data, error } = await supabase
             .from('bands')
-            .select('*, songs(*), band_members(*, users!user_id(*)), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))), coach:users!bands_coach_id_fkey(first_name, last_name, photo_url)')
+            .select('*, songs(*), band_members(*, users!user_id(*)), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready)))), coach:users!bands_coach_id_fkey(first_name, last_name, photo_url)')
             .eq('id', urlBandId)
             .single();
             
@@ -1773,7 +1773,7 @@ function App() {
         supabase.from('users').select('*, schools(*)').eq('id', userId).maybeSingle(),
         supabase.from('sessions').select('*, stations(name)').eq('user_id', userId).is('check_out_time', null).order('check_in_time', { ascending: false }).limit(1).maybeSingle(),
         supabase.from('sessions').select('check_in_time, check_out_time').eq('user_id', userId),
-        supabase.from('band_members').select('instrument, bands(id, name, school_id, song_id, status, photo_url, songs(*), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))))').eq('user_id', userId)
+        supabase.from('band_members').select('instrument, bands(id, name, school_id, song_id, status, photo_url, songs(*), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready)))))').eq('user_id', userId)
       ]).catch(err => {
         console.error('[Dashboard] Critical Fetch Error Stage 1:', err);
         return [ {error: err}, {error: err}, {error: err}, {error: err} ] as any;
@@ -1845,18 +1845,18 @@ function App() {
           )
         `).eq('school_id', schoolId),
         supabase.from('band_members').select('user_id, bands!inner(id, status, song_id, school_id, band_songs(song_id, status))').eq('bands.school_id', schoolId),
-        supabase.from('bands').select('*, band_members(*, profiles:users(id, first_name, photo_url)), band_songs(*, band_song_slots(*, profiles:users!user_id(id, first_name, photo_url)))').eq('school_id', schoolId).in('status', ['forming', 'active']),
+        supabase.from('bands').select('*, band_members(*, profiles:users(id, first_name, photo_url)), band_songs(*, band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))').eq('school_id', schoolId).in('status', ['forming', 'active']),
         supabase.from('songs').select('*').eq('school_id', schoolId).order('level').order('artist'),
         bandIds.length > 0
           ? supabase.from('bands').select(`
               *,
               songs (*),
               band_members (*, users(*)),
-              band_songs (*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))),
+              band_songs (*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready)))),
               coach:users!coach_id (first_name, last_name, photo_url)
             `).in('id', bandIds)
           : Promise.resolve({ data: [], error: null }),
-        supabase.from('bands').select('*, songs(title, artist, instrumentation), band_members(*, users!user_id(*)), band_songs(*, songs(id, title, artist, instrumentation), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))), coach:users!coach_id (first_name, last_name, photo_url)').eq('school_id', schoolId).order('name', { ascending: true }),
+        supabase.from('bands').select('*, songs(title, artist, instrumentation), band_members(*, users!user_id(*)), band_songs(*, songs(id, title, artist, instrumentation), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready)))), coach:users!coach_id (first_name, last_name, photo_url)').eq('school_id', schoolId).order('name', { ascending: true }),
         supabase.from('users').select('*').eq('school_id', schoolId).in('role', ['teacher', 'admin']).order('first_name'),
         supabase.from('sessions').select('user_id, station_id, users!inner(role, school_id, last_seen)').is('check_out_time', null).eq('users.school_id', schoolId)
       ]).catch(err => {
@@ -3844,21 +3844,24 @@ function App() {
 
       if (slotErr) throw slotErr;
 
-      // 3. Send a Shoutbox notification (Only if not complete)
+      // 3. Send a Shoutbox notification (Only if not fully mastered by all required players)
       const song = globalSongs.find((s: any) => s.id === skill.song_id);
-      let isComplete = false;
+      let isFullyMastered = false;
       if (song?.instrumentation) {
         const req = song.instrumentation;
-        const slots = (bsData.band_song_slots || []);
-        isComplete = Object.keys(req).every(inst => {
-          const needed = req[inst] || 0;
-          if (needed === 0) return true;
-          const filled = slots.filter((sl: any) => sl.instrument === inst).length;
-          return filled >= needed;
+        const normSugInst = normalizeInstrument(skill.instrument);
+        isFullyMastered = Object.entries(req).every(([inst, count]) => {
+          const normReq = normalizeInstrument(inst);
+          if (normReq === 'Vocals') return true;
+          const needed = count as number;
+          if (needed <= 0) return true;
+          const suggesterSatisfies = (normSugInst === normReq);
+          const filledCount = suggesterSatisfies ? 1 : 0;
+          return filledCount >= needed;
         });
       }
 
-      if (!isComplete) {
+      if (!isFullyMastered) {
         await supabase.from('band_shoutbox').insert({
           band_id: bandId,
           user_id: user.id,
@@ -3867,6 +3870,12 @@ function App() {
 
         alert('Song erfolgreich vorgeschlagen! Deine Bandmitglieder wurden benachrichtigt.');
       } else {
+        await supabase.from('band_songs').update({ status: 'active' }).eq('id', bsData.id);
+        await supabase.from('band_shoutbox').insert({
+          band_id: bandId,
+          user_id: user.id,
+          content: `🔥 Juhu! Wir haben "${song?.title || skill.songs?.title || skill.title}" vollständig besetzt und gemeistert! Der Song ist ab sofort in unserem Repertoire!`
+        });
         alert('Song wurde zu deinem Repertoire in dieser Band hinzugefügt.');
       }
       
@@ -8881,6 +8890,26 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
   const [showCopyAlert, setShowCopyAlert] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState<'starter' | 'pro'>('starter');
+  const [pageCount, setPageCount] = useState<number>(3); // Default fallback of 3 pages (covers most sheet music)
+  const [isPageCountFallback, setIsPageCountFallback] = useState(true);
+  const [containerWidth, setContainerWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        if (entry.contentRect.width) {
+          setContainerWidth(entry.contentRect.width);
+        }
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  const pageHeight = containerWidth * 1.414 + 16; // A4 aspect ratio + margin buffer
+  const sheetHeight = pageCount * pageHeight;
 
   const getPdfSlides = () => {
     const slides: { id: string; label: string; icon: string; desc: string }[] = [];
@@ -8983,12 +9012,6 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
 
   const activeUrl = getActiveUrl();
   
-  useEffect(() => {
-    if (activeUrl) {
-      setPdfLoading(true);
-    }
-  }, [activeUrl]);
-
   const isDropbox = activeUrl && activeUrl.includes('dropbox.com');
   const isGoogleDrive = activeUrl && activeUrl.includes('drive.google.com');
   const isOneDrive = activeUrl && (activeUrl.includes('onedrive.live.com') || activeUrl.includes('1drv.ms'));
@@ -8997,6 +9020,72 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
   const isDropboxFolder = isDropbox && 
     (activeUrl.includes('/scl/fo/') || activeUrl.includes('/sh/') || 
      !(activeUrl.includes('.pdf') || activeUrl.includes('/scl/fi/') || activeUrl.includes('/s/')));
+
+  useEffect(() => {
+    if (!activeUrl) return;
+    
+    if (isDropboxFolder) {
+      setPdfLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    setPdfLoading(true);
+
+    const countPages = async () => {
+      try {
+        let pdfjsLib = (window as any).pdfjsLib;
+        if (!pdfjsLib) {
+          const script = document.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+          script.async = true;
+          document.body.appendChild(script);
+          await new Promise((resolve, reject) => {
+            script.onload = resolve;
+            script.onerror = reject;
+          });
+          pdfjsLib = (window as any).pdfjsLib;
+        }
+
+        if (pdfjsLib) {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+          
+          let fetchUrl = activeUrl;
+          if (fetchUrl && fetchUrl.includes('dropbox.com')) {
+            fetchUrl = fetchUrl.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
+            if (fetchUrl.includes('?')) {
+              fetchUrl = fetchUrl.replace(/[?&]dl=[01]/, '').replace(/[?&]raw=[01]/, '');
+              fetchUrl += (fetchUrl.includes('?') ? '&' : '?') + 'raw=1';
+            } else {
+              fetchUrl += '?raw=1';
+            }
+          }
+
+          const loadingTask = pdfjsLib.getDocument(fetchUrl);
+          const pdf = await loadingTask.promise;
+          if (isMounted) {
+            console.log('[SecurePdfViewerModal] Page count loaded:', pdf.numPages);
+            setPageCount(pdf.numPages);
+            setIsPageCountFallback(false);
+            setPdfLoading(false);
+          }
+        }
+      } catch (e) {
+        console.error('[SecurePdfViewerModal] Error getting PDF page count:', e);
+        if (isMounted) {
+          setPageCount(3); // Default fallback of 3 pages (A4 size)
+          setIsPageCountFallback(true);
+          setPdfLoading(false);
+        }
+      }
+    };
+
+    countPages();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeUrl, isDropboxFolder]);
 
   // Adjust OneDrive/Dropbox/GoogleDrive URL to be optimized for embed
   const getSecureEmbedUrl = () => {
@@ -9034,14 +9123,14 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
         } else {
           embedUrl += '?raw=1';
         }
-        return embedUrl + '#toolbar=0';
+        return embedUrl + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH,0';
       }
     }
     
     // For standard self-hosted PDF links
     if (url.toLowerCase().endsWith('.pdf') || url.includes('.pdf?')) {
       if (!url.includes('#toolbar=')) {
-        return url + '#toolbar=0';
+        return url + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH,0';
       }
     }
     
@@ -9066,6 +9155,7 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
         backdropFilter: 'blur(20px)',
         display: 'flex',
         flexDirection: 'column',
+        overflow: 'hidden', // Prevent any scrolling at modal backdrop level
         userSelect: 'none',
         WebkitUserSelect: 'none',
       }}
@@ -9110,7 +9200,8 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
         background: 'rgba(15, 23, 42, 0.9)',
         height: '56px',
         minHeight: '56px',
-        zIndex: 10
+        zIndex: 10,
+        overflow: 'hidden' // Absolutely prevent horizontal overflow
       }}>
         {/* Left Side: Compact Title & Security */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flexShrink: 1 }}>
@@ -9277,6 +9368,7 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
               </button>
             </div>
           )}
+
         </div>
 
         {/* Right Side: Sleek Close Button */}
@@ -9314,89 +9406,18 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
         overflow: 'hidden'
       }}>
         
-        {/* Info panel for current active slide */}
-        <div style={{
-          position: 'absolute',
-          top: '16px',
-          background: 'rgba(15, 23, 42, 0.8)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          padding: '8px 20px',
-          borderRadius: '20px',
-          color: '#cbd5e1',
-          fontSize: '0.8rem',
-          fontWeight: 700,
-          zIndex: 100,
-          backdropFilter: 'blur(10px)',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.2)'
-        }}>
-          💡 Stimme: <span style={{ color: '#60a5fa', fontWeight: 900 }}>{slides[activeSlide]?.label}</span> — {slides[activeSlide]?.desc}
-        </div>
-
-        {/* SECURE OVERLAYS LAYER */}
-        <div 
-          style={{
-            position: 'absolute',
-            inset: 0,
-            zIndex: 4,
-            pointerEvents: 'none',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            padding: '12px',
-            border: '2px dashed rgba(239, 68, 68, 0.15)',
-            borderRadius: '8px',
-            margin: '8px'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.7rem', fontWeight: 800, color: 'rgba(239, 68, 68, 0.3)' }}>
-            <span>🔒 GrooveLab Secure DRM Platform</span>
-            <span>ID: {song.song_id || 'SecureSong'}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.7rem', fontWeight: 800, color: 'rgba(239, 68, 68, 0.3)' }}>
-            <span>🔒 Schreibgeschützt - Kein Download</span>
-            <span>Dateizugriff gesichert</span>
-          </div>
-        </div>
-
-        {/* DIAGONAL WATERMARK */}
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          zIndex: 3,
-          pointerEvents: 'none',
-          overflow: 'hidden',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gridTemplateRows: 'repeat(4, 1fr)',
-          opacity: 0.04,
-          userSelect: 'none'
-        }}>
-          {Array.from({ length: 16 }).map((_, idx) => (
-            <div key={idx} style={{
-              transform: 'rotate(-30deg)',
-              fontSize: '1rem',
-              fontWeight: 900,
-              color: '#ef4444',
-              textAlign: 'center',
-              alignSelf: 'center',
-              whiteSpace: 'nowrap'
-            }}>
-              GROOVELAB SECURE VIEW 🔒 COPY PROTECTED
-            </div>
-          ))}
-        </div>
-
         {/* IFRAME WORKSPACE CONTAINER */}
         <div style={{
           width: '100%',
           height: '100%',
-          background: isDropboxFolder ? '#1e293b' : 'white',
+          background: isDropboxFolder ? '#1e293b' : '#0f172a',
           overflow: 'hidden',
           position: 'relative',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center'
+          justifyContent: 'center',
+          padding: 0
         }}>
           {isDropboxFolder ? (
             <div style={{
@@ -9477,19 +9498,29 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
               </div>
             </div>
           ) : (
-            <div style={{
-              width: '100%',
-              height: '100%',
-              overflowY: 'auto',
-              background: 'white',
-              position: 'relative'
-            }}>
+            <div 
+              ref={containerRef}
+              style={{
+                width: '100%',
+                maxWidth: '1000px',
+                height: '100%',
+                overflowX: 'hidden', // Disable horizontal scroll
+                overflowY: 'auto',   // Enable vertical scroll only
+                WebkitOverflowScrolling: 'touch', // Native inertia scrolling for iPad
+                background: 'white',
+                position: 'relative',
+                borderRadius: '0px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                margin: '0 auto'
+              }}
+            >
               {/* PDF CONTENT INNER WRAPPER WITH DIRECT INTERACTION PROTECTION */}
               <div style={{
                 position: 'relative',
                 width: '100%',
-                height: '3200px', // Full height to render multiple pages of sheet music inline
-                background: 'white'
+                height: `${sheetHeight}px`, // Dynamic height based on selected page length
+                background: 'white',
+                overflow: 'hidden' // Clip any child overflow
               }}>
                 {/* 100% TRANSPARENT SECURITY SHIELD */}
                 <div 
@@ -9512,7 +9543,8 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
                   onLoad={() => setPdfLoading(false)}
                   scrolling="no"
                   style={{
-                    width: '100%',
+                    width: '1px',
+                    minWidth: '100%',
                     height: '100%',
                     border: 'none',
                     pointerEvents: 'none' // Completely dead to Safari/Chrome native floating toolbars and click events!
@@ -9569,6 +9601,76 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Floating controls in the bottom right corner for manual override when page count detection falls back */}
+          {isPageCountFallback && !isDropboxFolder && (
+            <div style={{
+              position: 'absolute',
+              bottom: '24px',
+              right: '24px',
+              zIndex: 101, // Above transparent security shield (99)
+              background: 'rgba(15, 23, 42, 0.85)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              borderRadius: '12px',
+              padding: '8px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
+              color: 'white',
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              pointerEvents: 'auto',
+              userSelect: 'none'
+            }}>
+              <span style={{ color: '#94a3b8' }}>📄 Seiten:</span>
+              <button 
+                onClick={() => setPageCount(p => Math.max(1, p - 1))}
+                className="hover-scale"
+                style={{
+                  background: 'rgba(255,255,255,0.08)',
+                  border: 'none',
+                  color: 'white',
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1rem',
+                  lineHeight: 1
+                }}
+              >
+                -
+              </button>
+              <span style={{ minWidth: '16px', textAlign: 'center', color: '#60a5fa', fontWeight: 950, fontSize: '0.85rem' }}>{pageCount}</span>
+              <button 
+                onClick={() => setPageCount(p => Math.min(15, p + 1))}
+                className="hover-scale"
+                style={{
+                  background: 'rgba(255,255,255,0.08)',
+                  border: 'none',
+                  color: 'white',
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1rem',
+                  lineHeight: 1
+                }}
+              >
+                +
+              </button>
             </div>
           )}
         </div>
