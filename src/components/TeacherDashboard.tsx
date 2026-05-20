@@ -309,6 +309,7 @@ const CoachesNode = React.memo(({ coaches, onProfileSelect }: { coaches: any[], 
           const total = coaches.length;
           const offset = total > 1 ? (idx - (total - 1) / 2) * 54 : 0;
           const verticalOffset = total > 1 ? (idx % 2 === 0 ? -12 : 12) : 0;
+          const labelAbove = total > 1 && idx % 2 === 0;
           return (
             <div 
               key={c.id} 
@@ -317,16 +318,17 @@ const CoachesNode = React.memo(({ coaches, onProfileSelect }: { coaches: any[], 
                 position: 'absolute',
                 transform: `translate(${offset}px, ${verticalOffset}px)`,
                 display: 'flex',
-                flexDirection: 'column',
+                flexDirection: labelAbove ? 'column-reverse' : 'column',
                 alignItems: 'center',
+                gap: '8px',
                 zIndex: 10 - idx,
                 cursor: 'pointer'
               }}
             >
-              <div style={{ width: '84px', height: '84px', borderRadius: '50%', border: '4px solid white', boxShadow: '0 8px 20px rgba(0,0,0,0.15)', overflow: 'hidden' }}>
+              <div style={{ width: '84px', height: '84px', borderRadius: '50%', border: '4px solid white', boxShadow: '0 8px 20px rgba(0,0,0,0.15)', overflow: 'hidden', flexShrink: 0 }}>
                 <AvatarImage src={c.users?.photo_url} user={c.users} />
               </div>
-              <div style={{ marginTop: '8px', background: 'white', padding: '5px 12px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', textAlign: 'center', minWidth: '90px' }}>
+              <div style={{ background: 'white', padding: '5px 12px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', textAlign: 'center', minWidth: '90px' }}>
                 <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '0.8rem' }}>{c.users?.first_name} {c.users?.last_name?.[0]}.</div>
                 <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '2px' }}>{c.session?.stations?.name || 'Lehrer'}</div>
               </div>
