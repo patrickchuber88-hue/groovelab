@@ -7568,48 +7568,50 @@ function App() {
                                   }}>
                                     <span>✨</span> Formation vollständig! 🎸 <span>✨</span>
                                   </div>
-                                  <button 
-                                    onClick={() => {
-                                      // Check for multi-band conflict first if the user already plays in another band
-                                      if (userBands.length > 0) {
-                                        const proceed = window.confirm('Deine Formation ist vollständig! 🎸\n\nDu spielst bereits in einer Band. Möchtest du wirklich eine zusätzliche Band gründen? Falls nicht, gibst du deinen Slot für andere frei.');
-                                        if (!proceed) {
-                                          (async () => {
-                                             await supabase.from('user_song_skills').update({ formation_group: null }).eq('id', mySlot.skill_id);
-                                             fetchDashboardData(user.id);
-                                          })();
-                                          return;
+                                  {!form.originBand && (
+                                    <button 
+                                      onClick={() => {
+                                        // Check for multi-band conflict first if the user already plays in another band
+                                        if (userBands.length > 0) {
+                                          const proceed = window.confirm('Deine Formation ist vollständig! 🎸\n\nDu spielst bereits in einer Band. Möchtest du wirklich eine zusätzliche Band gründen? Falls nicht, gibst du deinen Slot für andere frei.');
+                                          if (!proceed) {
+                                            (async () => {
+                                               await supabase.from('user_song_skills').update({ formation_group: null }).eq('id', mySlot.skill_id);
+                                               fetchDashboardData(user.id);
+                                            })();
+                                            return;
+                                          }
                                         }
-                                      }
 
-                                      // Open naming modal - whoever clicks the button becomes the leader/founder
-                                      console.log('[DEBUG-Groovelab] setSuggestingSkill (Matching Board click) in App.tsx');
-                                      setSuggestingSkill({
-                                        ...mySlot,
-                                        isLeader: true,
-                                        leaderName: 'Du',
-                                        song_id: song.song_id,
-                                        songs: { id: song.song_id, title: song.title },
-                                        formation_group: form.id,
-                                        members: form.members
-                                      });
-                                      if (!foundingName) setFoundingName(generateRandomBandName());
-                                    }}
-                                    className="hero-cta-artistic"
-                                    style={{ 
-                                      padding: '20px', 
-                                      borderRadius: '20px', 
-                                      fontSize: '1.1rem', 
-                                      width: '100%', 
-                                      cursor: 'pointer',
-                                      background: 'linear-gradient(135deg, #1e293b, #0f172a)',
-                                      color: 'white',
-                                      border: 'none',
-                                      boxShadow: '0 15px 30px rgba(15,23,42,0.2)'
-                                    }}
-                                  >
-                                    JETZT BAND GRÜNDEN
-                                  </button>
+                                        // Open naming modal - whoever clicks the button becomes the leader/founder
+                                        console.log('[DEBUG-Groovelab] setSuggestingSkill (Matching Board click) in App.tsx');
+                                        setSuggestingSkill({
+                                          ...mySlot,
+                                          isLeader: true,
+                                          leaderName: 'Du',
+                                          song_id: song.song_id,
+                                          songs: { id: song.song_id, title: song.title },
+                                          formation_group: form.id,
+                                          members: form.members
+                                        });
+                                        if (!foundingName) setFoundingName(generateRandomBandName());
+                                      }}
+                                      className="hero-cta-artistic"
+                                      style={{ 
+                                        padding: '20px', 
+                                        borderRadius: '20px', 
+                                        fontSize: '1.1rem', 
+                                        width: '100%', 
+                                        cursor: 'pointer',
+                                        background: 'linear-gradient(135deg, #1e293b, #0f172a)',
+                                        color: 'white',
+                                        border: 'none',
+                                        boxShadow: '0 15px 30px rgba(15,23,42,0.2)'
+                                      }}
+                                    >
+                                      JETZT BAND GRÜNDEN
+                                    </button>
+                                  )}
                                 </div>
                               )}
                             </div>
