@@ -2735,6 +2735,7 @@ function App() {
               const normalizedMemberInst = normalizeInstrument(skill.instrument);
               
               let form = formationsList.find(f => {
+                if (f.originBand) return false; // DO NOT automatically match pool players to active band projects in memory!
                 const userAlreadyIn = f.members.some((m: any) => m.user_id === skill.user_id);
                 if (userAlreadyIn) return false;
                 const currentCount = f.members.filter((m: any) => m.instrument === normalizedMemberInst).length;

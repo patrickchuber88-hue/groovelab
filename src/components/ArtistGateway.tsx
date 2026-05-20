@@ -206,7 +206,7 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
               fontSize: '0.8rem',
               fontWeight: 900
             }}>
-              <Clock size={16} /> {suggestion.day} {suggestion.start}-{suggestion.end}
+              <Clock size={16} /> Mögliche Bandprobe: {suggestion.day} {suggestion.start}-{suggestion.end}
             </div>
           )}
         </div>
@@ -282,7 +282,7 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
         </div>
 
         <div style={{ marginTop: '50px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '30px' }}>
-           <p style={{ color: 'rgba(255,255,255,0.3)', fontStyle: 'italic', fontSize: '1rem', maxWidth: '500px', margin: '0 auto', lineHeight: 1.6 }}>
+           <p style={{ color: 'rgba(255,255,255,0.3)', fontStyle: 'italic', fontSize: '1rem', maxWidth: 'none', margin: '0 auto', lineHeight: 1.6 }}>
              "Der Künstler ist nichts ohne die Gabe, aber die Gabe ist nichts ohne die Arbeit."
            </p>
         </div>

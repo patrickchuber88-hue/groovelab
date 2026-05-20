@@ -741,15 +741,25 @@ export function TeacherDashboard({
             if (levelSkills.length === 0) return;
 
             const songFormations: any[] = [];
-            levelSkills.forEach(skill => {
+            // Sort levelSkills: skills with a formation_group first, so they establish groups,
+            // then free agents (formation_group: null) to merge into them.
+            const sortedSkills = [...levelSkills].sort((a, b) => {
+              const aHas = !!a.formation_group;
+              const bHas = !!b.formation_group;
+              if (aHas && !bHas) return -1;
+              if (!aHas && bHas) return 1;
+              return 0;
+            });
+
+            sortedSkills.forEach(skill => {
               const norm = normalizeInstrument(skill.instrument);
               // Find a group that:
               // 1. Matches the formation_group (if set)
-              // 2. OR is a "pool" group for this song/level and doesn't have this instrument yet
+              // 2. OR is an automatic group and doesn't have this instrument yet
               let target = songFormations.find(f => {
                 if (skill.formation_group) return f.groupKey === skill.formation_group;
-                // Only merge into pool groups if it's a pool skill
-                return f.groupKey.startsWith('pool_') && !f.members.some((m: any) => normalizeInstrument(m.instrument) === norm);
+                // Merge into any group that doesn't have this instrument yet
+                return !f.members.some((m: any) => normalizeInstrument(m.instrument) === norm);
               });
 
               if (!target) {
@@ -790,8 +800,11 @@ export function TeacherDashboard({
                 });
               });
 
+              const isAlreadyFullId = groupKey.startsWith('pool_') || groupKey.startsWith('form_') || groupKey.startsWith('auto_') || groupKey.includes('-') || groupKey.length > 20;
+              const formationId = isAlreadyFullId ? groupKey : `pool_${song.id}_${level}_${groupKey}`;
+
               poolFormations.push({
-                id: `pool_${song.id}_${level}_${groupKey}`,
+                id: formationId,
                 song: song,
                 members,
                 openSlots: missingInstruments.length,
