@@ -8347,124 +8347,245 @@ function App() {
         <QRCodeModal user={user} onClose={() => setShowQR(false)} />
       )}
       {/* Mobile Bottom Navigation */}
-      <nav className="mobile-nav" style={{ gap: '4px', padding: '12px 8px 32px 8px', justifyContent: 'space-around' }}>
-        {/* Live Lab (special highlighted button, not a standard menu point) */}
-        <button 
-          onClick={() => setActiveStudentTab('live')} 
-          style={{ 
-            background: activeStudentTab === 'live' ? '#fef3c7' : '#ffffff', 
-            border: activeStudentTab === 'live' ? 'none' : '1px solid #e2e8f0', 
-            display: 'flex', 
-            flexDirection: 'column', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            gap: '2px', 
-            color: activeStudentTab === 'live' ? '#b45309' : '#64748b', 
-            cursor: 'pointer',
-            padding: '6px 10px',
-            borderRadius: '16px',
-            boxShadow: activeStudentTab === 'live' ? '0 4px 12px rgba(234, 179, 8, 0.25)' : '0 2px 6px rgba(0, 0, 0, 0.02)',
-            position: 'relative',
-            flex: '0 0 auto',
-            minWidth: '64px',
-            height: '52px',
-            transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-          }}
-          className="hover-scale"
-        >
-          <span style={{ 
-            position: 'absolute', 
-            top: '4px', 
-            right: '4px', 
-            width: '8px', 
-            height: '8px', 
-            borderRadius: '50%', 
-            background: '#ef4444', 
-            boxShadow: '0 0 8px #ef4444' 
-          }} className="animate-pulse"></span>
-          <Monitor size={20} color={activeStudentTab === 'live' ? '#b45309' : '#64748b'} />
-          <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.01em' }}>Live Lab</span>
-        </button>
+      {/* Mobile Bottom Navigation */}
+      <nav className="mobile-nav">
+        {user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'teacher' ? (
+          <>
+            {/* Live Lab (special highlighted button) */}
+            <button 
+              onClick={() => setActiveStudentTab('live')} 
+              style={{ 
+                background: activeStudentTab === 'live' ? '#fef3c7' : '#ffffff', 
+                border: activeStudentTab === 'live' ? 'none' : '1px solid #e2e8f0', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                gap: '2px', 
+                color: activeStudentTab === 'live' ? '#b45309' : '#64748b', 
+                cursor: 'pointer',
+                padding: '6px 10px',
+                borderRadius: '16px',
+                boxShadow: activeStudentTab === 'live' ? '0 4px 12px rgba(234, 179, 8, 0.25)' : '0 2px 6px rgba(0, 0, 0, 0.02)',
+                position: 'relative',
+                flex: '0 0 auto',
+                minWidth: '72px',
+                height: '52px',
+                transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+              }}
+              className="hover-scale"
+            >
+              <span style={{ 
+                position: 'absolute', 
+                top: '4px', 
+                right: '4px', 
+                width: '8px', 
+                height: '8px', 
+                borderRadius: '50%', 
+                background: '#ef4444', 
+                boxShadow: '0 0 8px #ef4444' 
+              }} className="animate-pulse"></span>
+              <Monitor size={20} color={activeStudentTab === 'live' ? '#b45309' : '#64748b'} />
+              <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.01em' }}>Live Lab</span>
+            </button>
 
-        <button onClick={() => setActiveStudentTab('practice')} className={activeStudentTab === 'practice' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'practice' ? brandColor : '#94a3b8', cursor: 'pointer', flex: 1 }}>
-          <Play size={20} />
-          <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Üben</span>
-        </button>
+            {/* Nachrichten */}
+            <button onClick={() => setActiveStudentTab('messages')} className={activeStudentTab === 'messages' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'messages' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
+              <div style={{ position: 'relative', display: 'inline-flex' }}>
+                <Mail size={20} />
+                {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length > 0 && (
+                  <span style={{ 
+                    position: 'absolute', 
+                    top: '-4px', 
+                    right: '-8px', 
+                    background: '#ef4444', 
+                    color: 'white', 
+                    fontSize: '0.55rem', 
+                    fontWeight: 900, 
+                    padding: '1px 4px', 
+                    borderRadius: '10px',
+                    minWidth: '14px',
+                    height: '14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 2px 4px rgba(239, 68, 68, 0.3)'
+                  }}>
+                    {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length}
+                  </span>
+                )}
+              </div>
+              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Nachrichten</span>
+            </button>
 
-        <button onClick={() => setActiveStudentTab('library')} className={activeStudentTab === 'library' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'library' ? brandColor : '#94a3b8', cursor: 'pointer', flex: 1 }}>
-          <Library size={20} />
-          <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Bibliothek</span>
-        </button>
+            {/* Schüler */}
+            <button onClick={() => setActiveStudentTab('students')} className={activeStudentTab === 'students' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'students' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
+              <Users size={20} />
+              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Schüler</span>
+            </button>
 
-        <button onClick={() => setActiveStudentTab('repertoire')} className={activeStudentTab === 'repertoire' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'repertoire' ? brandColor : '#94a3b8', cursor: 'pointer', flex: 1 }}>
-          <Award size={20} />
-          <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Repertoire</span>
-        </button>
+            {/* Team */}
+            <button onClick={() => setActiveStudentTab('team')} className={activeStudentTab === 'team' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'team' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
+              <Shield size={20} />
+              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Team</span>
+            </button>
 
-        <button onClick={() => setActiveStudentTab('matching')} className={activeStudentTab === 'matching' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'matching' ? brandColor : '#94a3b8', cursor: 'pointer', flex: 1 }}>
-          <Users size={20} />
-          <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Band-Matching</span>
-        </button>
+            {/* Räume */}
+            <button onClick={() => setActiveStudentTab('rooms')} className={activeStudentTab === 'rooms' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'rooms' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
+              <Box size={20} />
+              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Räume</span>
+            </button>
 
-        <button onClick={() => setActiveStudentTab('bands')} className={activeStudentTab === 'bands' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'bands' ? brandColor : '#94a3b8', cursor: 'pointer', flex: 1 }}>
-          <Box size={20} />
-          <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Bands</span>
-        </button>
+            {/* Songs */}
+            <button onClick={() => setActiveStudentTab('songs')} className={activeStudentTab === 'songs' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'songs' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
+              <Library size={20} />
+              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Songs</span>
+            </button>
 
-        {user?.show_messages_menu !== false && (
-          <button 
-            onClick={() => setActiveStudentTab('messages')} 
-            className={activeStudentTab === 'messages' ? 'active' : ''} 
-            style={{ 
-              background: 'transparent', 
-              border: 'none', 
-              display: 'flex', 
-              flexDirection: 'column', 
-              alignItems: 'center', 
-              justifyContent: 'center', 
-              gap: '4px', 
-              color: activeStudentTab === 'messages' ? brandColor : '#94a3b8', 
-              cursor: 'pointer', 
-              flex: 1 
-            }}
-          >
-            <div style={{ position: 'relative', display: 'inline-flex' }}>
-              <Megaphone size={20} />
-              {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length > 0 && (
-                <span style={{ 
-                  position: 'absolute', 
-                  top: '-4px', 
-                  right: '-8px', 
-                  background: '#ef4444', 
-                  color: 'white', 
-                  fontSize: '0.55rem', 
-                  fontWeight: 900, 
-                  padding: '1px 4px', 
-                  borderRadius: '10px',
-                  minWidth: '14px',
-                  height: '14px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 2px 4px rgba(239, 68, 68, 0.3)'
-                }}>
-                  {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length}
-                </span>
-              )}
-            </div>
-            <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Nachrichten</span>
-          </button>
+            {/* Bands */}
+            <button onClick={() => setActiveStudentTab('bands')} className={activeStudentTab === 'bands' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'bands' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
+              <Box size={20} />
+              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Bands</span>
+            </button>
+
+            {/* Statistik */}
+            <button onClick={() => setActiveStudentTab('stats')} className={activeStudentTab === 'stats' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'stats' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
+              <Music size={20} />
+              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Statistik</span>
+            </button>
+
+            {/* ID Galerie */}
+            <button onClick={() => setActiveStudentTab('gallery')} className={activeStudentTab === 'gallery' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'gallery' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
+              <QrCode size={20} />
+              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>ID Galerie</span>
+            </button>
+
+            {/* Setup */}
+            <button onClick={() => setActiveStudentTab('setup')} className={activeStudentTab === 'setup' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'setup' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
+              <Settings size={20} />
+              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Setup</span>
+            </button>
+          </>
+        ) : (
+          <>
+            {/* Student Bottom Navigation (Original) */}
+            <button 
+              onClick={() => setActiveStudentTab('live')} 
+              style={{ 
+                background: activeStudentTab === 'live' ? '#fef3c7' : '#ffffff', 
+                border: activeStudentTab === 'live' ? 'none' : '1px solid #e2e8f0', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                gap: '2px', 
+                color: activeStudentTab === 'live' ? '#b45309' : '#64748b', 
+                cursor: 'pointer',
+                padding: '6px 10px',
+                borderRadius: '16px',
+                boxShadow: activeStudentTab === 'live' ? '0 4px 12px rgba(234, 179, 8, 0.25)' : '0 2px 6px rgba(0, 0, 0, 0.02)',
+                position: 'relative',
+                flex: '0 0 auto',
+                minWidth: '72px',
+                height: '52px',
+                transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+              }}
+              className="hover-scale"
+            >
+              <span style={{ 
+                position: 'absolute', 
+                top: '4px', 
+                right: '4px', 
+                width: '8px', 
+                height: '8px', 
+                borderRadius: '50%', 
+                background: '#ef4444', 
+                boxShadow: '0 0 8px #ef4444' 
+              }} className="animate-pulse"></span>
+              <Monitor size={20} color={activeStudentTab === 'live' ? '#b45309' : '#64748b'} />
+              <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.01em' }}>Live Lab</span>
+            </button>
+
+            <button onClick={() => setActiveStudentTab('practice')} className={activeStudentTab === 'practice' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'practice' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
+              <Play size={20} />
+              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Üben</span>
+            </button>
+
+            <button onClick={() => setActiveStudentTab('library')} className={activeStudentTab === 'library' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'library' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
+              <Library size={20} />
+              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Bibliothek</span>
+            </button>
+
+            <button onClick={() => setActiveStudentTab('repertoire')} className={activeStudentTab === 'repertoire' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'repertoire' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
+              <Award size={20} />
+              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Repertoire</span>
+            </button>
+
+            <button onClick={() => setActiveStudentTab('matching')} className={activeStudentTab === 'matching' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'matching' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
+              <Users size={20} />
+              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Band-Matching</span>
+            </button>
+
+            <button onClick={() => setActiveStudentTab('bands')} className={activeStudentTab === 'bands' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'bands' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
+              <Box size={20} />
+              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Bands</span>
+            </button>
+
+            {user?.show_messages_menu !== false && (
+              <button 
+                onClick={() => setActiveStudentTab('messages')} 
+                className={activeStudentTab === 'messages' ? 'active' : ''} 
+                style={{ 
+                  background: 'transparent', 
+                  border: 'none', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: '4px', 
+                  color: activeStudentTab === 'messages' ? brandColor : '#94a3b8', 
+                  cursor: 'pointer'
+                }}
+              >
+                <div style={{ position: 'relative', display: 'inline-flex' }}>
+                  <Megaphone size={20} />
+                  {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length > 0 && (
+                    <span style={{ 
+                      position: 'absolute', 
+                      top: '-4px', 
+                      right: '-8px', 
+                      background: '#ef4444', 
+                      color: 'white', 
+                      fontSize: '0.55rem', 
+                      fontWeight: 900, 
+                      padding: '1px 4px', 
+                      borderRadius: '10px',
+                      minWidth: '14px',
+                      height: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 2px 4px rgba(239, 68, 68, 0.3)'
+                    }}>
+                      {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length}
+                    </span>
+                  )}
+                </div>
+                <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Nachrichten</span>
+              </button>
+            )}
+
+            <button onClick={() => setActiveStudentTab('profile')} className={activeStudentTab === 'profile' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'profile' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
+              <Shield size={20} />
+              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Profil</span>
+            </button>
+
+            <button onClick={() => setActiveStudentTab('team')} className={activeStudentTab === 'team' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'team' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
+              <Music size={20} />
+              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Team</span>
+            </button>
+          </>
         )}
-
-        <button onClick={() => setActiveStudentTab('profile')} className={activeStudentTab === 'profile' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'profile' ? brandColor : '#94a3b8', cursor: 'pointer', flex: 1 }}>
-          <Shield size={20} />
-          <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Profil</span>
-        </button>
-
-        <button onClick={() => setActiveStudentTab('team')} className={activeStudentTab === 'team' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'team' ? brandColor : '#94a3b8', cursor: 'pointer', flex: 1 }}>
-          <Music size={20} />
-          <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Team</span>
-        </button>
       </nav>
       {/* Announcement Notification Modal */}
       {activeAnnouncement && (() => {
