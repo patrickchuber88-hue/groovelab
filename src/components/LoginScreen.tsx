@@ -212,8 +212,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       await supabase.from('sessions').update({ check_out_time: now }).eq('user_id', user.id).is('check_out_time', null);
 
       if (!isHome) {
-        // 3. Station Cleanup: If using a station, ensure it's free
-        if (finalStationId) {
+        // 3. Station Cleanup: If using a station, ensure it's free.
+        // We only terminate other sessions if the station is NOT the teacher iPad (i.e. user is not a teacher).
+        if (finalStationId && !isTeacher) {
           await supabase.from('sessions').update({ check_out_time: now }).eq('station_id', finalStationId).is('check_out_time', null);
         }
         
