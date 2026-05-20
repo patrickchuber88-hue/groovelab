@@ -8886,7 +8886,7 @@ function App() {
       <ArtistGateway 
         show={!!selectedBandForGateway || !!pendingFounding} 
         onClose={() => {
-          gatewayJustClosed.current = true;
+gatewayJustClosed.current = true;
           setSelectedBandForGateway(null);
           setPendingFounding(null);
           clearConfetti();
@@ -8915,15 +8915,110 @@ interface SecurePdfViewerModalProps {
   onClose: () => void;
 }
 
+// Reusable PDF Page renderer component using HTML5 Canvas and PDF.js
+const PdfPage: React.FC<{ pdf: any; pageNum: number; width: number }> = ({ pdf, pageNum, width }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [loading, setLoading] = useState(true);
+  const [renderError, setRenderError] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    let renderTask: any = null;
+
+    const renderPage = async () => {
+      try {
+        setLoading(true);
+        setRenderError(false);
+        const page = await pdf.getPage(pageNum);
+        if (!isMounted) return;
+
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const context = canvas.getContext('2d');
+        if (!context) return;
+
+        const unscaledViewport = page.getViewport({ scale: 1.0 });
+        const targetWidth = width > 0 ? width : 1000;
+        const scale = targetWidth / unscaledViewport.width;
+        const viewport = page.getViewport({ scale });
+
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = viewport.width * dpr;
+        canvas.height = viewport.height * dpr;
+        canvas.style.width = `${viewport.width}px`;
+        canvas.style.height = `${viewport.height}px`;
+
+        context.scale(dpr, dpr);
+
+        const renderContext = {
+          canvasContext: context,
+          viewport: viewport,
+        };
+
+        renderTask = page.render(renderContext);
+        await renderTask.promise;
+        if (isMounted) {
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error(`Error rendering PDF page ${pageNum}:`, err);
+        if (isMounted) {
+          setRenderError(true);
+          setLoading(false);
+        }
+      }
+    };
+
+    renderPage();
+    return () => {
+      isMounted = false;
+      if (renderTask && renderTask.cancel) {
+        renderTask.cancel();
+      }
+    };
+  }, [pdf, pageNum, width]);
+
+  return (
+    <div style={{ 
+      position: 'relative', 
+      width: '100%', 
+      display: 'flex', 
+      flexDirection: 'column',
+      alignItems: 'center', 
+      background: 'white', 
+      borderBottom: '16px solid #e2e8f0',
+      minHeight: width > 0 ? `${width * 1.414}px` : '600px'
+    }}>
+      {loading && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', gap: '12px', zIndex: 1 }}>
+          <div className="custom-animate-spin" style={{ width: '32px', height: '32px', borderRadius: '50%', border: '3px solid rgba(59, 130, 246, 0.1)', borderTop: '3px solid #3b82f6' }} />
+          <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Lade Seite {pageNum}...</span>
+        </div>
+      )}
+      {renderError ? (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fff5f5', color: '#e53e3e', padding: '20px', textAlign: 'center' }}>
+          <span style={{ fontSize: '1.5rem', marginBottom: '8px' }}>⚠️</span>
+          <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>Seite {pageNum} konnte nicht gerendert werden.</span>
+        </div>
+      ) : (
+        <canvas ref={canvasRef} style={{ display: 'block', maxWidth: '100%' }} />
+      )}
+    </div>
+  );
+};
+
 const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folderUrl, onClose }) => {
   const [activeSlide, setActiveSlide] = useState(0);
   const [showCopyAlert, setShowCopyAlert] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState<'starter' | 'pro'>('starter');
-  const [pageCount, setPageCount] = useState<number>(3); // Default fallback of 3 pages (covers most sheet music)
+  const [pageCount, setPageCount] = useState<number>(3);
   const [isPageCountFallback, setIsPageCountFallback] = useState(true);
   const [containerWidth, setContainerWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [pdfDocument, setPdfDocument] = useState<any>(null);
+  const [pdfError, setPdfError] = useState<boolean>(false);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -8938,70 +9033,35 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
     return () => observer.disconnect();
   }, []);
 
-  const pageHeight = containerWidth * 1.414 + 16; // A4 aspect ratio + margin buffer
+  const pageHeight = containerWidth * 1.414 + 16;
   const sheetHeight = pageCount * pageHeight;
 
   const getPdfSlides = () => {
     const slides: { id: string; label: string; icon: string; desc: string }[] = [];
     const insts = song.instrumentation || {};
-    
-    const isWebspace = folderUrl && 
-      !folderUrl.includes('dropbox.com') && 
-      !folderUrl.includes('drive.google.com') && 
-      !folderUrl.includes('onedrive.live.com') && 
-      !folderUrl.includes('1drv.ms');
-      
+    const isWebspace = folderUrl && !folderUrl.includes('dropbox.com') && !folderUrl.includes('drive.google.com') && !folderUrl.includes('onedrive.live.com') && !folderUrl.includes('1drv.ms');
     const hasAnyDirectPdf = !!(song.pdf_guitar_url || song.pdf_bass_url || song.pdf_drums_url || song.pdf_keys_url || song.pdf_vocals_url);
     
-    if (insts['E-Gitarre'] > 0) {
-      if (!hasAnyDirectPdf || !!song.pdf_guitar_url || isWebspace) {
-        slides.push({ id: 'guitar', label: 'E-Gitarre', icon: '🎸', desc: 'Stimme für E-Gitarre (Starter & Pro)' });
-      }
-    }
-    if (insts['E-Bass'] > 0) {
-      if (!hasAnyDirectPdf || !!song.pdf_bass_url || isWebspace) {
-        slides.push({ id: 'bass', label: 'E-Bass', icon: '🎸', desc: 'Stimme für E-Bass (Starter & Pro)' });
-      }
-    }
-    if (insts['E-Drums'] > 0) {
-      if (!hasAnyDirectPdf || !!song.pdf_drums_url || isWebspace) {
-        slides.push({ id: 'drums', label: 'E-Drums', icon: '🥁', desc: 'Stimme für E-Drums / Schlagzeug' });
-      }
-    }
-    if (insts['E-Piano'] > 0) {
-      if (!hasAnyDirectPdf || !!song.pdf_keys_url || isWebspace) {
-        slides.push({ id: 'keys', label: 'E-Piano', icon: '🎹', desc: 'Stimme für Keyboard & E-Piano' });
-      }
-    }
-    
-    if (!hasAnyDirectPdf || !!song.pdf_vocals_url || isWebspace) {
-      slides.push({ id: 'vocals', label: 'Gesang / Lyrics', icon: '🎤', desc: 'Songtext, Gesangspart und Vocal-Harmonien' });
-    }
-    
+    if (insts['E-Gitarre'] > 0) { if (!hasAnyDirectPdf || !!song.pdf_guitar_url || isWebspace) slides.push({ id: 'guitar', label: 'E-Gitarre', icon: '🎸', desc: 'Stimme für E-Gitarre (Starter & Pro)' }); }
+    if (insts['E-Bass'] > 0) { if (!hasAnyDirectPdf || !!song.pdf_bass_url || isWebspace) slides.push({ id: 'bass', label: 'E-Bass', icon: '🎸', desc: 'Stimme für E-Bass (Starter & Pro)' }); }
+    if (insts['E-Drums'] > 0) { if (!hasAnyDirectPdf || !!song.pdf_drums_url || isWebspace) slides.push({ id: 'drums', label: 'E-Drums', icon: '🥁', desc: 'Stimme für E-Drums / Schlagzeug' }); }
+    if (insts['E-Piano'] > 0) { if (!hasAnyDirectPdf || !!song.pdf_keys_url || isWebspace) slides.push({ id: 'keys', label: 'E-Piano', icon: '🎹', desc: 'Stimme für Keyboard & E-Piano' }); }
+    if (!hasAnyDirectPdf || !!song.pdf_vocals_url || isWebspace) slides.push({ id: 'vocals', label: 'Gesang / Lyrics', icon: '🎤', desc: 'Songtext, Gesangspart und Vocal-Harmonien' });
     return slides;
   };
 
   const slides = getPdfSlides();
 
-  // Keyboard shortcut listener to prevent Copy, Save, and Print
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isCmdOrCtrl = e.metaKey || e.ctrlKey;
-      if (
-        (isCmdOrCtrl && e.key.toLowerCase() === 'p') || // Print
-        (isCmdOrCtrl && e.key.toLowerCase() === 's') || // Save
-        (isCmdOrCtrl && e.key.toLowerCase() === 'c') || // Copy
-        e.key === 'PrintScreen'
-      ) {
+      if ((isCmdOrCtrl && e.key.toLowerCase() === 'p') || (isCmdOrCtrl && e.key.toLowerCase() === 's') || (isCmdOrCtrl && e.key.toLowerCase() === 'c') || e.key === 'PrintScreen') {
         e.preventDefault();
         setShowCopyAlert(true);
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   useEffect(() => {
@@ -9014,54 +9074,41 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
   const getActiveUrl = () => {
     const activeSlideId = slides[activeSlide]?.id;
     let url = '';
-    
     if (activeSlideId === 'guitar') url = song.pdf_guitar_url;
     else if (activeSlideId === 'bass') url = song.pdf_bass_url;
     else if (activeSlideId === 'drums') url = song.pdf_drums_url;
     else if (activeSlideId === 'keys') url = song.pdf_keys_url;
     else if (activeSlideId === 'vocals') url = song.pdf_vocals_url;
-    
     if (url) return url;
-    
-    // Falls kein spezifischer Link da ist: Prüfen, ob folderUrl ein Webspace/Direkt-Pfad ist
     if (folderUrl && !folderUrl.includes('dropbox.com') && !folderUrl.includes('drive.google.com') && !folderUrl.includes('onedrive.live.com') && !folderUrl.includes('1drv.ms')) {
       let base = folderUrl;
       if (!base.endsWith('/')) base += '/';
-      
       const suffix = selectedLevel === 'pro' ? '_pro' : '_starter';
-      
       if (activeSlideId === 'guitar') return base + `gitarre${suffix}.pdf`;
       if (activeSlideId === 'bass') return base + `bass${suffix}.pdf`;
       if (activeSlideId === 'drums') return base + `drums${suffix}.pdf`;
       if (activeSlideId === 'keys') return base + `piano${suffix}.pdf`;
       if (activeSlideId === 'vocals') return base + 'gesang.pdf';
     }
-    
     return folderUrl;
   };
 
   const activeUrl = getActiveUrl();
-  
   const isDropbox = activeUrl && activeUrl.includes('dropbox.com');
-  const isGoogleDrive = activeUrl && activeUrl.includes('drive.google.com');
-  const isOneDrive = activeUrl && (activeUrl.includes('onedrive.live.com') || activeUrl.includes('1drv.ms'));
-
-  // We only show the Dropbox folder block screen if it's NOT a direct file URL. Direct files render beautifully!
-  const isDropboxFolder = isDropbox && 
-    (activeUrl.includes('/scl/fo/') || activeUrl.includes('/sh/') || 
-     !(activeUrl.includes('.pdf') || activeUrl.includes('/scl/fi/') || activeUrl.includes('/s/')));
+  const isDropboxFolder = isDropbox && (activeUrl.includes('/scl/fo/') || activeUrl.includes('/sh/') || !(activeUrl.includes('.pdf') || activeUrl.includes('/scl/fi/') || activeUrl.includes('/s/')));
 
   useEffect(() => {
     if (!activeUrl) return;
-    
     if (isDropboxFolder) {
       setPdfLoading(false);
+      setPdfDocument(null);
+      setPdfError(false);
       return;
     }
-
     let isMounted = true;
     setPdfLoading(true);
-
+    setPdfDocument(null);
+    setPdfError(false);
     const countPages = async () => {
       try {
         let pdfjsLib = (window as any).pdfjsLib;
@@ -9070,31 +9117,20 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
           script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
           script.async = true;
           document.body.appendChild(script);
-          await new Promise((resolve, reject) => {
-            script.onload = resolve;
-            script.onerror = reject;
-          });
+          await new Promise((resolve, reject) => { script.onload = resolve; script.onerror = reject; });
           pdfjsLib = (window as any).pdfjsLib;
         }
-
         if (pdfjsLib) {
           pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-          
           let fetchUrl = activeUrl;
           if (fetchUrl && fetchUrl.includes('dropbox.com')) {
             fetchUrl = fetchUrl.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
-            if (fetchUrl.includes('?')) {
-              fetchUrl = fetchUrl.replace(/[?&]dl=[01]/, '').replace(/[?&]raw=[01]/, '');
-              fetchUrl += (fetchUrl.includes('?') ? '&' : '?') + 'raw=1';
-            } else {
-              fetchUrl += '?raw=1';
-            }
+            fetchUrl = fetchUrl.replace(/[?&]dl=[01]/, '').replace(/[?&]raw=[01]/, '') + (fetchUrl.includes('?') ? '&' : '?') + 'raw=1';
           }
-
           const loadingTask = pdfjsLib.getDocument(fetchUrl);
           const pdf = await loadingTask.promise;
           if (isMounted) {
-            console.log('[SecurePdfViewerModal] Page count loaded:', pdf.numPages);
+            setPdfDocument(pdf);
             setPageCount(pdf.numPages);
             setIsPageCountFallback(false);
             setPdfLoading(false);
@@ -9103,604 +9139,109 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
       } catch (e) {
         console.error('[SecurePdfViewerModal] Error getting PDF page count:', e);
         if (isMounted) {
-          setPageCount(3); // Default fallback of 3 pages (A4 size)
+          setPdfDocument(null);
+          setPdfError(true);
+          setPageCount(3);
           setIsPageCountFallback(true);
           setPdfLoading(false);
         }
       }
     };
-
     countPages();
-
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, [activeUrl, isDropboxFolder]);
 
-  // Adjust OneDrive/Dropbox/GoogleDrive URL to be optimized for embed
   const getSecureEmbedUrl = () => {
     let url = activeUrl;
     if (!url) return '';
-    
-    if (isGoogleDrive) {
-      // Direct file preview
+    if (url.includes('drive.google.com')) {
       const fileIdMatch = url.match(/\/file\/d\/([a-zA-Z0-9-_]+)/);
-      if (fileIdMatch && fileIdMatch[1]) {
-        return `https://drive.google.com/file/d/${fileIdMatch[1]}/preview`;
-      }
-      
-      const folderIdMatch = url.match(/\/folders\/([a-zA-Z0-9-_]+)/);
-      if (folderIdMatch && folderIdMatch[1]) {
-        return `https://drive.google.com/embeddedfolderview?id=${folderIdMatch[1]}#list`;
-      }
+      if (fileIdMatch && fileIdMatch[1]) return `https://drive.google.com/file/d/${fileIdMatch[1]}/preview`;
     }
-    
-    if (isOneDrive) {
-      if (url.includes('1drv.ms')) {
-        return url.replace('/f/', '/embed/');
-      }
-      return url.replace('redir?', 'embed?').replace('view.aspx', 'embed.aspx');
+    if (url.includes('onedrive.live.com') || url.includes('1drv.ms')) {
+      return url.includes('1drv.ms') ? url.replace('/f/', '/embed/') : url.replace('redir?', 'embed?').replace('view.aspx', 'embed.aspx');
     }
-
-    if (isDropbox) {
-      const isFile = (url.includes('.pdf') || url.includes('/scl/fi/') || url.includes('/s/')) && 
-        !url.includes('/scl/fo/') && !url.includes('/sh/');
-      if (isFile) {
-        let embedUrl = url;
-        if (embedUrl.includes('?')) {
-          embedUrl = embedUrl.replace(/[?&]dl=[01]/, '').replace(/[?&]raw=[01]/, '');
-          embedUrl += (embedUrl.includes('?') ? '&' : '?') + 'raw=1';
-        } else {
-          embedUrl += '?raw=1';
-        }
-        return embedUrl + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH,0';
-      }
+    if (isDropbox && (url.includes('.pdf') || url.includes('/scl/fi/') || url.includes('/s/'))) {
+      return url.replace(/[?&]dl=[01]/, '').replace(/[?&]raw=[01]/, '') + '?raw=1#toolbar=0&navpanes=0&scrollbar=0&view=FitH,0';
     }
-    
-    // For standard self-hosted PDF links
-    if (url.toLowerCase().endsWith('.pdf') || url.includes('.pdf?')) {
-      if (!url.includes('#toolbar=')) {
-        return url + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH,0';
-      }
-    }
-    
-    return url;
-  };
-
-  const nextSlide = () => {
-    setActiveSlide((prev) => (prev + 1) % slides.length);
-  };
-
-  const prevSlide = () => {
-    setActiveSlide((prev) => (prev - 1 + slides.length) % slides.length);
+    return url.toLowerCase().endsWith('.pdf') || url.includes('.pdf?') ? url + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH,0' : url;
   };
 
   return (
-    <div 
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 5000,
-        background: 'rgba(15, 23, 42, 0.95)',
-        backdropFilter: 'blur(20px)',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden', // Prevent any scrolling at modal backdrop level
-        userSelect: 'none',
-        WebkitUserSelect: 'none',
-      }}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        setShowCopyAlert(true);
-      }}
-    >
-      {/* Alert Banner for Copy Prevention */}
+    <div style={{ position: 'fixed', inset: 0, zIndex: 5000, background: 'rgba(15, 23, 42, 0.95)', backdropFilter: 'blur(20px)', display: 'flex', flexDirection: 'column', overflow: 'hidden', userSelect: 'none', WebkitUserSelect: 'none' }} onContextMenu={(e) => { e.preventDefault(); setShowCopyAlert(true); }}>
       {showCopyAlert && (
-        <div style={{
-          position: 'fixed',
-          top: '24px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          background: 'linear-gradient(135deg, #ef4444, #b91c1c)',
-          color: 'white',
-          padding: '16px 28px',
-          borderRadius: '16px',
-          fontWeight: 800,
-          fontSize: '0.95rem',
-          boxShadow: '0 10px 25px rgba(239, 68, 68, 0.4)',
-          zIndex: 6000,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          border: '1px solid rgba(255,255,255,0.2)',
-          animation: 'shake 0.5s cubic-bezier(.36,.07,.19,.97) both'
-        }}>
+        <div style={{ position: 'fixed', top: '24px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(135deg, #ef4444, #b91c1c)', color: 'white', padding: '16px 28px', borderRadius: '16px', fontWeight: 800, fontSize: '0.95rem', boxShadow: '0 10px 25px rgba(239, 68, 68, 0.4)', zIndex: 6000, display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid rgba(255,255,255,0.2)' }}>
           <Lock size={18} />
           Sicherer GrooveLab-Modus: Kopieren, Speichern und Drucken ist deaktiviert! 🔒
         </div>
       )}
-
-      {/* Sleek, Ultra-Compact Unified Header (Single Row to Maximize PDF Space) */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '10px 24px',
-        borderBottom: '1px solid rgba(255,255,255,0.08)',
-        background: 'rgba(15, 23, 42, 0.9)',
-        height: '56px',
-        minHeight: '56px',
-        zIndex: 10,
-        overflow: 'hidden' // Absolutely prevent horizontal overflow
-      }}>
-        {/* Left Side: Compact Title & Security */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(15, 23, 42, 0.9)', height: '56px', minHeight: '56px', zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flexShrink: 1 }}>
-          <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '8px',
-            background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0
-          }}>
+          <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Library size={16} color="white" />
           </div>
           <div style={{ minWidth: 0 }}>
-            <h2 style={{ 
-              fontSize: '0.95rem', 
-              fontWeight: 900, 
-              color: 'white', 
-              margin: 0, 
-              whiteSpace: 'nowrap', 
-              overflow: 'hidden', 
-              textOverflow: 'ellipsis' 
-            }}>
+            <h2 style={{ fontSize: '0.95rem', fontWeight: 900, color: 'white', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {song.title} <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600 }}>({song.artist})</span>
             </h2>
           </div>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            background: 'rgba(239, 68, 68, 0.15)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            padding: '2px 8px',
-            borderRadius: '20px',
-            fontSize: '0.65rem',
-            fontWeight: 900,
-            color: '#f87171',
-            flexShrink: 0
-          }}>
-            <span className="flashing-dot" style={{
-              width: '5px',
-              height: '5px',
-              borderRadius: '50%',
-              background: '#ef4444'
-            }} />
-            SCHUTZ
-          </div>
         </div>
-
-        {/* Center Side: Compact Tabs Selector & Dynamic Level Switcher */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }}>
-          <div style={{
-            display: 'flex',
-            background: 'rgba(30, 41, 59, 0.8)',
-            borderRadius: '12px',
-            padding: '3px',
-            border: '1px solid rgba(255,255,255,0.08)',
-            overflowX: 'auto',
-            maxWidth: '400px'
-          }}>
-            {slides.map((slide, index) => {
-              const isActive = index === activeSlide;
-              
-              const isWebspace = folderUrl && 
-                !folderUrl.includes('dropbox.com') && 
-                !folderUrl.includes('drive.google.com') && 
-                !folderUrl.includes('onedrive.live.com') && 
-                !folderUrl.includes('1drv.ms');
-                
-              let hasSpecificUrl = isWebspace;
-              if (slide.id === 'guitar') hasSpecificUrl = hasSpecificUrl || !!song.pdf_guitar_url;
-              else if (slide.id === 'bass') hasSpecificUrl = hasSpecificUrl || !!song.pdf_bass_url;
-              else if (slide.id === 'drums') hasSpecificUrl = hasSpecificUrl || !!song.pdf_drums_url;
-              else if (slide.id === 'keys') hasSpecificUrl = hasSpecificUrl || !!song.pdf_keys_url;
-              else if (slide.id === 'vocals') hasSpecificUrl = hasSpecificUrl || !!song.pdf_vocals_url;
-
-              return (
-                <button
-                  key={slide.id}
-                  onClick={() => setActiveSlide(index)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    background: isActive ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'transparent',
-                    color: isActive ? 'white' : '#94a3b8',
-                    border: 'none',
-                    padding: '6px 14px',
-                    borderRadius: '9px',
-                    fontSize: '0.8rem',
-                    fontWeight: isActive ? 900 : 700,
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    boxShadow: isActive ? '0 3px 8px rgba(59, 130, 246, 0.2)' : 'none',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <span>{slide.icon}</span>
-                  <span>{slide.label}</span>
-                  {hasSpecificUrl && (
-                    <span style={{
-                      fontSize: '0.6rem',
-                      background: isActive ? 'rgba(255,255,255,0.25)' : 'rgba(34, 197, 94, 0.15)',
-                      color: isActive ? 'white' : '#22c55e',
-                      padding: '1px 5px',
-                      borderRadius: '6px',
-                      fontWeight: 900,
-                      marginLeft: '4px'
-                    }}>
-                      Direkt
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+          <div style={{ display: 'flex', background: 'rgba(30, 41, 59, 0.8)', borderRadius: '12px', padding: '3px', border: '1px solid rgba(255,255,255,0.08)', overflowX: 'auto', maxWidth: '400px' }}>
+            {slides.map((slide, index) => (
+              <button key={slide.id} onClick={() => setActiveSlide(index)} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: index === activeSlide ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'transparent', color: index === activeSlide ? 'white' : '#94a3b8', border: 'none', padding: '6px 14px', borderRadius: '9px', fontSize: '0.8rem', fontWeight: index === activeSlide ? 900 : 700, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s ease' }}>
+                <span>{slide.icon}</span>
+                <span>{slide.label}</span>
+              </button>
+            ))}
           </div>
-
-          {/* Premium Segmented Level Switcher (Only visible for actual instruments) */}
           {slides[activeSlide]?.id !== 'vocals' && (
-            <div style={{
-              display: 'flex',
-              background: 'rgba(30, 41, 59, 0.9)',
-              borderRadius: '10px',
-              padding: '2px',
-              border: '1px solid rgba(255,255,255,0.08)',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              flexShrink: 0
-            }}>
-              <button
-                onClick={() => setSelectedLevel('starter')}
-                style={{
-                  background: selectedLevel === 'starter' ? 'linear-gradient(135deg, #fbbf24, #d97706)' : 'transparent',
-                  color: selectedLevel === 'starter' ? '#1e293b' : '#94a3b8',
-                  border: 'none',
-                  padding: '5px 12px',
-                  borderRadius: '7px',
-                  fontSize: '0.75rem',
-                  fontWeight: 900,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  boxShadow: selectedLevel === 'starter' ? '0 2px 6px rgba(217, 119, 6, 0.3)' : 'none'
-                }}
-              >
-                Starter 🚀
-              </button>
-              <button
-                onClick={() => setSelectedLevel('pro')}
-                style={{
-                  background: selectedLevel === 'pro' ? 'linear-gradient(135deg, #ef4444, #b91c1c)' : 'transparent',
-                  color: selectedLevel === 'pro' ? 'white' : '#94a3b8',
-                  border: 'none',
-                  padding: '5px 12px',
-                  borderRadius: '7px',
-                  fontSize: '0.75rem',
-                  fontWeight: 900,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  boxShadow: selectedLevel === 'pro' ? '0 2px 6px rgba(185, 28, 28, 0.3)' : 'none'
-                }}
-              >
-                Pro 🔥
-              </button>
+            <div style={{ display: 'flex', background: 'rgba(30, 41, 59, 0.9)', borderRadius: '10px', padding: '2px', border: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+              <button onClick={() => setSelectedLevel('starter')} style={{ background: selectedLevel === 'starter' ? 'linear-gradient(135deg, #fbbf24, #d97706)' : 'transparent', color: selectedLevel === 'starter' ? '#1e293b' : '#94a3b8', border: 'none', padding: '5px 12px', borderRadius: '7px', fontSize: '0.75rem', fontWeight: 900, cursor: 'pointer', transition: 'all 0.2s ease' }}>Starter 🚀</button>
+              <button onClick={() => setSelectedLevel('pro')} style={{ background: selectedLevel === 'pro' ? 'linear-gradient(135deg, #ef4444, #b91c1c)' : 'transparent', color: selectedLevel === 'pro' ? 'white' : '#94a3b8', border: 'none', padding: '5px 12px', borderRadius: '7px', fontSize: '0.75rem', fontWeight: 900, cursor: 'pointer', transition: 'all 0.2s ease' }}>Pro 🔥</button>
             </div>
           )}
-
         </div>
-
-        {/* Right Side: Sleek Close Button */}
-        <button 
-          onClick={onClose}
-          className="hover-scale"
-          style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '50%',
-            background: 'rgba(255,255,255,0.08)',
-            border: 'none',
-            color: '#cbd5e1',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'all 0.2s',
-            flexShrink: 0
-          }}
-        >
-          <X size={16} />
-        </button>
+        <button onClick={onClose} style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: 'none', color: '#cbd5e1', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={16} /></button>
       </div>
-
-      {/* Main protected document workspace */}
-      <div style={{
-        flex: 1,
-        position: 'relative',
-        background: '#0f172a',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden'
-      }}>
-        
-        {/* IFRAME WORKSPACE CONTAINER */}
-        <div style={{
-          width: '100%',
-          height: '100%',
-          background: isDropboxFolder ? '#1e293b' : '#0f172a',
-          overflow: 'hidden',
-          position: 'relative',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 0
-        }}>
+      <div style={{ flex: 1, position: 'relative', background: '#0f172a', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ width: '100%', height: '100%', background: isDropboxFolder ? '#1e293b' : '#0f172a', overflow: 'hidden', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
           {isDropboxFolder ? (
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              textAlign: 'center',
-              padding: '40px',
-              maxWidth: '600px',
-              color: 'white'
-            }}>
-              {/* Beautiful Dropbox Icon Simulation */}
-              <div style={{
-                width: '96px',
-                height: '96px',
-                borderRadius: '24px',
-                background: 'linear-gradient(135deg, #0061ff, #0045b5)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 10px 30px rgba(0, 97, 255, 0.3)',
-                marginBottom: '28px'
-              }}>
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="white">
-                  <path d="M6 2l6 4-6 4-6-4 6-4zm12 0l6 4-6 4-6-4 6-4zM6 14l6-4-6-4-6 4 6 4zm12 0l6-4-6-4-6 4 6 4zM12 13l6 4-6 4-6-4 6-4z" />
-                </svg>
-              </div>
-
-              <h3 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: '12px', color: 'white' }}>
-                Sicherer Dropbox-Notenständer 🔒
-              </h3>
-              
-              <p style={{ fontSize: '0.95rem', color: '#94a3b8', lineHeight: '1.6', marginBottom: '32px' }}>
-                Dropbox blockiert aus Datenschutzgründen das direkte Einbetten von Ordnern innerhalb von Fremd-Apps. 
-                Dein schreibgeschützter Noten-Ordner kann jedoch mit einem Klick in einem sicheren Browser-Tab geöffnet werden.
-              </p>
-
-              <button
-                onClick={() => window.open(activeUrl, '_blank')}
-                className="hover-scale"
-                style={{
-                  background: 'linear-gradient(135deg, #0061ff, #0045b5)',
-                  color: 'white',
-                  border: 'none',
-                  padding: '16px 36px',
-                  borderRadius: '16px',
-                  fontWeight: 900,
-                  fontSize: '1rem',
-                  cursor: 'pointer',
-                  boxShadow: '0 8px 20px rgba(0, 97, 255, 0.25)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  transition: 'all 0.25s ease'
-                }}
-              >
-                <span>Ordner in Dropbox öffnen</span>
-                <ExternalLink size={18} />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '40px', maxWidth: '600px', color: 'white' }}>
+              <h3 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: '12px', color: 'white' }}>Sicherer Dropbox-Notenständer 🔒</h3>
+              <p style={{ fontSize: '0.95rem', color: '#94a3b8', marginBottom: '32px' }}>Dropbox blockiert das direkte Einbetten von Ordnern. Öffne den Ordner in einem neuen Tab.</p>
+              <button onClick={() => window.open(activeUrl, '_blank')} style={{ background: 'linear-gradient(135deg, #0061ff, #0045b5)', color: 'white', border: 'none', padding: '16px 36px', borderRadius: '16px', fontWeight: 900, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span>Ordner öffnen</span> <ExternalLink size={18} />
               </button>
-
-              <div style={{
-                marginTop: '48px',
-                padding: '16px 24px',
-                borderRadius: '14px',
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.05)',
-                fontSize: '0.8rem',
-                color: '#64748b',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px'
-              }}>
-                <span>💡</span>
-                <span style={{ textAlign: 'left' }}>
-                  <strong>Tipp für Lehrer:</strong> Um Notenblätter <strong>direkt</strong> anzuzeigen, trage einfach einen <strong>direkten Dropbox-Dateilink</strong> oder Google Drive/OneDrive Link für das jeweilige Instrument in den Song-Einstellungen ein!
-                </span>
-              </div>
             </div>
           ) : (
-            <div 
-              ref={containerRef}
-              style={{
-                width: '100%',
-                maxWidth: '1000px',
-                height: '100%',
-                overflowX: 'hidden', // Disable horizontal scroll
-                overflowY: 'auto',   // Enable vertical scroll only
-                WebkitOverflowScrolling: 'touch', // Native inertia scrolling for iPad
-                background: 'white',
-                position: 'relative',
-                borderRadius: '0px',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-                margin: '0 auto'
-              }}
-            >
-              {/* PDF CONTENT INNER WRAPPER WITH DIRECT INTERACTION PROTECTION */}
-              <div style={{
-                position: 'relative',
-                width: '100%',
-                height: `${sheetHeight}px`, // Dynamic height based on selected page length
-                background: 'white',
-                overflow: 'hidden' // Clip any child overflow
-              }}>
-                {/* 100% TRANSPARENT SECURITY SHIELD */}
-                <div 
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    setShowCopyAlert(true);
-                  }}
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    background: 'transparent',
-                    zIndex: 99,
-                    pointerEvents: 'auto',
-                    cursor: 'default'
-                  }}
-                />
-                
-                <iframe 
-                  src={getSecureEmbedUrl()}
-                  onLoad={() => setPdfLoading(false)}
-                  scrolling="no"
-                  style={{
-                    width: '1px',
-                    minWidth: '100%',
-                    height: '100%',
-                    border: 'none',
-                    pointerEvents: 'none' // Completely dead to Safari/Chrome native floating toolbars and click events!
-                  }}
-                />
-              </div>
-
-              {/* GORGEOUS PREMIUM PDF LOADING OVERLAY (Centered overlay) */}
+            <div ref={containerRef} style={{ width: '100%', maxWidth: '1000px', height: '100%', overflowY: 'auto', background: 'white', position: 'relative', margin: '0 auto' }}>
+              {pdfDocument ? (
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <div onContextMenu={(e) => { e.preventDefault(); setShowCopyAlert(true); }} style={{ position: 'absolute', inset: 0, background: 'transparent', zIndex: 99, pointerEvents: 'auto' }} />
+                  {Array.from({ length: pageCount }).map((_, idx) => (
+                    <PdfPage key={idx} pdf={pdfDocument} pageNum={idx + 1} width={containerWidth} />
+                  ))}
+                </div>
+              ) : (
+                <div style={{ position: 'relative', width: '100%', height: `${sheetHeight}px`, background: 'white', overflow: 'hidden' }}>
+                  <div onContextMenu={(e) => { e.preventDefault(); setShowCopyAlert(true); }} style={{ position: 'absolute', inset: 0, background: 'transparent', zIndex: 99, pointerEvents: 'auto' }} />
+                  <iframe src={getSecureEmbedUrl()} onLoad={() => setPdfLoading(false)} scrolling="no" style={{ width: '1px', minWidth: '100%', height: '100%', border: 'none', pointerEvents: 'none' }} />
+                </div>
+              )}
               {pdfLoading && (
-                <div style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  background: 'rgba(15, 23, 42, 0.85)',
-                  backdropFilter: 'blur(8px)',
-                  WebkitBackdropFilter: 'blur(8px)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 100,
-                  transition: 'all 0.3s ease'
-                }}>
-                  <div style={{ 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    alignItems: 'center', 
-                    gap: '24px',
-                    position: 'sticky',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    animation: 'pulse 2s infinite ease-in-out'
-                  }}>
-                    {/* Beautiful custom spinner */}
-                    <div className="custom-animate-spin" style={{
-                      width: '56px',
-                      height: '56px',
-                      borderRadius: '50%',
-                      border: '4px solid rgba(255, 255, 255, 0.1)',
-                      borderTop: '4px solid #3b82f6',
-                      boxShadow: '0 0 20px rgba(59, 130, 246, 0.3)'
-                    }} />
-                    
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                      <h3 style={{ margin: 0, color: 'white', fontSize: '1.15rem', fontWeight: 900, letterSpacing: '0.5px' }}>
-                        Notenblatt wird geladen
-                      </h3>
-                      <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>
-                        Sichere Verbindung wird hergestellt...
-                      </p>
-                    </div>
-                  </div>
+                <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+                  <div className="custom-animate-spin" style={{ width: '56px', height: '56px', borderRadius: '50%', border: '4px solid rgba(255, 255, 255, 0.1)', borderTop: '4px solid #3b82f6' }} />
                 </div>
               )}
             </div>
           )}
-
-          {/* Floating controls in the bottom right corner for manual override when page count detection falls back */}
           {isPageCountFallback && !isDropboxFolder && (
-            <div style={{
-              position: 'absolute',
-              bottom: '24px',
-              right: '24px',
-              zIndex: 101, // Above transparent security shield (99)
-              background: 'rgba(15, 23, 42, 0.85)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              backdropFilter: 'blur(8px)',
-              WebkitBackdropFilter: 'blur(8px)',
-              borderRadius: '12px',
-              padding: '8px 14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
-              color: 'white',
-              fontSize: '0.75rem',
-              fontWeight: 800,
-              pointerEvents: 'auto',
-              userSelect: 'none'
-            }}>
+            <div style={{ position: 'absolute', bottom: '24px', right: '24px', zIndex: 101, background: 'rgba(15, 23, 42, 0.85)', border: '1px solid rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(8px)', borderRadius: '12px', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: '12px', color: 'white', fontSize: '0.75rem', fontWeight: 800 }}>
               <span style={{ color: '#94a3b8' }}>📄 Seiten:</span>
-              <button 
-                onClick={() => setPageCount(p => Math.max(1, p - 1))}
-                className="hover-scale"
-                style={{
-                  background: 'rgba(255,255,255,0.08)',
-                  border: 'none',
-                  color: 'white',
-                  width: '24px',
-                  height: '24px',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '1rem',
-                  lineHeight: 1
-                }}
-              >
-                -
-              </button>
-              <span style={{ minWidth: '16px', textAlign: 'center', color: '#60a5fa', fontWeight: 950, fontSize: '0.85rem' }}>{pageCount}</span>
-              <button 
-                onClick={() => setPageCount(p => Math.min(15, p + 1))}
-                className="hover-scale"
-                style={{
-                  background: 'rgba(255,255,255,0.08)',
-                  border: 'none',
-                  color: 'white',
-                  width: '24px',
-                  height: '24px',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '1rem',
-                  lineHeight: 1
-                }}
-              >
-                +
-              </button>
+              <button onClick={() => setPageCount(p => Math.max(1, p - 1))} style={{ background: 'rgba(255,255,255,0.08)', border: 'none', color: 'white', width: '24px', height: '24px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>-</button>
+              <span style={{ minWidth: '16px', textAlign: 'center', color: '#60a5fa', fontWeight: 950 }}>{pageCount}</span>
+              <button onClick={() => setPageCount(p => Math.min(15, p + 1))} style={{ background: 'rgba(255,255,255,0.08)', border: 'none', color: 'white', width: '24px', height: '24px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>+</button>
             </div>
           )}
         </div>
