@@ -1536,6 +1536,60 @@ function App() {
       }
     }
   }, [userBands, suggestingSkill, user]);
+
+  // Safety check for Band Founding: If suggestingSkill is set for band founding (with formation_group),
+  // query Supabase directly to check if a band already exists for this group or if the user is already in a band for this song.
+  // This handles the case where someone else already founded the band (e.g. manual widget click)
+  // before the background polling runs.
+  useEffect(() => {
+    if (suggestingSkill && suggestingSkill.formation_group && user) {
+      const targetSongId = suggestingSkill.song_id || suggestingSkill.songs?.id;
+      const targetGroup = suggestingSkill.formation_group;
+      
+      const checkDbForExistingBand = async () => {
+        try {
+          // 1. Check if a band already exists for this formation group in the database
+          const { data: existingBands } = await supabase
+            .from('bands')
+            .select('id, name, status')
+            .eq('formation_group', targetGroup)
+            .in('status', ['forming', 'active']);
+            
+          if (existingBands && existingBands.length > 0) {
+            console.log('[SafetyCheck] Band already exists in DB for group:', targetGroup);
+            setSuggestingSkill(null);
+            fetchDashboardData(user.id, false);
+            return;
+          }
+          
+          // 2. Check if this student is already in a band for this song
+          if (targetSongId) {
+            const { data: memberships } = await supabase
+              .from('band_members')
+              .select('id, bands(id, status, song_id)')
+              .eq('user_id', user.id);
+              
+            const alreadyInBand = (memberships || []).some((m: any) => 
+              m.bands && 
+              ['forming', 'active'].includes(m.bands.status) && 
+              m.bands.song_id === targetSongId
+            );
+            
+            if (alreadyInBand) {
+              console.log('[SafetyCheck] Student is already in a band for this song in DB:', targetSongId);
+              setSuggestingSkill(null);
+              fetchDashboardData(user.id, false);
+            }
+          }
+        } catch (err) {
+          console.error('[SafetyCheck] Error checking database for existing band:', err);
+        }
+      };
+      
+      checkDbForExistingBand();
+    }
+  }, [suggestingSkill, user]);
+
   const [selectedStudentForPreview, setSelectedStudentForPreview] = useState<any>(null);
 
   // PERSISTENCE LOGIC: Save band profile state
