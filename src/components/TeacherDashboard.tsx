@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
 import { renderInstrumentIcon } from '../utils/instruments';
@@ -133,10 +133,24 @@ const AvatarImage = React.memo(({ src, style, className, user, userId, onClick }
   );
 }, (prev, next) => prev.src === next.src);
 
-const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProfileSelect, onLogout, hasHelpRequest }: { 
-  num: number, color: string, inst: string, sess: any, isMe: boolean, viewMode: string, onProfileSelect: (u: any) => void, onLogout: (id: string) => void, hasHelpRequest?: boolean 
+const getStationColor = (name: string | null | undefined) => {
+  if (!name) return '#64748b';
+  const lowerName = name.toLowerCase();
+  if (lowerName.includes('lehrer') || lowerName.includes('teacher')) return '#22c55e'; // Green
+  const match = name.match(/\d+/);
+  if (!match) return '#64748b';
+  const num = parseInt(match[0]);
+  if (num === 1 || num === 2) return '#ef4444'; // Red
+  if (num === 3 || num === 4) return '#a855f7'; // Purple
+  if (num === 5 || num === 6) return '#3b82f6'; // Blue
+  if (num === 7 || num === 8) return '#eab308'; // Yellow
+  return '#64748b';
+};
+
+const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProfileSelect, onLogout, hasHelpRequest, customName }: { 
+  num: number, color: string, inst: string, sess: any, isMe: boolean, viewMode: string, onProfileSelect: (u: any) => void, onLogout: (id: string) => void, hasHelpRequest?: boolean, customName?: string
 }) => {
-  const stationName = sess?.stations?.name || `iPad ${num}`;
+  const stationName = customName || sess?.stations?.name || `iPad ${num}`;
   const isActive = !!sess;
   
   const activeMins = useMemo(() => {
@@ -146,7 +160,7 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
   }, [sess?.check_in_time]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', height: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', height: '100%', width: '100%' }}>
       <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '6px' }}>
         <Music size={14} /> {inst}
       </div>
@@ -159,6 +173,7 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
           }
         }}
         style={{ 
+          width: '100%',
           background: 'white', 
           padding: '10px 12px', 
           minHeight: '135px', 
@@ -166,18 +181,18 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
           display: 'flex', 
           flexDirection: 'column', 
           position: 'relative', 
-          border: isActive ? `2px solid ${color}` : '1px solid #f1f5f9',
-          boxShadow: isActive ? `0 12px 30px rgba(0,0,0,0.03), 0 2px 8px ${color}10` : 'none',
+          border: isActive ? `2.5px solid ${color}` : `1.5px solid ${color}40`,
+          boxShadow: isActive ? `0 12px 30px rgba(0,0,0,0.03), 0 2px 8px ${color}10` : `0 4px 12px ${color}08`,
           borderRadius: '24px',
           cursor: isActive ? 'pointer' : 'default',
           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           overflow: 'hidden'
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 900, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-            <span>{stationName}</span>
-            {sess && <span style={{ color: color, fontWeight: 900, textTransform: 'none' }}>• {activeMins}m übt</span>}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', width: '100%', minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', fontWeight: 900, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>
+            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stationName}</span>
+            {sess && <span style={{ color: color, fontWeight: 900, textTransform: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>• {activeMins}m</span>}
           </div>
           {hasHelpRequest && (
             <div style={{ 
@@ -206,14 +221,16 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
               style={{ 
                 background: '#fef2f2', 
                 border: '1px solid #fee2e2', 
-                padding: '4px 10px', 
-                borderRadius: '8px', 
+                padding: '2px 6px', 
+                borderRadius: '6px', 
                 cursor: 'pointer', 
                 color: '#ef4444', 
-                fontSize: '0.65rem', 
+                fontSize: '0.6rem', 
                 fontWeight: 900, 
                 textTransform: 'uppercase',
-                transition: 'all 0.2s'
+                transition: 'all 0.2s',
+                flexShrink: 0,
+                marginLeft: '4px'
               }}
               onMouseEnter={(e) => e.currentTarget.style.background = '#fee2e2'}
               onMouseLeave={(e) => e.currentTarget.style.background = '#fef2f2'}
@@ -226,9 +243,9 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
         {sess ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, marginTop: '2px' }}>
             <div style={{ 
-              width: '88px', 
-              height: '88px', 
-              borderRadius: '22px', 
+              width: '80px', 
+              height: '80px', 
+              borderRadius: '20px', 
               overflow: 'hidden', 
               border: `2px solid ${color}`, 
               boxShadow: `0 10px 28px ${color}25`, 
@@ -334,9 +351,22 @@ interface TeacherDashboardProps {
   onTabChange?: (tab: string) => void;
   onOpenBandProfile?: (band: any) => void;
   onFoundBand?: (form: any, mySlot: any) => void;
+  isSidebarCollapsed?: boolean;
+  setIsSidebarCollapsed?: (collapsed: boolean) => void;
 }
 
-export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideHeader = false, viewMode = 'admin', onTabChange, onOpenBandProfile, onFoundBand }: TeacherDashboardProps) {
+export function TeacherDashboard({ 
+  userId, 
+  onLogout, 
+  locationMode = 'lab', 
+  hideHeader = false, 
+  viewMode = 'admin', 
+  onTabChange, 
+  onOpenBandProfile, 
+  onFoundBand,
+  isSidebarCollapsed: propsIsSidebarCollapsed,
+  setIsSidebarCollapsed: propsSetIsSidebarCollapsed
+}: TeacherDashboardProps) {
   const [teacher, setTeacher] = useState<any>(null);
   const [stations, setStations] = useState<any[]>([]);
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
@@ -365,6 +395,35 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
   const [rehearsalSuggestions, setRehearsalSuggestions] = useState<any[]>([]);
   const [openProposals, setOpenProposals] = useState<any[]>([]);
   const [collapsedBands, setCollapsedBands] = useState<Record<string, boolean>>({});
+  const [rooms, setRooms] = useState<any[]>([]);
+  const [selectedRoomId, setSelectedRoomId] = useState<string>('');
+  const [localIsSidebarCollapsed, setLocalIsSidebarCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 1200;
+    }
+    return false;
+  });
+
+  const isSidebarCollapsed = propsIsSidebarCollapsed !== undefined ? propsIsSidebarCollapsed : localIsSidebarCollapsed;
+  const setIsSidebarCollapsed = propsSetIsSidebarCollapsed !== undefined ? propsSetIsSidebarCollapsed : setLocalIsSidebarCollapsed;
+
+  const [containerWidth, setContainerWidth] = useState(1000);
+  const observerRef = useRef<ResizeObserver | null>(null);
+  const containerRef = useCallback((node: HTMLDivElement | null) => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
+    if (node) {
+      const observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          setContainerWidth(entry.contentRect.width || 1000);
+        }
+      });
+      observer.observe(node);
+      observerRef.current = observer;
+    }
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => setTicker(t => t + 1), 60000);
@@ -405,7 +464,16 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
 
       if (tData?.school_id) {
         // 2. Stations
-        const { data: rData } = await supabase.from('rooms').select('id').eq('school_id', tData.school_id);
+        const { data: rData } = await supabase.from('rooms').select('*').eq('school_id', tData.school_id);
+        setRooms(rData || []);
+        if (rData && rData.length > 0 && !selectedRoomId) {
+          const savedRoomId = localStorage.getItem('groovelab_teacher_selected_room_id');
+          if (savedRoomId && rData.some(r => r.id === savedRoomId)) {
+            setSelectedRoomId(savedRoomId);
+          } else {
+            setSelectedRoomId(rData[0].id);
+          }
+        }
         const roomIds = rData?.map(r => r.id) || [];
         const { data: sData } = await supabase.from('stations').select('*').in('room_id', roomIds).order('name');
         setStations(sData || []);
@@ -1287,151 +1355,378 @@ export function TeacherDashboard({ userId, onLogout, locationMode = 'lab', hideH
             <p style={{ color: '#64748b', fontWeight: 600, fontSize: '0.9rem', marginTop: '8px' }}>MUSÄK - Groovelab Academy • Management Dashboard</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+             {activeTab === 'live' && (
+               <button
+                 onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                 style={{
+                   background: 'white',
+                   border: '1.5px solid #e2e8f0',
+                   padding: '10px 20px',
+                   borderRadius: '16px',
+                   fontSize: '0.85rem',
+                   fontWeight: 800,
+                   color: isSidebarCollapsed ? '#b45309' : '#475569',
+                   cursor: 'pointer',
+                   display: 'flex',
+                   alignItems: 'center',
+                   gap: '8px',
+                   boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                   transition: 'all 0.15s',
+                   marginRight: '8px'
+                 }}
+                 className="hover-scale"
+               >
+                 {isSidebarCollapsed ? (
+                   <>
+                     <ChevronLeft size={16} /> Sidebar einblenden
+                   </>
+                 ) : (
+                   <>
+                     Sidebar ausblenden <ChevronRight size={16} />
+                   </>
+                 )}
+               </button>
+             )}
              <div style={{ background: '#f0fdf4', padding: '8px 16px', borderRadius: '100px', border: '1px solid #dcfce7', color: '#166534', fontSize: '0.85rem', fontWeight: 800 }}>{activeSessions.length} im Lab</div>
              {viewMode === 'admin' && onLogout && <button onClick={onLogout} style={{ background: 'white', border: '1px solid #e2e8f0', padding: '10px 20px', borderRadius: '12px', fontWeight: 700, color: '#ef4444', cursor: 'pointer' }}>Zentrale schließen</button>}
           </div>
         </header>
       )}
-
       {activeTab === 'live' ? (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '32px', alignItems: 'start' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '32px' }}>
-            {[3, 4, 5, 6].map(n => {
-              const station = stations.find(s => {
-                const match = s.name.match(/\d+$/);
-                return match && match[0] === n.toString();
-              });
-              const sess = activeSessions.find(s => {
-                const sName = s.stations?.name?.toLowerCase() || '';
-                const sId = s.station_id;
-                
-                // 1. Check if the station name contains the number 'n'
-                const nameMatch = sName.includes(` ${n}`) || sName.includes(`${n}`) || sName.endsWith(`${n}`);
-                
-                // 2. Check if the station ID matches a station in our list that matches 'n'
-                const stationMatch = stations.find(st => {
-                  const stName = st.name.toLowerCase();
-                  return stName.includes(` ${n}`) || stName.includes(`${n}`) || stName.endsWith(`${n}`);
-                });
-                const idMatch = sId && stationMatch && sId === stationMatch.id;
+        <div className={`live-lab-grid ${isSidebarCollapsed ? 'collapsed' : ''}`}>
+          {(() => {
+            const activeRoom = rooms.find(r => r.id === selectedRoomId);
+            const roomStations = stations.filter(s => s.room_id === selectedRoomId);
+            const hasCustomLayout = activeRoom && 
+              activeRoom.room_width && 
+              activeRoom.room_height && 
+              roomStations.some(s => s.pos_x !== null && s.pos_y !== null);
 
-                return (nameMatch || idMatch) && (s.users?.role !== 'student' || s.gps_verified);
+            if (hasCustomLayout) {
+              const placedStations = roomStations.filter(s => s.pos_x !== null && s.pos_y !== null);
+              const minX = placedStations.length > 0 ? Math.min(...placedStations.map(s => s.pos_x as number)) : 0;
+              const maxX = placedStations.length > 0 ? Math.max(...placedStations.map(s => s.pos_x as number)) : 100;
+              const minY = placedStations.length > 0 ? Math.min(...placedStations.map(s => s.pos_y as number)) : 0;
+              const maxY = placedStations.length > 0 ? Math.max(...placedStations.map(s => s.pos_y as number)) : 100;
+
+              // 14% horizontal / 14% vertical padding to create standard spacing and edge margins
+              const padX = 14;
+              const padY = 14;
+
+              const viewportMinX = Math.max(0, minX - padX);
+              const viewportMaxX = Math.min(100, maxX + padX);
+              const viewportMinY = Math.max(0, minY - padY);
+              const viewportMaxY = Math.min(100, maxY + padY);
+
+              const viewportWidth = viewportMaxX - viewportMinX;
+              const viewportHeight = viewportMaxY - viewportMinY;
+
+              const safeViewportWidth = Math.max(15, viewportWidth);
+              const safeViewportHeight = Math.max(15, viewportHeight);
+
+              const croppedAspectRatio = activeRoom
+                ? (activeRoom.room_width * safeViewportWidth) / (activeRoom.room_height * safeViewportHeight)
+                : 1.5;
+
+              // Calculate resolved collision-free coordinates inside the 1000px canvas space
+              const canvasWidth = 1000;
+              const canvasHeight = 1000 / croppedAspectRatio;
+
+              // Prepare raw elements
+              const rawItems = roomStations.map(station => {
+                const sName = station.name || '';
+                const isTeacher = sName.toLowerCase().includes('lehrer') || sName.toLowerCase().includes('teacher');
+                const posLeftOriginal = station.pos_x !== null ? station.pos_x : 50;
+                const posTopOriginal = station.pos_y !== null ? station.pos_y : 50;
+
+                const posLeftPct = safeViewportWidth > 0 ? ((posLeftOriginal - viewportMinX) / safeViewportWidth) * 100 : 50;
+                const posTopPct = safeViewportHeight > 0 ? ((posTopOriginal - viewportMinY) / safeViewportHeight) * 100 : 50;
+
+                const x = (posLeftPct / 100) * canvasWidth;
+                const y = (posTopPct / 100) * canvasHeight;
+
+                // Card/Node dimensions inside the 1000px coordinate system
+                const w = isTeacher ? 180 : 180;
+                const h = isTeacher ? 220 : 180;
+
+                return {
+                  id: station.id,
+                  station,
+                  isTeacher,
+                  x,
+                  y,
+                  w,
+                  h
+                };
               });
-              const getStationColor = (num: number) => {
-                if (num <= 2) return '#ef4444'; // Rot
-                if (num <= 4) return '#a855f7'; // Purple
-                if (num <= 6) return '#3b82f6'; // Blau
-                return '#eab308'; // Gelb
+
+              // Helper to clamp a single item to canvas margins
+              const clampItem = (item: any) => {
+                const marginX = item.w / 2 + 10;
+                const marginY = item.h / 2 + 10;
+                item.x = Math.max(marginX, Math.min(canvasWidth - marginX, item.x));
+                item.y = Math.max(marginY, Math.min(canvasHeight - marginY, item.y));
               };
+
+              // Resolve overlaps using a relaxation loop
+              const resolvedItems = [...rawItems];
+              // Pre-clamp raw items to bounds before relaxation
+              resolvedItems.forEach(clampItem);
+
+              for (let iter = 0; iter < 25; iter++) {
+                let moved = false;
+                for (let i = 0; i < resolvedItems.length; i++) {
+                  for (let j = i + 1; j < resolvedItems.length; j++) {
+                    const a = resolvedItems[i];
+                    const b = resolvedItems[j];
+
+                    // Gap of 16px to prevent them touching too closely
+                    const hWidth = (a.w + b.w) / 2 + 16;
+                    const hHeight = (a.h + b.h) / 2 + 16;
+                    const dx = b.x - a.x;
+                    const dy = b.y - a.y;
+                    const absDx = Math.abs(dx);
+                    const absDy = Math.abs(dy);
+
+                    if (absDx < hWidth && absDy < hHeight) {
+                      moved = true;
+                      const overlapX = hWidth - absDx;
+                      const overlapY = hHeight - absDy;
+
+                      if (overlapX < overlapY) {
+                        const pushX = overlapX / 2;
+                        const sign = dx >= 0 ? 1 : -1;
+                        b.x += pushX * sign;
+                        a.x -= pushX * sign;
+                      } else {
+                        const pushY = overlapY / 2;
+                        const sign = dy >= 0 ? 1 : -1;
+                        b.y += pushY * sign;
+                        a.y -= pushY * sign;
+                      }
+                      
+                      // Clamp immediately inside the loop after pushing
+                      clampItem(a);
+                      clampItem(b);
+                    }
+                  }
+                }
+                if (!moved) break;
+              }
+
+              // Constrain back to canvas margins
+              const finalPositions = new Map<string, { x: number; y: number }>();
+              resolvedItems.forEach(item => {
+                finalPositions.set(item.id, { x: item.x, y: item.y });
+              });
+
               return (
-                <StationNode 
-                  key={n} 
-                  num={n} 
-                  color={getStationColor(n)} 
-                  inst={n < 5 ? 'E-Piano' : 'E-Drum'} 
-                  sess={sess} 
-                  isMe={sess?.user_id === userId} 
-                  viewMode={viewMode} 
-                  onProfileSelect={setSelectedStudentProfile} 
-                  onLogout={handleLogoutStudent}
-                  hasHelpRequest={helpRequests.some(r => {
-                    const st = stations.find(s => s.id === r.station_id);
-                    if (!st) return false;
-                    const match = st.name.match(/\d+$/);
-                    return match && match[0] === n.toString();
-                  })}
-                />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: rooms.length > 1 ? '16px' : '0px', maxWidth: '850px', width: '100%' }}>
+                  {/* Toolbar Row */}
+                  {rooms.length > 1 && (
+                    <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '6px', borderRadius: '16px', alignSelf: 'flex-start', marginBottom: '8px' }}>
+                      {rooms.map(room => {
+                        const isSelected = room.id === selectedRoomId;
+                        return (
+                          <button
+                            key={room.id}
+                            onClick={() => {
+                              setSelectedRoomId(room.id);
+                              localStorage.setItem('groovelab_teacher_selected_room_id', room.id);
+                            }}
+                            style={{
+                              border: 'none',
+                              background: isSelected ? 'white' : 'transparent',
+                              color: isSelected ? '#1e293b' : '#64748b',
+                              padding: '8px 16px',
+                              borderRadius: '12px',
+                              fontSize: '0.85rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              boxShadow: isSelected ? '0 4px 10px rgba(0,0,0,0.05)' : 'none',
+                              transition: 'all 0.2s'
+                            }}
+                            className="hover-scale-mini"
+                          >
+                            {room.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Scaled room blueprint to fit parent width without scrolling or overlaps */}
+                  <div 
+                    ref={containerRef}
+                    style={{ 
+                      width: '100%', 
+                      position: 'relative', 
+                      overflow: 'hidden',
+                      aspectRatio: `${croppedAspectRatio}`
+                    }}
+                  >
+                    {/* Visual Blueprint Canvas */}
+                    <div style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: 0,
+                      width: '1000px',
+                      height: `${1000 * (1 / croppedAspectRatio)}px`,
+                      transform: `scale(${containerWidth / 1000})`,
+                      transformOrigin: 'top left',
+                      background: 'transparent',
+                      border: 'none',
+                      borderRadius: '0px',
+                      boxShadow: 'none',
+                      overflow: 'visible'
+                    }}>
+
+                      {resolvedItems.map(item => {
+                        const { station, isTeacher } = item;
+                        const sName = station.name || '';
+                        const instColor = station.color && station.color !== '#e5e7eb' && station.color !== '#e2e8f0'
+                          ? station.color
+                          : getStationColor(sName);
+
+                        const pos = finalPositions.get(station.id) || { x: item.x, y: item.y };
+
+                        if (isTeacher) {
+                          return (
+                            <div 
+                              key={station.id} 
+                              style={{
+                                position: 'absolute',
+                                left: `${pos.x}px`,
+                                top: `${pos.y}px`,
+                                transform: 'translate(-50%, -50%)',
+                                zIndex: 100
+                              }}
+                            >
+                              <CoachesNode coaches={coaches} onProfileSelect={setSelectedCoachProfile} />
+                            </div>
+                          );
+                        }
+
+                        const sess = activeSessions.find(se => se.station_id === station.id);
+                        const num = parseInt(sName.match(/\d+/)?.[0] || '1');
+
+                        return (
+                          <div 
+                            key={station.id} 
+                            style={{
+                              position: 'absolute',
+                              left: `${pos.x}px`,
+                              top: `${pos.y}px`,
+                              transform: 'translate(-50%, -50%)',
+                              width: '180px',
+                              zIndex: 10
+                            }}
+                          >
+                            <StationNode
+                              num={num}
+                              customName={station.name}
+                              color={instColor}
+                              inst={station.instrument || 'Tablet'}
+                              sess={sess}
+                              isMe={sess?.user_id === userId}
+                              viewMode={viewMode}
+                              onProfileSelect={setSelectedStudentProfile}
+                              onLogout={handleLogoutStudent}
+                              hasHelpRequest={helpRequests.some(r => r.station_id === station.id)}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
               );
-            })}
-            
-            <div style={{ gridColumn: '1', fontSize: '0.7rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{'> TISCH LINKS'}</div>
-            <div style={{ gridColumn: '2 / span 2' }}></div>
-            <div style={{ gridColumn: '4', fontSize: '0.7rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{'> TISCH RECHTS'}</div>
+            }
 
-            <div style={{ gridColumn: '1', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              {[2, 1].map(n => {
-                const station = stations.find(s => {
-                  const match = s.name.match(/\d+$/);
-                  return match && match[0] === n.toString();
-                });
-                const sess = activeSessions.find(s => {
-                  const sName = s.stations?.name?.toLowerCase() || '';
-                  const sId = s.station_id;
-                  const nameMatch = sName.includes(` ${n}`) || sName.includes(`${n}`) || sName.endsWith(`${n}`);
-                  const stationMatch = stations.find(st => {
-                    const stName = st.name.toLowerCase();
-                    return stName.includes(` ${n}`) || stName.includes(`${n}`) || stName.endsWith(`${n}`);
-                  });
-                  const idMatch = sId && stationMatch && sId === stationMatch.id;
-                  return (nameMatch || idMatch) && (s.users?.role !== 'student' || s.gps_verified);
-                });
-                return (
-                  <StationNode 
-                    key={n} 
-                    num={n} 
-                    color="#ef4444" 
-                    inst="E-Gitarre" 
-                    sess={sess} 
-                    isMe={sess?.user_id === userId} 
-                    viewMode={viewMode} 
-                    onProfileSelect={setSelectedStudentProfile} 
-                    onLogout={handleLogoutStudent} 
-                    hasHelpRequest={helpRequests.some(r => {
-                      const st = stations.find(s => s.id === r.station_id);
-                      if (!st) return false;
-                      const match = st.name.match(/\d+$/);
-                      return match && match[0] === n.toString();
+            // Fallback grid layout if no custom layout coordinates set
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: rooms.length > 1 ? '16px' : '0px', flex: 1 }}>
+                {/* Room Switcher */}
+                {rooms.length > 1 && (
+                  <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '6px', borderRadius: '16px', alignSelf: 'flex-start', marginBottom: '8px' }}>
+                    {rooms.map(room => {
+                      const isSelected = room.id === selectedRoomId;
+                      return (
+                        <button
+                          key={room.id}
+                          onClick={() => {
+                            setSelectedRoomId(room.id);
+                            localStorage.setItem('groovelab_teacher_selected_room_id', room.id);
+                          }}
+                          style={{
+                            border: 'none',
+                            background: isSelected ? 'white' : 'transparent',
+                            color: isSelected ? '#1e293b' : '#64748b',
+                            padding: '8px 16px',
+                            borderRadius: '12px',
+                            fontSize: '0.85rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            boxShadow: isSelected ? '0 4px 10px rgba(0,0,0,0.05)' : 'none',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          {room.name}
+                        </button>
+                      );
                     })}
-                  />
-                );
-              })}
-            </div>
+                  </div>
+                )}
+                {/* Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '24px', background: '#ffffff', padding: '24px', borderRadius: '32px', border: '1px solid #e2e8f0' }}>
+                  {/* Coaches Node */}
+                  <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+                    <CoachesNode coaches={coaches} onProfileSelect={setSelectedCoachProfile} />
+                  </div>
+                  {roomStations.filter(s => {
+                    const sName = s.name || '';
+                    return !(sName.toLowerCase().includes('lehrer') || sName.toLowerCase().includes('teacher'));
+                  }).map(station => {
+                    const sess = activeSessions.find(se => se.station_id === station.id);
+                    const sName = station.name || '';
+                    const num = parseInt(sName.match(/\d+/)?.[0] || '1');
+                    const instColor = station.color && station.color !== '#e5e7eb' && station.color !== '#e2e8f0'
+                      ? station.color
+                      : getStationColor(sName);
 
-            <div style={{ gridColumn: '2 / span 2', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-              <CoachesNode coaches={coaches} onProfileSelect={setSelectedCoachProfile} />
-            </div>
+                    return (
+                      <div key={station.id}>
+                        <StationNode
+                          num={num}
+                          customName={station.name}
+                          color={instColor}
+                          inst={station.instrument || 'Tablet'}
+                          sess={sess}
+                          isMe={sess?.user_id === userId}
+                          viewMode={viewMode}
+                          onProfileSelect={setSelectedStudentProfile}
+                          onLogout={handleLogoutStudent}
+                          hasHelpRequest={helpRequests.some(r => r.station_id === station.id)}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
-            <div style={{ gridColumn: '4', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              {[7, 8].map(n => {
-                const station = stations.find(s => {
-                  const match = s.name.match(/\d+$/);
-                  return match && match[0] === n.toString();
-                });
-                const sess = activeSessions.find(s => {
-                  const sName = s.stations?.name?.toLowerCase() || '';
-                  const sId = s.station_id;
-                  const nameMatch = sName.includes(` ${n}`) || sName.includes(`${n}`) || sName.endsWith(`${n}`);
-                  const stationMatch = stations.find(st => {
-                    const stName = st.name.toLowerCase();
-                    return stName.includes(` ${n}`) || stName.includes(`${n}`) || stName.endsWith(`${n}`);
-                  });
-                  const idMatch = sId && stationMatch && sId === stationMatch.id;
-                  return (nameMatch || idMatch) && (s.users?.role !== 'student' || s.gps_verified);
-                });
-                return (
-                  <StationNode 
-                    key={n} 
-                    num={n} 
-                    color="#eab308" 
-                    inst="Bass" 
-                    sess={sess} 
-                    isMe={sess?.user_id === userId} 
-                    viewMode={viewMode} 
-                    onProfileSelect={setSelectedStudentProfile} 
-                    onLogout={handleLogoutStudent} 
-                    hasHelpRequest={helpRequests.some(r => {
-                      const st = stations.find(s => s.id === r.station_id);
-                      if (!st) return false;
-                      const match = st.name.match(/\d+$/);
-                      return match && match[0] === n.toString();
-                    })}
-                  />
-                );
-              })}
-            </div>
-          </div>
-
-          <aside style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <aside style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '24px',
+            width: isSidebarCollapsed ? '0px' : '340px',
+            opacity: isSidebarCollapsed ? 0 : 1,
+            transform: isSidebarCollapsed ? 'translateX(20px)' : 'translateX(0)',
+            pointerEvents: isSidebarCollapsed ? 'none' : 'auto',
+            overflow: 'hidden',
+            transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+          }}>
             {/* Help Requests Section */}
             {helpRequests.length > 0 && (
               <div className="glass-panel" style={{ 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check } from 'lucide-react';
+import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { 
   ResponsiveContainer,
   BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell,
@@ -143,6 +143,12 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [setupStations, setSetupStations] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<string>(() => localStorage.getItem('groovelab_active_tab') || forceTab || 'live');
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 1200;
+    }
+    return false;
+  });
   
   const [bandSearch, setBandSearch] = useState('');
   const [bandLetter, setBandLetter] = useState<string | null>(null);
@@ -172,7 +178,42 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   
   const [showAddStationForRoom, setShowAddStationForRoom] = useState<string | null>(null);
   const [newStationName, setNewStationName] = useState('');
-  const [newStationColor, setNewStationColor] = useState('#e5e7eb');
+  const [newStationColor, setNewStationColor] = useState('#64748b');
+  const [activeColorMenuStationId, setActiveColorMenuStationId] = useState<string | null>(null);
+  
+  // Layout Customizer states
+  const [customizingRoom, setCustomizingRoom] = useState<any | null>(null);
+  const [roomWidth, setRoomWidth] = useState<number>(10.0);
+  const [roomHeight, setRoomHeight] = useState<number>(8.0);
+  const [activeEditStationId, setActiveEditStationId] = useState<string | null>(null);
+  const [editingStationName, setEditingStationName] = useState<string>('');
+  const [editingStationInstrument, setEditingStationInstrument] = useState<string>('');
+  const [editingStationColor, setEditingStationColor] = useState<string>('#e5e7eb');
+  const [snapToGrid, setSnapToGrid] = useState(true);
+  const canvasRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (customizingRoom) {
+      setRoomWidth(customizingRoom.room_width || 10.0);
+      setRoomHeight(customizingRoom.room_height || 8.0);
+      setActiveEditStationId(null);
+    }
+  }, [customizingRoom]);
+
+  useEffect(() => {
+    if (activeEditStationId) {
+      const station = stations.find(s => s.id === activeEditStationId);
+      if (station) {
+        setEditingStationName(station.name || '');
+        setEditingStationInstrument(station.instrument || '');
+        setEditingStationColor(station.color || '#e5e7eb');
+      }
+    } else {
+      setEditingStationName('');
+      setEditingStationInstrument('');
+      setEditingStationColor('#e5e7eb');
+    }
+  }, [activeEditStationId, stations]);
   
   const [showAddSong, setShowAddSong] = useState(false);
   const [newSong, setNewSong] = useState({ artist: '', title: '', level: 1, media_link: '', tomplay_url: '', pdf_folder_url: '', guitar_pro_url: '', pdf_drums_url: '', pdf_guitar_url: '', pdf_bass_url: '', pdf_vocals_url: '', pdf_keys_url: '', bypass_wlan_check: false, instrumentation: { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 } as Record<string, number> });
@@ -1071,7 +1112,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       setStations([...stations, data]); 
       setShowAddStationForRoom(null); 
       setNewStationName(''); 
-      setNewStationColor('#e5e7eb');
+      setNewStationColor('#64748b');
     }
   };
 
@@ -1576,6 +1617,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         hideHeader={true} 
         viewMode="admin" 
         onTabChange={(id) => onTabChange?.(id)}
+        isSidebarCollapsed={isSidebarCollapsed}
+        setIsSidebarCollapsed={setIsSidebarCollapsed}
       />
     </div>
   );
@@ -2721,6 +2764,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={() => setCustomizingRoom(room)} style={{ padding: '8px 12px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569', cursor: 'pointer', fontWeight: 700, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <MapPin size={14} /> Layout
+                  </button>
                   <button onClick={() => setShowAddStationForRoom(room.id)} style={{ padding: '8px 12px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', color: brandColor, cursor: 'pointer', fontWeight: 700, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <Plus size={14} /> iPad
                   </button>
@@ -2731,23 +2777,206 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               </div>
 
               {showAddStationForRoom === room.id && (
-                <form onSubmit={(e) => handleAddStation(e, room.id)} style={{ display: 'flex', gap: '8px', marginBottom: '16px', animation: 'fadeIn 0.3s' }}>
-                  <input required placeholder="iPad Name (z.B. iPad 1)" value={newStationName} onChange={e => setNewStationName(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.875rem' }} />
-                  <button type="submit" style={{ background: brandColor, color: 'white', border: 'none', padding: '10px 16px', borderRadius: '10px', fontWeight: 700, fontSize: '0.875rem' }}>OK</button>
+                <form onSubmit={(e) => handleAddStation(e, room.id)} style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', marginBottom: '16px', animation: 'fadeIn 0.3s' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>Neues iPad hinzufügen</span>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input required placeholder="iPad Name (z.B. iPad 1)" value={newStationName} onChange={e => setNewStationName(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.875rem' }} />
+                    <button type="submit" style={{ background: brandColor, color: 'white', border: 'none', padding: '10px 16px', borderRadius: '10px', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer' }}>OK</button>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8' }}>Farbe wählen:</span>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      {[
+                        { hex: '#ef4444', label: 'Rot' },
+                        { hex: '#a855f7', label: 'Lila' },
+                        { hex: '#3b82f6', label: 'Blau' },
+                        { hex: '#eab308', label: 'Gelb' },
+                        { hex: '#22c55e', label: 'Grün' },
+                        { hex: '#64748b', label: 'Grau' }
+                      ].map(c => {
+                        const isSelected = newStationColor === c.hex;
+                        return (
+                          <button
+                            type="button"
+                            key={c.hex}
+                            title={c.label}
+                            onClick={() => setNewStationColor(c.hex)}
+                            style={{
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              background: c.hex,
+                              border: isSelected ? '2px solid #1e293b' : '2px solid transparent',
+                              outline: 'none',
+                              cursor: 'pointer',
+                              padding: 0,
+                              transform: isSelected ? 'scale(1.15)' : 'none',
+                              transition: 'all 0.15s ease',
+                              boxShadow: isSelected 
+                                ? `0 0 0 2px white, 0 4px 8px ${c.hex}40` 
+                                : '0 2px 4px rgba(0,0,0,0.04)'
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
                 </form>
               )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {stations.filter(s => s.room_id === room.id).map(station => (
-                  <div key={station.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #f1f5f9', transition: 'all 0.2s' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 700, color: '#475569' }}>
-                      <Tablet size={16} color={getStationColor(station.name)} /> {station.name}
+                {stations.filter(s => s.room_id === room.id).map(station => {
+                  const activeColor = station.color && station.color !== '#e5e7eb' && station.color !== '#e2e8f0' ? station.color : getStationColor(station.name);
+                  return (
+                    <div key={station.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #f1f5f9', transition: 'all 0.2s', position: 'relative' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 700, color: '#475569' }}>
+                        <Tablet size={16} color={activeColor} /> {station.name}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ position: 'relative' }}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveColorMenuStationId(activeColorMenuStationId === station.id ? null : station.id);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '5px 10px',
+                              borderRadius: '20px',
+                              border: '1.5px solid #cbd5e1',
+                              background: '#ffffff',
+                              cursor: 'pointer',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              color: '#475569',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                              transition: 'all 0.15s ease',
+                              outline: 'none'
+                            }}
+                            onMouseEnter={e => {
+                              e.currentTarget.style.borderColor = '#94a3b8';
+                              e.currentTarget.style.background = '#f8fafc';
+                            }}
+                            onMouseLeave={e => {
+                              e.currentTarget.style.borderColor = '#cbd5e1';
+                              e.currentTarget.style.background = '#ffffff';
+                            }}
+                          >
+                            <span style={{
+                              width: '10px',
+                              height: '10px',
+                              borderRadius: '50%',
+                              background: activeColor,
+                              display: 'inline-block',
+                              boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.1)'
+                            }} />
+                            <span>Farbe</span>
+                            <span style={{ fontSize: '0.6rem', color: '#94a3b8' }}>▼</span>
+                          </button>
+
+                          {activeColorMenuStationId === station.id && (
+                            <>
+                              <div 
+                                onClick={() => setActiveColorMenuStationId(null)}
+                                style={{
+                                  position: 'fixed',
+                                  inset: 0,
+                                  zIndex: 999,
+                                  background: 'transparent'
+                                }}
+                              />
+                              <div style={{
+                                position: 'absolute',
+                                right: 0,
+                                top: '30px',
+                                background: '#ffffff',
+                                borderRadius: '14px',
+                                border: '1px solid #cbd5e1',
+                                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
+                                padding: '8px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '4px',
+                                zIndex: 1000,
+                                minWidth: '120px',
+                                animation: 'fadeIn 0.15s ease'
+                              }}>
+                                {[
+                                  { hex: '#ef4444', label: 'Rot' },
+                                  { hex: '#a855f7', label: 'Lila' },
+                                  { hex: '#3b82f6', label: 'Blau' },
+                                  { hex: '#eab308', label: 'Gelb' },
+                                  { hex: '#22c55e', label: 'Grün' },
+                                  { hex: '#64748b', label: 'Grau' }
+                                ].map(c => {
+                                  const isSelected = activeColor === c.hex;
+                                  return (
+                                    <button
+                                      type="button"
+                                      key={c.hex}
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        setStations(prev => prev.map(s => s.id === station.id ? { ...s, color: c.hex } : s));
+                                        setActiveColorMenuStationId(null);
+                                        const { error } = await supabase.from('stations').update({ color: c.hex }).eq('id', station.id);
+                                        if (error) alert('Fehler: ' + error.message);
+                                      }}
+                                      style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        width: '100%',
+                                        padding: '6px 10px',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        background: isSelected ? '#f1f5f9' : 'transparent',
+                                        cursor: 'pointer',
+                                        textAlign: 'left',
+                                        fontSize: '0.75rem',
+                                        fontWeight: isSelected ? 800 : 600,
+                                        color: isSelected ? '#1e293b' : '#475569',
+                                        transition: 'all 0.15s',
+                                        outline: 'none'
+                                      }}
+                                      onMouseEnter={e => {
+                                        if (!isSelected) {
+                                          e.currentTarget.style.background = '#f8fafc';
+                                          e.currentTarget.style.color = '#1e293b';
+                                        }
+                                      }}
+                                      onMouseLeave={e => {
+                                        if (!isSelected) {
+                                          e.currentTarget.style.background = 'transparent';
+                                          e.currentTarget.style.color = '#475569';
+                                        }
+                                      }}
+                                    >
+                                      <span style={{
+                                        width: '10px',
+                                        height: '10px',
+                                        borderRadius: '50%',
+                                        background: c.hex,
+                                        boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.1)'
+                                      }} />
+                                      <span>{c.label}</span>
+                                      {isSelected && <span style={{ marginLeft: 'auto', color: brandColor, fontSize: '0.75rem' }}>✓</span>}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                        <button onClick={() => handleDeleteStation(station.id)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} onMouseEnter={e => e.currentTarget.style.color = '#ef4444'} onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}>
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
-                    <button onClick={() => handleDeleteStation(station.id)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }} onMouseEnter={e => e.currentTarget.style.color = '#ef4444'} onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}>
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
                 {stations.filter(s => s.room_id === room.id).length === 0 && (
                   <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8', fontSize: '0.8125rem', border: '1px dashed #e2e8f0', borderRadius: '14px' }}>Keine Übeplätze definiert.</div>
                 )}
@@ -4267,6 +4496,501 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     );
   };
 
+
+
+  const handleSaveRoomSize = async () => {
+    if (!customizingRoom) return;
+    const { error } = await supabase
+      .from('rooms')
+      .update({ room_width: roomWidth, room_height: roomHeight })
+      .eq('id', customizingRoom.id);
+
+    if (error) {
+      alert('Fehler beim Speichern der Raumgröße: ' + error.message);
+    } else {
+      setRooms(rooms.map(r => r.id === customizingRoom.id ? { ...r, room_width: roomWidth, room_height: roomHeight } : r));
+      setCustomizingRoom({ ...customizingRoom, room_width: roomWidth, room_height: roomHeight });
+      alert('Raumgröße erfolgreich gespeichert!');
+    }
+  };
+
+  const handleUpdateInstrument = async (val: string) => {
+    if (!activeEditStationId) return;
+    setEditingStationInstrument(val);
+    setStations(prev => prev.map(s => s.id === activeEditStationId ? { ...s, instrument: val } : s));
+    await supabase.from('stations').update({ instrument: val }).eq('id', activeEditStationId);
+  };
+
+  const handleUpdateColor = async (val: string) => {
+    if (!activeEditStationId) return;
+    setEditingStationColor(val);
+    setStations(prev => prev.map(s => s.id === activeEditStationId ? { ...s, color: val } : s));
+    await supabase.from('stations').update({ color: val }).eq('id', activeEditStationId);
+  };
+
+  const handleSaveStationName = async () => {
+    if (!activeEditStationId) return;
+    setStations(prev => prev.map(s => s.id === activeEditStationId ? { ...s, name: editingStationName } : s));
+    const { error } = await supabase.from('stations').update({ name: editingStationName }).eq('id', activeEditStationId);
+    if (error) {
+      alert('Fehler beim Speichern: ' + error.message);
+    }
+  };
+
+  const handleApplyDefaultGrid = async () => {
+    if (!customizingRoom) return;
+    const roomStations = stations.filter(s => s.room_id === customizingRoom.id);
+    const updatedStations = roomStations.map(s => {
+      const sName = s.name || '';
+      const lowName = sName.toLowerCase();
+      let pos_x = 50;
+      let pos_y = 50;
+      
+      if (lowName.includes('lehrer') || lowName.includes('teacher')) {
+        pos_x = 50;
+        pos_y = 50;
+      } else {
+        const match = sName.match(/\d+/);
+        if (match) {
+          const num = parseInt(match[0]);
+          if (num === 1) { pos_x = 39; pos_y = 75; }
+          else if (num === 2) { pos_x = 29; pos_y = 50; }
+          else if (num === 3) { pos_x = 18; pos_y = 25; }
+          else if (num === 4) { pos_x = 39; pos_y = 25; }
+          else if (num === 5) { pos_x = 61; pos_y = 25; }
+          else if (num === 6) { pos_x = 82; pos_y = 25; }
+          else if (num === 7) { pos_x = 71; pos_y = 50; }
+          else if (num === 8) { pos_x = 61; pos_y = 75; }
+        }
+      }
+      return { ...s, pos_x, pos_y };
+    });
+    
+    // Update local state
+    setStations(prev => prev.map(s => {
+      const updated = updatedStations.find(us => us.id === s.id);
+      return updated ? updated : s;
+    }));
+    
+    // Update Database
+    for (const us of updatedStations) {
+      await supabase.from('stations').update({ pos_x: us.pos_x, pos_y: us.pos_y }).eq('id', us.id);
+    }
+    
+    alert('Symmetrisches Standard-Raster wurde erfolgreich auf die iPads angewendet!');
+  };
+
+  const renderRoomLayoutModal = () => {
+    if (!customizingRoom) return null;
+
+    const roomStations = stations.filter(s => s.room_id === customizingRoom.id);
+    const activeStation = stations.find(s => s.id === activeEditStationId);
+    
+    // Generate Kiosk URLs
+    const getStationKioskUrl = (id: string) => `${window.location.origin}/?kiosk_station_id=${id}`;
+    const getRoomKioskUrl = (id: string) => `${window.location.origin}/?kiosk_room_id=${id}`;
+
+    return (
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(12px)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+        <style dangerouslySetInnerHTML={{__html: `
+          @keyframes pulse-orange {
+            0%, 100% { border-color: #f97316; box-shadow: 0 0 0 0px rgba(249, 115, 22, 0.4); }
+            50% { border-color: #ffedd5; box-shadow: 0 0 0 6px rgba(249, 115, 22, 0); }
+          }
+        `}} />
+        <div style={{ background: '#ffffff', width: '100%', maxWidth: '1200px', borderRadius: '32px', display: 'flex', flexDirection: 'column', maxHeight: '90vh', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', overflow: 'hidden' }}>
+          
+          {/* Header */}
+          <div style={{ padding: '24px 32px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
+            <div>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a', margin: 0 }}>Raum-Layout gestalten: {customizingRoom.name}</h2>
+              <p style={{ fontSize: '0.875rem', color: '#64748b', margin: '4px 0 0 0' }}>Bewege die iPads an ihre Plätze und konfiguriere die Instrumente.</p>
+            </div>
+            <button 
+              onClick={() => setCustomizingRoom(null)} 
+              style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s' }}
+              onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'}
+              onMouseLeave={e => e.currentTarget.style.background = '#f1f5f9'}
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Modal Content */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 380px', flex: 1, overflow: 'hidden', height: '100%' }}>
+            
+            {/* Left: Designer Canvas */}
+            <div style={{ padding: '32px', display: 'flex', flexDirection: 'column', background: '#f8fafc', borderRight: '1px solid #e2e8f0', justifyContent: 'center', alignItems: 'center', overflow: 'auto' }}>
+              <div 
+                ref={canvasRef}
+                style={{
+                  position: 'relative',
+                  width: '100%',
+                  backgroundColor: '#0f172a', // Sleek architectural layout background
+                  backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.15) 1.5px, transparent 1.5px)',
+                  backgroundSize: '24px 24px',
+                  border: '3px solid #334155',
+                  borderRadius: '24px',
+                  boxShadow: 'inset 0 4px 20px rgba(0,0,0,0.6), 0 10px 30px rgba(15, 23, 42, 0.1)',
+                  aspectRatio: `${roomWidth} / ${roomHeight}`,
+                  maxHeight: '55vh',
+                  minHeight: '320px',
+                  overflow: 'hidden'
+                }}
+              >
+                {/* Center helper line */}
+                <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, borderLeft: '1px dashed rgba(255,255,255,0.06)', pointerEvents: 'none' }} />
+                <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, borderTop: '1px dashed rgba(255,255,255,0.06)', pointerEvents: 'none' }} />
+
+                {/* Station Nodes */}
+                {roomStations.map(station => {
+                  const isSelected = activeEditStationId === station.id;
+                  const sName = station.name || '';
+                  const isTeacher = sName.toLowerCase().includes('lehrer') || sName.toLowerCase().includes('teacher');
+                  
+                  // Color codes: custom station color with name-based fallback
+                  const instColor = station.color && station.color !== '#e5e7eb' && station.color !== '#e2e8f0'
+                    ? station.color
+                    : getStationColor(sName);
+
+                  const posLeft = station.pos_x !== null && station.pos_x !== undefined ? station.pos_x : 50;
+                  const posTop = station.pos_y !== null && station.pos_y !== undefined ? station.pos_y : 50;
+                  const isUnplaced = station.pos_x === null || station.pos_y === null;
+
+                  return (
+                    <div
+                      key={station.id}
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        setActiveEditStationId(station.id);
+                        const canvas = canvasRef.current;
+                        if (!canvas) return;
+                        const rect = canvas.getBoundingClientRect();
+
+                        let latestX = posLeft;
+                        let latestY = posTop;
+
+                        const handlePointerMove = (moveEvent: PointerEvent) => {
+                          const x = ((moveEvent.clientX - rect.left) / rect.width) * 100;
+                          const y = ((moveEvent.clientY - rect.top) / rect.height) * 100;
+                          let clampedX = Math.max(4, Math.min(96, x));
+                          let clampedY = Math.max(5, Math.min(95, y));
+                          
+                          if (snapToGrid) {
+                            clampedX = Math.round(clampedX / 5) * 5;
+                            clampedY = Math.round(clampedY / 5) * 5;
+                            clampedX = Math.max(5, Math.min(95, clampedX));
+                            clampedY = Math.max(5, Math.min(95, clampedY));
+                          }
+                          
+                          latestX = clampedX;
+                          latestY = clampedY;
+                          
+                          setStations(prev => prev.map(s => s.id === station.id ? { ...s, pos_x: clampedX, pos_y: clampedY } : s));
+                        };
+
+                        const handlePointerUp = async () => {
+                          window.removeEventListener('pointermove', handlePointerMove);
+                          window.removeEventListener('pointerup', handlePointerUp);
+                          
+                          // Save final coords
+                          const finalX = Math.round(latestX * 10) / 10;
+                          const finalY = Math.round(latestY * 10) / 10;
+                          await supabase.from('stations').update({ pos_x: finalX, pos_y: finalY }).eq('id', station.id);
+                        };
+
+                        window.addEventListener('pointermove', handlePointerMove);
+                        window.addEventListener('pointerup', handlePointerUp);
+                      }}
+                      style={{
+                        position: 'absolute',
+                        left: `${posLeft}%`,
+                        top: `${posTop}%`,
+                        transform: 'translate(-50%, -50%)',
+                        cursor: 'grab',
+                        zIndex: isSelected ? 100 : 10,
+                        touchAction: 'none',
+                        userSelect: 'none'
+                      }}
+                    >
+                      <div style={{
+                        background: isSelected ? `${instColor}25` : 'rgba(30, 41, 59, 0.85)',
+                        backdropFilter: 'blur(4px)',
+                        border: isSelected ? `2.5px solid ${instColor}` : `1.5px solid ${isUnplaced ? '#f97316' : '#475569'}`,
+                        borderRadius: '20px',
+                        padding: '8px 16px',
+                        color: 'white',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '4px',
+                        minWidth: '95px',
+                        textAlign: 'center',
+                        boxShadow: isSelected ? `0 10px 25px -5px ${instColor}50` : '0 4px 10px rgba(0,0,0,0.3)',
+                        transition: 'border-color 0.2s, background-color 0.2s',
+                        animation: isUnplaced ? 'pulse-orange 2s infinite' : 'none'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Tablet size={12} color={instColor} />
+                          <span style={{ fontSize: '0.75rem', fontWeight: 800 }}>{station.name}</span>
+                        </div>
+                        {station.instrument && (
+                          <span style={{ fontSize: '0.6rem', fontWeight: 700, opacity: 0.8, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            {station.instrument === 'E-Piano' && '🎹'}
+                            {station.instrument === 'E-Drums' && '🥁'}
+                            {station.instrument === 'E-Gitarre' && '🎸'}
+                            {station.instrument === 'E-Bass' && '🎸'}
+                            {station.instrument === 'Vocals' && '🎤'}
+                            {station.instrument}
+                          </span>
+                        )}
+                        {isUnplaced && (
+                          <span style={{ fontSize: '0.55rem', color: '#fb923c', fontWeight: 800 }}>Unplatziert</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Right: Customization & QR Tools */}
+            <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto' }}>
+              
+              {/* Section 1: Room Dimensions */}
+              <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+                <h3 style={{ margin: '0 0 16px 0', fontSize: '0.95rem', fontWeight: 900, color: '#0f172a' }}>Raumgröße (Seitenverhältnis)</h3>
+                <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>Breite (Meter)</label>
+                    <input 
+                      type="number" 
+                      step="0.5" 
+                      min="3" 
+                      max="30"
+                      value={roomWidth} 
+                      onChange={e => setRoomWidth(Number(e.target.value))} 
+                      style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1', marginTop: '4px', fontSize: '0.875rem', fontWeight: 700 }}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>Höhe (Meter)</label>
+                    <input 
+                      type="number" 
+                      step="0.5" 
+                      min="2" 
+                      max="30"
+                      value={roomHeight} 
+                      onChange={e => setRoomHeight(Number(e.target.value))} 
+                      style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1', marginTop: '4px', fontSize: '0.875rem', fontWeight: 700 }}
+                    />
+                  </div>
+                </div>
+                <button 
+                  onClick={handleSaveRoomSize}
+                  style={{ width: '100%', background: brandColor, color: 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                >
+                  Größe aktualisieren
+                </button>
+              </div>
+
+              {/* Section 1.5: Grid & Alignment Tools */}
+              <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+                <h3 style={{ margin: '0 0 16px 0', fontSize: '0.95rem', fontWeight: 900, color: '#0f172a' }}>Raster & Symmetrie</h3>
+                
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '16px', fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={snapToGrid} 
+                    onChange={e => setSnapToGrid(e.target.checked)} 
+                    style={{ width: '16px', height: '16px', borderRadius: '4px', accentColor: brandColor }}
+                  />
+                  Am Raster ausrichten (5%-Schritte)
+                </label>
+
+                <button 
+                  onClick={handleApplyDefaultGrid}
+                  style={{ width: '100%', background: '#ffffff', color: '#1e293b', border: '1.5px solid #cbd5e1', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', transition: 'all 0.2s' }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = brandColor}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = '#cbd5e1'}
+                >
+                  ✨ Symmetrisches Standard-Raster anwenden
+                </button>
+              </div>
+
+              {/* Section 2: Selected Station Configuration */}
+              {activeStation ? (
+                <div style={{ background: '#ffffff', padding: '24px 20px', borderRadius: '20px', border: `1.5px solid ${brandColor}30`, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 950, color: '#0f172a' }}>Konfiguration: {activeStation.name}</h3>
+                    <button 
+                      onClick={() => setActiveEditStationId(null)}
+                      style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+
+                  {/* Name Input */}
+                  <div>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>Station Name</label>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                      <input 
+                        value={editingStationName}
+                        onChange={e => setEditingStationName(e.target.value)}
+                        onBlur={handleSaveStationName}
+                        style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.875rem', fontWeight: 700 }}
+                      />
+                      <button onClick={handleSaveStationName} style={{ background: '#f1f5f9', border: 'none', borderRadius: '10px', padding: '10px 14px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', color: '#475569' }}>
+                        Set
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Instrument Select */}
+                  <div>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>Musikinstrument</label>
+                    <select 
+                      value={editingStationInstrument} 
+                      onChange={e => handleUpdateInstrument(e.target.value)}
+                      style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1', marginTop: '4px', fontSize: '0.875rem', fontWeight: 700, background: 'white' }}
+                    >
+                      <option value="">-- Instrument wählen --</option>
+                      <option value="E-Piano">🎹 E-Piano</option>
+                      <option value="E-Drums">🥁 E-Drums</option>
+                      <option value="E-Gitarre">🎸 E-Gitarre</option>
+                      <option value="E-Bass">🎸 E-Bass</option>
+                      <option value="Vocals">🎤 Mikrofon (Gesang)</option>
+                      <option value="Tablet">📱 Tablet (Standard/Anderes)</option>
+                    </select>
+                  </div>
+
+                  {/* Color Selector */}
+                  <div>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>iPad Rahmenfarbe</label>
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '6px', flexWrap: 'wrap' }}>
+                      {[
+                        { hex: '#ef4444', label: 'Rot' },
+                        { hex: '#a855f7', label: 'Lila' },
+                        { hex: '#3b82f6', label: 'Blau' },
+                        { hex: '#eab308', label: 'Gelb' },
+                        { hex: '#22c55e', label: 'Grün' },
+                        { hex: '#64748b', label: 'Grau' }
+                      ].map(colorOpt => {
+                        const isColorSelected = editingStationColor === colorOpt.hex;
+                        return (
+                          <button
+                            key={colorOpt.hex}
+                            onClick={() => handleUpdateColor(colorOpt.hex)}
+                            title={colorOpt.label}
+                            type="button"
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '50%',
+                              backgroundColor: colorOpt.hex,
+                              border: isColorSelected ? '3px solid #0f172a' : '2px solid transparent',
+                              cursor: 'pointer',
+                              transform: isColorSelected ? 'scale(1.15)' : 'scale(1)',
+                              boxShadow: isColorSelected 
+                                ? `0 6px 12px ${colorOpt.hex}60` 
+                                : '0 2px 4px rgba(0,0,0,0.06)',
+                              transition: 'all 0.2s',
+                              padding: 0,
+                              outline: 'none'
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <hr style={{ border: 'none', borderTop: '1px solid #f1f5f9', margin: '8px 0' }} />
+
+                  {/* QR Code and link setup */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', alignSelf: 'flex-start' }}>iPad Kiosk Setup</span>
+                    
+                    <div style={{ padding: '8px', border: '1px solid #e2e8f0', borderRadius: '16px', background: 'white' }}>
+                      <img 
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(getStationKioskUrl(activeStation.id))}`}
+                        alt="Kiosk Setup QR Code"
+                        style={{ width: '180px', height: '180px', display: 'block' }}
+                      />
+                    </div>
+                    
+                    <p style={{ fontSize: '0.7rem', color: '#64748b', textAlign: 'center', margin: 0 }}>
+                      Scanne diesen QR-Code mit der Kamera des iPads an dieser Station, um es sofort als Kiosk-Gerät zu sperren.
+                    </p>
+
+                    <button 
+                      onClick={() => {
+                        navigator.clipboard.writeText(getStationKioskUrl(activeStation.id));
+                        alert('Kiosk-Setup-Link für diesen Platz kopiert!');
+                      }}
+                      style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#475569', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                    >
+                      <ExternalLink size={12} /> Setup-Link kopieren
+                    </button>
+                  </div>
+
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', border: '2px dashed #cbd5e1', borderRadius: '20px', color: '#94a3b8', textAlign: 'center' }}>
+                  <Tablet size={32} style={{ marginBottom: '12px', opacity: 0.5 }} />
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>Kein iPad ausgewählt</span>
+                  <span style={{ fontSize: '0.7rem', marginTop: '4px' }}>Tippe auf ein iPad auf der Karte links, um es zu konfigurieren oder den Kiosk-QR-Code anzuzeigen.</span>
+                </div>
+              )}
+
+              {/* Room Kiosk Link */}
+              <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <span style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>Allgemeiner Raum-Kiosk Link</span>
+                <span style={{ fontSize: '0.7rem', color: '#64748b', margin: 0 }}>
+                  Nutze diesen Link auf einem Kiosk-iPad, wenn du den Raum-Plan aufrufen möchtest, um die Station manuell auszuwählen.
+                </span>
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText(getRoomKioskUrl(customizingRoom.id));
+                    alert('Allgemeiner Raum-Kiosk Link kopiert!');
+                  }}
+                  style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', color: '#475569' }}
+                >
+                  Raum-Kiosk Link kopieren
+                </button>
+              </div>
+
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div style={{ padding: '20px 32px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end', background: '#f8fafc' }}>
+            <button 
+              onClick={() => setCustomizingRoom(null)}
+              style={{ 
+                background: brandColor, 
+                color: 'white', 
+                border: 'none', 
+                padding: '12px 32px', 
+                borderRadius: '16px', 
+                fontWeight: 800, 
+                fontSize: '0.9rem', 
+                cursor: 'pointer', 
+                boxShadow: '0 8px 20px rgba(0,0,0,0.1)', 
+                transition: 'all 0.2s' 
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+              onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              Speichern & Schließen
+            </button>
+          </div>
+
+        </div>
+      </div>
+    );
+  };
+
   const renderLogoutDialog = () => {
     if (!showLogoutConfirm) return null;
     return (
@@ -4296,6 +5020,37 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             {(admin as any)?.schools?.name} • Management Dashboard
           </p>
         </div>
+        {activeTab === 'live' && (
+          <button
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            style={{
+              background: 'white',
+              border: '1.5px solid #e2e8f0',
+              padding: '10px 20px',
+              borderRadius: '16px',
+              fontSize: '0.85rem',
+              fontWeight: 800,
+              color: isSidebarCollapsed ? '#b45309' : '#475569',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+              transition: 'all 0.15s'
+            }}
+            className="hover-scale"
+          >
+            {isSidebarCollapsed ? (
+              <>
+                <ChevronLeft size={16} /> Sidebar einblenden
+              </>
+            ) : (
+              <>
+                Sidebar ausblenden <ChevronRight size={16} />
+              </>
+            )}
+          </button>
+        )}
       </header>
 
       {activeTab === 'live' && renderLiveTab()}
@@ -4310,6 +5065,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
       {renderStudentDetailModal()}
       {renderQRModal()}
+      {renderRoomLayoutModal()}
       {renderLogoutDialog()}
 
       {/* Modals for Band Editing (Teacher Sonderrecht) */}
@@ -4699,7 +5455,7 @@ function DeviceSetupScreen({
   onCleanupPlanning: () => void,
   onResetPlanning: () => void
 }) {
-  const [activeSubTab, setActiveSubTab] = useState<'academy' | 'device' | 'maintenance'>('academy');
+  const [activeSubTab, setActiveSubTab] = useState<'academy' | 'device' | 'maintenance'>('device');
   const [selectedRoomId, setSelectedRoomId] = useState(() => rooms[0]?.id || '');
   const [bookingStationId, setBookingStationId] = useState<string | null>(null);
 
@@ -4754,17 +5510,21 @@ function DeviceSetupScreen({
   };
 
   const roomStations = stations.filter(s => s.room_id === selectedRoomId);
+  const activeRoom = rooms.find(r => r.id === selectedRoomId) || rooms[0];
+  const roomKioskUrl = activeRoom ? `${window.location.origin}/?kiosk_room_id=${activeRoom.id}` : '';
 
   const getStationByNumber = (num: number) => {
     return roomStations.find(s => {
-      const name = s.name.toLowerCase();
-      return name === `ipad ${num}` || name === `ipad${num}`;
+      const name = s.name || '';
+      const lower = name.toLowerCase();
+      return lower === `ipad ${num}` || lower === `ipad${num}`;
     });
   };
 
   const lehrerStation = roomStations.find(s => {
-    const name = s.name.toLowerCase();
-    return name.includes('lehrer') || name.includes('teacher');
+    const name = s.name || '';
+    const lower = name.toLowerCase();
+    return lower.includes('lehrer') || lower.includes('teacher');
   });
 
   const renderStationCell = (station: any, defaultName: string, isLarge = false) => {
@@ -4869,8 +5629,8 @@ function DeviceSetupScreen({
               width: '32px',
               height: '32px',
               borderRadius: '10px',
-              background: isCurrentDevice ? `${brandColor}15` : '#f8fafc',
-              color: isCurrentDevice ? brandColor : '#64748b',
+              background: isCurrentDevice ? `${brandColor}15` : `${station.color && station.color !== '#e5e7eb' && station.color !== '#e2e8f0' ? station.color : getStationColor(station.name)}15`,
+              color: isCurrentDevice ? brandColor : (station.color && station.color !== '#e5e7eb' && station.color !== '#e2e8f0' ? station.color : getStationColor(station.name)),
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -5112,6 +5872,101 @@ function DeviceSetupScreen({
                   {r.name}
                 </button>
               ))}
+            </div>
+          )}
+
+          {/* Prominent Kiosk Link & QR Code Banner */}
+          {activeRoom && (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '24px',
+              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+              border: '1.5px dashed #cbd5e1',
+              borderRadius: '24px',
+              padding: '20px 24px',
+              marginBottom: '24px',
+              boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)',
+              animation: 'fadeIn 0.3s'
+            }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{
+                    background: `linear-gradient(135deg, ${brandColor} 0%, #f59e0b 100%)`,
+                    color: 'white',
+                    fontSize: '0.65rem',
+                    fontWeight: 900,
+                    padding: '3px 10px',
+                    borderRadius: '20px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    boxShadow: `0 4px 10px ${brandColor}20`
+                  }}>
+                    WICHTIG
+                  </span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#1e293b' }}>
+                    Allgemeiner Raum-Kiosk Link für "{activeRoom.name}"
+                  </span>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: '#475569', margin: 0, lineHeight: 1.4 }}>
+                  Dies ist der zentrale Einstiegspunkt für Schüler und Lehrer in diesem Raum. Öffne diesen Link auf einem iPad (oder scanne den QR-Code), um die interaktive Raum-Kiosk-Ansicht zu starten.
+                </p>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                  <input
+                    readOnly
+                    value={roomKioskUrl}
+                    style={{
+                      flex: 1,
+                      padding: '10px 14px',
+                      borderRadius: '12px',
+                      border: '1px solid #cbd5e1',
+                      background: 'white',
+                      fontSize: '0.75rem',
+                      fontFamily: 'monospace',
+                      color: '#334155',
+                      boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
+                      outline: 'none'
+                    }}
+                    onClick={(e) => (e.target as HTMLInputElement).select()}
+                  />
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(roomKioskUrl);
+                      alert(`Kiosk-Link für Raum "${activeRoom.name}" kopiert!`);
+                    }}
+                    style={{
+                      background: brandColor,
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '12px',
+                      padding: '10px 18px',
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.filter = 'brightness(1.05)'}
+                    onMouseLeave={e => e.currentTarget.style.filter = 'none'}
+                  >
+                    Kopieren
+                  </button>
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', background: 'white', padding: '12px', borderRadius: '18px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(roomKioskUrl)}`}
+                  alt="Raum Kiosk QR Code"
+                  style={{ width: '100px', height: '100px' }}
+                />
+                <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  QR-Code Scannen
+                </span>
+              </div>
             </div>
           )}
 

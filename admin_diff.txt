@@ -1,0 +1,439 @@
+diff --git a/src/components/AdminDashboard.tsx b/src/components/AdminDashboard.tsx
+index aeebce1..101b97d 100644
+--- a/src/components/AdminDashboard.tsx
++++ b/src/components/AdminDashboard.tsx
+@@ -174,6 +174,35 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
+   const [newStationName, setNewStationName] = useState('');
+   const [newStationColor, setNewStationColor] = useState('#e5e7eb');
+   
++  // Layout Customizer states
++  const [customizingRoom, setCustomizingRoom] = useState<any | null>(null);
++  const [roomWidth, setRoomWidth] = useState<number>(10.0);
++  const [roomHeight, setRoomHeight] = useState<number>(8.0);
++  const [activeEditStationId, setActiveEditStationId] = useState<string | null>(null);
++  const [editingStationName, setEditingStationName] = useState<string>('');
++  const [editingStationInstrument, setEditingStationInstrument] = useState<string>('');
++
++  useEffect(() => {
++    if (customizingRoom) {
++      setRoomWidth(customizingRoom.room_width || 10.0);
++      setRoomHeight(customizingRoom.room_height || 8.0);
++      setActiveEditStationId(null);
++    }
++  }, [customizingRoom]);
++
++  useEffect(() => {
++    if (activeEditStationId) {
++      const station = stations.find(s => s.id === activeEditStationId);
++      if (station) {
++        setEditingStationName(station.name || '');
++        setEditingStationInstrument(station.instrument || '');
++      }
++    } else {
++      setEditingStationName('');
++      setEditingStationInstrument('');
++    }
++  }, [activeEditStationId, stations]);
++  
+   const [showAddSong, setShowAddSong] = useState(false);
+   const [newSong, setNewSong] = useState({ artist: '', title: '', level: 1, media_link: '', tomplay_url: '', pdf_folder_url: '', guitar_pro_url: '', pdf_drums_url: '', pdf_guitar_url: '', pdf_bass_url: '', pdf_vocals_url: '', pdf_keys_url: '', bypass_wlan_check: false, instrumentation: { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 } as Record<string, number> });
+   
+@@ -2721,6 +2750,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
+                   </div>
+                 </div>
+                 <div style={{ display: 'flex', gap: '8px' }}>
++                  <button onClick={() => setCustomizingRoom(room)} style={{ padding: '8px 12px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569', cursor: 'pointer', fontWeight: 700, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
++                    <MapPin size={14} /> Layout
++                  </button>
+                   <button onClick={() => setShowAddStationForRoom(room.id)} style={{ padding: '8px 12px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', color: brandColor, cursor: 'pointer', fontWeight: 700, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                     <Plus size={14} /> iPad
+                   </button>
+@@ -4267,6 +4299,359 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
+     );
+   };
+ 
++  const canvasRef = React.useRef<HTMLDivElement>(null);
++
++  const handleSaveRoomSize = async () => {
++    if (!customizingRoom) return;
++    const { error } = await supabase
++      .from('rooms')
++      .update({ room_width: roomWidth, room_height: roomHeight })
++      .eq('id', customizingRoom.id);
++
++    if (error) {
++      alert('Fehler beim Speichern der Raumgröße: ' + error.message);
++    } else {
++      setRooms(rooms.map(r => r.id === customizingRoom.id ? { ...r, room_width: roomWidth, room_height: roomHeight } : r));
++      setCustomizingRoom({ ...customizingRoom, room_width: roomWidth, room_height: roomHeight });
++      alert('Raumgröße erfolgreich gespeichert!');
++    }
++  };
++
++  const handleUpdateInstrument = async (val: string) => {
++    if (!activeEditStationId) return;
++    setEditingStationInstrument(val);
++    setStations(prev => prev.map(s => s.id === activeEditStationId ? { ...s, instrument: val } : s));
++    await supabase.from('stations').update({ instrument: val }).eq('id', activeEditStationId);
++  };
++
++  const handleSaveStationName = async () => {
++    if (!activeEditStationId) return;
++    setStations(prev => prev.map(s => s.id === activeEditStationId ? { ...s, name: editingStationName } : s));
++    const { error } = await supabase.from('stations').update({ name: editingStationName }).eq('id', activeEditStationId);
++    if (error) {
++      alert('Fehler beim Speichern: ' + error.message);
++    }
++  };
++
++  const renderRoomLayoutModal = () => {
++    if (!customizingRoom) return null;
++
++    const roomStations = stations.filter(s => s.room_id === customizingRoom.id);
++    const activeStation = stations.find(s => s.id === activeEditStationId);
++    
++    // Generate Kiosk URLs
++    const getStationKioskUrl = (id: string) => `${window.location.origin}/?kiosk_station_id=${id}`;
++    const getRoomKioskUrl = (id: string) => `${window.location.origin}/?kiosk_room_id=${id}`;
++
++    return (
++      <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(12px)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
++        <style dangerouslySetInnerHTML={{__html: `
++          @keyframes pulse-orange {
++            0%, 100% { border-color: #f97316; box-shadow: 0 0 0 0px rgba(249, 115, 22, 0.4); }
++            50% { border-color: #ffedd5; box-shadow: 0 0 0 6px rgba(249, 115, 22, 0); }
++          }
++        `}} />
++        <div style={{ background: '#ffffff', width: '100%', maxWidth: '1200px', borderRadius: '32px', display: 'flex', flexDirection: 'column', maxHeight: '90vh', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', overflow: 'hidden' }}>
++          
++          {/* Header */}
++          <div style={{ padding: '24px 32px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
++            <div>
++              <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a', margin: 0 }}>Raum-Layout gestalten: {customizingRoom.name}</h2>
++              <p style={{ fontSize: '0.875rem', color: '#64748b', margin: '4px 0 0 0' }}>Bewege die iPads an ihre Plätze und konfiguriere die Instrumente.</p>
++            </div>
++            <button 
++              onClick={() => setCustomizingRoom(null)} 
++              style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s' }}
++              onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'}
++              onMouseLeave={e => e.currentTarget.style.background = '#f1f5f9'}
++            >
++              <X size={20} />
++            </button>
++          </div>
++
++          {/* Modal Content */}
++          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 380px', flex: 1, overflow: 'hidden', height: '100%' }}>
++            
++            {/* Left: Designer Canvas */}
++            <div style={{ padding: '32px', display: 'flex', flexDirection: 'column', background: '#f8fafc', borderRight: '1px solid #e2e8f0', justifyContent: 'center', alignItems: 'center', overflow: 'auto' }}>
++              <div 
++                ref={canvasRef}
++                style={{
++                  position: 'relative',
++                  width: '100%',
++                  backgroundColor: '#0f172a', // Sleek architectural layout background
++                  backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.15) 1.5px, transparent 1.5px)',
++                  backgroundSize: '24px 24px',
++                  border: '3px solid #334155',
++                  borderRadius: '24px',
++                  boxShadow: 'inset 0 4px 20px rgba(0,0,0,0.6), 0 10px 30px rgba(15, 23, 42, 0.1)',
++                  aspectRatio: `${roomWidth} / ${roomHeight}`,
++                  maxHeight: '55vh',
++                  minHeight: '320px',
++                  overflow: 'hidden'
++                }}
++              >
++                {/* Center helper line */}
++                <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, borderLeft: '1px dashed rgba(255,255,255,0.06)', pointerEvents: 'none' }} />
++                <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, borderTop: '1px dashed rgba(255,255,255,0.06)', pointerEvents: 'none' }} />
++
++                {/* Station Nodes */}
++                {roomStations.map(station => {
++                  const isSelected = activeEditStationId === station.id;
++                  const sName = station.name || '';
++                  const isTeacher = sName.toLowerCase().includes('lehrer') || sName.toLowerCase().includes('teacher');
++                  
++                  // Color codes matching instrument
++                  const inst = station.instrument || '';
++                  let instColor = brandColor; // default fallback yellow/amber
++                  if (inst.includes('Piano')) instColor = '#3b82f6';
++                  if (inst.includes('Drums')) instColor = '#f97316';
++                  if (inst.includes('Gitarre')) instColor = '#ef4444';
++                  if (inst.includes('Bass')) instColor = '#eab308';
++                  if (inst.includes('Vocals')) instColor = '#14b8a6';
++                  if (isTeacher) instColor = '#a855f7';
++
++                  const posLeft = station.pos_x !== null && station.pos_x !== undefined ? station.pos_x : 50;
++                  const posTop = station.pos_y !== null && station.pos_y !== undefined ? station.pos_y : 50;
++                  const isUnplaced = station.pos_x === null || station.pos_y === null;
++
++                  return (
++                    <div
++                      key={station.id}
++                      onPointerDown={(e) => {
++                        e.preventDefault();
++                        setActiveEditStationId(station.id);
++                        const canvas = canvasRef.current;
++                        if (!canvas) return;
++                        const rect = canvas.getBoundingClientRect();
++
++                        const handlePointerMove = (moveEvent: PointerEvent) => {
++                          const x = ((moveEvent.clientX - rect.left) / rect.width) * 100;
++                          const y = ((moveEvent.clientY - rect.top) / rect.height) * 100;
++                          const clampedX = Math.max(4, Math.min(96, x));
++                          const clampedY = Math.max(5, Math.min(95, y));
++                          
++                          setStations(prev => prev.map(s => s.id === station.id ? { ...s, pos_x: clampedX, pos_y: clampedY } : s));
++                        };
++
++                        const handlePointerUp = async () => {
++                          window.removeEventListener('pointermove', handlePointerMove);
++                          window.removeEventListener('pointerup', handlePointerUp);
++                          
++                          // Save final coords
++                          const currentStation = stations.find(s => s.id === station.id);
++                          if (currentStation) {
++                            const finalX = Math.round((currentStation.pos_x || 50) * 10) / 10;
++                            const finalY = Math.round((currentStation.pos_y || 50) * 10) / 10;
++                            await supabase.from('stations').update({ pos_x: finalX, pos_y: finalY }).eq('id', station.id);
++                          }
++                        };
++
++                        window.addEventListener('pointermove', handlePointerMove);
++                        window.addEventListener('pointerup', handlePointerUp);
++                      }}
++                      style={{
++                        position: 'absolute',
++                        left: `${posLeft}%`,
++                        top: `${posTop}%`,
++                        transform: 'translate(-50%, -50%)',
++                        cursor: 'grab',
++                        zIndex: isSelected ? 100 : 10,
++                        touchAction: 'none',
++                        userSelect: 'none'
++                      }}
++                    >
++                      <div style={{
++                        background: isSelected ? `${instColor}25` : 'rgba(30, 41, 59, 0.85)',
++                        backdropFilter: 'blur(4px)',
++                        border: isSelected ? `2.5px solid ${instColor}` : `1.5px solid ${isUnplaced ? '#f97316' : '#475569'}`,
++                        borderRadius: '20px',
++                        padding: '8px 16px',
++                        color: 'white',
++                        display: 'flex',
++                        flexDirection: 'column',
++                        alignItems: 'center',
++                        gap: '4px',
++                        minWidth: '95px',
++                        textAlign: 'center',
++                        boxShadow: isSelected ? `0 10px 25px -5px ${instColor}50` : '0 4px 10px rgba(0,0,0,0.3)',
++                        transition: 'border-color 0.2s, background-color 0.2s',
++                        animation: isUnplaced ? 'pulse-orange 2s infinite' : 'none'
++                      }}>
++                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
++                          <Tablet size={12} color={instColor} />
++                          <span style={{ fontSize: '0.75rem', fontWeight: 800 }}>{station.name}</span>
++                        </div>
++                        {station.instrument && (
++                          <span style={{ fontSize: '0.6rem', fontWeight: 700, opacity: 0.8, display: 'flex', alignItems: 'center', gap: '3px' }}>
++                            {station.instrument === 'E-Piano' && '🎹'}
++                            {station.instrument === 'E-Drums' && '🥁'}
++                            {station.instrument === 'E-Gitarre' && '🎸'}
++                            {station.instrument === 'E-Bass' && '🎸'}
++                            {station.instrument === 'Vocals' && '🎤'}
++                            {station.instrument}
++                          </span>
++                        )}
++                        {isUnplaced && (
++                          <span style={{ fontSize: '0.55rem', color: '#fb923c', fontWeight: 800 }}>Unplatziert</span>
++                        )}
++                      </div>
++                    </div>
++                  );
++                })}
++              </div>
++            </div>
++
++            {/* Right: Customization & QR Tools */}
++            <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto' }}>
++              
++              {/* Section 1: Room Dimensions */}
++              <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
++                <h3 style={{ margin: '0 0 16px 0', fontSize: '0.95rem', fontWeight: 900, color: '#0f172a' }}>Raumgröße (Seitenverhältnis)</h3>
++                <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
++                  <div style={{ flex: 1 }}>
++                    <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>Breite (Meter)</label>
++                    <input 
++                      type="number" 
++                      step="0.5" 
++                      min="3" 
++                      max="30"
++                      value={roomWidth} 
++                      onChange={e => setRoomWidth(Number(e.target.value))} 
++                      style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1', marginTop: '4px', fontSize: '0.875rem', fontWeight: 700 }}
++                    />
++                  </div>
++                  <div style={{ flex: 1 }}>
++                    <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>Höhe (Meter)</label>
++                    <input 
++                      type="number" 
++                      step="0.5" 
++                      min="2" 
++                      max="30"
++                      value={roomHeight} 
++                      onChange={e => setRoomHeight(Number(e.target.value))} 
++                      style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1', marginTop: '4px', fontSize: '0.875rem', fontWeight: 700 }}
++                    />
++                  </div>
++                </div>
++                <button 
++                  onClick={handleSaveRoomSize}
++                  style={{ width: '100%', background: brandColor, color: 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
++                >
++                  Größe aktualisieren
++                </button>
++              </div>
++
++              {/* Section 2: Selected Station Configuration */}
++              {activeStation ? (
++                <div style={{ background: '#ffffff', padding: '24px 20px', borderRadius: '20px', border: `1.5px solid ${brandColor}30`, display: 'flex', flexDirection: 'column', gap: '16px' }}>
++                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
++                    <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 950, color: '#0f172a' }}>Konfiguration: {activeStation.name}</h3>
++                    <button 
++                      onClick={() => setActiveEditStationId(null)}
++                      style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}
++                    >
++                      <X size={14} />
++                    </button>
++                  </div>
++
++                  {/* Name Input */}
++                  <div>
++                    <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>Station Name</label>
++                    <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
++                      <input 
++                        value={editingStationName}
++                        onChange={e => setEditingStationName(e.target.value)}
++                        onBlur={handleSaveStationName}
++                        style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.875rem', fontWeight: 700 }}
++                      />
++                      <button onClick={handleSaveStationName} style={{ background: '#f1f5f9', border: 'none', borderRadius: '10px', padding: '10px 14px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', color: '#475569' }}>
++                        Set
++                      </button>
++                    </div>
++                  </div>
++
++                  {/* Instrument Select */}
++                  <div>
++                    <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>Musikinstrument</label>
++                    <select 
++                      value={editingStationInstrument} 
++                      onChange={e => handleUpdateInstrument(e.target.value)}
++                      style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1', marginTop: '4px', fontSize: '0.875rem', fontWeight: 700, background: 'white' }}
++                    >
++                      <option value="">-- Instrument wählen --</option>
++                      <option value="E-Piano">🎹 E-Piano</option>
++                      <option value="E-Drums">🥁 E-Drums</option>
++                      <option value="E-Gitarre">🎸 E-Gitarre</option>
++                      <option value="E-Bass">🎸 E-Bass</option>
++                      <option value="Vocals">🎤 Mikrofon (Gesang)</option>
++                      <option value="Tablet">📱 Tablet (Standard/Anderes)</option>
++                    </select>
++                  </div>
++
++                  <hr style={{ border: 'none', borderTop: '1px solid #f1f5f9', margin: '8px 0' }} />
++
++                  {/* QR Code and link setup */}
++                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
++                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', alignSelf: 'flex-start' }}>iPad Kiosk Setup</span>
++                    
++                    <div style={{ padding: '8px', border: '1px solid #e2e8f0', borderRadius: '16px', background: 'white' }}>
++                      <img 
++                        src={`https://chart.googleapis.com/chart?chs=180x180&cht=qr&chl=${encodeURIComponent(getStationKioskUrl(activeStation.id))}`}
++                        alt="Kiosk Setup QR Code"
++                        style={{ width: '180px', height: '180px', display: 'block' }}
++                      />
++                    </div>
++                    
++                    <p style={{ fontSize: '0.7rem', color: '#64748b', textAlign: 'center', margin: 0 }}>
++                      Scanne diesen QR-Code mit der Kamera des iPads an dieser Station, um es sofort als Kiosk-Gerät zu sperren.
++                    </p>
++
++                    <button 
++                      onClick={() => {
++                        navigator.clipboard.writeText(getStationKioskUrl(activeStation.id));
++                        alert('Kiosk-Setup-Link für diesen Platz kopiert!');
++                      }}
++                      style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#475569', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
++                    >
++                      <ExternalLink size={12} /> Setup-Link kopieren
++                    </button>
++                  </div>
++
++                </div>
++              ) : (
++                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', border: '2px dashed #cbd5e1', borderRadius: '20px', color: '#94a3b8', textAlign: 'center' }}>
++                  <Tablet size={32} style={{ marginBottom: '12px', opacity: 0.5 }} />
++                  <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>Kein iPad ausgewählt</span>
++                  <span style={{ fontSize: '0.7rem', marginTop: '4px' }}>Tippe auf ein iPad auf der Karte links, um es zu konfigurieren oder den Kiosk-QR-Code anzuzeigen.</span>
++                </div>
++              )}
++
++              {/* Room Kiosk Link */}
++              <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
++                <span style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>Allgemeiner Raum-Kiosk Link</span>
++                <span style={{ fontSize: '0.7rem', color: '#64748b', margin: 0 }}>
++                  Nutze diesen Link auf einem Kiosk-iPad, wenn du den Raum-Plan aufrufen möchtest, um die Station manuell auszuwählen.
++                </span>
++                <button 
++                  onClick={() => {
++                    navigator.clipboard.writeText(getRoomKioskUrl(customizingRoom.id));
++                    alert('Allgemeiner Raum-Kiosk Link kopiert!');
++                  }}
++                  style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', color: '#475569' }}
++                >
++                  Raum-Kiosk Link kopieren
++                </button>
++              </div>
++
++            </div>
++          </div>
++
++        </div>
++      </div>
++    );
++  };
++
+   const renderLogoutDialog = () => {
+     if (!showLogoutConfirm) return null;
+     return (
+@@ -4310,6 +4695,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
+ 
+       {renderStudentDetailModal()}
+       {renderQRModal()}
++      {renderRoomLayoutModal()}
+       {renderLogoutDialog()}
+ 
+       {/* Modals for Band Editing (Teacher Sonderrecht) */}
+@@ -4757,14 +5143,16 @@ function DeviceSetupScreen({
+ 
+   const getStationByNumber = (num: number) => {
+     return roomStations.find(s => {
+-      const name = s.name.toLowerCase();
+-      return name === `ipad ${num}` || name === `ipad${num}`;
++      const name = s.name || '';
++      const lower = name.toLowerCase();
++      return lower === `ipad ${num}` || lower === `ipad${num}`;
+     });
+   };
+ 
+   const lehrerStation = roomStations.find(s => {
+-    const name = s.name.toLowerCase();
+-    return name.includes('lehrer') || name.includes('teacher');
++    const name = s.name || '';
++    const lower = name.toLowerCase();
++    return lower.includes('lehrer') || lower.includes('teacher');
+   });
+ 
+   const renderStationCell = (station: any, defaultName: string, isLarge = false) => {

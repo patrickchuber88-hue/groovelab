@@ -1,0 +1,24 @@
+diff --git a/src/App.tsx b/src/App.tsx
+index bcd4567..d3e05ae 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -1118,6 +1118,19 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
+   );
+ }
+ 
++// Auto-setup kiosk mode from URL parameters
++const params = new URLSearchParams(window.location.search);
++const kioskStationId = params.get('kiosk_station_id');
++if (kioskStationId) {
++  localStorage.setItem('groovelab_station_id', kioskStationId);
++  sessionStorage.removeItem('groovelab_user_id');
++  // Strip parameter and redirect to clean up URL
++  params.delete('kiosk_station_id');
++  const newSearch = params.toString();
++  const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '');
++  window.location.replace(newUrl);
++}
++
+ function App() {
+   const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => sessionStorage.getItem('groovelab_user_id'));
+   const [loading, setLoading] = useState(false);

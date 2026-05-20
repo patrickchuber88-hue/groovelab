@@ -301,14 +301,14 @@ interface WallSong {
 }
 
 // --- Defensive Error Boundary ---
-class ErrorBoundary extends React.Component<{ children: React.ReactNode, fallback?: React.ReactNode }, { hasError: boolean }> {
+class ErrorBoundary extends React.Component<{ children: React.ReactNode, fallback?: React.ReactNode }, { hasError: boolean, error: any }> {
   constructor(props: any) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, error: null };
   }
 
-  static getDerivedStateFromError(_: any) {
-    return { hasError: true };
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
   }
 
   componentDidCatch(error: any, errorInfo: any) {
@@ -329,9 +329,26 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode, fallbac
         }}>
           <div style={{ fontSize: '4rem', marginBottom: '24px' }}>🎸</div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', marginBottom: '12px' }}>Hoppla! Ein kleiner "Saitenriss"...</h2>
-          <p style={{ color: '#64748b', fontSize: '1.1rem', lineHeight: 1.6, marginBottom: '32px' }}>
+          <p style={{ color: '#64748b', fontSize: '1.1rem', lineHeight: 1.6, marginBottom: '20px' }}>
             Beim Laden dieses Bereichs ist ein Fehler aufgetreten. Keine Sorge, deine Daten sind sicher!
           </p>
+          {this.state.error && (
+            <pre style={{
+              background: '#f8fafc',
+              color: '#ef4444',
+              padding: '16px',
+              borderRadius: '12px',
+              textAlign: 'left',
+              fontSize: '0.8rem',
+              overflowX: 'auto',
+              marginBottom: '24px',
+              fontFamily: 'monospace',
+              border: '1px solid #cbd5e1'
+            }}>
+              {this.state.error.message || String(this.state.error)}
+              {this.state.error.stack && `\n\n${this.state.error.stack.split('\n').slice(0, 4).join('\n')}`}
+            </pre>
+          )}
           <button 
             onClick={() => window.location.reload()}
             style={{ 
@@ -1116,6 +1133,19 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
       </div>
     </div>
   );
+}
+
+// Auto-setup kiosk mode from URL parameters
+const params = new URLSearchParams(window.location.search);
+const kioskStationId = params.get('kiosk_station_id');
+if (kioskStationId) {
+  localStorage.setItem('groovelab_station_id', kioskStationId);
+  sessionStorage.removeItem('groovelab_user_id');
+  // Strip parameter and redirect to clean up URL
+  params.delete('kiosk_station_id');
+  const newSearch = params.toString();
+  const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '');
+  window.location.replace(newUrl);
 }
 
 function App() {
@@ -5552,7 +5582,7 @@ function App() {
 
         {/* Admin/Teacher Section Tabs (Unified) */}
         {((user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'teacher')) && ['live', 'students', 'team', 'rooms', 'songs', 'stats', 'gallery', 'setup', 'bands'].includes(activeStudentTab) && (
-          <ErrorBoundary>
+          <ErrorBoundary key={activeStudentTab}>
             <AdminDashboard 
               userId={user.id} 
               onLogout={handleLogout} 

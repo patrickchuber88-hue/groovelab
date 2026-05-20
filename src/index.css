@@ -418,3 +418,38 @@ body {
   border-color: #ec4899 !important; /* Pink border */
   box-shadow: 0 10px 25px -5px rgba(236, 72, 153, 0.25);
 }
+
+/* Premium Responsive Live Lab Layout Grid */
+.live-lab-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 32px;
+  align-items: start;
+  width: 100%;
+  transition: grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1), gap 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.live-lab-grid.collapsed {
+  grid-template-columns: 1fr 0px;
+  gap: 0px;
+}
+
+@media (max-width: 1200px) {
+  .live-lab-grid {
+    grid-template-columns: 1fr !important;
+    gap: 24px !important;
+  }
+  
+  .live-lab-grid.collapsed aside {
+    display: none !important;
+  }
+  
+  .live-lab-grid aside {
+    width: 100% !important;
+    opacity: 1 !important;
+    transform: none !important;
+    pointer-events: auto !important;
+    transition: none !important;
+  }
+}
+
