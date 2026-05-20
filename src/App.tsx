@@ -1455,9 +1455,10 @@ function App() {
           
           const mySlot = (form.members || []).find((m: any) => m.user_id === user.id);
           if (mySlot) {
-            // Leader Logic: The active member who reloads or loads the page first is designated as the leader!
-            const isLeader = true;
-            const leader = mySlot;
+            // Leader Logic: Assign leader stably across all clients by sorting members alphabetically by user_id
+            const sortedMembers = [...(form.members || [])].sort((a: any, b: any) => (a.user_id || '').localeCompare(b.user_id || ''));
+            const leader = sortedMembers[0] || mySlot;
+            const isLeader = leader.user_id === user.id;
 
             // 1. Check if we already have a band for this song/group locally to avoid re-triggering
             const alreadyHaveBand = userBands.some((b: any) => 
@@ -1481,8 +1482,8 @@ function App() {
             // Auto-trigger founding flow
             updateAutoTriggerId(form.id);
             
-            // Check for multi-band conflict first (mimic button logic)
-            if (userBands.length > 0) {
+            // Check for multi-band conflict first (mimic button logic) - Only for the leader!
+            if (isLeader && userBands.length > 0) {
               const proceed = window.confirm('Deine Formation ist vollständig! 🎸\n\nDu spielst bereits in einer Band. Möchtest du wirklich eine zusätzliche Band gründen? Falls nicht, gibst du deinen Slot für andere frei.');
               if (!proceed) {
                 (async () => {
@@ -1842,7 +1843,7 @@ function App() {
         supabase.from('users').select('*, schools(*)').eq('id', userId).maybeSingle(),
         supabase.from('sessions').select('*, stations(name)').eq('user_id', userId).is('check_out_time', null).order('check_in_time', { ascending: false }).limit(1).maybeSingle(),
         supabase.from('sessions').select('check_in_time, check_out_time').eq('user_id', userId),
-        supabase.from('band_members').select('instrument, bands(id, name, school_id, song_id, status, photo_url, songs(*), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready)))))').eq('user_id', userId)
+        supabase.from('band_members').select('id, instrument, confetti_seen, bands(id, name, school_id, song_id, status, photo_url, songs(*), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready)))))').eq('user_id', userId)
       ]).catch(err => {
         console.error('[Dashboard] Critical Fetch Error Stage 1:', err);
         return [ {error: err}, {error: err}, {error: err}, {error: err} ] as any;
@@ -3379,7 +3380,7 @@ function App() {
         console.log('[Founding] Pre-fetching members for group:', groupID);
         const { data: groupData } = await supabase
           .from('user_song_skills')
-          .select('user_id, instrument, verified_by_id, created_at, profiles:users(first_name, photo_url)')
+          .select('id, user_id, instrument, verified_by_id, created_at, profiles:users(first_name, photo_url)')
           .eq('formation_group', groupID);
           
         if (groupData && groupData.length > 0) {
@@ -3387,6 +3388,8 @@ function App() {
            const actualLeaderId = user.id;
 
           formationMembers = groupData.map((d: any) => ({
+            id: d.id,
+            skill_id: d.id,
             user_id: d.user_id,
             instrument: d.instrument,
             first_name: d.profiles?.first_name || 'Musiker',
