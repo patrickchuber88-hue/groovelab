@@ -4670,6 +4670,80 @@ function App() {
     return matchesSearch && matchesAlpha;
   });
 
+  const getTeacherColorStyle = (teachersInSlot: any[], loggedInUserId: string | undefined) => {
+    const hasPatrick = teachersInSlot.some(t => (t.profiles?.first_name || '').toLowerCase().includes('patrick'));
+    const hasBoris = teachersInSlot.some(t => (t.profiles?.first_name || '').toLowerCase().includes('boris'));
+
+    if (hasPatrick && hasBoris) {
+      const containsMe = teachersInSlot.some(t => t.user_id === loggedInUserId);
+      if (containsMe) {
+        // Current user is one of them - show solid gradient
+        return {
+          bgColor: 'linear-gradient(135deg, #f59e0b 0%, #10b981 100%)',
+          border: '1px solid #cbd5e1',
+          textColor: 'white'
+        };
+      } else {
+        // Neither is current user - show light gradient
+        return {
+          bgColor: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(16, 185, 129, 0.12) 100%)',
+          border: '1px dashed #cbd5e1',
+          textColor: '#475569'
+        };
+      }
+    }
+
+    // Single teacher or default
+    const primaryTeacher = teachersInSlot[0];
+    const teacherName = (primaryTeacher?.profiles?.first_name || '').toLowerCase();
+    const isMe = primaryTeacher?.user_id === loggedInUserId;
+
+    if (teacherName.includes('patrick')) {
+      if (isMe) {
+        return {
+          bgColor: '#f59e0b',
+          border: '1px solid #d97706',
+          textColor: 'white'
+        };
+      } else {
+        return {
+          bgColor: 'rgba(245, 158, 11, 0.12)',
+          border: '1px dashed rgba(245, 158, 11, 0.5)',
+          textColor: '#d97706'
+        };
+      }
+    } else if (teacherName.includes('boris')) {
+      if (isMe) {
+        return {
+          bgColor: '#10b981',
+          border: '1px solid #059669',
+          textColor: 'white'
+        };
+      } else {
+        return {
+          bgColor: 'rgba(16, 185, 129, 0.12)',
+          border: '1px dashed rgba(16, 185, 129, 0.5)',
+          textColor: '#059669'
+        };
+      }
+    } else {
+      // Default fallback (e.g. Purple / Indigo)
+      if (isMe) {
+        return {
+          bgColor: '#6366f1',
+          border: '1px solid #4f46e5',
+          textColor: 'white'
+        };
+      } else {
+        return {
+          bgColor: 'rgba(99, 102, 241, 0.12)',
+          border: '1px dashed rgba(99, 102, 241, 0.5)',
+          textColor: '#4f46e5'
+        };
+      }
+    }
+  };
+
   const getTeacherPresenceList = () => {
     const teacherSlots = globalPlannedSlots.filter((s: any) => 
       s.profiles?.role?.toLowerCase() === 'teacher' || 
@@ -5440,31 +5514,50 @@ function App() {
                               {(() => {
                                 const teacherPresences = getTeacherPresenceList();
                                 if (teacherPresences.length === 0) return null;
+                                
+                                const groupedPresences: { [teacherName: string]: typeof teacherPresences } = {};
+                                teacherPresences.forEach(pres => {
+                                  if (!groupedPresences[pres.teacherName]) {
+                                    groupedPresences[pres.teacherName] = [];
+                                  }
+                                  groupedPresences[pres.teacherName].push(pres);
+                                });
+
                                 return (
                                   <div style={{ marginTop: '24px', borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
                                     <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                       <span style={{ fontSize: '1.1rem' }}>👨‍🏫</span>
                                       Anwesende Coaches diese Woche:
                                     </h4>
-                                    <div style={{ display: 'flex', flexDirection: 'row', gap: '8px', flexWrap: 'nowrap' }}>
-                                      {teacherPresences.map((pres, idx) => (
-                                        <div key={idx} style={{ 
-                                          display: 'flex', 
-                                          alignItems: 'center', 
-                                          gap: '8px', 
-                                          background: '#f8fafc', 
-                                          border: '1px solid #f1f5f9', 
-                                          padding: '8px 12px', 
-                                          borderRadius: '12px',
-                                          flex: '1 1 0px',
-                                          minWidth: '0'
-                                        }}>
-                                          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#f59e0b', flexShrink: 0 }}></div>
-                                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`${pres.teacherName} — ${pres.day}. ${pres.rangeStr}`}>
-                                            <span style={{ color: '#1e293b', fontWeight: 900 }}>{pres.teacherName}</span> — {pres.day}. {pres.rangeStr}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                      {Object.entries(groupedPresences).map(([teacherName, presList]) => {
+                                        const isPatrick = teacherName.toLowerCase().includes('patrick');
+                                        const isBoris = teacherName.toLowerCase().includes('boris');
+                                        const dotColor = isPatrick ? '#f59e0b' : isBoris ? '#10b981' : '#6366f1';
+                                        return (
+                                          <div key={teacherName} style={{ 
+                                            display: 'flex', 
+                                            flexDirection: 'column', 
+                                            gap: '6px', 
+                                            background: '#f8fafc', 
+                                            border: '1px solid #f1f5f9', 
+                                            padding: '12px 16px', 
+                                            borderRadius: '16px' 
+                                          }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: dotColor, flexShrink: 0 }}></div>
+                                              <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#1e293b' }}>{teacherName}</span>
+                                            </div>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '16px' }}>
+                                              {presList.map((pres, idx) => (
+                                                <div key={idx} style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569' }}>
+                                                  Mögliche Bandprobe: <span style={{ fontWeight: 800, color: '#1e293b' }}>{pres.day}. {pres.rangeStr}</span>
+                                                </div>
+                                              ))}
+                                            </div>
                                           </div>
-                                        </div>
-                                      ))}
+                                        );
+                                      })}
                                     </div>
                                   </div>
                                 );
@@ -5673,24 +5766,27 @@ function App() {
                               width: '12px', 
                               height: '12px', 
                               borderRadius: '3px', 
-                              border: '1px solid #d97706', 
-                              background: '#f59e0b'
-                            }}></div> Deine Zeit
+                              background: (user?.first_name || '').toLowerCase().includes('patrick') ? '#f59e0b' : 'rgba(245, 158, 11, 0.12)', 
+                              border: (user?.first_name || '').toLowerCase().includes('patrick') ? '1px solid #d97706' : '1px dashed rgba(245, 158, 11, 0.5)'
+                            }}></div> Patrick {(user?.first_name || '').toLowerCase().includes('patrick') ? '(Du)' : ''}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
                             <div style={{ 
                               width: '12px', 
                               height: '12px', 
                               borderRadius: '3px', 
-                              border: '1px dashed rgba(245, 158, 11, 0.5)', 
-                              background: 'rgba(245, 158, 11, 0.12)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: '#d97706',
-                              fontSize: '0.5rem',
-                              fontWeight: 900
-                            }}>👤</div> Anderer Coach
+                              background: (user?.first_name || '').toLowerCase().includes('boris') ? '#10b981' : 'rgba(16, 185, 129, 0.12)', 
+                              border: (user?.first_name || '').toLowerCase().includes('boris') ? '1px solid #059669' : '1px dashed rgba(16, 185, 129, 0.5)'
+                            }}></div> Boris {(user?.first_name || '').toLowerCase().includes('boris') ? '(Du)' : ''}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
+                            <div style={{ 
+                              width: '12px', 
+                              height: '12px', 
+                              borderRadius: '3px', 
+                              background: 'linear-gradient(135deg, #f59e0b 0%, #10b981 100%)', 
+                              border: '1px solid #cbd5e1'
+                            }}></div> Beide
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
                             <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: 'rgba(79, 70, 229, 0.4)' }}></div> Lab voll
@@ -5801,16 +5897,11 @@ function App() {
                                             content = <span style={{ opacity: 0.3, fontSize: '0.6rem' }}>✕</span>;
                                           } else {
                                             // 1. Determine Background, Border, and Text Color based strictly on heatmap density and coach presence
-                                            if (hasMySlot) {
-                                              // Solid brand gold-amber für eigene geplante Zeiten (eine Farbe uni)
-                                              bgColor = '#f59e0b';
-                                              textColor = 'white';
-                                              border = '1px solid #d97706';
-                                            } else if (hasOtherTeacher) {
-                                              // Soft light gold-amber für andere Coaches
-                                              bgColor = 'rgba(245, 158, 11, 0.12)';
-                                              textColor = '#d97706';
-                                              border = '1px dashed rgba(245, 158, 11, 0.5)';
+                                            if (teachersInSlot.length > 0) {
+                                              const styleDetails = getTeacherColorStyle(teachersInSlot, loggedInUserId);
+                                              bgColor = styleDetails.bgColor;
+                                              textColor = styleDetails.textColor;
+                                              border = styleDetails.border;
                                             } else {
                                               // Soft transparent purple/blue heatmap for other slots — linear progressive up to 8 stations!
                                               if (totalCount > 0) {
@@ -5825,20 +5916,19 @@ function App() {
                                               }
                                             }
 
-                                            // 2. Determine Inner Content (Student Count or Other Teachers' initials)
+                                            // 2. Determine Inner Content (Student Count or Teachers' initials)
                                             if (totalCount > 0) {
                                               content = (
                                                 <span style={{ fontSize: '0.75rem', fontWeight: 900 }}>
                                                   {totalCount}
                                                 </span>
                                               );
-                                            } else if (hasOtherTeacher && !hasMySlot) {
+                                            } else if (teachersInSlot.length > 0) {
                                               const initials = teachersInSlot
-                                                .filter(t => t.user_id !== loggedInUserId)
                                                 .map(t => t.profiles?.first_name?.[0] || 'L')
                                                 .join('+');
                                               content = (
-                                                <span style={{ fontSize: '0.6rem', fontWeight: 900, color: '#d97706' }} title={teachersInSlot.map(t => t.profiles?.first_name).join(', ')}>
+                                                <span style={{ fontSize: '0.65rem', fontWeight: 900, color: textColor }} title={teachersInSlot.map(t => t.profiles?.first_name).join(', ')}>
                                                   {initials}
                                                 </span>
                                               );
@@ -5888,31 +5978,50 @@ function App() {
                               {(() => {
                                 const teacherPresences = getTeacherPresenceList();
                                 if (teacherPresences.length === 0) return null;
+                                
+                                const groupedPresences: { [teacherName: string]: typeof teacherPresences } = {};
+                                teacherPresences.forEach(pres => {
+                                  if (!groupedPresences[pres.teacherName]) {
+                                    groupedPresences[pres.teacherName] = [];
+                                  }
+                                  groupedPresences[pres.teacherName].push(pres);
+                                });
+
                                 return (
                                   <div style={{ marginTop: '24px', borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
                                     <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                       <span style={{ fontSize: '1.1rem' }}>👨‍🏫</span>
                                       Anwesende Coaches diese Woche:
                                     </h4>
-                                    <div style={{ display: 'flex', flexDirection: 'row', gap: '8px', flexWrap: 'nowrap' }}>
-                                      {teacherPresences.map((pres, idx) => (
-                                        <div key={idx} style={{ 
-                                          display: 'flex', 
-                                          alignItems: 'center', 
-                                          gap: '8px', 
-                                          background: '#f8fafc', 
-                                          border: '1px solid #f1f5f9', 
-                                          padding: '8px 12px', 
-                                          borderRadius: '12px',
-                                          flex: '1 1 0px',
-                                          minWidth: '0'
-                                        }}>
-                                          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#f59e0b', flexShrink: 0 }}></div>
-                                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`${pres.teacherName} — ${pres.day}. ${pres.rangeStr}`}>
-                                            <span style={{ color: '#1e293b', fontWeight: 900 }}>{pres.teacherName}</span> — {pres.day}. {pres.rangeStr}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                      {Object.entries(groupedPresences).map(([teacherName, presList]) => {
+                                        const isPatrick = teacherName.toLowerCase().includes('patrick');
+                                        const isBoris = teacherName.toLowerCase().includes('boris');
+                                        const dotColor = isPatrick ? '#f59e0b' : isBoris ? '#10b981' : '#6366f1';
+                                        return (
+                                          <div key={teacherName} style={{ 
+                                            display: 'flex', 
+                                            flexDirection: 'column', 
+                                            gap: '6px', 
+                                            background: '#f8fafc', 
+                                            border: '1px solid #f1f5f9', 
+                                            padding: '12px 16px', 
+                                            borderRadius: '16px' 
+                                          }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: dotColor, flexShrink: 0 }}></div>
+                                              <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#1e293b' }}>{teacherName}</span>
+                                            </div>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '16px' }}>
+                                              {presList.map((pres, idx) => (
+                                                <div key={idx} style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569' }}>
+                                                  Mögliche Bandprobe: <span style={{ fontWeight: 800, color: '#1e293b' }}>{pres.day}. {pres.rangeStr}</span>
+                                                </div>
+                                              ))}
+                                            </div>
                                           </div>
-                                        </div>
-                                      ))}
+                                        );
+                                      })}
                                     </div>
                                   </div>
                                 );
