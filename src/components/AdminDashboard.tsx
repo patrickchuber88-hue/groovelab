@@ -333,9 +333,21 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
   const brandColor = admin?.schools?.brand_color || '#eab308';
 
-  const getStatusColor = (studentId: string, lastSeen: string | null) => {
+  const getStatusColor = (studentId: string, lastSeen: string | null, createdAt?: string | null) => {
     const hasLiveSession = activeSessions.some(se => se.user_id === studentId);
-    const isOnline = lastSeen ? (new Date(lastSeen).getTime() > Date.now() - 5 * 60 * 1000) : false;
+    
+    let isOnline = false;
+    if (lastSeen) {
+      const lastSeenTime = new Date(lastSeen).getTime();
+      const createdTime = createdAt ? new Date(createdAt).getTime() : 0;
+      
+      // If last_seen is identical to created_at (or within 1 second), they have never logged in
+      const hasNeverLoggedIn = Math.abs(lastSeenTime - createdTime) < 1000;
+      
+      if (!hasNeverLoggedIn) {
+        isOnline = lastSeenTime > Date.now() - 5 * 60 * 1000;
+      }
+    }
     
     if (hasLiveSession) return '#10b981'; // Green
     if (isOnline) return '#fbbf24'; // Yellow (Home)
@@ -2452,165 +2464,167 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             
             let matchesStatus = true;
             if (statusFilter !== 'all') {
-              const statusColor = getStatusColor(s.id, s.last_seen);
+              const statusColor = getStatusColor(s.id, s.last_seen, s.created_at);
               if (statusFilter === 'green' && statusColor !== '#10b981') matchesStatus = false;
               if (statusFilter === 'yellow' && statusColor !== '#fbbf24') matchesStatus = false;
               if (statusFilter === 'red' && statusColor !== '#ef4444') matchesStatus = false;
             }
             
             return matchesSearch && matchesType && matchesStatus;
-          }).map(s => (
-            <div 
-              key={s.id} 
-              className="glass-panel" 
-              style={{ 
-                padding: '20px', 
-                background: 'white', 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
-                borderRadius: '24px', 
-                border: '1px solid #e2e8f0', 
-                borderLeft: `8px solid ${brandColor}`, 
-                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.02), 0 8px 10px -6px rgba(0, 0, 0, 0.02)',
-                transition: 'transform 0.2s, box-shadow 0.2s', 
-                cursor: 'default' 
-              }} 
-              onMouseEnter={e => {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02)';
-              }} 
-              onMouseLeave={e => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.02), 0 8px 10px -6px rgba(0, 0, 0, 0.02)';
-              }}
-            >
+          }).map(s => {
+            const statusColor = getStatusColor(s.id, s.last_seen, s.created_at);
+            const statusText = statusColor === '#10b981' 
+              ? 'Im Live Lab eingecheckt' 
+              : (statusColor === '#fbbf24' ? 'Im Home Modus eingecheckt' : 'Nicht eingeloggt');
+            return (
               <div 
-                onClick={() => fetchStudentProfile(s)}
-                style={{ display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', flex: 1 }}
+                key={s.id} 
+                className="glass-panel" 
+                style={{ 
+                  padding: '20px', 
+                  background: 'white', 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  borderRadius: '24px', 
+                  border: '1px solid #e2e8f0', 
+                  borderLeft: `8px solid ${brandColor}`, 
+                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.02), 0 8px 10px -6px rgba(0, 0, 0, 0.02)',
+                  transition: 'transform 0.2s, box-shadow 0.2s', 
+                  cursor: 'default' 
+                }} 
+                onMouseEnter={e => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02)';
+                }} 
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.02), 0 8px 10px -6px rgba(0, 0, 0, 0.02)';
+                }}
               >
-                <div style={{ position: 'relative' }}>
-                  <div style={{ 
-                    width: '64px', 
-                    height: '64px', 
-                    borderRadius: '20px', 
-                    background: `${brandColor}15`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    overflow: 'hidden',
-                    border: '2px solid white',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
-                  }}>
-                    <img 
-                      src={s.photo_url || '/avatar_ghost.jpg'} 
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                    />
-                    <span style={{ fontSize: '1.25rem', fontWeight: 900, color: brandColor }}>{s.first_name?.[0]}</span>
+                <div 
+                  onClick={() => fetchStudentProfile(s)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', flex: 1 }}
+                >
+                  <div style={{ position: 'relative' }}>
+                    <div style={{ 
+                      width: '64px', 
+                      height: '64px', 
+                      borderRadius: '20px', 
+                      background: `${brandColor}15`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                      border: '2px solid white',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+                    }}>
+                      <img 
+                        src={s.photo_url || '/avatar_ghost.jpg'} 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                      <span style={{ fontSize: '1.25rem', fontWeight: 900, color: brandColor }}>{s.first_name?.[0]}</span>
+                    </div>
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '-2px',
+                      right: '-2px',
+                      width: '20px',
+                      height: '20px',
+                      borderRadius: '50%',
+                      backgroundColor: statusColor,
+                      border: '3px solid white',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                      zIndex: 10
+                    }} title={statusText} />
                   </div>
-                  <div style={{
-                    position: 'absolute',
-                    bottom: '-2px',
-                    right: '-2px',
-                    width: '20px',
-                    height: '20px',
-                    borderRadius: '50%',
-                    backgroundColor: getStatusColor(s.id, s.last_seen),
-                    border: '3px solid white',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-                    zIndex: 10
-                  }} title={
-                    activeSessions.some(se => se.user_id === s.id) 
-                      ? 'Im Live Lab eingecheckt' 
-                      : (s.last_seen && (new Date(s.last_seen).getTime() > Date.now() - 5 * 60 * 1000) ? 'Im Home Modus eingecheckt' : 'Nicht eingeloggt')
-                  } />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '1.15rem', letterSpacing: '-0.02em' }}>{s.first_name} {s.last_name}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontFamily: 'monospace', fontWeight: 600 }}>ID: {s.id.split('-')[0].toUpperCase()}</div>
+                    <div style={{ 
+                      display: 'inline-flex', 
+                      alignItems: 'center', 
+                      gap: '6px', 
+                      background: '#fef3c7', 
+                      color: '#d97706', 
+                      padding: '4px 10px', 
+                      borderRadius: '8px', 
+                      fontSize: '0.75rem', 
+                      fontWeight: 800, 
+                      marginTop: '6px',
+                      width: 'fit-content'
+                    }}>
+                      <Star size={12} fill="#d97706" color="#d97706" />
+                      <span>{studentsXP[s.id] || 0} XP</span>
+                    </div>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '1.15rem', letterSpacing: '-0.02em' }}>{s.first_name} {s.last_name}</div>
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontFamily: 'monospace', fontWeight: 600 }}>ID: {s.id.split('-')[0].toUpperCase()}</div>
-                  <div style={{ 
-                    display: 'inline-flex', 
-                    alignItems: 'center', 
-                    gap: '6px', 
-                    background: '#fef3c7', 
-                    color: '#d97706', 
-                    padding: '4px 10px', 
-                    borderRadius: '8px', 
-                    fontSize: '0.75rem', 
-                    fontWeight: 800, 
-                    marginTop: '6px',
-                    width: 'fit-content'
-                  }}>
-                    <Star size={12} fill="#d97706" color="#d97706" />
-                    <span>{studentsXP[s.id] || 0} XP</span>
-                  </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginLeft: '12px' }}>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setEditingStudent(s); }} 
+                    style={{ 
+                      background: "#f1f5f9", 
+                      border: "none", 
+                      padding: "10px", 
+                      borderRadius: "12px", 
+                      cursor: "pointer", 
+                      color: "#475569", 
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }} 
+                    onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'} 
+                    onMouseLeave={e => e.currentTarget.style.background = '#f1f5f9'} 
+                    title="Bearbeiten"
+                  >
+                    <Pencil size={18} />
+                  </button>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setSelectedQRUser(s); }} 
+                    style={{ 
+                      background: "#f1f5f9", 
+                      border: "none", 
+                      padding: "10px", 
+                      borderRadius: "12px", 
+                      cursor: "pointer", 
+                      color: "#475569", 
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }} 
+                    onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'} 
+                    onMouseLeave={e => e.currentTarget.style.background = '#f1f5f9'} 
+                    title="QR Code"
+                  >
+                    <QrCode size={18} />
+                  </button>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handleDeleteStudent(s.id); }} 
+                    style={{ 
+                      background: "#f1f5f9", 
+                      border: "none", 
+                      padding: "10px", 
+                      borderRadius: "12px", 
+                      cursor: "pointer", 
+                      color: "#ef4444", 
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }} 
+                    onMouseEnter={e => { e.currentTarget.style.background = '#fee2e2'; e.currentTarget.style.color = '#ef4444'; }} 
+                    onMouseLeave={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#ef4444'; }} 
+                    title="Löschen"
+                  >
+                    <Trash2 size={18} />
+                  </button>
                 </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginLeft: '12px' }}>
-                <button 
-                  onClick={(e) => { e.stopPropagation(); setEditingStudent(s); }} 
-                  style={{ 
-                    background: "#f1f5f9", 
-                    border: "none", 
-                    padding: "10px", 
-                    borderRadius: "12px", 
-                    cursor: "pointer", 
-                    color: "#475569", 
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }} 
-                  onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'} 
-                  onMouseLeave={e => e.currentTarget.style.background = '#f1f5f9'} 
-                  title="Bearbeiten"
-                >
-                  <Pencil size={18} />
-                </button>
-                <button 
-                  onClick={(e) => { e.stopPropagation(); setSelectedQRUser(s); }} 
-                  style={{ 
-                    background: "#f1f5f9", 
-                    border: "none", 
-                    padding: "10px", 
-                    borderRadius: "12px", 
-                    cursor: "pointer", 
-                    color: "#475569", 
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }} 
-                  onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'} 
-                  onMouseLeave={e => e.currentTarget.style.background = '#f1f5f9'} 
-                  title="QR Code"
-                >
-                  <QrCode size={18} />
-                </button>
-                <button 
-                  onClick={(e) => { e.stopPropagation(); handleDeleteStudent(s.id); }} 
-                  style={{ 
-                    background: "#f1f5f9", 
-                    border: "none", 
-                    padding: "10px", 
-                    borderRadius: "12px", 
-                    cursor: "pointer", 
-                    color: "#ef4444", 
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }} 
-                  onMouseEnter={e => { e.currentTarget.style.background = '#fee2e2'; e.currentTarget.style.color = '#ef4444'; }} 
-                  onMouseLeave={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#ef4444'; }} 
-                  title="Löschen"
-                >
-                  <Trash2 size={18} />
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
