@@ -1150,6 +1150,15 @@ if (kioskStationId) {
 
 function App() {
   const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => sessionStorage.getItem('groovelab_user_id'));
+  const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const [loading, setLoading] = useState(false);
   const [isSchoolPaused, setIsSchoolPaused] = useState(false);
   const [user, setUser] = useState<any>(null);
@@ -4510,7 +4519,7 @@ function App() {
         }
       `}</style>
       {/* Sidebar Navigation (iPad/Desktop) */}
-      <aside className="sidebar-nav">
+      <aside className="sidebar-nav" style={{ display: windowWidth > 1024 ? 'flex' : 'none' }}>
         <div className="sidebar-logo" style={{ padding: '8px 0px', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{ 
             width: '42px', 
@@ -8363,7 +8372,7 @@ function App() {
       )}
       {/* Mobile Bottom Navigation */}
       {/* Mobile Bottom Navigation */}
-      <nav className="mobile-nav">
+      <nav className="mobile-nav" style={{ display: windowWidth <= 1024 ? 'flex' : 'none' }}>
         {user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'teacher' ? (
           <>
             {/* Live Lab (special highlighted button) */}
