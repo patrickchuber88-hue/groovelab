@@ -50,7 +50,25 @@ const TEACHER_AVATARS = [
 ];
 
 const STUDENT_AVATARS = [
-  // Younger / Kids - Warm Acoustic Style
+  // NEW AVATARS (Alternating Girl, Boy)
+  { id: 'student_girl_blonde_guitar', url: '/avatars/student_girl_blonde_guitar.png', label: 'Blonde Girl Guitar' },
+  { id: 'student_boy_blonde_guitar', url: '/avatars/student_boy_blonde_guitar.png', label: 'Blonde Boy Guitar' },
+  { id: 'student_girl_black_drums', url: '/avatars/student_girl_black_drums.png', label: 'Black Girl Drums' },
+  { id: 'student_boy_black_drums', url: '/avatars/student_boy_black_drums.png', label: 'Black Boy Drums' },
+  { id: 'student_girl_lightbrown_piano', url: '/avatars/student_girl_lightbrown_piano.png', label: 'Light Brown Girl Synth' },
+  { id: 'student_boy_lightbrown_piano', url: '/avatars/student_boy_lightbrown_piano.png', label: 'Light Brown Boy Keyboard' },
+  { id: 'student_girl_black_bass', url: '/avatars/student_girl_black_bass.png', label: 'Black Girl Bass' },
+  { id: 'student_boy_black_bass', url: '/avatars/student_boy_black_bass.png', label: 'Black Boy Bass' },
+  { id: 'student_girl_red_vocals', url: '/avatars/student_girl_red_vocals.png', label: 'Red Hair Girl Singer' },
+  { id: 'student_boy_red_vocals', url: '/avatars/student_boy_red_vocals.png', label: 'Red Hair Boy Singer' },
+  { id: 'student_girl_black_guitar', url: '/avatars/student_girl_black_guitar.png', label: 'Black Girl Guitar' },
+  { id: 'student_boy_black_guitar', url: '/avatars/student_boy_black_guitar.png', label: 'Black Boy Guitar' },
+  { id: 'student_girl_blonde_drums', url: '/avatars/student_girl_blonde_drums.png', label: 'Blonde Girl Drums' },
+  { id: 'student_boy_blonde_drums', url: '/avatars/student_boy_blonde_drums.png', label: 'Blonde Boy Drums' },
+  { id: 'student_girl_black_piano', url: '/avatars/student_girl_black_piano.png', label: 'Black Girl Piano' },
+  { id: 'student_boy_black_piano', url: '/avatars/student_boy_black_piano.png', label: 'Black Boy Piano' },
+
+  // EXISTING AVATARS (Alternating Girl, Boy)
   { id: 'g_guitar', url: '/avatar_girl_guitar.jpg', label: 'Classic Girl Guitar' },
   { id: 'b_guitar', url: '/avatar_boy_guitar.jpg', label: 'Classic Boy Guitar' },
   { id: 'g_piano', url: '/avatar_girl_piano.jpg', label: 'Classic Girl Piano' },
@@ -59,8 +77,7 @@ const STUDENT_AVATARS = [
   { id: 'b_drums', url: '/avatar_boy_drums.jpg', label: 'Classic Boy Drums' },
   { id: 'g_bass', url: '/avatar_girl_bass.jpg', label: 'Classic Girl Bass' },
   { id: 'b_bass', url: '/avatar_boy_bass.jpg', label: 'Classic Boy Bass' },
-  
-  // Teenagers & Mid-Age - Warm Acoustic / Studio Style
+
   { id: 'teen_girl_eguitar_focused', url: '/avatars/teen_girl_eguitar_focused.png', label: 'Teen Girl Electric Guitar' },
   { id: 'student_teen_boy_guitar_1', url: '/avatars/student_teen_boy_guitar_1.png', label: 'Teen Boy Guitar (Casual)' },
   { id: 'student_girl_eguitar_3', url: '/avatars/student_girl_eguitar_3.png', label: 'Student Girl Guitar 3' },
@@ -79,8 +96,7 @@ const STUDENT_AVATARS = [
   { id: 'student_boy_drums_2', url: '/avatars/student_boy_drums_2.png', label: 'Student Boy Drums 2' },
   { id: 'voc_f', url: '/vocalist_female.png', label: 'Vocalist Female' },
   { id: 'student_boy_drums_3', url: '/avatars/student_boy_drums_3.png', label: 'Student Boy Drums 3' },
-  
-  // Digital Neon & Additional Teens
+
   { id: 'bandstyle_girl_eguitar', url: '/avatars/bandstyle_girl_eguitar.png', label: 'Bandstyle Girl Guitar' },
   { id: 'student_boy_producer_1', url: '/avatars/student_boy_producer_1.png', label: 'Student Boy Producer' },
   { id: 'bandstyle_girl_ebass', url: '/avatars/bandstyle_girl_ebass.png', label: 'Bandstyle Girl Bass' },
@@ -89,42 +105,21 @@ const STUDENT_AVATARS = [
   { id: 'student_bass_1', url: '/avatars/student_bass_1.png', label: 'Student Bass 1' },
   { id: 'bandstyle_girl_epiano', url: '/avatars/bandstyle_girl_epiano.png', label: 'Bandstyle Girl Piano' },
   { id: 'student_drums_1', url: '/avatars/student_drums_1.png', label: 'Student Drums 1' },
-  
-  // Remaining neutral acoustic teen boys
+
+  { id: 'teen_girl_acoustic_guitar', url: '/avatars/teen_girl_acoustic_guitar.png', label: 'Teen Girl Acoustic Guitar' },
+  { id: 'teen_boy_acoustic_guitar', url: '/avatars/teen_boy_acoustic_guitar.png', label: 'Teen Boy Acoustic Guitar' },
+  { id: 'avatar_girl_new', url: '/avatar_girl_1777237237899.png', label: 'Girl (Premium)' },
+  { id: 'b_def', url: '/avatar_boy.jpg', label: 'Classic Boy' },
+
+  // Remaining Neutral/Male Avatars
   { id: 'student_eguitar_1', url: '/avatars/student_eguitar_1.png', label: 'Student Guitar 1' },
   { id: 'student_piano_1', url: '/avatars/student_piano_1.png', label: 'Student Piano 1' },
   { id: 'student_vocals_1', url: '/avatars/student_vocals_1.png', label: 'Student Singer 1' },
   { id: 'student_tech_1', url: '/avatars/student_tech_1.png', label: 'Student Tech Pro' },
-  
-  // Remaining neon boys
   { id: 'bandstyle_boy_eguitar', url: '/avatars/bandstyle_boy_eguitar.png', label: 'Bandstyle Boy Guitar' },
   { id: 'bandstyle_boy_ebass', url: '/avatars/bandstyle_boy_ebass.png', label: 'Bandstyle Boy Bass' },
   { id: 'bandstyle_boy_edrums', url: '/avatars/bandstyle_boy_edrums.png', label: 'Bandstyle Boy Drums' },
-  { id: 'bandstyle_boy_epiano', url: '/avatars/bandstyle_boy_epiano.png', label: 'Bandstyle Boy Piano' },
-  
-  // REQUESTED END-AVATARS
-  { id: 'teen_boy_acoustic_guitar', url: '/avatars/teen_boy_acoustic_guitar.png', label: 'Teen Boy Acoustic Guitar' },
-  { id: 'teen_girl_acoustic_guitar', url: '/avatars/teen_girl_acoustic_guitar.png', label: 'Teen Girl Acoustic Guitar' },
-  { id: 'avatar_girl_new', url: '/avatar_girl_1777237237899.png', label: 'Girl (Premium)' },
-  { id: 'b_def', url: '/avatar_boy.jpg', label: 'Classic Boy' },
-
-  // Additional Diverse Student Avatars (Blonde, Red hair, Diverse Skin tones)
-  { id: 'student_boy_blonde_guitar', url: '/avatars/student_boy_blonde_guitar.png', label: 'Blonde Boy Guitar' },
-  { id: 'student_boy_black_drums', url: '/avatars/student_boy_black_drums.png', label: 'Black Boy Drums' },
-  { id: 'student_boy_lightbrown_piano', url: '/avatars/student_boy_lightbrown_piano.png', label: 'Light Brown Boy Keyboard' },
-  { id: 'student_boy_black_bass', url: '/avatars/student_boy_black_bass.png', label: 'Black Boy Bass' },
-  { id: 'student_boy_red_vocals', url: '/avatars/student_boy_red_vocals.png', label: 'Red Hair Boy Singer' },
-  { id: 'student_boy_black_guitar', url: '/avatars/student_boy_black_guitar.png', label: 'Black Boy Guitar' },
-  { id: 'student_boy_blonde_drums', url: '/avatars/student_boy_blonde_drums.png', label: 'Blonde Boy Drums' },
-  { id: 'student_boy_black_piano', url: '/avatars/student_boy_black_piano.png', label: 'Black Boy Piano' },
-  { id: 'student_girl_blonde_guitar', url: '/avatars/student_girl_blonde_guitar.png', label: 'Blonde Girl Guitar' },
-  { id: 'student_girl_black_drums', url: '/avatars/student_girl_black_drums.png', label: 'Black Girl Drums' },
-  { id: 'student_girl_lightbrown_piano', url: '/avatars/student_girl_lightbrown_piano.png', label: 'Light Brown Girl Synth' },
-  { id: 'student_girl_black_bass', url: '/avatars/student_girl_black_bass.png', label: 'Black Girl Bass' },
-  { id: 'student_girl_red_vocals', url: '/avatars/student_girl_red_vocals.png', label: 'Red Hair Girl Singer' },
-  { id: 'student_girl_black_guitar', url: '/avatars/student_girl_black_guitar.png', label: 'Black Girl Guitar' },
-  { id: 'student_girl_blonde_drums', url: '/avatars/student_girl_blonde_drums.png', label: 'Blonde Girl Drums' },
-  { id: 'student_girl_black_piano', url: '/avatars/student_girl_black_piano.png', label: 'Black Girl Piano' }
+  { id: 'bandstyle_boy_epiano', url: '/avatars/bandstyle_boy_epiano.png', label: 'Bandstyle Boy Piano' }
 ];
 
 const getStationColor = (name: string | null | undefined) => {

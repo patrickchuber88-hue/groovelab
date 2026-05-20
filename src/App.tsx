@@ -1587,7 +1587,10 @@ function App() {
     { id: 'band_trio_1', url: '/avatars/band_trio_1.png', size: 3 },
     { id: 'band_duo_1', url: '/avatars/band_duo_1.png', size: 2 },
     { id: 'band_quartet_1', url: '/avatars/band_quartet_1.png', size: 4 },
-    { id: 'band_quintet_1', url: '/avatars/band_quint  const STUDENT_AVATARS = [
+    { id: 'band_quintet_1', url: '/avatars/band_quintet_1.png', size: 5 },
+  ];
+
+  const STUDENT_AVATARS = [
     // NEW AVATARS (Alternating Girl, Boy)
     { id: 'student_girl_blonde_guitar', url: '/avatars/student_girl_blonde_guitar.png' },
     { id: 'student_boy_blonde_guitar', url: '/avatars/student_boy_blonde_guitar.png' },
@@ -1658,7 +1661,6 @@ function App() {
     { id: 'bandstyle_boy_ebass', url: '/avatars/bandstyle_boy_ebass.png' },
     { id: 'bandstyle_boy_edrums', url: '/avatars/bandstyle_boy_edrums.png' },
     { id: 'bandstyle_boy_epiano', url: '/avatars/bandstyle_boy_epiano.png' }
-  ];girl_black_piano.png' }
   ];
 
   const TEACHER_AVATARS = [
