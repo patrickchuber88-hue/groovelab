@@ -1018,7 +1018,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                
                <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(circle at 20% 20%, ${brandColor}15 0%, transparent 70%), radial-gradient(circle at 80% 80%, ${brandColor}11 0%, transparent 70%), radial-gradient(circle at 50% 50%, ${brandColor}08 0%, transparent 80%)`, filter: 'blur(80px)', opacity: 0.9 }}></div>
                
-               <img src={selectedBandForProfile.photo_url || "/studio_dark.jpg"} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 15%' }} />
+               <img src={selectedBandForProfile.photo_url || "/studio_dark.jpg"} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 35%' }} />
                {/* Cinematic Vignette - Slightly lighter for overall brightness */}
                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(10,10,10,0.2) 0%, rgba(10,10,10,0.7) 60%, #0a0a0a 100%)', zIndex: 1 }}></div>
                {/* Brand Glow behind Title */}
