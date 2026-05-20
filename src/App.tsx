@@ -1604,6 +1604,28 @@ function App() {
   }, [showBandProfile, bandProfileView, selectedBandForProfile]);
 
   const BAND_AVATARS = [
+    // 20 New 3D Studio Band Avatars (Alternating sizes/types matching the student avatar style)
+    { id: 'band_avatar_new_01', url: '/avatars/band_avatar_new_01.png', size: 3 },
+    { id: 'band_avatar_new_02', url: '/avatars/band_avatar_new_02.png', size: 3 },
+    { id: 'band_avatar_new_03', url: '/avatars/band_avatar_new_03.png', size: 3 },
+    { id: 'band_avatar_new_04', url: '/avatars/band_avatar_new_04.png', size: 3 },
+    { id: 'band_avatar_new_05', url: '/avatars/band_avatar_new_05.png', size: 4 },
+    { id: 'band_avatar_new_06', url: '/avatars/band_avatar_new_06.png', size: 4 },
+    { id: 'band_avatar_new_07', url: '/avatars/band_avatar_new_07.png', size: 5 },
+    { id: 'band_avatar_new_08', url: '/avatars/band_avatar_new_08.png', size: 5 },
+    { id: 'band_avatar_new_09', url: '/avatars/band_avatar_new_09.png', size: 4 },
+    { id: 'band_avatar_new_10', url: '/avatars/band_avatar_new_10.png', size: 3 },
+    { id: 'band_avatar_new_11', url: '/avatars/band_avatar_new_11.png', size: 3 },
+    { id: 'band_avatar_new_12', url: '/avatars/band_avatar_new_12.png', size: 3 },
+    { id: 'band_avatar_new_13', url: '/avatars/band_avatar_new_13.png', size: 4 },
+    { id: 'band_avatar_new_14', url: '/avatars/band_avatar_new_14.png', size: 4 },
+    { id: 'band_avatar_new_15', url: '/avatars/band_avatar_new_15.png', size: 5 },
+    { id: 'band_avatar_new_16', url: '/avatars/band_avatar_new_16.png', size: 4 },
+    { id: 'band_avatar_new_17', url: '/avatars/band_avatar_new_17.png', size: 3 },
+    { id: 'band_avatar_new_18', url: '/avatars/band_avatar_new_18.png', size: 4 },
+    { id: 'band_avatar_new_19', url: '/avatars/band_avatar_new_19.png', size: 5 },
+    { id: 'band_avatar_new_20', url: '/avatars/band_avatar_new_20.png', size: 3 },
+
     { id: 'band_kids_formation_light_1', url: '/avatars/band_kids_formation_light_1.png', size: 5 },
     { id: 'band_kids_formation_light_2', url: '/avatars/band_kids_formation_light_2.png', size: 5 },
     { id: 'band_kids_formation_light_3', url: '/avatars/band_kids_formation_light_3.png', size: 5 },
