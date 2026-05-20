@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, LogOut, Award, Users, User, Monitor, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail } from 'lucide-react';
+import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, LogOut, Award, Users, User, Monitor, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School } from 'lucide-react';
 import { 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer,
   BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell
@@ -5765,7 +5765,7 @@ function App() {
                           transition: 'all 0.2s'
                         }}
                       >
-                        📣 Alle
+                        <Megaphone size={14} /> Alle
                       </button>
                       <button 
                         onClick={() => {
@@ -5791,7 +5791,7 @@ function App() {
                           transition: 'all 0.2s'
                         }}
                       >
-                        🏫 Schule
+                        <School size={14} /> Schule
                       </button>
                       <button 
                         onClick={() => {
@@ -5817,7 +5817,7 @@ function App() {
                           transition: 'all 0.2s'
                         }}
                       >
-                        🎸 Bands
+                        <Music size={14} /> Bands
                       </button>
                     </div>
                   </div>
@@ -5839,10 +5839,10 @@ function App() {
 
                       if (filtered.length === 0) {
                         return (
-                          <div style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8' }}>
-                            <div style={{ fontSize: '2.5rem', marginBottom: '16px' }}>✉️</div>
-                            <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#64748b' }}>Keine Nachrichten</div>
-                            <div style={{ fontSize: '0.75rem', marginTop: '6px', color: '#94a3b8' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, padding: '40px 20px', color: '#94a3b8', textAlign: 'center' }}>
+                            <Mail size={40} style={{ strokeWidth: 1.5, color: '#cbd5e1', marginBottom: '12px' }} />
+                            <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#64748b' }}>Posteingang leer</div>
+                            <div style={{ fontSize: '0.75rem', color: '#cbd5e1', marginTop: '4px' }}>
                               {studentMessagesFilter === 'school' ? 'Keine Ankündigungen der Musikschule.' : studentMessagesFilter === 'band' ? 'Keine Nachrichten aus deinen Bands.' : 'Du bist auf dem neuesten Stand!'}
                             </div>
                           </div>
@@ -6080,11 +6080,23 @@ function App() {
                       
                     </div>
                   ) : (
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', padding: '40px' }}>
-                      <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📬</div>
-                      <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#64748b', margin: '0' }}>Keine Nachricht ausgewählt</h4>
-                      <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: '8px 0 0 0', textAlign: 'center' }}>
-                        Wähle links eine Nachricht aus der Liste aus, um die Details zu lesen.
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, padding: '40px', textAlign: 'center', background: '#f8fafc' }}>
+                      <div style={{ 
+                        width: '80px', 
+                        height: '80px', 
+                        borderRadius: '50%', 
+                        background: 'white', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.03)',
+                        marginBottom: '24px'
+                      }}>
+                        <Mail size={36} style={{ strokeWidth: 1.5, color: '#3b82f6' }} />
+                      </div>
+                      <h3 style={{ fontSize: '1.3rem', fontWeight: 900, color: '#1e293b', marginBottom: '8px' }}>Willkommen im Postfach</h3>
+                      <p style={{ fontSize: '0.95rem', color: '#64748b', maxWidth: '360px', lineHeight: 1.6, margin: '0' }}>
+                        Wähle eine Mitteilung aus der Liste aus, um die Lesedetails anzuzeigen.
                       </p>
                     </div>
                   )}
