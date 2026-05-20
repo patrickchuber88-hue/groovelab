@@ -232,12 +232,17 @@ export function DeviceSetupScreen() {
 
     sessionStorage.removeItem('groovelab_user_id');
     localStorage.setItem('groovelab_station_id', stationId);
-    window.location.reload();
+    
+    // Clean up URL parameters by redirecting to base path
+    const newUrl = window.location.origin + window.location.pathname;
+    window.location.replace(newUrl);
   };
 
   const handleSkip = () => {
     localStorage.setItem('groovelab_station_id', 'skip');
-    window.location.reload();
+    // Clean up URL parameters by redirecting to base path
+    const newUrl = window.location.origin + window.location.pathname;
+    window.location.replace(newUrl);
   };
 
   return (

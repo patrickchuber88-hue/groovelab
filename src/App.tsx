@@ -4179,6 +4179,12 @@ function App() {
     );
   }
 
+  // 1.8 KIOSK ROOM SETUP BYPASS
+  const kioskRoomId = new URLSearchParams(window.location.search).get('kiosk_room_id');
+  if (kioskRoomId) {
+    return <DeviceSetupScreen />;
+  }
+
   // 2. AUTHENTICATION CHECK
   if (!loggedInUserId) {
     return <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />;
