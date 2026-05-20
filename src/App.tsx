@@ -2004,8 +2004,18 @@ function App() {
       })
       .subscribe();
 
+    // Realtime subscription for user_song_skills (Student's challenges/skills updates)
+    const skillsChannel = supabase
+      .channel('skills-realtime-sync')
+      .on('postgres_changes', { schema: 'public', event: '*', table: 'user_song_skills' }, () => {
+        console.log('[Realtime] user_song_skills update detected, refetching dashboard...');
+        if (user?.id) fetchDashboardData(user.id);
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(sessionChannel);
+      supabase.removeChannel(skillsChannel);
     };
   }, [user]);
 
