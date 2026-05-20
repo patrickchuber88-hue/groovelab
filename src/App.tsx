@@ -172,12 +172,28 @@ const renderBandAvatar = (name: string, photoUrl?: string | null, size: string =
 
 // --- Band Name Generator Words ---
 const BAND_ADJECTIVES = [
-  "Electric", "Sonic", "Golden", "Velvet", "Neon", "Midnight", "Cosmic", "Wild", "Mystic", "Royal",
-  "Silver", "Atomic", "Groovy", "Funk", "Lunar", "Solar", "Echo", "Static", "Infinite", "Crystal"
+  // English – Energy & Sound
+  "Electric", "Sonic", "Neon", "Atomic", "Static", "Magnetic", "Pulse", "Kinetic", "Turbo", "Hyper",
+  // English – Nature & Cosmos
+  "Cosmic", "Lunar", "Solar", "Stellar", "Midnight", "Aurora", "Thunder", "Storm", "Crystal", "Frozen",
+  // English – Mood & Style
+  "Golden", "Velvet", "Silver", "Wild", "Mystic", "Royal", "Infinite", "Eternal", "Fearless", "Savage",
+  // English – Music-themed
+  "Groovy", "Funky", "Echo", "Reverb", "Loud", "Deep", "Raw", "Broken", "Blazing", "Drifting",
+  // German-inspired
+  "Laut", "Stark", "Frei", "Wilde", "Coole", "Echte", "Neue", "Große", "Junge", "Heiße"
 ];
 const BAND_NOUNS = [
-  "Rhythm", "Sound", "Project", "Vibe", "Core", "Beat", "Waves", "Pulse", "Theory", "Symphony",
-  "Collective", "Studio", "Echo", "Lab", "Flow", "Groove", "Rebel", "Soul", "Vision", "Quest"
+  // Classic band words
+  "Rhythm", "Sound", "Vibe", "Beat", "Pulse", "Wave", "Groove", "Theory", "Symphony", "Chord",
+  // Collective nouns
+  "Collective", "Crew", "Squad", "Gang", "Tribe", "Pack", "Union", "Alliance", "Force", "League",
+  // Places & spaces
+  "Studio", "Lab", "Stage", "Arena", "Chamber", "Vault", "Signal", "Circuit", "Grid", "Portal",
+  // Abstract
+  "Flow", "Soul", "Vision", "Quest", "Echo", "Dream", "Mission", "Code", "Spark", "Surge",
+  // German-inspired
+  "Klang", "Band", "Weg", "Kraft", "Geist", "Welle", "Feuer", "Licht", "Raum", "Traum"
 ];
 
 const generateRandomBandName = () => {
@@ -8261,40 +8277,107 @@ function App() {
                     </div>
                   </div>
 
-                  {/* Coach Selection Section */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {/* Coach Selection Section – Apple-style card picker */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <label style={{ fontSize: '0.8rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                       Wähle euren Bandcoach (Lehrer): *
                     </label>
-                    <select 
-                      value={selectedCoachId} 
-                      onChange={(e) => setSelectedCoachId(e.target.value)} 
-                      required
-                      style={{ 
-                        width: '100%', 
-                        padding: '16px', 
-                        background: 'white', 
-                        border: '1px solid #cbd5e1', 
-                        borderRadius: '16px', 
-                        color: '#1e293b', 
-                        fontSize: '1rem', 
-                        fontWeight: 700,
-                        outline: 'none',
-                        transition: 'all 0.2s'
-                      }}
-                      onFocus={e => e.currentTarget.style.borderColor = brandColor}
-                      onBlur={e => e.currentTarget.style.borderColor = '#cbd5e1'}
-                    >
-                      <option value="">-- Coach wählen * --</option>
-                      {teachers.length === 0 ? (
-                        <option value="" disabled>Keine Lehrer gefunden</option>
-                      ) : (
-                        teachers.map(t => (
-                          <option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>
-                        ))
-                      )}
-                    </select>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 0 0', lineHeight: 1.4 }}>
+                    {teachers.length === 0 ? (
+                      <div style={{ background: '#f1f5f9', borderRadius: '16px', padding: '20px', textAlign: 'center', color: '#94a3b8', fontSize: '0.9rem' }}>
+                        Keine Lehrer gefunden
+                      </div>
+                    ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px' }}>
+                        {teachers.map(t => {
+                          const isSelected = selectedCoachId === t.id;
+                          const initials = `${(t.first_name || '')[0] || ''}${(t.last_name || '')[0] || ''}`.toUpperCase();
+                          return (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => setSelectedCoachId(t.id)}
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '16px 10px',
+                                background: isSelected ? `linear-gradient(135deg, ${brandColor}18, ${brandColor}08)` : 'white',
+                                border: isSelected ? `2.5px solid ${brandColor}` : '2px solid #e2e8f0',
+                                borderRadius: '18px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                                transform: isSelected ? 'scale(1.04)' : 'scale(1)',
+                                boxShadow: isSelected ? `0 8px 24px ${brandColor}30` : '0 2px 8px rgba(0,0,0,0.06)',
+                                position: 'relative',
+                                minWidth: 0
+                              }}
+                            >
+                              {isSelected && (
+                                <div style={{
+                                  position: 'absolute',
+                                  top: '8px',
+                                  right: '8px',
+                                  width: '18px',
+                                  height: '18px',
+                                  background: brandColor,
+                                  borderRadius: '50%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '10px',
+                                  color: 'white',
+                                  fontWeight: 900
+                                }}>✓</div>
+                              )}
+                              {t.photo_url ? (
+                                <img
+                                  src={t.photo_url}
+                                  alt={t.first_name}
+                                  onError={(e) => { e.currentTarget.style.display='none'; }}
+                                  style={{
+                                    width: '52px',
+                                    height: '52px',
+                                    borderRadius: '50%',
+                                    objectFit: 'cover',
+                                    border: isSelected ? `3px solid ${brandColor}` : '3px solid #e2e8f0',
+                                    transition: 'border 0.2s'
+                                  }}
+                                />
+                              ) : (
+                                <div style={{
+                                  width: '52px',
+                                  height: '52px',
+                                  borderRadius: '50%',
+                                  background: isSelected ? `linear-gradient(135deg, ${brandColor}, #d97706)` : 'linear-gradient(135deg, #94a3b8, #64748b)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '1.1rem',
+                                  fontWeight: 900,
+                                  color: 'white',
+                                  letterSpacing: '-0.02em',
+                                  transition: 'background 0.2s'
+                                }}>
+                                  {initials || '?'}
+                                </div>
+                              )}
+                              <div style={{ textAlign: 'center', lineHeight: 1.2 }}>
+                                <div style={{ fontWeight: 800, fontSize: '0.82rem', color: isSelected ? brandColor : '#1e293b', transition: 'color 0.2s' }}>
+                                  {t.first_name}
+                                </div>
+                                {t.last_name && (
+                                  <div style={{ fontWeight: 600, fontSize: '0.75rem', color: isSelected ? `${brandColor}cc` : '#64748b', transition: 'color 0.2s' }}>
+                                    {t.last_name}
+                                  </div>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <p style={{ fontSize: '0.72rem', color: '#94a3b8', margin: '0', lineHeight: 1.4 }}>
                       💡 <em>Lehrer können den Bandcoach nachträglich jederzeit ändern.</em>
                     </p>
                   </div>
