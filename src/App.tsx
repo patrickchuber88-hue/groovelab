@@ -1647,7 +1647,25 @@ function App() {
     { id: 'teen_boy_acoustic_guitar', url: '/avatars/teen_boy_acoustic_guitar.png' },
     { id: 'teen_girl_acoustic_guitar', url: '/avatars/teen_girl_acoustic_guitar.png' },
     { id: 'avatar_girl_new', url: '/avatar_girl_1777237237899.png' },
-    { id: 'avatar_boy', url: '/avatar_boy.jpg' }
+    { id: 'avatar_boy', url: '/avatar_boy.jpg' },
+
+    // Additional Diverse Student Avatars (Blonde, Red hair, Diverse Skin tones)
+    { id: 'student_boy_blonde_guitar', url: '/avatars/student_boy_blonde_guitar.png' },
+    { id: 'student_boy_black_drums', url: '/avatars/student_boy_black_drums.png' },
+    { id: 'student_boy_lightbrown_piano', url: '/avatars/student_boy_lightbrown_piano.png' },
+    { id: 'student_boy_black_bass', url: '/avatars/student_boy_black_bass.png' },
+    { id: 'student_boy_red_vocals', url: '/avatars/student_boy_red_vocals.png' },
+    { id: 'student_boy_black_guitar', url: '/avatars/student_boy_black_guitar.png' },
+    { id: 'student_boy_blonde_drums', url: '/avatars/student_boy_blonde_drums.png' },
+    { id: 'student_boy_black_piano', url: '/avatars/student_boy_black_piano.png' },
+    { id: 'student_girl_blonde_guitar', url: '/avatars/student_girl_blonde_guitar.png' },
+    { id: 'student_girl_black_drums', url: '/avatars/student_girl_black_drums.png' },
+    { id: 'student_girl_lightbrown_piano', url: '/avatars/student_girl_lightbrown_piano.png' },
+    { id: 'student_girl_black_bass', url: '/avatars/student_girl_black_bass.png' },
+    { id: 'student_girl_red_vocals', url: '/avatars/student_girl_red_vocals.png' },
+    { id: 'student_girl_black_guitar', url: '/avatars/student_girl_black_guitar.png' },
+    { id: 'student_girl_blonde_drums', url: '/avatars/student_girl_blonde_drums.png' },
+    { id: 'student_girl_black_piano', url: '/avatars/student_girl_black_piano.png' }
   ];
 
   const TEACHER_AVATARS = [
@@ -3978,10 +3996,6 @@ function App() {
 
   const hasInviteSchoolId = new URLSearchParams(window.location.search).has('invite_school_id');
 
-  if (!stationIdFromStorage && !loggedInUserId && !hasInviteSchoolId) {
-    return <DeviceSetupScreen />;
-  }
-
   const handleLogin = async (userId: string, isHome?: boolean) => {
     const mode = isHome ? 'home' : 'lab';
     
@@ -4268,11 +4282,6 @@ function App() {
         </div>
       </div>
     );
-  }
-
-  // If a normal student/teacher is logged in without a station, send to setup
-  if (!stationIdFromStorage) {
-    return <DeviceSetupScreen />;
   }
 
   // 3. MAIN DASHBOARD LOGIC (Resumes here after Auth/Loading checks)

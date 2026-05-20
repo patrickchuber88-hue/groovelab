@@ -106,7 +106,25 @@ const STUDENT_AVATARS = [
   { id: 'teen_boy_acoustic_guitar', url: '/avatars/teen_boy_acoustic_guitar.png', label: 'Teen Boy Acoustic Guitar' },
   { id: 'teen_girl_acoustic_guitar', url: '/avatars/teen_girl_acoustic_guitar.png', label: 'Teen Girl Acoustic Guitar' },
   { id: 'avatar_girl_new', url: '/avatar_girl_1777237237899.png', label: 'Girl (Premium)' },
-  { id: 'b_def', url: '/avatar_boy.jpg', label: 'Classic Boy' }
+  { id: 'b_def', url: '/avatar_boy.jpg', label: 'Classic Boy' },
+
+  // Additional Diverse Student Avatars (Blonde, Red hair, Diverse Skin tones)
+  { id: 'student_boy_blonde_guitar', url: '/avatars/student_boy_blonde_guitar.png', label: 'Blonde Boy Guitar' },
+  { id: 'student_boy_black_drums', url: '/avatars/student_boy_black_drums.png', label: 'Black Boy Drums' },
+  { id: 'student_boy_lightbrown_piano', url: '/avatars/student_boy_lightbrown_piano.png', label: 'Light Brown Boy Keyboard' },
+  { id: 'student_boy_black_bass', url: '/avatars/student_boy_black_bass.png', label: 'Black Boy Bass' },
+  { id: 'student_boy_red_vocals', url: '/avatars/student_boy_red_vocals.png', label: 'Red Hair Boy Singer' },
+  { id: 'student_boy_black_guitar', url: '/avatars/student_boy_black_guitar.png', label: 'Black Boy Guitar' },
+  { id: 'student_boy_blonde_drums', url: '/avatars/student_boy_blonde_drums.png', label: 'Blonde Boy Drums' },
+  { id: 'student_boy_black_piano', url: '/avatars/student_boy_black_piano.png', label: 'Black Boy Piano' },
+  { id: 'student_girl_blonde_guitar', url: '/avatars/student_girl_blonde_guitar.png', label: 'Blonde Girl Guitar' },
+  { id: 'student_girl_black_drums', url: '/avatars/student_girl_black_drums.png', label: 'Black Girl Drums' },
+  { id: 'student_girl_lightbrown_piano', url: '/avatars/student_girl_lightbrown_piano.png', label: 'Light Brown Girl Synth' },
+  { id: 'student_girl_black_bass', url: '/avatars/student_girl_black_bass.png', label: 'Black Girl Bass' },
+  { id: 'student_girl_red_vocals', url: '/avatars/student_girl_red_vocals.png', label: 'Red Hair Girl Singer' },
+  { id: 'student_girl_black_guitar', url: '/avatars/student_girl_black_guitar.png', label: 'Black Girl Guitar' },
+  { id: 'student_girl_blonde_drums', url: '/avatars/student_girl_blonde_drums.png', label: 'Blonde Girl Drums' },
+  { id: 'student_girl_black_piano', url: '/avatars/student_girl_black_piano.png', label: 'Black Girl Piano' }
 ];
 
 const getStationColor = (name: string | null | undefined) => {
