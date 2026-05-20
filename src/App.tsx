@@ -8288,7 +8288,7 @@ function App() {
                       </div>
                     ) : (
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px' }}>
-                        {teachers.map(t => {
+                        {teachers.filter(t => !t.is_observer).map(t => {
                           const isSelected = selectedCoachId === t.id;
                           const initials = `${(t.first_name || '')[0] || ''}${(t.last_name || '')[0] || ''}`.toUpperCase();
                           return (

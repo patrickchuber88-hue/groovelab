@@ -546,6 +546,7 @@ export function TeacherDashboard({
         const isHomeMode = sessionStorage.getItem('groovelab_location_mode') === 'home';
         
         const activeCoaches = (allCoaches || []).filter(c => {
+          if (c.is_observer) return false; // Hospitanten are never shown in Live Lab
           const isCurrentTeacher = c.id === userId && !hidePresence && !isHomeMode;
           const hasSession = trulyActive.some(s => s.user_id === c.id);
           return isCurrentTeacher || hasSession;

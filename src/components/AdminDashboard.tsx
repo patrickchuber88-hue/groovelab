@@ -1114,6 +1114,19 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     }
   };
 
+  const handleToggleObserver = async (t: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newValue = !t.is_observer;
+    // Optimistic update
+    setTeachers((prev: any[]) => prev.map(x => x.id === t.id ? { ...x, is_observer: newValue } : x));
+    const { error } = await supabase.from('users').update({ is_observer: newValue }).eq('id', t.id);
+    if (error) {
+      // Rollback on failure
+      setTeachers((prev: any[]) => prev.map(x => x.id === t.id ? { ...x, is_observer: !newValue } : x));
+      alert('Fehler beim Speichern: ' + error.message);
+    }
+  };
+
   const handleUpdateTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTeacher) return;
@@ -2821,7 +2834,10 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '32px', marginTop: '16px' }}>
-          {teachers.map(t => (
+          {teachers.map(t => {
+            const isObserver = !!t.is_observer;
+            const accentColor = isObserver ? '#94a3b8' : (t.role === 'admin' ? '#f59e0b' : brandColor);
+            return (
             <div 
               key={t.id} 
               className="glass-panel" 
@@ -2830,30 +2846,80 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 display: 'flex', 
                 alignItems: 'center', 
                 gap: '24px', 
-                background: 'white', 
+                background: isObserver ? '#f8fafc' : 'white', 
                 borderRadius: '32px', 
-                border: '1px solid #f1f5f9',
+                border: `1px solid ${isObserver ? '#e2e8f0' : '#f1f5f9'}`,
                 boxShadow: '0 15px 40px rgba(0,0,0,0.04)',
                 position: 'relative',
                 overflow: 'hidden',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                transition: 'background 0.3s, border 0.3s'
               }}
               onClick={() => setEditingTeacher(t)}
             >
-              <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '8px', background: t.role === 'admin' ? '#f59e0b' : brandColor }}></div>
+              {/* Left accent bar */}
+              <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '8px', background: accentColor, transition: 'background 0.3s' }}></div>
               
-              <div style={{ width: '100px', height: '100px', borderRadius: '32px', overflow: 'hidden', flexShrink: 0, boxShadow: '0 8px 24px rgba(0,0,0,0.1)' }}>
+              {/* Avatar */}
+              <div style={{ width: '100px', height: '100px', borderRadius: '32px', overflow: 'hidden', flexShrink: 0, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', opacity: isObserver ? 0.65 : 1, transition: 'opacity 0.3s' }}>
                 <img src={t.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
               </div>
               
+              {/* Info */}
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                  <h3 style={{ fontSize: '1.4rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>{t.first_name} {t.last_name}</h3>
-                  {t.role === 'admin' && <Shield size={16} color="#f59e0b" />}
+                  <h3 style={{ fontSize: '1.4rem', fontWeight: 900, color: isObserver ? '#94a3b8' : '#1e293b', margin: 0, transition: 'color 0.3s' }}>{t.first_name} {t.last_name}</h3>
+                  {t.role === 'admin' && !isObserver && <Shield size={16} color="#f59e0b" />}
                 </div>
-                <div style={{ fontSize: '0.875rem', fontWeight: 800, color: t.role === 'admin' ? '#f59e0b' : brandColor, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>
-                  Lehrer
+                <div style={{ fontSize: '0.875rem', fontWeight: 800, color: accentColor, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px', transition: 'color 0.3s' }}>
+                  {isObserver ? '👁 Hospitant' : 'Lehrer'}
                 </div>
+
+                {/* Lehrer / Hospitant Toggle */}
+                <div
+                  onClick={(e) => handleToggleObserver(t, e)}
+                  title={isObserver ? 'Auf Lehrer-Modus umschalten' : 'Auf Hospitant-Modus umschalten'}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    marginBottom: '12px',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    padding: '6px 10px 6px 6px',
+                    borderRadius: '20px',
+                    background: isObserver ? '#f1f5f9' : `${brandColor}10`,
+                    border: `1.5px solid ${isObserver ? '#e2e8f0' : `${brandColor}30`}`,
+                    transition: 'all 0.25s'
+                  }}
+                >
+                  {/* Toggle pill */}
+                  <div style={{
+                    width: '44px', height: '24px',
+                    borderRadius: '12px',
+                    background: isObserver ? '#cbd5e1' : brandColor,
+                    position: 'relative',
+                    transition: 'background 0.25s',
+                    flexShrink: 0,
+                    boxShadow: isObserver ? 'none' : `0 2px 8px ${brandColor}40`
+                  }}>
+                    <div style={{
+                      position: 'absolute',
+                      top: '2px',
+                      left: isObserver ? '2px' : '22px',
+                      width: '20px', height: '20px',
+                      background: 'white',
+                      borderRadius: '50%',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.18)',
+                      transition: 'left 0.25s cubic-bezier(0.34,1.56,0.64,1)'
+                    }}></div>
+                  </div>
+                  {/* Label */}
+                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: isObserver ? '#94a3b8' : brandColor, letterSpacing: '0.02em', transition: 'color 0.25s' }}>
+                    {isObserver ? 'Hospitant' : 'Lehrer aktiv'}
+                  </span>
+                </div>
+
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                   {t.instrument?.split(',')
                     .map((inst: string) => inst.trim())
@@ -2867,12 +2933,14 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 </div>
               </div>
               
+              {/* Action buttons */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }} onClick={e => e.stopPropagation()}>
                 <button onClick={() => setSelectedQRUser(t)} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '12px', borderRadius: '14px', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'} onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}><QrCode size={20} /></button>
                 <button onClick={() => handleDeleteTeacher(t.id)} style={{ background: '#fff1f2', border: '1px solid #fecaca', padding: '12px', borderRadius: '14px', cursor: 'pointer', color: '#ef4444', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = '#ffe4e6'} onMouseLeave={e => e.currentTarget.style.background = '#fff1f2'}><Trash2 size={20} /></button>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
