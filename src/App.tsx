@@ -1628,75 +1628,6 @@ function App() {
         }
       }
     }
-
-    // 2. Auto-trigger Band Founding Modal when formation is complete (public matching)
-    for (const song of wallSongs) {
-      for (const form of (song.formations || [])) {
-        if (form.isComplete && form.id !== lastAutoTriggeredFormId) {
-          console.log('[AutoTrigger] Checking formation:', form.id, 'Last:', lastAutoTriggeredFormId);
-          
-          const mySlot = (form.members || []).find((m: any) => m.user_id === user.id);
-          if (mySlot) {
-            // Leader Logic: Assign leader stably across all clients by sorting members alphabetically by user_id
-            const sortedMembers = [...(form.members || [])].sort((a: any, b: any) => (a.user_id || '').localeCompare(b.user_id || ''));
-            const leader = sortedMembers[0] || mySlot;
-            const isLeader = leader.user_id === user.id;
-
-            // 1. Check if we already have a band for this song/group locally to avoid re-triggering
-            const alreadyHaveBand = userBands.some((b: any) => 
-              b.formation_group === form.id || 
-              b.song_id === song.id ||
-              b.song_id === song.song_id ||
-              (b.band_songs || []).some((bs: any) => bs.song_id === song.id || bs.song_id === song.song_id || bs.songs?.id === song.id)
-            );
-            
-            const isDone = localStorage.getItem(`groovelab_founding_done_${user.id}_${song.id}`) || 
-                           localStorage.getItem(`groovelab_founding_done_${user.id}_${song.song_id}`) ||
-                           localStorage.getItem(`groovelab_form_done_${user.id}_${form.id}`) ||
-                           localStorage.getItem(`groovelab_founding_ignored_${user.id}_${song.id}`) ||
-                           localStorage.getItem(`groovelab_founding_ignored_${user.id}_${song.song_id}`);
-            
-            if (alreadyHaveBand || isDone || ignoredFoundingIds.current.includes(form.id)) {
-              console.log('[AutoTrigger] Already have band, formation processed, or ignored. Skipping.');
-              continue;
-            }
-
-            // Auto-trigger founding flow
-            updateAutoTriggerId(form.id);
-            
-            // Check for multi-band conflict first (mimic button logic) - Only for the leader!
-            if (isLeader && userBands.length > 0) {
-              const proceed = window.confirm('Deine Formation ist vollständig! 🎸\n\nDu spielst bereits in einer Band. Möchtest du wirklich eine zusätzliche Band gründen? Falls nicht, gibst du deinen Slot für andere frei.');
-              if (!proceed) {
-                (async () => {
-                   await supabase.from('user_song_skills').update({ formation_group: null }).eq('id', mySlot.skill_id);
-                   fetchDashboardData(user.id);
-                })();
-                return;
-              }
-            }
-
-            // Open naming modal
-            console.log('[DEBUG-Groovelab] setSuggestingSkill (band founding) in auto-trigger complete matching:', song.title);
-            setSuggestingSkill({
-              ...mySlot,
-              isLeader,
-              leaderName: isLeader ? 'Du' : leader?.first_name || 'Dein Teamkollege',
-              song_id: song.song_id,
-              songs: { id: song.song_id, title: song.title },
-              formation_group: form.id,
-              members: form.members
-            });
-            if (isLeader) {
-              setFoundingName(generateRandomBandName());
-            }
-            
-            // Modal should now be open
-            console.log('[AutoTrigger] Triggering modal for:', song.title);
-          }
-        }
-      }
-    }
   }, [wallSongs, activeStudentTab, user, userBands, suggestingSkill, selectedBandForGateway, pendingFounding, showBandProfile, loading]);
 
   // Safety check: If suggestingSkill is set but userBands loads and indicates
@@ -7446,15 +7377,8 @@ function App() {
 
                                     const isGuestSearch = !!form.originBand;
                                     const isProposal = form.status === 'proposal';
-                                
-                                const sortedMembers = [...(form?.members || [])].sort((a, b) => 
-                                  new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
-                                );
-                                const leader = sortedMembers[0];
-                                const isLeader = (form?.members || []).some((m: any) => m?.user_id === user?.id);
-
-                                const mySkill = userSongs.find(us => us.song_id === song.song_id && (us.difficulty_level || 'original') === song.level);
-                                const canJoin = mySkill && !isMySlot && !form.memberMap[mySkill.instrument] && !form.isComplete;
+                                    const mySkill = userSongs.find(us => us.song_id === song.song_id && (us.difficulty_level || 'original') === song.level);
+                                    const canJoin = mySkill && !isMySlot && !form.memberMap[mySkill.instrument] && !form.isComplete;
 
                                 return (
                                   <div key={form.id} style={{ 
@@ -7635,18 +7559,30 @@ function App() {
                                   </div>
                                   <button 
                                     onClick={() => {
-                                      // Open naming modal
+                                      // Check for multi-band conflict first if the user already plays in another band
+                                      if (userBands.length > 0) {
+                                        const proceed = window.confirm('Deine Formation ist vollständig! 🎸\n\nDu spielst bereits in einer Band. Möchtest du wirklich eine zusätzliche Band gründen? Falls nicht, gibst du deinen Slot für andere frei.');
+                                        if (!proceed) {
+                                          (async () => {
+                                             await supabase.from('user_song_skills').update({ formation_group: null }).eq('id', mySlot.skill_id);
+                                             fetchDashboardData(user.id);
+                                          })();
+                                          return;
+                                        }
+                                      }
+
+                                      // Open naming modal - whoever clicks the button becomes the leader/founder
                                       console.log('[DEBUG-Groovelab] setSuggestingSkill (Matching Board click) in App.tsx');
                                       setSuggestingSkill({
                                         ...mySlot,
-                                        isLeader,
-                                        leaderName: isLeader ? 'Du' : leader?.first_name || 'Dein Teamkollege',
+                                        isLeader: true,
+                                        leaderName: 'Du',
                                         song_id: song.song_id,
                                         songs: { id: song.song_id, title: song.title },
                                         formation_group: form.id,
                                         members: form.members
                                       });
-                                      if (isLeader && !foundingName) setFoundingName(generateRandomBandName());
+                                      if (!foundingName) setFoundingName(generateRandomBandName());
                                     }}
                                     className="hero-cta-artistic"
                                     style={{ 
@@ -8161,37 +8097,159 @@ function App() {
                     <p style={{ fontSize: '0.9rem' }}>Probiere einen anderen Suchbegriff oder Filter.</p>
                   </div>
                 ) : (
-                  filteredLibrary.map((song: any) => (
-                <div key={song.id} className="glass-panel" style={{ padding: '24px', background: 'white', borderLeft: `4px solid ${brandColor}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{song.artist}</div>
-                    <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>{song.title}</div>
-                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px', alignItems: 'center' }}>
-                      <span style={{ background: '#fef3c7', color: '#b45309', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600 }}>Level {song.level}</span>
-                      {song.media_link && (
-                        <a href={song.media_link} target="_blank" rel="noreferrer" style={{ color: 'var(--primary-color)', fontSize: '0.75rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <ExternalLink size={12} /> Noten / Media
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                  {userSongs.some(us => us.song_id === song.id) ? (
-                    <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '12px 20px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px', color: '#166534', fontWeight: 800, fontSize: '0.8rem' }}>
-                      <Check size={20} /> Hinzugefügt
-                    </div>
-                  ) : (
-                    <button 
-                      onClick={() => handleAddSongToRepertoire(song)}
-                      style={{ background: '#f9fafb', border: '1px solid #e5e7eb', padding: '12px', borderRadius: '12px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', transition: 'all 0.2s' }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#f3f4f6'}
-                      onMouseLeave={e => e.currentTarget.style.background = '#f9fafb'}
-                    >
-                      <Plus size={20} color={brandColor} />
-                      <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-main)' }}>Üben</span>
-                    </button>
-                  )}
-                </div>
-              ))
+                  filteredLibrary.map((song: any) => {
+                    const LEVEL_COLORS: Record<string | number, string> = {
+                      '1': '#ef4444', // Red
+                      '2': '#3b82f6', // Blue
+                      '3': '#10b981', // Emerald
+                      '4': '#8b5cf6', // Violet
+                      '5': '#ec4899', // Pink
+                      'starter': '#ef4444',
+                      'pro': '#8b5cf6'
+                    };
+                    const levelColor = LEVEL_COLORS[String(song.level).toLowerCase()] || '#f59e0b';
+                    return (
+                      <div 
+                        key={song.id} 
+                        className="glass-panel" 
+                        style={{ 
+                          padding: '24px', 
+                          background: 'white', 
+                          border: '1px solid #f1f5f9',
+                          borderLeft: `8px solid ${levelColor}`, 
+                          borderRadius: '24px',
+                          display: 'flex', 
+                          justifyContent: 'space-between', 
+                          alignItems: 'center', 
+                          gap: '24px',
+                          boxShadow: '0 10px 30px rgba(0,0,0,0.02)',
+                          transition: 'all 0.25s ease',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1 }}>
+                          {/* Music Icon Rounded Box */}
+                          <div style={{ 
+                            width: '64px', 
+                            height: '64px', 
+                            borderRadius: '18px', 
+                            background: '#f8fafc', 
+                            border: '1px solid #e2e8f0', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}>
+                            <Music size={28} color="#94a3b8" />
+                          </div>
+
+                          {/* Text Info */}
+                          <div style={{ flex: 1 }}>
+                            <div style={{ 
+                              fontSize: '0.75rem', 
+                              fontWeight: 900, 
+                              color: '#64748b', 
+                              textTransform: 'uppercase', 
+                              letterSpacing: '0.08em',
+                              lineHeight: 1.2
+                            }}>
+                              {song.artist}
+                            </div>
+                            <div style={{ 
+                              fontSize: '1.4rem', 
+                              fontWeight: 950, 
+                              color: '#0f172a', 
+                              marginTop: '4px',
+                              lineHeight: 1.2
+                            }}>
+                              {song.title}
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', marginTop: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                              <span style={{ 
+                                background: '#fef3c7', 
+                                color: '#b45309', 
+                                padding: '4px 10px', 
+                                borderRadius: '8px', 
+                                fontSize: '0.75rem', 
+                                fontWeight: 700 
+                              }}>
+                                Level {song.level}
+                              </span>
+                              {song.media_link && (
+                                <a 
+                                  href={song.media_link} 
+                                  target="_blank" 
+                                  rel="noreferrer" 
+                                  style={{ 
+                                    color: '#2563eb', 
+                                    fontSize: '0.75rem', 
+                                    fontWeight: 700, 
+                                    textDecoration: 'none', 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '4px',
+                                    marginLeft: '8px' 
+                                  }}
+                                >
+                                  <ExternalLink size={12} /> Noten / Media
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div style={{ flexShrink: 0 }}>
+                          {userSongs.some(us => us.song_id === song.id) ? (
+                            <div style={{ 
+                              background: '#f0fdf4', 
+                              border: '1px solid #bbf7d0', 
+                              padding: '12px 24px', 
+                              borderRadius: '16px', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '8px', 
+                              color: '#166534', 
+                              fontWeight: 900, 
+                              fontSize: '0.85rem' 
+                            }}>
+                              <Check size={18} strokeWidth={3} /> Hinzugefügt
+                            </div>
+                          ) : (
+                            <button 
+                              onClick={() => handleAddSongToRepertoire(song)}
+                              style={{ 
+                                background: '#ffffff', 
+                                border: '1px solid #e2e8f0', 
+                                padding: '12px 24px', 
+                                borderRadius: '16px', 
+                                cursor: 'pointer', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '8px', 
+                                boxShadow: '0 4px 10px rgba(0,0,0,0.02)',
+                                transition: 'all 0.2s ease' 
+                              }}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.background = '#f8fafc';
+                                e.currentTarget.style.borderColor = '#cbd5e1';
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                                e.currentTarget.style.boxShadow = '0 6px 15px rgba(0,0,0,0.04)';
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.background = '#ffffff';
+                                e.currentTarget.style.borderColor = '#e2e8f0';
+                                e.currentTarget.style.transform = 'none';
+                                e.currentTarget.style.boxShadow = '0 4px 10px rgba(0,0,0,0.02)';
+                              }}
+                            >
+                              <Plus size={18} color="#f59e0b" strokeWidth={3} />
+                              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>Üben</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
              )}
             </div>
             </section>
