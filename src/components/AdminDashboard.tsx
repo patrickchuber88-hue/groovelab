@@ -162,6 +162,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [newStudent, setNewStudent] = useState({ firstName: '', lastName: '', birthDate: '', photoUrl: '/avatar_ghost.jpg', isExternalVocalist: false });
   const [vocalistOnlyMode, setVocalistOnlyMode] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'green' | 'yellow' | 'red'>('all');
   const [studentsXP, setStudentsXP] = useState<Record<string, number>>({});
   
   const [showAddBand, setShowAddBand] = useState(false);
@@ -1056,7 +1057,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       role: newTeacher.isAdmin ? 'admin' : 'teacher', 
       first_name: newTeacher.firstName, 
       last_name: newTeacher.lastName, 
-      instrument: newTeacher.instrument || 'Guitar',
+      instrument: newTeacher.instrument || '',
       photo_url: newTeacher.photoUrl,
       qr_token: crypto.randomUUID()
     }).select().single();
@@ -2338,12 +2339,112 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           />
         </div>
 
+        {/* Status Filters */}
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+          <button
+            onClick={() => setStatusFilter('all')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '12px',
+              border: statusFilter === 'all' ? `1.5px solid ${brandColor}` : '1.5px solid #e2e8f0',
+              background: statusFilter === 'all' ? `${brandColor}0a` : 'white',
+              color: statusFilter === 'all' ? brandColor : '#64748b',
+              fontWeight: 800,
+              fontSize: '0.8rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+            }}
+            className="hover-scale"
+          >
+            Alle
+          </button>
+          <button
+            onClick={() => setStatusFilter('green')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '12px',
+              border: statusFilter === 'green' ? '1.5px solid #10b981' : '1.5px solid #e2e8f0',
+              background: statusFilter === 'green' ? '#10b98110' : 'white',
+              color: statusFilter === 'green' ? '#059669' : '#64748b',
+              fontWeight: 800,
+              fontSize: '0.8rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.2s',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+            }}
+            className="hover-scale"
+          >
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }}></span>
+            Live Lab
+          </button>
+          <button
+            onClick={() => setStatusFilter('yellow')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '12px',
+              border: statusFilter === 'yellow' ? '1.5px solid #fbbf24' : '1.5px solid #e2e8f0',
+              background: statusFilter === 'yellow' ? '#fbbf2415' : 'white',
+              color: statusFilter === 'yellow' ? '#d97706' : '#64748b',
+              fontWeight: 800,
+              fontSize: '0.8rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.2s',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+            }}
+            className="hover-scale"
+          >
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#fbbf24' }}></span>
+            Home Modus
+          </button>
+          <button
+            onClick={() => setStatusFilter('red')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '12px',
+              border: statusFilter === 'red' ? '1.5px solid #ef4444' : '1.5px solid #e2e8f0',
+              background: statusFilter === 'red' ? '#ef444410' : 'white',
+              color: statusFilter === 'red' ? '#dc2626' : '#64748b',
+              fontWeight: 800,
+              fontSize: '0.8rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.2s',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+            }}
+            className="hover-scale"
+          >
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444' }}></span>
+            Offline
+          </button>
+        </div>
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '16px' }}>
           {students.filter(s => {
             const fullName = `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase();
             const matchesSearch = fullName.includes(studentSearch.toLowerCase());
             const matchesType = vocalistOnlyMode ? s.is_external_vocalist : !s.is_external_vocalist;
-            return matchesSearch && matchesType;
+            
+            let matchesStatus = true;
+            if (statusFilter !== 'all') {
+              const statusColor = getStatusColor(s.id, s.last_seen);
+              if (statusFilter === 'green' && statusColor !== '#10b981') matchesStatus = false;
+              if (statusFilter === 'yellow' && statusColor !== '#fbbf24') matchesStatus = false;
+              if (statusFilter === 'red' && statusColor !== '#ef4444') matchesStatus = false;
+            }
+            
+            return matchesSearch && matchesType && matchesStatus;
           }).map(s => (
             <div 
               key={s.id} 
@@ -2726,11 +2827,15 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   Lehrer
                 </div>
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  {t.instrument?.split(',').map((inst: string) => (
-                    <span key={inst} style={{ padding: '6px 12px', background: '#f1f5f9', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
-                      {ADMIN_INSTRUMENT_ICONS[inst.trim()] || '🎸'} {inst.trim()}
-                    </span>
-                  ))}
+                  {t.instrument?.split(',')
+                    .map((inst: string) => inst.trim())
+                    .filter(Boolean)
+                    .map((inst: string) => (
+                      <span key={inst} style={{ padding: '6px 12px', background: '#f1f5f9', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
+                        {ADMIN_INSTRUMENT_ICONS[inst] || '🎸'} {inst}
+                      </span>
+                    ))
+                  }
                 </div>
               </div>
               

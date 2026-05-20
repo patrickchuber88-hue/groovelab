@@ -542,11 +542,13 @@ export function TeacherDashboard({
 
         // 4. Coaches
         const { data: allCoaches } = await supabase.from('users').select('*').in('role', ['teacher', 'admin']).eq('school_id', tData.school_id);
-        const fiveMinsAgoMs = Date.now() - 5 * 60000;
+        const hidePresence = sessionStorage.getItem('groovelab_teacher_hide_presence') === 'true';
+        const isHomeMode = sessionStorage.getItem('groovelab_location_mode') === 'home';
+        
         const activeCoaches = (allCoaches || []).filter(c => {
-          const isCurrentTeacher = c.id === userId;
-          const isRecentSeen = c.last_seen && (new Date(c.last_seen).getTime() > fiveMinsAgoMs);
-          return isCurrentTeacher || isRecentSeen || trulyActive.some(s => s.user_id === c.id);
+          const isCurrentTeacher = c.id === userId && !hidePresence && !isHomeMode;
+          const hasSession = trulyActive.some(s => s.user_id === c.id);
+          return isCurrentTeacher || hasSession;
         });
         setCoaches(activeCoaches.map(c => ({ id: c.id, users: c, session: trulyActive.find(s => s.user_id === c.id) })));
 

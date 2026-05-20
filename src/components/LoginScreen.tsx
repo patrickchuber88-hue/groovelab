@@ -50,6 +50,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [adminLoginLoading, setAdminLoginLoading] = useState(false);
 
+  // Teacher check-in choice modal state
+  const [showTeacherChoiceModal, setShowTeacherChoiceModal] = useState(false);
+  const [pendingTeacherUser, setPendingTeacherUser] = useState<{ user: any; isWithinAnyRoom: boolean } | null>(null);
+
   // Reset logo clicks after 3 seconds of inactivity
   useEffect(() => {
     if (logoClicks > 0) {
@@ -135,7 +139,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   let effectiveStationId = kioskStationId || localStorage.getItem('groovelab_station_id');
   if (effectiveStationId === 'skip') effectiveStationId = null;
 
-  const finalizeLogin = async (user: any, stationId: string | null, isWithinAnyRoom: boolean) => {
+  const finalizeLogin = async (user: any, stationId: string | null, isWithinAnyRoom: boolean, hidePresence = false) => {
     try {
       setLoading(true);
       const schoolData = Array.isArray(user.schools) ? user.schools[0] : user.schools;
@@ -147,6 +151,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       }
       const now = new Date().toISOString();
       const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
+      
+      if (isTeacher) {
+        if (hidePresence) {
+          sessionStorage.setItem('groovelab_teacher_hide_presence', 'true');
+        } else {
+          sessionStorage.setItem('groovelab_teacher_hide_presence', 'false');
+        }
+      }
       
       let finalStationId = null;
       let isHome = false;
@@ -173,8 +185,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       }
 
       // Geofence check
-      if (!isWithinAnyRoom) {
-        console.log(`[Login] Outside geofence. Forcing Home mode.`);
+      if (!isWithinAnyRoom || (isTeacher && hidePresence)) {
+        console.log(`[Login] Outside geofence or hiding presence. Forcing Home mode.`);
         isHome = true;
         finalStationId = null;
       }
@@ -382,6 +394,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       console.log(`[Login] Scan successful. Geofence match: ${isWithinAnyRoom}`);
       
+      const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
+      if (isTeacher) {
+        setPendingTeacherUser({ user, isWithinAnyRoom });
+        setShowTeacherChoiceModal(true);
+        setLoading(false);
+        return;
+      }
+
       // Automatically finalize based on geofence detection
       await finalizeLogin(user, effectiveStationId, isWithinAnyRoom);
     } catch (err: any) {
@@ -389,6 +409,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       setError(err.message);
       setLoading(false);
     }
+  };
+
+  const confirmTeacherLogin = async (hidePresence: boolean) => {
+    if (!pendingTeacherUser) return;
+    const { user, isWithinAnyRoom } = pendingTeacherUser;
+    setShowTeacherChoiceModal(false);
+    setPendingTeacherUser(null);
+    await finalizeLogin(user, effectiveStationId, isWithinAnyRoom, hidePresence);
   };
 
   const [geoDebug, setGeoDebug] = useState<any>(null);
@@ -1271,6 +1299,144 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 {adminLoginLoading ? 'Verifiziere...' : 'Einloggen'}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Teacher Check-in Choice Modal */}
+      {showTeacherChoiceModal && pendingTeacherUser && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.40)',
+          backdropFilter: 'blur(16px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '20px',
+          fontFamily: '"Outfit", "Inter", sans-serif',
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '32px',
+            boxShadow: '0 30px 80px rgba(15, 23, 42, 0.18)',
+            border: '1px solid #f1f5f9',
+            padding: '36px',
+            maxWidth: '460px',
+            width: '100%',
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px',
+            boxSizing: 'border-box',
+            textAlign: 'center'
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+              <div style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#16a34a'
+              }}>
+                <span style={{ fontSize: '28px' }}>👋</span>
+              </div>
+              <div>
+                <h3 style={{ margin: '0 0 8px 0', fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>
+                  Hallo {pendingTeacherUser.user.first_name}!
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.95rem', color: '#64748b', lineHeight: '1.5' }}>
+                  Möchtest du dich im GrooveLab anmelden?
+                </p>
+              </div>
+            </div>
+
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '20px',
+              padding: '16px 20px',
+              fontSize: '0.85rem',
+              color: '#475569',
+              textAlign: 'left',
+              lineHeight: '1.5',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px'
+            }}>
+              <div>
+                🟢 <strong>Ja, anmelden:</strong> Du wirst im GrooveLab (Live Lab) eingecheckt und bist für alle sichtbar.
+              </div>
+              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '8px' }}>
+                ⚪ <strong>Nein, nur Ansicht:</strong> Du siehst alle Funktionen des Lehrerdashboards, wirst aber selbst im Live Lab nicht angezeigt.
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '4px' }}>
+              <button
+                onClick={() => confirmTeacherLogin(false)}
+                style={{
+                  width: '100%',
+                  padding: '16px',
+                  borderRadius: '16px',
+                  background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontSize: '1rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 8px 20px rgba(22, 163, 74, 0.25)',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 12px 24px rgba(22, 163, 74, 0.35)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'none';
+                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(22, 163, 74, 0.25)';
+                }}
+              >
+                Ja, im Live Lab anmelden
+              </button>
+
+              <button
+                onClick={() => confirmTeacherLogin(true)}
+                style={{
+                  width: '100%',
+                  padding: '16px',
+                  borderRadius: '16px',
+                  background: '#f1f5f9',
+                  color: '#475569',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '1rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#e2e8f0';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#f1f5f9';
+                }}
+              >
+                Nein, nur Ansicht (ohne Einchecken)
+              </button>
+            </div>
           </div>
         </div>
       )}
