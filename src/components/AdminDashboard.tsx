@@ -106,11 +106,6 @@ const STUDENT_AVATARS = [
   { id: 'bandstyle_girl_epiano', url: '/avatars/bandstyle_girl_epiano.png', label: 'Bandstyle Girl Piano' },
   { id: 'student_drums_1', url: '/avatars/student_drums_1.png', label: 'Student Drums 1' },
 
-  { id: 'teen_girl_acoustic_guitar', url: '/avatars/teen_girl_acoustic_guitar.png', label: 'Teen Girl Acoustic Guitar' },
-  { id: 'teen_boy_acoustic_guitar', url: '/avatars/teen_boy_acoustic_guitar.png', label: 'Teen Boy Acoustic Guitar' },
-  { id: 'avatar_girl_new', url: '/avatar_girl_1777237237899.png', label: 'Girl (Premium)' },
-  { id: 'b_def', url: '/avatar_boy.jpg', label: 'Classic Boy' },
-
   // Remaining Neutral/Male Avatars
   { id: 'student_eguitar_1', url: '/avatars/student_eguitar_1.png', label: 'Student Guitar 1' },
   { id: 'student_piano_1', url: '/avatars/student_piano_1.png', label: 'Student Piano 1' },
@@ -119,7 +114,13 @@ const STUDENT_AVATARS = [
   { id: 'bandstyle_boy_eguitar', url: '/avatars/bandstyle_boy_eguitar.png', label: 'Bandstyle Boy Guitar' },
   { id: 'bandstyle_boy_ebass', url: '/avatars/bandstyle_boy_ebass.png', label: 'Bandstyle Boy Bass' },
   { id: 'bandstyle_boy_edrums', url: '/avatars/bandstyle_boy_edrums.png', label: 'Bandstyle Boy Drums' },
-  { id: 'bandstyle_boy_epiano', url: '/avatars/bandstyle_boy_epiano.png', label: 'Bandstyle Boy Piano' }
+  { id: 'bandstyle_boy_epiano', url: '/avatars/bandstyle_boy_epiano.png', label: 'Bandstyle Boy Piano' },
+
+  // REQUESTED END-AVATARS
+  { id: 'teen_girl_acoustic_guitar', url: '/avatars/teen_girl_acoustic_guitar.png', label: 'Teen Girl Acoustic Guitar' },
+  { id: 'teen_boy_acoustic_guitar', url: '/avatars/teen_boy_acoustic_guitar.png', label: 'Teen Boy Acoustic Guitar' },
+  { id: 'avatar_girl_new', url: '/avatar_girl_1777237237899.png', label: 'Girl (Premium)' },
+  { id: 'b_def', url: '/avatar_boy.jpg', label: 'Classic Boy' }
 ];
 
 const getStationColor = (name: string | null | undefined) => {

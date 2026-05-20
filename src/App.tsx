@@ -1647,11 +1647,6 @@ function App() {
     { id: 'bandstyle_girl_epiano', url: '/avatars/bandstyle_girl_epiano.png' },
     { id: 'student_drums_1', url: '/avatars/student_drums_1.png' },
 
-    { id: 'teen_girl_acoustic_guitar', url: '/avatars/teen_girl_acoustic_guitar.png' },
-    { id: 'teen_boy_acoustic_guitar', url: '/avatars/teen_boy_acoustic_guitar.png' },
-    { id: 'avatar_girl_new', url: '/avatar_girl_1777237237899.png' },
-    { id: 'avatar_boy', url: '/avatar_boy.jpg' },
-
     // Remaining Neutral/Male Avatars
     { id: 'student_eguitar_1', url: '/avatars/student_eguitar_1.png' },
     { id: 'student_piano_1', url: '/avatars/student_piano_1.png' },
@@ -1660,7 +1655,11 @@ function App() {
     { id: 'bandstyle_boy_eguitar', url: '/avatars/bandstyle_boy_eguitar.png' },
     { id: 'bandstyle_boy_ebass', url: '/avatars/bandstyle_boy_ebass.png' },
     { id: 'bandstyle_boy_edrums', url: '/avatars/bandstyle_boy_edrums.png' },
-    { id: 'bandstyle_boy_epiano', url: '/avatars/bandstyle_boy_epiano.png' }
+    { id: 'bandstyle_boy_epiano', url: '/avatars/bandstyle_boy_epiano.png' },
+    { id: 'teen_girl_acoustic_guitar', url: '/avatars/teen_girl_acoustic_guitar.png' },
+    { id: 'teen_boy_acoustic_guitar', url: '/avatars/teen_boy_acoustic_guitar.png' },
+    { id: 'avatar_girl_new', url: '/avatar_girl_1777237237899.png' },
+    { id: 'avatar_boy', url: '/avatar_boy.jpg' }
   ];
 
   const TEACHER_AVATARS = [
