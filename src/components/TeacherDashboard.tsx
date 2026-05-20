@@ -353,6 +353,7 @@ interface TeacherDashboardProps {
   onFoundBand?: (form: any, mySlot: any) => void;
   isSidebarCollapsed?: boolean;
   setIsSidebarCollapsed?: (collapsed: boolean) => void;
+  onSidebarNotificationsChange?: (count: number) => void;
 }
 
 export function TeacherDashboard({ 
@@ -365,7 +366,8 @@ export function TeacherDashboard({
   onOpenBandProfile, 
   onFoundBand,
   isSidebarCollapsed: propsIsSidebarCollapsed,
-  setIsSidebarCollapsed: propsSetIsSidebarCollapsed
+  setIsSidebarCollapsed: propsSetIsSidebarCollapsed,
+  onSidebarNotificationsChange
 }: TeacherDashboardProps) {
   const [teacher, setTeacher] = useState<any>(null);
   const [stations, setStations] = useState<any[]>([]);
@@ -397,6 +399,15 @@ export function TeacherDashboard({
   const [collapsedBands, setCollapsedBands] = useState<Record<string, boolean>>({});
   const [rooms, setRooms] = useState<any[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string>('');
+  
+  const [lastSeenCounts, setLastSeenCounts] = useState(() => {
+    try {
+      const saved = localStorage.getItem('groovelab_last_seen_sidebar');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return { help: 0, rehearsal: 0, matching: 0 };
+  });
+
   const [localIsSidebarCollapsed, setLocalIsSidebarCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
       return window.innerWidth < 1200;
@@ -406,6 +417,29 @@ export function TeacherDashboard({
 
   const isSidebarCollapsed = propsIsSidebarCollapsed !== undefined ? propsIsSidebarCollapsed : localIsSidebarCollapsed;
   const setIsSidebarCollapsed = propsSetIsSidebarCollapsed !== undefined ? propsSetIsSidebarCollapsed : setLocalIsSidebarCollapsed;
+
+  const unreadHelpCount = Math.max(0, helpRequests.length - lastSeenCounts.help);
+  const unreadRehearsalCount = Math.max(0, rehearsalSuggestions.length - lastSeenCounts.rehearsal);
+  const unreadMatchingCount = Math.max(0, wallSongs.length - lastSeenCounts.matching);
+  const sidebarNotificationsCount = unreadHelpCount + unreadRehearsalCount + unreadMatchingCount;
+
+  useEffect(() => {
+    if (!isSidebarCollapsed) {
+      const currentCounts = {
+        help: helpRequests.length,
+        rehearsal: rehearsalSuggestions.length,
+        matching: wallSongs.length
+      };
+      setLastSeenCounts(currentCounts);
+      localStorage.setItem('groovelab_last_seen_sidebar', JSON.stringify(currentCounts));
+    }
+  }, [isSidebarCollapsed, helpRequests.length, rehearsalSuggestions.length, wallSongs.length]);
+
+  useEffect(() => {
+    if (onSidebarNotificationsChange) {
+      onSidebarNotificationsChange(sidebarNotificationsCount);
+    }
+  }, [sidebarNotificationsCount, onSidebarNotificationsChange]);
 
   const [containerWidth, setContainerWidth] = useState(1000);
   const observerRef = useRef<ResizeObserver | null>(null);
@@ -534,8 +568,12 @@ export function TeacherDashboard({
         const { data: studData } = await supabase.from('users').select('*').eq('school_id', tData.school_id).eq('role', 'student').order('first_name');
         setAllStudents(studData || []);
         // 8. Help
-        const { data: helpData } = await supabase.from('help_requests').select('*, users(*)').eq('school_id', tData.school_id).eq('status', 'pending').order('created_at', { ascending: false });
-        setHelpRequests(helpData || []);
+        if (viewMode !== 'student') {
+          const { data: helpData } = await supabase.from('help_requests').select('*, users(*)').eq('school_id', tData.school_id).eq('status', 'pending').order('created_at', { ascending: false });
+          setHelpRequests(helpData || []);
+        } else {
+          setHelpRequests([]);
+        }
 
         // Part B: Explicit Bands in Formation & Active (Fetched early to prevent TDZ errors in poolFormations)
         const { data: formingBands } = await supabase
@@ -1379,6 +1417,26 @@ export function TeacherDashboard({
                  {isSidebarCollapsed ? (
                    <>
                      <ChevronLeft size={16} /> Sidebar einblenden
+                     {sidebarNotificationsCount > 0 && (
+                       <span style={{
+                         background: '#ef4444',
+                         color: 'white',
+                         fontSize: '0.7rem',
+                         fontWeight: 900,
+                         borderRadius: '10px',
+                         padding: '2px 6px',
+                         minWidth: '16px',
+                         height: '16px',
+                         display: 'flex',
+                         alignItems: 'center',
+                         justifyContent: 'center',
+                         boxShadow: '0 2px 8px rgba(239, 68, 68, 0.35)',
+                         animation: 'pulse 1.5s infinite',
+                         marginLeft: '4px'
+                       }}>
+                         {sidebarNotificationsCount}
+                       </span>
+                     )}
                    </>
                  ) : (
                    <>
@@ -1716,6 +1774,14 @@ export function TeacherDashboard({
             );
           })()}
 
+          {/* Backdrop for mobile overlay sidebar */}
+          {!isSidebarCollapsed && (
+            <div 
+              className="sidebar-backdrop"
+              onClick={() => setIsSidebarCollapsed(true)}
+            />
+          )}
+
           <aside style={{ 
             display: 'flex', 
             flexDirection: 'column', 
@@ -1727,8 +1793,37 @@ export function TeacherDashboard({
             overflow: 'hidden',
             transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
           }}>
+            {/* Mobile Header (Close Button) */}
+            <div className="mobile-sidebar-header" style={{
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '8px',
+              borderBottom: '1px solid #f1f5f9',
+              paddingBottom: '16px'
+            }}>
+              <span style={{ fontWeight: 900, fontSize: '1rem', color: '#1e293b', letterSpacing: '-0.02em' }}>Zusatz-Infos</span>
+              <button 
+                onClick={() => setIsSidebarCollapsed(true)}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '36px',
+                  height: '36px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  padding: 0
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
             {/* Help Requests Section */}
-            {helpRequests.length > 0 && (
+            {viewMode !== 'student' && helpRequests.length > 0 && (
               <div className="glass-panel" style={{ 
                 background: '#fff1f2', 
                 padding: '24px', 

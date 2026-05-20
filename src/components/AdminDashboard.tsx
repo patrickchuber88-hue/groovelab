@@ -162,6 +162,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [newStudent, setNewStudent] = useState({ firstName: '', lastName: '', birthDate: '', photoUrl: '/avatar_ghost.jpg', isExternalVocalist: false });
   const [vocalistOnlyMode, setVocalistOnlyMode] = useState(false);
+  const [studentsXP, setStudentsXP] = useState<Record<string, number>>({});
   
   const [showAddBand, setShowAddBand] = useState(false);
   const [newBand, setNewBand] = useState({ name: '', song_id: '', coach_id: userId, photo_url: '' });
@@ -216,7 +217,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   }, [activeEditStationId, stations]);
   
   const [showAddSong, setShowAddSong] = useState(false);
-  const [newSong, setNewSong] = useState({ artist: '', title: '', level: 1, media_link: '', tomplay_url: '', pdf_folder_url: '', guitar_pro_url: '', pdf_drums_url: '', pdf_guitar_url: '', pdf_bass_url: '', pdf_vocals_url: '', pdf_keys_url: '', bypass_wlan_check: false, instrumentation: { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 } as Record<string, number> });
+  const [newSong, setNewSong] = useState({ artist: '', title: '', level: 1, media_link: '', tomplay_url: '', pdf_folder_url: '', guitar_pro_url: '', pdf_drums_url: '', pdf_guitar_url: '', pdf_bass_url: '', pdf_vocals_url: '', pdf_keys_url: '', playalong_url: '', bypass_wlan_check: false, instrumentation: { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 } as Record<string, number> });
   
   const [songSearch, setSongSearch] = useState('');
   const [songSearchType, setSongSearchType] = useState<'title' | 'artist'>('title');
@@ -316,6 +317,15 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [editingRoomName, setEditingRoomName] = useState('');
 
   const brandColor = admin?.schools?.brand_color || '#eab308';
+
+  const getStatusColor = (studentId: string, lastSeen: string | null) => {
+    const hasLiveSession = activeSessions.some(se => se.user_id === studentId);
+    const isOnline = lastSeen ? (new Date(lastSeen).getTime() > Date.now() - 5 * 60 * 1000) : false;
+    
+    if (hasLiveSession) return '#10b981'; // Green
+    if (isOnline) return '#fbbf24'; // Yellow (Home)
+    return '#ef4444'; // Red
+  };
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(Date.now()), 60000);
@@ -529,7 +539,53 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           .eq('school_id', adminData.school_id)
           .eq('role', 'student')
           .order('first_name');
-        if (studentsData) setStudents(studentsData);
+        if (studentsData) {
+          setStudents(studentsData);
+          const studentIds = studentsData.map(s => s.id);
+          
+          // Fetch active sessions for school's students
+          const { data: sData } = await supabase
+            .from('sessions')
+            .select('*, profiles:users!inner(*), stations(*)')
+            .eq('profiles.school_id', adminData.school_id)
+            .is('check_out_time', null);
+          setActiveSessions(sData || []);
+
+          if (studentIds.length > 0) {
+            // Fetch skills for XP calculation
+            const { data: skillsData } = await supabase
+              .from('user_song_skills')
+              .select('user_id, instrument, is_stage_ready')
+              .in('user_id', studentIds);
+
+            // Fetch band song slots for Vocals XP
+            const { data: slotsData } = await supabase
+              .from('band_song_slots')
+              .select('user_id, instrument, status')
+              .in('user_id', studentIds);
+
+            const xpMap: Record<string, number> = {};
+            studentsData.forEach(student => {
+              const studentSkills = (skillsData || []).filter(sk => sk.user_id === student.id);
+              const studentSlots = (slotsData || []).filter(sl => sl.user_id === student.id);
+
+              const stageReadyCount = studentSkills.filter(sk => {
+                const isVocal = (sk.instrument || '').toLowerCase().includes('vocal') || (sk.instrument || '').toLowerCase().includes('gesang');
+                return sk.is_stage_ready && !isVocal;
+              }).length;
+
+              const vocalsCount = studentSlots.filter(sl => {
+                const isVocal = (sl.instrument || '').toLowerCase().includes('vocal') || (sl.instrument || '').toLowerCase().includes('gesang');
+                return isVocal && sl.status !== 'declined';
+              }).length;
+
+              xpMap[student.id] = (stageReadyCount + vocalsCount) * 100;
+            });
+            setStudentsXP(xpMap);
+          } else {
+            setStudentsXP({});
+          }
+        }
       } else if (activeTab === 'team') {
         const { data: teachersData } = await supabase
           .from('users')
@@ -1348,7 +1404,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const handleAddSong = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!admin?.school_id) return;
-    const { data, error } = await supabase.from('songs').insert({
+    
+    const insertPayload: any = {
       school_id: admin.school_id, 
       artist: newSong.artist, 
       title: newSong.title, 
@@ -1362,21 +1419,35 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       pdf_bass_url: newSong.pdf_bass_url || '',
       pdf_vocals_url: newSong.pdf_vocals_url || '',
       pdf_keys_url: newSong.pdf_keys_url || '',
+      playalong_url: newSong.playalong_url || '',
       bypass_wlan_check: !!newSong.bypass_wlan_check,
       instrumentation: newSong.instrumentation
-    }).select().single();
+    };
+
+    let { data, error } = await supabase.from('songs').insert(insertPayload).select().single();
+    
+    // Fallback: If playalong_url column doesn't exist, retry without it
+    if (error && (error.message.includes('playalong_url') || error.code === 'PGRST204' || error.message.includes('column') || error.message.includes('cache'))) {
+      console.warn('[AdminDashboard] playalong_url column missing, retrying insert without it');
+      const { playalong_url, ...strippedPayload } = insertPayload;
+      const retryResult = await supabase.from('songs').insert(strippedPayload).select().single();
+      data = retryResult.data;
+      error = retryResult.error;
+    }
+
     if (error) alert('Fehler: ' + error.message);
     else if (data) { 
       setSongs([...songs, data]); 
       setShowAddSong(false); 
-      setNewSong({ artist: '', title: '', level: 1, media_link: '', tomplay_url: '', pdf_folder_url: '', guitar_pro_url: '', pdf_drums_url: '', pdf_guitar_url: '', pdf_bass_url: '', pdf_vocals_url: '', pdf_keys_url: '', bypass_wlan_check: false, instrumentation: { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 } }); 
+      setNewSong({ artist: '', title: '', level: 1, media_link: '', tomplay_url: '', pdf_folder_url: '', guitar_pro_url: '', pdf_drums_url: '', pdf_guitar_url: '', pdf_bass_url: '', pdf_vocals_url: '', pdf_keys_url: '', playalong_url: '', bypass_wlan_check: false, instrumentation: { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 } }); 
     }
   };
 
   const handleUpdateSong = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingSong) return;
-    const { error } = await supabase.from('songs').update({
+
+    const updatePayload: any = {
       artist: editingSong.artist,
       title: editingSong.title,
       level: editingSong.level,
@@ -1389,10 +1460,21 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       pdf_bass_url: editingSong.pdf_bass_url || '',
       pdf_vocals_url: editingSong.pdf_vocals_url || '',
       pdf_keys_url: editingSong.pdf_keys_url || '',
+      playalong_url: editingSong.playalong_url || '',
       bypass_wlan_check: !!editingSong.bypass_wlan_check,
       instrumentation: editingSong.instrumentation
-    }).eq('id', editingSong.id);
+    };
+
+    let { error } = await supabase.from('songs').update(updatePayload).eq('id', editingSong.id);
     
+    // Fallback: If playalong_url column doesn't exist, retry without it
+    if (error && (error.message.includes('playalong_url') || error.code === 'PGRST204' || error.message.includes('column') || error.message.includes('cache'))) {
+      console.warn('[AdminDashboard] playalong_url column missing, retrying update without it');
+      const { playalong_url, ...strippedPayload } = updatePayload;
+      const retryResult = await supabase.from('songs').update(strippedPayload).eq('id', editingSong.id);
+      error = retryResult.error;
+    }
+
     if (error) alert('Fehler: ' + error.message);
     else {
       setSongs(songs.map(s => s.id === editingSong.id ? editingSong : s));
@@ -2263,40 +2345,154 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             const matchesType = vocalistOnlyMode ? s.is_external_vocalist : !s.is_external_vocalist;
             return matchesSearch && matchesType;
           }).map(s => (
-            <div key={s.id} className="glass-panel" style={{ padding: '16px', background: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '20px', border: '1px solid #f1f5f9', transition: 'transform 0.2s', cursor: 'default' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
+            <div 
+              key={s.id} 
+              className="glass-panel" 
+              style={{ 
+                padding: '20px', 
+                background: 'white', 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                borderRadius: '24px', 
+                border: '1px solid #e2e8f0', 
+                borderLeft: `8px solid ${brandColor}`, 
+                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.02), 0 8px 10px -6px rgba(0, 0, 0, 0.02)',
+                transition: 'transform 0.2s, box-shadow 0.2s', 
+                cursor: 'default' 
+              }} 
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02)';
+              }} 
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.02), 0 8px 10px -6px rgba(0, 0, 0, 0.02)';
+              }}
+            >
               <div 
                 onClick={() => fetchStudentProfile(s)}
                 style={{ display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', flex: 1 }}
               >
-                <div style={{ 
-                  width: '52px', 
-                  height: '52px', 
-                  borderRadius: '16px', 
-                  background: `${brandColor}15`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  overflow: 'hidden',
-                  position: 'relative',
-                  border: '2px solid white',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
-                }}>
-                  <img 
-                    src={s.photo_url || '/avatar_ghost.jpg'} 
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0, zIndex: 2 }}
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                  />
-                  <span style={{ fontSize: '1rem', fontWeight: 900, color: brandColor, zIndex: 1 }}>{s.first_name?.[0]}</span>
+                <div style={{ position: 'relative' }}>
+                  <div style={{ 
+                    width: '64px', 
+                    height: '64px', 
+                    borderRadius: '20px', 
+                    background: `${brandColor}15`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    border: '2px solid white',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+                  }}>
+                    <img 
+                      src={s.photo_url || '/avatar_ghost.jpg'} 
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                    <span style={{ fontSize: '1.25rem', fontWeight: 900, color: brandColor }}>{s.first_name?.[0]}</span>
+                  </div>
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '-2px',
+                    right: '-2px',
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '50%',
+                    backgroundColor: getStatusColor(s.id, s.last_seen),
+                    border: '3px solid white',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                    zIndex: 10
+                  }} title={
+                    activeSessions.some(se => se.user_id === s.id) 
+                      ? 'Im Live Lab eingecheckt' 
+                      : (s.last_seen && (new Date(s.last_seen).getTime() > Date.now() - 5 * 60 * 1000) ? 'Im Home Modus eingecheckt' : 'Nicht eingeloggt')
+                  } />
                 </div>
-                <div>
-                  <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '1.05rem' }}>{s.first_name} {s.last_name}</div>
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>ID: {s.id.split('-')[0].toUpperCase()}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '1.15rem', letterSpacing: '-0.02em' }}>{s.first_name} {s.last_name}</div>
+                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontFamily: 'monospace', fontWeight: 600 }}>ID: {s.id.split('-')[0].toUpperCase()}</div>
+                  <div style={{ 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    gap: '6px', 
+                    background: '#fef3c7', 
+                    color: '#d97706', 
+                    padding: '4px 10px', 
+                    borderRadius: '8px', 
+                    fontSize: '0.75rem', 
+                    fontWeight: 800, 
+                    marginTop: '6px',
+                    width: 'fit-content'
+                  }}>
+                    <Star size={12} fill="#d97706" color="#d97706" />
+                    <span>{studentsXP[s.id] || 0} XP</span>
+                  </div>
                 </div>
               </div>
-              <div style={{ display: "flex", gap: "8px" }}>
-                <button onClick={() => setEditingStudent(s)} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", padding: "10px", borderRadius: "10px", cursor: "pointer", color: "#64748b", transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'} onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'} title="Bearbeiten"><Pencil size={18} /></button>
-                <button onClick={() => setSelectedQRUser(s)} style={{ background: `${brandColor}10`, border: `1px solid ${brandColor}30`, padding: "10px", borderRadius: "10px", cursor: "pointer", color: brandColor }} title="QR Code"><QrCode size={18} /></button>
-                <button onClick={() => handleDeleteStudent(s.id)} style={{ background: "#fef2f2", border: "1px solid #fecaca", padding: "10px", borderRadius: "10px", cursor: "pointer", color: "#ef4444" }} title="Löschen"><Trash2 size={18} /></button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginLeft: '12px' }}>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setEditingStudent(s); }} 
+                  style={{ 
+                    background: "#f1f5f9", 
+                    border: "none", 
+                    padding: "10px", 
+                    borderRadius: "12px", 
+                    cursor: "pointer", 
+                    color: "#475569", 
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }} 
+                  onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'} 
+                  onMouseLeave={e => e.currentTarget.style.background = '#f1f5f9'} 
+                  title="Bearbeiten"
+                >
+                  <Pencil size={18} />
+                </button>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setSelectedQRUser(s); }} 
+                  style={{ 
+                    background: "#f1f5f9", 
+                    border: "none", 
+                    padding: "10px", 
+                    borderRadius: "12px", 
+                    cursor: "pointer", 
+                    color: "#475569", 
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }} 
+                  onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'} 
+                  onMouseLeave={e => e.currentTarget.style.background = '#f1f5f9'} 
+                  title="QR Code"
+                >
+                  <QrCode size={18} />
+                </button>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); handleDeleteStudent(s.id); }} 
+                  style={{ 
+                    background: "#f1f5f9", 
+                    border: "none", 
+                    padding: "10px", 
+                    borderRadius: "12px", 
+                    cursor: "pointer", 
+                    color: "#ef4444", 
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }} 
+                  onMouseEnter={e => { e.currentTarget.style.background = '#fee2e2'; e.currentTarget.style.color = '#ef4444'; }} 
+                  onMouseLeave={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#ef4444'; }} 
+                  title="Löschen"
+                >
+                  <Trash2 size={18} />
+                </button>
               </div>
             </div>
           ))}
@@ -3144,9 +3340,15 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 </div>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxWidth: '50%' }}>
-                <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b' }}>🎤 Gesang / Lyrics PDF Link</label>
-                <input placeholder="https://www.dropbox.com/.../vocals.pdf?dl=0" value={newSong.pdf_vocals_url || ''} onChange={e => setNewSong({...newSong, pdf_vocals_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b' }}>🎤 Gesang / Lyrics PDF Link</label>
+                  <input placeholder="https://www.dropbox.com/.../vocals.pdf?dl=0" value={newSong.pdf_vocals_url || ''} onChange={e => setNewSong({...newSong, pdf_vocals_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b' }}>🎵 Playback / Playalong Audio-Track Link (.mp3/.wav)</label>
+                  <input placeholder="https://www.dropbox.com/.../playback.mp3?dl=0" value={newSong.playalong_url || ''} onChange={e => setNewSong({...newSong, playalong_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                </div>
               </div>
             </div>
 
@@ -3248,9 +3450,15 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 </div>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxWidth: '50%' }}>
-                <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b' }}>🎤 Gesang / Lyrics PDF Link</label>
-                <input placeholder="https://www.dropbox.com/.../vocals.pdf?dl=0" value={editingSong.pdf_vocals_url || ''} onChange={e => setEditingSong({...editingSong, pdf_vocals_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b' }}>🎤 Gesang / Lyrics PDF Link</label>
+                  <input placeholder="https://www.dropbox.com/.../vocals.pdf?dl=0" value={editingSong.pdf_vocals_url || ''} onChange={e => setEditingSong({...editingSong, pdf_vocals_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b' }}>🎵 Playback / Playalong Audio-Track Link (.mp3/.wav)</label>
+                  <input placeholder="https://www.dropbox.com/.../playback.mp3?dl=0" value={editingSong.playalong_url || ''} onChange={e => setEditingSong({...editingSong, playalong_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                </div>
               </div>
             </div>
 

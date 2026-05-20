@@ -136,6 +136,18 @@ export function DeviceSetupScreen() {
         }
       }
 
+      if (!targetSchoolId) {
+        targetSchoolId = localStorage.getItem('groovelab_school_id');
+      }
+
+      // Default fallback to the primary school ID
+      if (!targetSchoolId) {
+        targetSchoolId = '11111111-1111-1111-1111-111111111111';
+      }
+
+      // Persist the resolved school ID to localStorage for stability
+      localStorage.setItem('groovelab_school_id', targetSchoolId);
+
       let roomsQuery = supabase.from('rooms').select('*').order('name');
       if (targetSchoolId) {
         roomsQuery = roomsQuery.eq('school_id', targetSchoolId);

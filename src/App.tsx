@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Music, AlertCircle, Play, Library, Shield, LogOut, Award, Users, User, Monitor, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, LogOut, Award, Users, User, Monitor, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail } from 'lucide-react';
 import { 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer,
   BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell
@@ -1203,6 +1203,13 @@ function App() {
   const [activeStudentTab, setActiveStudentTab] = useState<string>(() => {
     return localStorage.getItem('groovelab_active_tab') || 'profile';
   });
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 1200;
+    }
+    return false;
+  });
+  const [sidebarNotificationsCount, setSidebarNotificationsCount] = useState<number>(0);
   const [selectedMatchingInsts, setSelectedMatchingInsts] = useState<Record<string, string>>({});
   const [activeBandSubTab, setActiveBandSubTab] = useState<'meine' | 'alle'>('meine');
   const [selectedBandForProfile, setSelectedBandForProfile] = useState<any>(null);
@@ -1219,6 +1226,17 @@ function App() {
   const [bandSearchLetter, setBandSearchLetter] = useState<string | null>(null);
   const [expandedMatchingSong, setExpandedMatchingSong] = useState<string | null>(null);
   const [showQR, setShowQR] = useState(false);
+  const [toastMessage, setToastMessage] = useState<{ text: string, type: 'success' | 'error' | 'info' } | null>(null);
+  
+  useEffect(() => {
+    if (toastMessage) {
+      const timer = setTimeout(() => {
+        setToastMessage(null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
+
   const [activePdfFolderUrl, setActivePdfFolderUrl] = useState<string | null>(null);
   const [activePdfSong, setActivePdfSong] = useState<any>(null);
   const [showConfetti, setShowConfetti] = useState<any>(null);
@@ -1857,7 +1875,7 @@ function App() {
       const [skillsRes, wallRes, membersRes, formingBandsRes, songsRes, userBandsRes, bandsRes, teachersRes, activeSessionsRes] = await Promise.all([
         supabase.from('user_song_skills').select(`
           id, progress_percent, is_stage_ready, is_pending_approval, instrument, part_number, difficulty_level, is_favorite, verified_by_id,
-          songs (id, title, artist, media_link, tomplay_url, instrumentation, pdf_folder_url, guitar_pro_url, pdf_drums_url, pdf_guitar_url, pdf_bass_url, pdf_vocals_url, pdf_keys_url)
+          songs (*)
         `).eq('user_id', userId),
         supabase.from('songs').select(`
           id, artist, title, media_link, instrumentation,
@@ -1948,7 +1966,8 @@ function App() {
             pdf_folder_url: song.pdf_folder_url, guitar_pro_url: song.guitar_pro_url,
             pdf_guitar_url: song.pdf_guitar_url, pdf_bass_url: song.pdf_bass_url,
             pdf_drums_url: song.pdf_drums_url, pdf_keys_url: song.pdf_keys_url,
-            pdf_vocals_url: song.pdf_vocals_url
+            pdf_vocals_url: song.pdf_vocals_url,
+            playalong_url: song.playalong_url
           };
       }).filter(Boolean);
 
@@ -1982,7 +2001,8 @@ function App() {
               pdf_folder_url: s.pdf_folder_url, guitar_pro_url: s.guitar_pro_url,
               pdf_guitar_url: s.pdf_guitar_url, pdf_bass_url: s.pdf_bass_url,
               pdf_drums_url: s.pdf_drums_url, pdf_keys_url: s.pdf_keys_url,
-              pdf_vocals_url: s.pdf_vocals_url
+              pdf_vocals_url: s.pdf_vocals_url,
+              playalong_url: s.playalong_url
             });
             addedSongIds.add(s.id);
           }
@@ -2023,7 +2043,8 @@ function App() {
               pdf_folder_url: bSong.pdf_folder_url, guitar_pro_url: bSong.guitar_pro_url,
               pdf_guitar_url: bSong.pdf_guitar_url, pdf_bass_url: bSong.pdf_bass_url,
               pdf_drums_url: bSong.pdf_drums_url, pdf_keys_url: bSong.pdf_keys_url,
-              pdf_vocals_url: bSong.pdf_vocals_url
+              pdf_vocals_url: bSong.pdf_vocals_url,
+              playalong_url: bSong.playalong_url
             });
           }
         }
@@ -3151,9 +3172,9 @@ function App() {
       });
       
     if (error) {
-      alert('Fehler beim Senden: ' + error.message);
+      setToastMessage({ text: 'Fehler beim Senden: ' + error.message, type: 'error' });
     } else {
-      alert(`Hilfe wurde angefordert. Der Lehrer sieht deinen Tisch im Dashboard.`);
+      setToastMessage({ text: 'Hilfe wurde angefordert. Der Lehrer sieht deinen Tisch im Dashboard.', type: 'success' });
     }
   };
 
@@ -4321,6 +4342,7 @@ function App() {
         pdf_drums_url: skill.pdf_drums_url,
         pdf_keys_url: skill.pdf_keys_url,
         pdf_vocals_url: skill.pdf_vocals_url,
+        playalong_url: skill.playalong_url,
         instrumentation: skill.instrumentation,
         isBandReady: wallMatch?.isComplete || false,
         isBandSong: isBandSong,
@@ -4446,6 +4468,36 @@ function App() {
 
   return (
     <div className="app-layout">
+      {toastMessage && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: '24px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 9999,
+            background: toastMessage.type === 'error' ? 'rgba(239, 68, 68, 0.95)' : 'rgba(30, 41, 59, 0.95)',
+            backdropFilter: 'blur(16px)',
+            color: 'white',
+            padding: '12px 24px',
+            borderRadius: '20px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            fontSize: '0.9rem',
+            fontWeight: 700,
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            cursor: 'pointer',
+            pointerEvents: 'auto',
+            animation: 'slideDownFade 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
+          }}
+          onClick={() => setToastMessage(null)}
+        >
+          {toastMessage.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle size={18} color="#22c55e" />}
+          <span>{toastMessage.text}</span>
+        </div>
+      )}
       <style>{`
         .sidebar-nav .hover-scale { transition: all 0.2s ease !important; }
         .sidebar-nav .hover-scale:hover { 
@@ -4694,12 +4746,66 @@ function App() {
         {user.role === 'student' && activeStudentTab === 'live' && (
           <ErrorBoundary>
             <div className="animation-slide-up" style={{ width: '100%', padding: '0px 48px 48px 48px' }}>
-              <h1 style={{ fontSize: '2rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.04em', marginBottom: '8px', marginTop: '16px' }}>Live Lab</h1>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', marginTop: '16px' }}>
+                <h1 style={{ fontSize: '2rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.04em', margin: 0 }}>Live Lab</h1>
+                <button 
+                  onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                  style={{
+                    background: 'white',
+                    border: '1.5px solid #e2e8f0',
+                    padding: '8px 16px',
+                    borderRadius: '12px',
+                    fontSize: '0.85rem',
+                    fontWeight: 800,
+                    color: '#475569',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                    transition: 'all 0.15s'
+                  }}
+                  className="hover-scale"
+                >
+                  {isSidebarCollapsed ? (
+                    <>
+                      <ChevronLeft size={16} /> Sidebar einblenden
+                      {sidebarNotificationsCount > 0 && (
+                        <span style={{
+                          background: '#ef4444',
+                          color: 'white',
+                          fontSize: '0.7rem',
+                          fontWeight: 900,
+                          borderRadius: '10px',
+                          padding: '2px 6px',
+                          minWidth: '16px',
+                          height: '16px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 2px 8px rgba(239, 68, 68, 0.35)',
+                          animation: 'pulse 1.5s infinite',
+                          marginLeft: '4px'
+                        }}>
+                          {sidebarNotificationsCount}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      Sidebar ausblenden <ChevronRight size={16} />
+                    </>
+                  )}
+                </button>
+              </div>
               <TeacherDashboard 
                 userId={user.id} 
                 hideHeader={true} 
                 viewMode="student" 
                 onTabChange={setActiveStudentTab}
+                isSidebarCollapsed={isSidebarCollapsed}
+                setIsSidebarCollapsed={setIsSidebarCollapsed}
+                onSidebarNotificationsChange={setSidebarNotificationsCount}
                 onFoundBand={(form, mySlot) => {
                   console.log('[DEBUG-Groovelab] setSuggestingSkill (manual click) in TeacherDashboard onFoundBand');
                   setSuggestingSkill({
@@ -7791,16 +7897,18 @@ function App() {
         </div>
       )}
 
-      {/* Help FAB */}
-      <div className="fab-container">
-        <button 
-          className="fab-button" 
-          onClick={handleHelpRequest}
-          style={{ background: brandColor }}
-        >
-          <AlertCircle size={28} />
-        </button>
-      </div>
+      {/* Help FAB (Only for students in Lab Mode with active station) */}
+      {user && user.role === 'student' && locationMode === 'lab' && session?.station_id && (
+        <div className="fab-container">
+          <button 
+            className="fab-button" 
+            onClick={handleHelpRequest}
+            title="Hilfe rufen"
+          >
+            <AlertCircle size={28} />
+          </button>
+        </div>
+      )}
       {/* Skill Suggestion & Band Founding Modals */}
       {suggestingSkill && suggestingSkill.formation_group && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 6000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', background: 'rgba(2, 6, 23, 0.95)', backdropFilter: 'blur(16px)' }}>
@@ -8244,18 +8352,18 @@ function App() {
         <button 
           onClick={() => setActiveStudentTab('live')} 
           style={{ 
-            background: activeStudentTab === 'live' ? '#fef3c7' : 'linear-gradient(135deg, #eff6ff, #dbeafe)', 
-            border: activeStudentTab === 'live' ? 'none' : '1px solid #bfdbfe', 
+            background: activeStudentTab === 'live' ? '#fef3c7' : '#ffffff', 
+            border: activeStudentTab === 'live' ? 'none' : '1px solid #e2e8f0', 
             display: 'flex', 
             flexDirection: 'column', 
             alignItems: 'center', 
             justifyContent: 'center',
             gap: '2px', 
-            color: activeStudentTab === 'live' ? '#b45309' : '#1d4ed8', 
+            color: activeStudentTab === 'live' ? '#b45309' : '#64748b', 
             cursor: 'pointer',
             padding: '6px 10px',
             borderRadius: '16px',
-            boxShadow: activeStudentTab === 'live' ? '0 4px 12px rgba(234, 179, 8, 0.25)' : '0 4px 10px rgba(59, 130, 246, 0.1)',
+            boxShadow: activeStudentTab === 'live' ? '0 4px 12px rgba(234, 179, 8, 0.25)' : '0 2px 6px rgba(0, 0, 0, 0.02)',
             position: 'relative',
             flex: '0 0 auto',
             minWidth: '64px',
@@ -8274,7 +8382,7 @@ function App() {
             background: '#ef4444', 
             boxShadow: '0 0 8px #ef4444' 
           }} className="animate-pulse"></span>
-          <Monitor size={20} color={activeStudentTab === 'live' ? '#b45309' : '#1d4ed8'} />
+          <Monitor size={20} color={activeStudentTab === 'live' ? '#b45309' : '#64748b'} />
           <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.01em' }}>Live Lab</span>
         </button>
 
@@ -8302,6 +8410,51 @@ function App() {
           <Box size={20} />
           <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Bands</span>
         </button>
+
+        {user?.show_messages_menu !== false && (
+          <button 
+            onClick={() => setActiveStudentTab('messages')} 
+            className={activeStudentTab === 'messages' ? 'active' : ''} 
+            style={{ 
+              background: 'transparent', 
+              border: 'none', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              gap: '4px', 
+              color: activeStudentTab === 'messages' ? brandColor : '#94a3b8', 
+              cursor: 'pointer', 
+              flex: 1 
+            }}
+          >
+            <div style={{ position: 'relative', display: 'inline-flex' }}>
+              <Megaphone size={20} />
+              {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length > 0 && (
+                <span style={{ 
+                  position: 'absolute', 
+                  top: '-4px', 
+                  right: '-8px', 
+                  background: '#ef4444', 
+                  color: 'white', 
+                  fontSize: '0.55rem', 
+                  fontWeight: 900, 
+                  padding: '1px 4px', 
+                  borderRadius: '10px',
+                  minWidth: '14px',
+                  height: '14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 4px rgba(239, 68, 68, 0.3)'
+                }}>
+                  {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length}
+                </span>
+              )}
+            </div>
+            <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Nachrichten</span>
+          </button>
+        )}
 
         <button onClick={() => setActiveStudentTab('profile')} className={activeStudentTab === 'profile' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'profile' ? brandColor : '#94a3b8', cursor: 'pointer', flex: 1 }}>
           <Shield size={20} />
@@ -9020,6 +9173,20 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
   const [pdfDocument, setPdfDocument] = useState<any>(null);
   const [pdfError, setPdfError] = useState<boolean>(false);
 
+  // Audio Playback & Auto-scroll states
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState(1.0);
+  const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
+  const [showScrollPausedToast, setShowScrollPausedToast] = useState(false);
+  const [extractedBpm, setExtractedBpm] = useState<number | null>(null);
+  const [testAudioUrl, setTestAudioUrl] = useState<string>('');
+  const lastProgrammaticScroll = useRef<number>(0);
+
+  const brandColor = "#eab308"; // Standard brand color
+
   useEffect(() => {
     if (!containerRef.current) return;
     const observer = new ResizeObserver((entries) => {
@@ -9097,6 +9264,74 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
   const isDropbox = activeUrl && activeUrl.includes('dropbox.com');
   const isDropboxFolder = isDropbox && (activeUrl.includes('/scl/fo/') || activeUrl.includes('/sh/') || !(activeUrl.includes('.pdf') || activeUrl.includes('/scl/fi/') || activeUrl.includes('/s/')));
 
+  // Extract BPM from PDF pages using regex
+  const extractBpmFromPdf = async (pdfDoc: any) => {
+    try {
+      const page = await pdfDoc.getPage(1);
+      const textContent = await page.getTextContent();
+      const strings = textContent.items.map((item: any) => item.str);
+      const fullText = strings.join(' ');
+      console.log('[SecurePdfViewerModal] Extracted page 1 text:', fullText);
+
+      const bpmRegexes = [
+        /[♩\u2669\u266a\u266b\u2705q]\s*=\s*(\d+)/i,
+        /(?:bpm|tempo)\s*[:=]?\s*(\d+)/i,
+        /(\d+)\s*(?:bpm|BPM)/i,
+        /(?:^|\s)=\s*(\d+)/
+      ];
+
+      for (const regex of bpmRegexes) {
+        const match = fullText.match(regex);
+        if (match) {
+          const val = parseInt(match[1], 10);
+          if (val >= 40 && val <= 300) return val;
+        }
+      }
+
+      for (const str of strings) {
+        for (const regex of bpmRegexes) {
+          const match = str.match(regex);
+          if (match) {
+            const val = parseInt(match[1], 10);
+            if (val >= 40 && val <= 300) return val;
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error extracting BPM from PDF:', err);
+    }
+    return null;
+  };
+
+  // Helper for resolving Media / Audio Link
+  const resolveMediaUrl = (url: string) => {
+    if (!url) return '';
+    if (url.includes('dropbox.com')) {
+      let directUrl = url.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
+      directUrl = directUrl.replace(/[?&]dl=[01]/, '').replace(/[?&]raw=[01]/, '');
+      directUrl += (directUrl.includes('?') ? '&' : '?') + 'raw=1';
+      return directUrl;
+    }
+    return url;
+  };
+
+  const resolvedAudioUrl = useMemo(() => {
+    if (testAudioUrl) return resolveMediaUrl(testAudioUrl);
+    
+    const rawUrl = song?.playalong_url || song?.media_link;
+    if (!rawUrl) return '';
+    
+    // Only fallback to media_link if it's a Dropbox link or a direct audio file link
+    if (!song?.playalong_url && song?.media_link) {
+      const isDropbox = song.media_link.includes('dropbox.com');
+      const isAudioFile = song.media_link.match(/\.(mp3|wav|m4a|aac|ogg)(\?|$)/i);
+      if (!isDropbox && !isAudioFile) return '';
+    }
+    
+    return resolveMediaUrl(rawUrl);
+  }, [song?.playalong_url, song?.media_link, testAudioUrl]);
+
+  // Load PDF and try to detect BPM
   useEffect(() => {
     if (!activeUrl) return;
     if (isDropboxFolder) {
@@ -9109,6 +9344,8 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
     setPdfLoading(true);
     setPdfDocument(null);
     setPdfError(false);
+    setExtractedBpm(null); // Reset extracted BPM for the new slide
+    
     const countPages = async () => {
       try {
         let pdfjsLib = (window as any).pdfjsLib;
@@ -9134,6 +9371,12 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
             setPageCount(pdf.numPages);
             setIsPageCountFallback(false);
             setPdfLoading(false);
+
+            // Auto-detect BPM
+            const bpm = await extractBpmFromPdf(pdf);
+            if (bpm && isMounted) {
+              setExtractedBpm(bpm);
+            }
           }
         }
       } catch (e) {
@@ -9151,6 +9394,77 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
     return () => { isMounted = false; };
   }, [activeUrl, isDropboxFolder]);
 
+  // Sync playback speed rate
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.playbackRate = playbackRate;
+    }
+  }, [playbackRate, isPlaying]); // Update rate on state change and play start
+
+  // Auto-scroll animation logic via requestAnimationFrame
+  useEffect(() => {
+    if (!isPlaying || !isAutoScrollEnabled || !containerRef.current || !audioRef.current) return;
+
+    let active = true;
+    const scrollContainer = containerRef.current;
+    const audio = audioRef.current;
+
+    const updateScroll = () => {
+      if (!active) return;
+      const durationVal = audio.duration;
+      if (durationVal && durationVal > 0) {
+        const maxScroll = scrollContainer.scrollHeight - scrollContainer.clientHeight;
+        if (maxScroll > 0) {
+          let targetScroll = 0;
+          // Apply a 7-second delay hold before auto-scrolling starts
+          if (audio.currentTime > 7 && durationVal > 7) {
+            const percent = (audio.currentTime - 7) / (durationVal - 7);
+            targetScroll = percent * maxScroll;
+          } else if (durationVal <= 7) {
+            const percent = audio.currentTime / durationVal;
+            targetScroll = percent * maxScroll;
+          }
+          lastProgrammaticScroll.current = targetScroll;
+          scrollContainer.scrollTop = targetScroll;
+        }
+      }
+      requestAnimationFrame(updateScroll);
+    };
+
+    requestAnimationFrame(updateScroll);
+    return () => {
+      active = false;
+    };
+  }, [isPlaying, isAutoScrollEnabled]);
+
+  // Handle manual scrolling to pause auto-scroll
+  useEffect(() => {
+    const scrollContainer = containerRef.current;
+    if (!scrollContainer) return;
+
+    const handleScroll = () => {
+      if (!isPlaying || !isAutoScrollEnabled) return;
+      const currentScroll = scrollContainer.scrollTop;
+      const diff = Math.abs(currentScroll - lastProgrammaticScroll.current);
+      // User manually scrolled more than 15px away from target scroll position
+      if (diff > 15) {
+        setIsAutoScrollEnabled(false);
+        setShowScrollPausedToast(true);
+      }
+    };
+
+    scrollContainer.addEventListener('scroll', handleScroll);
+    return () => scrollContainer.removeEventListener('scroll', handleScroll);
+  }, [isPlaying, isAutoScrollEnabled]);
+
+  // Automatically fade out the scroll-paused toast
+  useEffect(() => {
+    if (showScrollPausedToast) {
+      const timer = setTimeout(() => setShowScrollPausedToast(false), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [showScrollPausedToast]);
+
   const getSecureEmbedUrl = () => {
     let url = activeUrl;
     if (!url) return '';
@@ -9167,6 +9481,64 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
     return url.toLowerCase().endsWith('.pdf') || url.includes('.pdf?') ? url + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH,0' : url;
   };
 
+  const formatTime = (time: number) => {
+    if (isNaN(time)) return '0:00';
+    const mins = Math.floor(time / 60);
+    const secs = Math.floor(time % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  const handlePlayPause = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play().catch(err => console.error("Audio playback error:", err));
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (!audioRef.current) return;
+    setCurrentTime(audioRef.current.currentTime);
+  };
+
+  const handleLoadedMetadata = () => {
+    if (!audioRef.current) return;
+    setDuration(audioRef.current.duration);
+  };
+
+  const handleAudioEnded = () => {
+    setIsPlaying(false);
+    setCurrentTime(0);
+    if (containerRef.current) {
+      containerRef.current.scrollTop = 0;
+    }
+  };
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!audioRef.current) return;
+    const time = parseFloat(e.target.value);
+    audioRef.current.currentTime = time;
+    setCurrentTime(time);
+    
+    if (duration > 0 && containerRef.current) {
+      const maxScroll = containerRef.current.scrollHeight - containerRef.current.clientHeight;
+      if (maxScroll > 0) {
+        const percent = time / duration;
+        const targetScroll = percent * maxScroll;
+        lastProgrammaticScroll.current = targetScroll;
+        containerRef.current.scrollTop = targetScroll;
+      }
+    }
+  };
+
+  const handleSpeedChange = (rate: number) => {
+    setPlaybackRate(rate);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = rate;
+    }
+  };
+
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 5000, background: 'rgba(15, 23, 42, 0.95)', backdropFilter: 'blur(20px)', display: 'flex', flexDirection: 'column', overflow: 'hidden', userSelect: 'none', WebkitUserSelect: 'none' }} onContextMenu={(e) => { e.preventDefault(); setShowCopyAlert(true); }}>
       {showCopyAlert && (
@@ -9175,6 +9547,79 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
           Sicherer GrooveLab-Modus: Kopieren, Speichern und Drucken ist deaktiviert! 🔒
         </div>
       )}
+      
+      {/* Hidden audio element */}
+      {resolvedAudioUrl && (
+        <audio
+          ref={audioRef}
+          src={resolvedAudioUrl}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          onTimeUpdate={handleTimeUpdate}
+          onLoadedMetadata={handleLoadedMetadata}
+          onEnded={handleAudioEnded}
+        />
+      )}
+
+      {/* Floating Auto-Scroll manual override toast */}
+      {showScrollPausedToast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '120px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(30, 41, 59, 0.9)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          color: '#f8fafc',
+          padding: '10px 18px',
+          borderRadius: '12px',
+          fontSize: '0.8rem',
+          fontWeight: 700,
+          zIndex: 5500,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          boxShadow: '0 8px 16px rgba(0,0,0,0.3)',
+        }}>
+          <span>⚠️ Auto-Scroll pausiert (Manuelles Scrollen)</span>
+          <button 
+            onClick={() => {
+              setIsAutoScrollEnabled(true);
+              setShowScrollPausedToast(false);
+              if (audioRef.current && duration > 0 && containerRef.current) {
+                const maxScroll = containerRef.current.scrollHeight - containerRef.current.clientHeight;
+                let targetScroll = 0;
+                // Apply the same 7-second delay hold on reactivation
+                if (audioRef.current.currentTime > 7 && duration > 7) {
+                  const percent = (audioRef.current.currentTime - 7) / (duration - 7);
+                  targetScroll = percent * maxScroll;
+                } else if (duration <= 7) {
+                  const percent = audioRef.current.currentTime / duration;
+                  targetScroll = percent * maxScroll;
+                }
+                lastProgrammaticScroll.current = targetScroll;
+                containerRef.current.scrollTop = targetScroll;
+              }
+            }}
+            style={{
+              background: brandColor,
+              color: 'white',
+              border: 'none',
+              padding: '4px 8px',
+              borderRadius: '6px',
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              marginLeft: '6px'
+            }}
+          >
+            Reaktivieren
+          </button>
+        </div>
+      )}
+
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(15, 23, 42, 0.9)', height: '56px', minHeight: '56px', zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flexShrink: 1 }}>
           <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -9189,7 +9634,7 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }}>
           <div style={{ display: 'flex', background: 'rgba(30, 41, 59, 0.8)', borderRadius: '12px', padding: '3px', border: '1px solid rgba(255,255,255,0.08)', overflowX: 'auto', maxWidth: '400px' }}>
             {slides.map((slide, index) => (
-              <button key={slide.id} onClick={() => setActiveSlide(index)} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: index === activeSlide ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'transparent', color: index === activeSlide ? 'white' : '#94a3b8', border: 'none', padding: '6px 14px', borderRadius: '9px', fontSize: '0.8rem', fontWeight: index === activeSlide ? 900 : 700, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s ease' }}>
+              <button key={slide.id} onClick={() => { setActiveSlide(index); setIsAutoScrollEnabled(true); }} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: index === activeSlide ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'transparent', color: index === activeSlide ? 'white' : '#94a3b8', border: 'none', padding: '6px 14px', borderRadius: '9px', fontSize: '0.8rem', fontWeight: index === activeSlide ? 900 : 700, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s ease' }}>
                 <span>{slide.icon}</span>
                 <span>{slide.label}</span>
               </button>
@@ -9215,7 +9660,7 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
               </button>
             </div>
           ) : (
-            <div ref={containerRef} style={{ width: '100%', maxWidth: '1000px', height: '100%', overflowY: 'auto', background: 'white', position: 'relative', margin: '0 auto' }}>
+            <div ref={containerRef} style={{ width: '100%', maxWidth: '1000px', height: '100%', overflowY: 'auto', background: 'white', position: 'relative', margin: '0 auto', paddingBottom: resolvedAudioUrl ? '120px' : '0' }}>
               {pdfDocument ? (
                 <div style={{ position: 'relative', width: '100%' }}>
                   <div onContextMenu={(e) => { e.preventDefault(); setShowCopyAlert(true); }} style={{ position: 'absolute', inset: 0, background: 'transparent', zIndex: 99, pointerEvents: 'auto' }} />
@@ -9236,6 +9681,208 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
               )}
             </div>
           )}
+
+          {/* Floating Glassmorphic Audio Player & Scroll Controller */}
+          {resolvedAudioUrl && (
+            <div style={{
+              position: 'absolute',
+              bottom: '24px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '90%',
+              maxWidth: '560px',
+              background: 'rgba(15, 23, 42, 0.8)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: '24px',
+              padding: '16px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.6)',
+              color: 'white',
+              zIndex: 1000,
+              userSelect: 'none',
+              WebkitUserSelect: 'none'
+            }}>
+              {/* Playback Controls & Info */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <button 
+                    onClick={handlePlayPause}
+                    style={{
+                      width: '42px',
+                      height: '42px',
+                      borderRadius: '50%',
+                      background: isPlaying ? 'linear-gradient(135deg, #ef4444, #b91c1c)' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                      border: 'none',
+                      color: 'white',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 4px 10px rgba(59, 130, 246, 0.3)'
+                    }}
+                  >
+                    {isPlaying ? <Pause size={18} fill="white" /> : <Play size={18} fill="white" style={{ marginLeft: '2px' }} />}
+                  </button>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      Playback Track 🎵
+                    </span>
+                    <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>
+                      {formatTime(currentTime)} / {formatTime(duration)}
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {/* BPM badge */}
+                  <div style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    padding: '5px 10px',
+                    borderRadius: '10px',
+                    fontSize: '0.75rem',
+                    fontWeight: 900,
+                    color: '#60a5fa',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <span>♩ =</span>
+                    <span>{extractedBpm || '...'}</span>
+                    <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 700 }}>BPM</span>
+                  </div>
+
+                  {/* Auto-scroll Switch */}
+                  <button
+                    onClick={() => {
+                      const nextState = !isAutoScrollEnabled;
+                      setIsAutoScrollEnabled(nextState);
+                      if (nextState && audioRef.current && duration > 0 && containerRef.current) {
+                        const maxScroll = containerRef.current.scrollHeight - containerRef.current.clientHeight;
+                        const percent = audioRef.current.currentTime / duration;
+                        const targetScroll = percent * maxScroll;
+                        lastProgrammaticScroll.current = targetScroll;
+                        containerRef.current.scrollTop = targetScroll;
+                      }
+                    }}
+                    style={{
+                      background: isAutoScrollEnabled ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255,255,255,0.05)',
+                      border: isAutoScrollEnabled ? '1px solid rgba(34, 197, 94, 0.3)' : '1px solid rgba(255,255,255,0.1)',
+                      color: isAutoScrollEnabled ? '#4ade80' : '#94a3b8',
+                      padding: '5px 10px',
+                      borderRadius: '10px',
+                      fontSize: '0.75rem',
+                      fontWeight: 900,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <ArrowDown size={12} />
+                    <span>Auto-Scroll</span>
+                  </button>
+
+                  {/* Speed Selector */}
+                  <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '10px', padding: '2px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    {[0.75, 1.0, 1.25].map(rate => (
+                      <button
+                        key={rate}
+                        onClick={() => handleSpeedChange(rate)}
+                        style={{
+                          background: playbackRate === rate ? 'rgba(255,255,255,0.12)' : 'transparent',
+                          color: playbackRate === rate ? 'white' : '#94a3b8',
+                          border: 'none',
+                          padding: '3px 8px',
+                          borderRadius: '8px',
+                          fontSize: '0.7rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        {rate}x
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Progress Slider */}
+              <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '8px' }}>
+                <input
+                  type="range"
+                  min={0}
+                  max={duration || 100}
+                  value={currentTime}
+                  onChange={handleSeek}
+                  style={{
+                    flex: 1,
+                    height: '4px',
+                    borderRadius: '2px',
+                    background: 'rgba(255, 255, 255, 0.15)',
+                    outline: 'none',
+                    cursor: 'pointer',
+                    accentColor: brandColor,
+                    WebkitAppearance: 'none'
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {!resolvedAudioUrl && (
+            <div style={{
+              position: 'absolute',
+              bottom: '24px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: 'rgba(30, 41, 59, 0.95)',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '20px',
+              padding: '12px 24px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '16px',
+              boxShadow: '0 10px 30px rgba(0, 0, 0, 0.4)',
+              color: 'white',
+              fontSize: '0.85rem',
+              zIndex: 4900,
+              whiteSpace: 'nowrap'
+            }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Music size={16} color="#fbbf24" />
+                Kein Playalong-Track für diesen Song hinterlegt.
+              </span>
+              <button
+                onClick={() => setTestAudioUrl('https://dl.espressif.com/dl/audio/ff-16b-2c-44100hz.mp3')}
+                style={{
+                  background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '6px 14px',
+                  borderRadius: '10px',
+                  fontSize: '0.75rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Demo-Playback laden 🎶
+              </button>
+            </div>
+          )}
+
           {isPageCountFallback && !isDropboxFolder && (
             <div style={{ position: 'absolute', bottom: '24px', right: '24px', zIndex: 101, background: 'rgba(15, 23, 42, 0.85)', border: '1px solid rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(8px)', borderRadius: '12px', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: '12px', color: 'white', fontSize: '0.75rem', fontWeight: 800 }}>
               <span style={{ color: '#94a3b8' }}>📄 Seiten:</span>

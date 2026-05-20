@@ -434,22 +434,68 @@ body {
   gap: 0px;
 }
 
+/* Sidebar backdrop for mobile overlay drawer */
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 9998;
+  animation: sidebarFadeIn 0.25s ease-out;
+}
+
+@keyframes sidebarFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (min-width: 1201px) {
+  .sidebar-backdrop {
+    display: none !important;
+  }
+  .mobile-sidebar-header {
+    display: none !important;
+  }
+}
+
 @media (max-width: 1200px) {
   .live-lab-grid {
     grid-template-columns: 1fr !important;
     gap: 24px !important;
   }
   
-  .live-lab-grid.collapsed aside {
-    display: none !important;
+  .mobile-sidebar-header {
+    display: flex !important;
   }
   
   .live-lab-grid aside {
-    width: 100% !important;
-    opacity: 1 !important;
-    transform: none !important;
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    height: 100vh !important;
+    width: 360px !important;
+    max-width: 90vw !important;
+    background: white !important;
+    z-index: 9999 !important;
+    box-shadow: -10px 0 30px rgba(15, 23, 42, 0.15) !important;
+    padding: 24px !important;
+    margin: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow-y: auto !important;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    transform: translateX(0) !important;
     pointer-events: auto !important;
-    transition: none !important;
+    opacity: 1 !important;
+  }
+  
+  .live-lab-grid.collapsed aside {
+    transform: translateX(100%) !important;
+    pointer-events: none !important;
+    box-shadow: none !important;
+    opacity: 0 !important;
   }
 }
 
