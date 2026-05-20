@@ -5670,21 +5670,31 @@ function App() {
                         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', background: '#f8fafc', padding: '10px 16px', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
                             <div style={{ 
-                              width: '10px', 
-                              height: '10px', 
+                              width: '12px', 
+                              height: '12px', 
                               borderRadius: '3px', 
-                              border: '1px solid #cbd5e1', 
-                              background: '#f8fafc', 
-                              position: 'relative', 
-                              overflow: 'hidden' 
-                            }}>
-                              <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '3px', background: '#f59e0b' }}></div>
-                            </div> Deine Zeit
+                              border: '1px solid #d97706', 
+                              background: '#f59e0b'
+                            }}></div> Deine Zeit
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
-                            <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: 'rgba(79, 70, 229, 0.4)' }}></div> Lab voll
+                            <div style={{ 
+                              width: '12px', 
+                              height: '12px', 
+                              borderRadius: '3px', 
+                              border: '1px dashed rgba(245, 158, 11, 0.5)', 
+                              background: 'rgba(245, 158, 11, 0.12)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#d97706',
+                              fontSize: '0.5rem',
+                              fontWeight: 900
+                            }}>👤</div> Anderer Coach
                           </div>
-                          
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
+                            <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: 'rgba(79, 70, 229, 0.4)' }}></div> Lab voll
+                          </div>
                         </div>
                       </div>
 
@@ -5772,7 +5782,8 @@ function App() {
                                             s.time === time && 
                                             (s.profiles?.role?.toLowerCase() === 'teacher' || s.profiles?.role?.toLowerCase() === 'admin')
                                           );
-                                          const hasTeacher = teachersInSlot.length > 0;
+                                          const hasMySlot = isPlanned;
+                                          const hasOtherTeacher = teachersInSlot.some(t => t.user_id !== loggedInUserId);
 
                                           const dayHours = hours[day.key];
                                           const isOpen = dayHours?.active && time >= dayHours.start && time < dayHours.end;
@@ -5790,11 +5801,16 @@ function App() {
                                             content = <span style={{ opacity: 0.3, fontSize: '0.6rem' }}>✕</span>;
                                           } else {
                                             // 1. Determine Background, Border, and Text Color based strictly on heatmap density and coach presence
-                                            if (isPlanned || hasTeacher) {
-                                              // Solid brand gold-amber für eigene geplante Zeiten und andere Coaches (eine Farbe uni)
+                                            if (hasMySlot) {
+                                              // Solid brand gold-amber für eigene geplante Zeiten (eine Farbe uni)
                                               bgColor = '#f59e0b';
                                               textColor = 'white';
                                               border = '1px solid #d97706';
+                                            } else if (hasOtherTeacher) {
+                                              // Soft light gold-amber für andere Coaches
+                                              bgColor = 'rgba(245, 158, 11, 0.12)';
+                                              textColor = '#d97706';
+                                              border = '1px dashed rgba(245, 158, 11, 0.5)';
                                             } else {
                                               // Soft transparent purple/blue heatmap for other slots — linear progressive up to 8 stations!
                                               if (totalCount > 0) {
@@ -5809,11 +5825,21 @@ function App() {
                                               }
                                             }
 
-                                            // 2. Determine Inner Content (Student Count)
+                                            // 2. Determine Inner Content (Student Count or Other Teachers' initials)
                                             if (totalCount > 0) {
                                               content = (
                                                 <span style={{ fontSize: '0.75rem', fontWeight: 900 }}>
                                                   {totalCount}
+                                                </span>
+                                              );
+                                            } else if (hasOtherTeacher && !hasMySlot) {
+                                              const initials = teachersInSlot
+                                                .filter(t => t.user_id !== loggedInUserId)
+                                                .map(t => t.profiles?.first_name?.[0] || 'L')
+                                                .join('+');
+                                              content = (
+                                                <span style={{ fontSize: '0.6rem', fontWeight: 900, color: '#d97706' }} title={teachersInSlot.map(t => t.profiles?.first_name).join(', ')}>
+                                                  {initials}
                                                 </span>
                                               );
                                             }
