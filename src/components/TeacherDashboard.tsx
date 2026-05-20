@@ -761,6 +761,17 @@ export function TeacherDashboard({
               // 2. OR is an automatic group and doesn't have this instrument yet
               let target = songFormations.find(f => {
                 if (skill.formation_group) return f.groupKey === skill.formation_group;
+                
+                // Prevent placing the same student on multiple instruments in a single formation (except Vocals)
+                const isVocals = norm.toLowerCase().includes('vocal') || norm.toLowerCase().includes('gesang');
+                const userAlreadyIn = f.members.some((m: any) => {
+                  const mNorm = normalizeInstrument(m.instrument);
+                  const mIsVocals = mNorm.toLowerCase().includes('vocal') || mNorm.toLowerCase().includes('gesang');
+                  if (isVocals || mIsVocals) return false;
+                  return m.user_id === skill.user_id;
+                });
+                if (userAlreadyIn) return false;
+
                 // Merge into any group that doesn't have this instrument yet
                 return !f.members.some((m: any) => normalizeInstrument(m.instrument) === norm);
               });

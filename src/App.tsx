@@ -1581,10 +1581,12 @@ function App() {
 
     // Also mark the specific song as ignored for auto-founding trigger
     if (suggestingSkill?.song_id) {
-       localStorage.setItem(`groovelab_founding_ignored_${user.id}_${suggestingSkill.song_id}`, 'true');
+       const inst = (suggestingSkill.instrument || '').toLowerCase();
+       localStorage.setItem(`groovelab_founding_ignored_${user.id}_${suggestingSkill.song_id}_${inst}`, 'true');
     }
     if (suggestingSkill?.songs?.id) {
-       localStorage.setItem(`groovelab_founding_ignored_${user.id}_${suggestingSkill.songs.id}`, 'true');
+       const inst = (suggestingSkill.instrument || '').toLowerCase();
+       localStorage.setItem(`groovelab_founding_ignored_${user.id}_${suggestingSkill.songs.id}_${inst}`, 'true');
     }
 
     console.log('[DEBUG-Groovelab] setSuggestingSkill(null) in dismissSuggestion');
@@ -1608,7 +1610,8 @@ function App() {
       const stageReadySkills = userSongs.filter((s: any) => s.is_stage_ready && s.instrument !== 'Vocals');
       
       for (const skill of stageReadySkills) {
-        const isIgnored = localStorage.getItem(`groovelab_founding_ignored_${user.id}_${skill.song_id}`);
+        const inst = (skill.instrument || '').toLowerCase();
+        const isIgnored = localStorage.getItem(`groovelab_founding_ignored_${user.id}_${skill.song_id}_${inst}`);
         if (isIgnored) continue;
         
         // Has it already been suggested/added to ANY of their bands?
@@ -1628,7 +1631,7 @@ function App() {
         }
       }
     }
-  }, [wallSongs, activeStudentTab, user, userBands, suggestingSkill, selectedBandForGateway, pendingFounding, showBandProfile, loading]);
+  }, [wallSongs, activeStudentTab, user, userBands, userSongs, suggestingSkill, selectedBandForGateway, pendingFounding, showBandProfile, loading]);
 
   // Safety check: If suggestingSkill is set but userBands loads and indicates
   // that the song is already suggested or active in their band, dismiss the popup immediately.
@@ -2195,7 +2198,6 @@ function App() {
       // Add vocal songs if they are registered as singers
       const vocalSongs = (membershipsRes?.data || []).flatMap((m: any) => {
         const mi = (m.instrument || '').toLowerCase();
-        if (!(mi.includes('vocal') || mi.includes('gesang'))) return [];
         
         const band = m.bands;
         if (!band) return [];
@@ -2229,44 +2231,47 @@ function App() {
           }
         });
 
-        // 2. Fallback for the main band song if it wasn't added yet (to be safe)
-        const bSong = Array.isArray(band.songs) ? band.songs[0] : band.songs;
-        if (bSong && !addedSongIds.has(bSong.id)) {
-          // Check if this student has a Vocals slot for the main song (or if they are the core vocalist, fallback to adding it if no slots exist at all)
-          const mainBandSongRow = (band.band_songs || []).find((bs: any) => {
-            const s = Array.isArray(bs.songs) ? bs.songs[0] : bs.songs;
-            return s && s.id === bSong.id;
-          });
-          
-          let shouldAddMain = false;
-          if (mainBandSongRow) {
-            const hasAnyVocalSlots = (mainBandSongRow.band_song_slots || []).some((slot: any) => 
-              ((slot.instrument || '').toLowerCase().includes('vocal') || (slot.instrument || '').toLowerCase().includes('gesang'))
-            );
-            if (hasAnyVocalSlots) {
-              shouldAddMain = (mainBandSongRow.band_song_slots || []).some((slot: any) => 
-                slot.user_id === userId && 
+        // 2. Fallback for the main band song if it wasn't added yet (to be safe), ONLY if the member's primary instrument is vocals/gesang
+        const isPrimaryVocalist = mi.includes('vocal') || mi.includes('gesang');
+        if (isPrimaryVocalist) {
+          const bSong = Array.isArray(band.songs) ? band.songs[0] : band.songs;
+          if (bSong && !addedSongIds.has(bSong.id)) {
+            // Check if this student has a Vocals slot for the main song (or if they are the core vocalist, fallback to adding it if no slots exist at all)
+            const mainBandSongRow = (band.band_songs || []).find((bs: any) => {
+              const s = Array.isArray(bs.songs) ? bs.songs[0] : bs.songs;
+              return s && s.id === bSong.id;
+            });
+            
+            let shouldAddMain = false;
+            if (mainBandSongRow) {
+              const hasAnyVocalSlots = (mainBandSongRow.band_song_slots || []).some((slot: any) => 
                 ((slot.instrument || '').toLowerCase().includes('vocal') || (slot.instrument || '').toLowerCase().includes('gesang'))
               );
+              if (hasAnyVocalSlots) {
+                shouldAddMain = (mainBandSongRow.band_song_slots || []).some((slot: any) => 
+                  slot.user_id === userId && 
+                  ((slot.instrument || '').toLowerCase().includes('vocal') || (slot.instrument || '').toLowerCase().includes('gesang'))
+                );
+              } else {
+                shouldAddMain = true; // Fallback if slots aren't populated yet
+              }
             } else {
-              shouldAddMain = true; // Fallback if slots aren't populated yet
+              shouldAddMain = true; // Fallback if band_songs row doesn't exist yet
             }
-          } else {
-            shouldAddMain = true; // Fallback if band_songs row doesn't exist yet
-          }
 
-          if (shouldAddMain) {
-            songs.push({
-              id: `vocal_${band.id}_${bSong.id}`, song_id: bSong.id, user_id: userId, title: bSong.title || '...', artist: bSong.artist || '...',
-              progress: 100, instrument: 'Vocals', difficulty_level: 'original',
-              is_stage_ready: true, is_favorite: false, locked: false, is_pending_approval: false,
-              media_link: bSong.media_link, tomplay_url: bSong.tomplay_url, instrumentation: bSong.instrumentation,
-              pdf_folder_url: bSong.pdf_folder_url, guitar_pro_url: bSong.guitar_pro_url,
-              pdf_guitar_url: bSong.pdf_guitar_url, pdf_bass_url: bSong.pdf_bass_url,
-              pdf_drums_url: bSong.pdf_drums_url, pdf_keys_url: bSong.pdf_keys_url,
-              pdf_vocals_url: bSong.pdf_vocals_url,
-              playalong_url: bSong.playalong_url
-            });
+            if (shouldAddMain) {
+              songs.push({
+                id: `vocal_${band.id}_${bSong.id}`, song_id: bSong.id, user_id: userId, title: bSong.title || '...', artist: bSong.artist || '...',
+                progress: 100, instrument: 'Vocals', difficulty_level: 'original',
+                is_stage_ready: true, is_favorite: false, locked: false, is_pending_approval: false,
+                media_link: bSong.media_link, tomplay_url: bSong.tomplay_url, instrumentation: bSong.instrumentation,
+                pdf_folder_url: bSong.pdf_folder_url, guitar_pro_url: bSong.guitar_pro_url,
+                pdf_guitar_url: bSong.pdf_guitar_url, pdf_bass_url: bSong.pdf_bass_url,
+                pdf_drums_url: bSong.pdf_drums_url, pdf_keys_url: bSong.pdf_keys_url,
+                pdf_vocals_url: bSong.pdf_vocals_url,
+                playalong_url: bSong.playalong_url
+              });
+            }
           }
         }
         return songs;
@@ -2693,7 +2698,13 @@ function App() {
               
               let form = formationsList.find(f => {
                 if (f.originBand) return false; // DO NOT automatically match pool players to active band projects in memory!
-                const userAlreadyIn = f.members.some((m: any) => m.user_id === skill.user_id);
+                const userAlreadyIn = f.members.some((m: any) => {
+                  const mNorm = normalizeInstrument(m.instrument);
+                  const isVocals = normalizedMemberInst.toLowerCase().includes('vocal') || normalizedMemberInst.toLowerCase().includes('gesang');
+                  const mIsVocals = mNorm.toLowerCase().includes('vocal') || mNorm.toLowerCase().includes('gesang');
+                  if (isVocals || mIsVocals) return false;
+                  return m.user_id === skill.user_id;
+                });
                 if (userAlreadyIn) return false;
                 const currentCount = f.members.filter((m: any) => m.instrument === normalizedMemberInst).length;
                 const requiredCount = song.instrumentation?.[normalizedMemberInst] || song.instrumentation?.[skill.instrument] || 0;
@@ -8705,10 +8716,6 @@ function App() {
                       const myMember = (band.band_members || []).find((m: any) => m.user_id === user?.id);
                       if (!myMember) return false;
                       
-                      const skillInst = normalizeInstrument(suggestingSkill.instrument);
-                      const memberInst = normalizeInstrument(myMember.instrument);
-                      if (skillInst !== memberInst) return false;
-
                       const bandSong = (band.band_songs || []).find((bs: any) => (bs.songs?.id || bs.song_id) === suggestingSkill.song_id);
                       if (!bandSong) return true;
                       
@@ -8730,7 +8737,7 @@ function App() {
                     if (filteredBands.length === 0) {
                       return (
                         <div style={{ color: '#64748b', fontSize: '0.9rem', fontStyle: 'italic', padding: '8px 0' }}>
-                          Keine deiner Bands sucht derzeit dieses Instrument oder du spielst in der Band ein anderes Instrument.
+                          Dieser Song wurde bereits komplett besetzt oder deine Bands haben keine passenden Slots.
                         </div>
                       );
                     }
@@ -8778,7 +8785,8 @@ function App() {
                         if (user) {
                           const sId = suggestingSkill.song_id || suggestingSkill.songs?.id;
                           if (sId) {
-                            localStorage.setItem(`groovelab_founding_ignored_${user.id}_${sId}`, 'true');
+                            const inst = (suggestingSkill.instrument || '').toLowerCase();
+                            localStorage.setItem(`groovelab_founding_ignored_${user.id}_${sId}_${inst}`, 'true');
                           }
                           const skillRecordId = suggestingSkill.id || suggestingSkill.skill_id;
                           if (skillRecordId) {
