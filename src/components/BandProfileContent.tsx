@@ -123,6 +123,26 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
   const [songProposals, setSongProposals] = useState<any[]>([]);
   const [shoutboxMessages, setShoutboxMessages] = useState<any[]>([]);
   const [newShoutMessage, setNewShoutMessage] = useState('');
+  const [resolvedSchoolName, setResolvedSchoolName] = useState<string>('');
+
+  useEffect(() => {
+    // 1. If we have schoolData from user, try using it first
+    const schoolData = Array.isArray(user?.schools) ? user?.schools[0] : user?.schools;
+    if (schoolData?.name) {
+      setResolvedSchoolName(schoolData.name);
+      return;
+    }
+    
+    // 2. Otherwise (e.g. shared view), fetch the school from the band's school_id
+    if (selectedBandForProfile?.school_id) {
+      supabase.from('schools').select('name').eq('id', selectedBandForProfile.school_id).single()
+        .then(({ data, error }) => {
+          if (!error && data?.name) {
+            setResolvedSchoolName(data.name);
+          }
+        });
+    }
+  }, [user, selectedBandForProfile?.school_id]);
   const [isLoadingShout, setIsLoadingShout] = useState(false);
   const [shoutboxError, setShoutboxError] = useState<string | null>(null);
   const [isPostingShout, setIsPostingShout] = useState(false);
@@ -998,7 +1018,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                
                <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(circle at 20% 20%, ${brandColor}15 0%, transparent 70%), radial-gradient(circle at 80% 80%, ${brandColor}11 0%, transparent 70%), radial-gradient(circle at 50% 50%, ${brandColor}08 0%, transparent 80%)`, filter: 'blur(80px)', opacity: 0.9 }}></div>
                
-               <img src={selectedBandForProfile.photo_url || "/studio_dark.jpg"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+               <img src={selectedBandForProfile.photo_url || "/studio_dark.jpg"} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 15%' }} />
                {/* Cinematic Vignette - Slightly lighter for overall brightness */}
                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(10,10,10,0.2) 0%, rgba(10,10,10,0.7) 60%, #0a0a0a 100%)', zIndex: 1 }}></div>
                {/* Brand Glow behind Title */}
@@ -1034,7 +1054,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
                           {/* Ultimate Contrast Verified Badge - Now Left-Aligned */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', fontWeight: 950, color: 'black', textTransform: 'uppercase', background: brandColor, padding: '8px 16px', borderRadius: '10px', boxShadow: '0 10px 40px rgba(0,0,0,0.5)', border: '1px solid rgba(0,0,0,0.1)' }}>
-                             <CheckCircle size={14} fill="black" color={brandColor} /> Verifiziertes  GrooveLab  Projekt  der  Musäk  Bad  Säckingen
+                             <CheckCircle size={14} fill="black" color={brandColor} /> VERIFIZIERTES GROOVELAB PROJEKT DER {resolvedSchoolName ? resolvedSchoolName.toUpperCase() : 'MUSÄK BAD SÄCKINGEN'}
                           </div>
 
                           {/* Genre Label - Only show if present */}
