@@ -847,15 +847,25 @@ export function TeacherDashboard({
 
               const slots = bs.band_song_slots || [];
               const members: any[] = [];
+              const addedUserIds = new Set<string>();
               const addedSlotKeys = new Set<string>();
 
+              // 1. Add participants from slots (guests only – skip core members so smart allocation handles them)
               slots.filter((sl: any) => sl.user_id).forEach((sl: any) => {
                 const normalizedMemberInst = normalizeInstrument(sl.instrument);
+                
+                // Skip core band members in slots (unless Vocals) – smart allocation (step 2) will place them correctly
+                const isCoreMember = (b.band_members || []).some((bm: any) => bm.user_id === sl.user_id);
+                if (isCoreMember && !normalizedMemberInst.toLowerCase().includes('vocal') && !normalizedMemberInst.toLowerCase().includes('gesang')) {
+                  return;
+                }
+
                 const slPart = sl.part_number || 1;
                 const slotKey = `${sl.user_id}_${normalizedMemberInst}_${slPart}`;
                 
                 if (addedSlotKeys.has(slotKey)) return;
                 addedSlotKeys.add(slotKey);
+                addedUserIds.add(sl.user_id);
                 
                 const prof = Array.isArray(sl.profiles) ? sl.profiles[0] : sl.profiles;
                 const skills = schoolSkillsMap[sl.user_id] || [];
@@ -880,27 +890,64 @@ export function TeacherDashboard({
                 });
               });
 
+              // 2. Add core band members who aren't in slots yet
               let instCount: Record<string, number> = {};
               members.forEach((m: any) => {
                 instCount[m.instrument] = Math.max(instCount[m.instrument] || 0, m.part_number || 1);
               });
 
-              const addedUserIds = new Set<string>(members.map(m => m.user_id));
               (b.band_members || []).forEach((bm: any) => {
                 if (addedUserIds.has(bm.user_id)) return;
-                addedUserIds.add(bm.user_id);
                 
                 const prof = bm.profiles ? (Array.isArray(bm.profiles) ? bm.profiles[0] : bm.profiles) : null;
-                const normalizedMemberInst = normalizeInstrument(bm.instrument);
-
                 if (prof) {
-                  const nextPart = (instCount[normalizedMemberInst] || 0) + 1;
-                  instCount[normalizedMemberInst] = nextPart;
-
+                  const normalizedMemberInst = normalizeInstrument(bm.instrument);
                   const skills = schoolSkillsMap[bm.user_id] || [];
+
+                  // Determine which instrument this core member should fill for this song
+                  let targetInstrument = normalizedMemberInst;
+                  const requiredInsts = song.instrumentation || { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 };
+                  
+                  // Helper to check if a specific required instrument slot is already fully filled
+                  const isInstSlotFilled = (instName: string) => {
+                    const normTarget = normalizeInstrument(instName);
+                    const countRequired = requiredInsts[instName] || 0;
+                    const countFilled = members.filter((m: any) => normalizeInstrument(m.instrument) === normTarget).length;
+                    return countFilled >= countRequired;
+                  };
+
+                  // If their core instrument is required by the song and not fully filled yet, use it
+                  const coreInstRequired = Object.keys(requiredInsts).some(ri => normalizeInstrument(ri) === normalizedMemberInst);
+                  const coreInstFilled = isInstSlotFilled(bm.instrument);
+
+                  if (coreInstRequired && !coreInstFilled) {
+                    targetInstrument = normalizedMemberInst;
+                  } else {
+                    // Otherwise, check if they have 100% mastered skills for any of the other required but empty/incomplete slots!
+                    const alternativeInst = Object.keys(requiredInsts).find(ri => {
+                      const normRi = normalizeInstrument(ri);
+                      if (isInstSlotFilled(ri)) return false;
+                      
+                      // Check if they have 100% skill for this instrument
+                      return skills.some((sk: any) => 
+                        sk.song_id === song.id && 
+                        normalizeInstrument(sk.instrument) === normRi && 
+                        (sk.is_stage_ready || (sk.progress_percent || 0) >= 100)
+                      );
+                    });
+                    
+                    if (alternativeInst) {
+                      targetInstrument = normalizeInstrument(alternativeInst);
+                    }
+                  }
+
+                  addedUserIds.add(bm.user_id);
+                  const nextPart = (instCount[targetInstrument] || 0) + 1;
+                  instCount[targetInstrument] = nextPart;
+
                   const isMastered = skills.some((sk: any) => 
                     sk.song_id === song.id && 
-                    normalizeInstrument(sk.instrument) === normalizedMemberInst && 
+                    normalizeInstrument(sk.instrument) === targetInstrument && 
                     (sk.part_number || 1) === nextPart &&
                     (sk.is_stage_ready || (sk.progress_percent || 0) >= 100)
                   );
@@ -912,7 +959,7 @@ export function TeacherDashboard({
                     photo_url: prof.photo_url,
                     created_at: prof.created_at,
                     birth_date: prof.birth_date,
-                    instrument: normalizedMemberInst,
+                    instrument: targetInstrument,
                     part_number: nextPart,
                     isFromBand: true,
                     isMastered
