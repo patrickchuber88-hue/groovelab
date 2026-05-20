@@ -1148,6 +1148,172 @@ if (kioskStationId) {
   window.location.replace(newUrl);
 }
 
+if (typeof window !== 'undefined') {
+  window.alert = (message: string) => {
+    // 1. Remove existing custom alert if any
+    const existing = document.getElementById('apple-alert-root');
+    if (existing) {
+      existing.remove();
+    }
+
+    // 2. Create styling tag if not present
+    if (!document.getElementById('apple-alert-styles')) {
+      const style = document.createElement('style');
+      style.id = 'apple-alert-styles';
+      style.innerHTML = `
+        @keyframes appleAlertFadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes appleAlertScaleIn {
+          from { transform: scale(0.9) translateY(10px); opacity: 0; }
+          to { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .apple-alert-close-btn:hover {
+          background-color: rgba(255, 255, 255, 0.06) !important;
+        }
+        .apple-alert-close-btn:active {
+          background-color: rgba(255, 255, 255, 0.1) !important;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    // 3. Create overlay container
+    const overlay = document.createElement('div');
+    overlay.id = 'apple-alert-root';
+    overlay.style.position = 'fixed';
+    overlay.style.inset = '0';
+    overlay.style.zIndex = '999999';
+    overlay.style.background = 'rgba(0, 0, 0, 0.45)';
+    overlay.style.backdropFilter = 'blur(12px)';
+    overlay.style.setProperty('-webkit-backdrop-filter', 'blur(12px)');
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    overlay.style.opacity = '0';
+    overlay.style.transition = 'opacity 0.25s ease-out';
+    overlay.style.fontFamily = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+
+    // Determine type
+    const msgLower = String(message).toLowerCase();
+    const isError = msgLower.includes('fehler') || msgLower.includes('error') || msgLower.includes('fehlgeschlagen') || msgLower.includes('konnte nicht') || msgLower.includes('deaktiviert') || msgLower.includes('gesperrt');
+    const isSuccess = msgLower.includes('erfolg') || msgLower.includes('erfolgreich') || msgLower.includes('glückwunsch') || msgLower.includes('kopiert') || msgLower.includes('bereit') || msgLower.includes('gespeichert') || msgLower.includes('zurückgesetzt') || msgLower.includes('gelöscht') || msgLower.includes('gesendet') || msgLower.includes('eingereicht') || msgLower.includes('akzeptiert') || msgLower.includes('✅') || msgLower.includes('🎉') || msgLower.includes('🤘') || msgLower.includes('🚀');
+
+    let iconHtml = '';
+    let titleText = 'GrooveLab';
+    if (isError) {
+      titleText = 'Hinweis';
+      iconHtml = `
+        <div style="width: 52px; height: 52px; border-radius: 50%; background: rgba(255, 69, 58, 0.12); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; border: 1px solid rgba(255, 69, 58, 0.2);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ff453a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+        </div>
+      `;
+    } else if (isSuccess) {
+      iconHtml = `
+        <div style="width: 52px; height: 52px; border-radius: 50%; background: rgba(48, 209, 88, 0.12); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; border: 1px solid rgba(48, 209, 88, 0.2);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#30d158" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+        </div>
+      `;
+    } else {
+      iconHtml = `
+        <div style="width: 52px; height: 52px; border-radius: 50%; background: rgba(10, 132, 255, 0.12); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; border: 1px solid rgba(10, 132, 255, 0.2);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+        </div>
+      `;
+    }
+
+    // Create alert box
+    const alertBox = document.createElement('div');
+    alertBox.style.background = 'rgba(28, 28, 30, 0.85)';
+    alertBox.style.backdropFilter = 'blur(25px) saturate(180%)';
+    alertBox.style.setProperty('-webkit-backdrop-filter', 'blur(25px) saturate(180%)');
+    alertBox.style.borderRadius = '16px';
+    alertBox.style.width = '300px';
+    alertBox.style.maxWidth = '85%';
+    alertBox.style.display = 'flex';
+    alertBox.style.flexDirection = 'column';
+    alertBox.style.alignItems = 'center';
+    alertBox.style.overflow = 'hidden';
+    alertBox.style.boxShadow = '0 25px 50px rgba(0, 0, 0, 0.55)';
+    alertBox.style.border = '1px solid rgba(255, 255, 255, 0.12)';
+    alertBox.style.color = 'white';
+    alertBox.style.textAlign = 'center';
+    alertBox.style.transform = 'scale(0.92) translateY(10px)';
+    alertBox.style.transition = 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease-out';
+    alertBox.style.boxSizing = 'border-box';
+
+    // Safe innerHTML
+    const escapedMessage = String(message)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;")
+      .replace(/\n/g, "<br />");
+
+    alertBox.innerHTML = `
+      <div style="padding: 24px 20px 22px; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box;">
+        ${iconHtml}
+        <div style="font-size: 18px; font-weight: 600; letter-spacing: -0.4px; color: white; margin-bottom: 6px;">
+          ${titleText}
+        </div>
+        <div style="font-size: 13.5px; font-weight: 400; color: #e5e5ea; line-height: 1.45; white-space: normal; word-break: break-word;">
+          ${escapedMessage}
+        </div>
+      </div>
+      <button class="apple-alert-close-btn" style="
+        width: 100%;
+        padding: 14px;
+        border-top: 0.5px solid rgba(255, 255, 255, 0.12);
+        background: transparent;
+        border-left: none;
+        border-right: none;
+        border-bottom: none;
+        color: #0a84ff;
+        font-size: 17px;
+        font-weight: 600;
+        cursor: pointer;
+        outline: none;
+        transition: background-color 0.2s;
+        -webkit-tap-highlight-color: transparent;
+        font-family: inherit;
+      ">OK</button>
+    `;
+
+    overlay.appendChild(alertBox);
+    document.body.appendChild(overlay);
+
+    // Trigger animations in next tick
+    setTimeout(() => {
+      overlay.style.opacity = '1';
+      alertBox.style.transform = 'scale(1) translateY(0)';
+    }, 15);
+
+    const closeAlert = () => {
+      overlay.style.opacity = '0';
+      alertBox.style.transform = 'scale(0.92) translateY(10px)';
+      setTimeout(() => {
+        overlay.remove();
+      }, 250);
+    };
+
+    const closeBtn = alertBox.querySelector('.apple-alert-close-btn');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', closeAlert);
+    }
+
+    // Support ESC and ENTER key to close
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' || e.key === 'Enter') {
+        closeAlert();
+        document.removeEventListener('keydown', keyHandler);
+      }
+    };
+    document.addEventListener('keydown', keyHandler);
+  };
+}
+
 function App() {
   const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => sessionStorage.getItem('groovelab_user_id'));
   const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
