@@ -861,7 +861,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             <button 
               onClick={() => {
                 localStorage.removeItem('groovelab_station_id');
-                window.location.reload();
+                const savedKioskRoomId = localStorage.getItem('groovelab_kiosk_room_id');
+                if (savedKioskRoomId) {
+                  window.location.href = `${window.location.origin}${window.location.pathname}?kiosk_room_id=${savedKioskRoomId}`;
+                } else {
+                  window.location.reload();
+                }
               }}
               style={{ background: 'none', border: 'none', color: '#f87171', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', cursor: 'pointer' }}
             >

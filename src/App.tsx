@@ -1167,6 +1167,12 @@ if (kioskStationId) {
   window.location.replace(newUrl);
 }
 
+// Persist kiosk_room_id to localStorage so we can restore it on "Beenden"
+const kioskRoomIdFromUrl = params.get('kiosk_room_id');
+if (kioskRoomIdFromUrl) {
+  localStorage.setItem('groovelab_kiosk_room_id', kioskRoomIdFromUrl);
+}
+
 if (typeof window !== 'undefined') {
   window.alert = (message: string) => {
     // 1. Remove existing custom alert if any
@@ -1336,6 +1342,51 @@ if (typeof window !== 'undefined') {
 function App() {
   const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => sessionStorage.getItem('groovelab_user_id'));
   const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  // Kiosk Room Auto-Bootstrap: when kiosk_room_id is in the URL, automatically resolve
+  // a station ID for that room and go directly to the QR-scanner (LoginScreen),
+  // bypassing the DeviceSetupScreen completely.
+  const [kioskBootstrapping, setKioskBootstrapping] = useState<boolean>(() => {
+    return !!new URLSearchParams(window.location.search).get('kiosk_room_id');
+  });
+
+  useEffect(() => {
+    const kioskRoomId = new URLSearchParams(window.location.search).get('kiosk_room_id');
+    if (!kioskRoomId) return;
+
+    const bootstrap = async () => {
+      try {
+        console.log('[KioskBootstrap] Auto-resolving station for room:', kioskRoomId);
+        // Fetch the first non-teacher station for this room
+        const { data: roomStations } = await supabase
+          .from('stations')
+          .select('id, name')
+          .eq('room_id', kioskRoomId)
+          .order('name');
+
+        if (roomStations && roomStations.length > 0) {
+          // Pick first non-teacher station, or first station as fallback
+          const nonTeacher = roomStations.find((s: any) => !s.name?.toLowerCase().includes('lehrer'));
+          const chosen = nonTeacher || roomStations[0];
+          localStorage.setItem('groovelab_station_id', chosen.id);
+          console.log('[KioskBootstrap] Station set to:', chosen.name, chosen.id);
+        } else {
+          // No stations found – set skip so LoginScreen opens in home mode
+          localStorage.setItem('groovelab_station_id', 'skip');
+          console.warn('[KioskBootstrap] No stations found for room. Falling back to skip.');
+        }
+      } catch (err) {
+        console.error('[KioskBootstrap] Failed to resolve station:', err);
+        localStorage.setItem('groovelab_station_id', 'skip');
+      }
+
+      // Remove kiosk_room_id from URL and reload cleanly → LoginScreen will show
+      const cleanUrl = window.location.origin + window.location.pathname;
+      window.location.replace(cleanUrl);
+    };
+
+    bootstrap();
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -4413,10 +4464,14 @@ function App() {
     );
   }
 
-  // 1.8 KIOSK ROOM SETUP BYPASS
-  const kioskRoomId = new URLSearchParams(window.location.search).get('kiosk_room_id');
-  if (kioskRoomId) {
-    return <DeviceSetupScreen />;
+  // 1.8 KIOSK ROOM AUTO-BOOTSTRAP (show spinner while resolving station)
+  if (kioskBootstrapping) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px' }}>
+        <div className="animate-spin" style={{ width: '32px', height: '32px', border: '3px solid #e2e8f0', borderTopColor: '#eab308', borderRadius: '50%' }}></div>
+        <div style={{ fontSize: '13px', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Kiosk wird gestartet…</div>
+      </div>
+    );
   }
 
   // 2. AUTHENTICATION CHECK
