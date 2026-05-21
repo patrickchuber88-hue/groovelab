@@ -2073,6 +2073,13 @@ function App() {
         return;
       }
 
+      // If we are in initial load and home-mode, check if external vocalist, and adjust tab if needed
+      if (isInitial && isStudent && locationMode === 'home') {
+        const startTab = userData.is_external_vocalist ? 'repertoire' : 'practice';
+        setActiveStudentTab(startTab);
+        localStorage.setItem('groovelab_active_tab', startTab);
+      }
+
       const schoolId = userData.school_id || (Array.isArray(userData.schools) ? userData.schools[0]?.id : userData.schools?.id);
       if (!schoolId) {
         console.warn('[Dashboard] No school_id found. Board will be empty.');
@@ -4227,9 +4234,10 @@ function App() {
     sessionStorage.setItem('groovelab_user_id', userId);
     sessionStorage.setItem('groovelab_location_mode', mode);
 
-    // Always start with the Live Lab after login!
-    setActiveStudentTab('live');
-    localStorage.setItem('groovelab_active_tab', 'live');
+    // Default start tab
+    const startTab = mode === 'home' ? 'practice' : 'live';
+    setActiveStudentTab(startTab);
+    localStorage.setItem('groovelab_active_tab', startTab);
 
     // Immediate Heartbeat on Login (non-blocking for instantaneous login transition!)
     supabase
@@ -4246,8 +4254,9 @@ function App() {
 
   useEffect(() => {
     if (user && !localStorage.getItem('groovelab_active_tab')) {
-      setActiveStudentTab('live');
-      localStorage.setItem('groovelab_active_tab', 'live');
+      const startTab = locationMode === 'home' ? (user.is_external_vocalist ? 'repertoire' : 'practice') : 'live';
+      setActiveStudentTab(startTab);
+      localStorage.setItem('groovelab_active_tab', startTab);
     }
     // Realtime subscription for sessions (Active Student Count)
     const sessionsChannel = supabase
@@ -5054,78 +5063,185 @@ function App() {
             <div className="animation-slide-up" style={{ width: '100%', padding: '0px 48px 48px 48px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', marginTop: '16px' }}>
                 <h1 style={{ fontSize: '2rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.04em', margin: 0 }}>Live Lab</h1>
-                <button 
-                  onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                  style={{
-                    background: 'white',
-                    border: '1.5px solid #e2e8f0',
-                    padding: '8px 16px',
-                    borderRadius: '12px',
-                    fontSize: '0.85rem',
-                    fontWeight: 800,
-                    color: '#475569',
-                    cursor: 'pointer',
+                {locationMode !== 'home' && (
+                  <button 
+                    onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                    style={{
+                      background: 'white',
+                      border: '1.5px solid #e2e8f0',
+                      padding: '8px 16px',
+                      borderRadius: '12px',
+                      fontSize: '0.85rem',
+                      fontWeight: 800,
+                      color: '#475569',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                      transition: 'all 0.15s'
+                    }}
+                    className="hover-scale"
+                  >
+                    {isSidebarCollapsed ? (
+                      <>
+                        <ChevronLeft size={16} /> Sidebar einblenden
+                        {sidebarNotificationsCount > 0 && (
+                          <span style={{
+                            background: '#ef4444',
+                            color: 'white',
+                            fontSize: '0.7rem',
+                            fontWeight: 900,
+                            borderRadius: '10px',
+                            padding: '2px 6px',
+                            minWidth: '16px',
+                            height: '16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '0 2px 8px rgba(239, 68, 68, 0.35)',
+                            animation: 'pulse 1.5s infinite',
+                            marginLeft: '4px'
+                          }}>
+                            {sidebarNotificationsCount}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        Sidebar ausblenden <ChevronRight size={16} />
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+              
+              {locationMode === 'home' ? (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.4) 100%)',
+                  backdropFilter: 'blur(20px)',
+                  border: '1px solid rgba(255, 255, 255, 0.7)',
+                  borderRadius: '32px',
+                  padding: '56px 32px',
+                  textAlign: 'center',
+                  maxWidth: '640px',
+                  margin: '40px auto 0 auto',
+                  boxShadow: '0 20px 50px rgba(15, 23, 42, 0.05)',
+                  boxSizing: 'border-box'
+                }}>
+                  <div style={{
+                    width: '80px',
+                    height: '80px',
+                    borderRadius: '28px',
+                    background: 'rgba(234, 179, 8, 0.1)',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-                    transition: 'all 0.15s'
-                  }}
-                  className="hover-scale"
-                >
-                  {isSidebarCollapsed ? (
-                    <>
-                      <ChevronLeft size={16} /> Sidebar einblenden
-                      {sidebarNotificationsCount > 0 && (
-                        <span style={{
-                          background: '#ef4444',
-                          color: 'white',
-                          fontSize: '0.7rem',
+                    justifyContent: 'center',
+                    marginBottom: '24px',
+                    boxShadow: '0 8px 24px rgba(234, 179, 8, 0.15)',
+                    animation: 'pulse 2s infinite'
+                  }}>
+                    <Lock size={40} color="#eab308" />
+                  </div>
+                  <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', margin: '0 0 12px 0', letterSpacing: '-0.03em', fontFamily: '"Outfit", sans-serif' }}>
+                    Live Lab (Home-Modus)
+                  </h2>
+                  <p style={{ color: '#475569', fontSize: '15px', lineHeight: '1.6', margin: '0 0 32px 0', maxWidth: '480px', fontWeight: 600, fontFamily: '"Inter", sans-serif' }}>
+                    Dein Standort wurde via GPS überprüft: Du bist aktuell außerhalb des GrooveLabs eingeloggt. Das Live-Mischpult, die Raum-Buchungen und das Einbuchen in Live-Proben stehen dir nur vor Ort im GrooveLab zur Verfügung.
+                  </p>
+                  
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    width: '100%',
+                    maxWidth: '320px'
+                  }}>
+                    {!user.is_external_vocalist && (
+                      <button 
+                        onClick={() => {
+                          setActiveStudentTab('practice');
+                          localStorage.setItem('groovelab_active_tab', 'practice');
+                        }}
+                        style={{
+                          background: '#eab308',
+                          color: '#0f172a',
+                          border: 'none',
+                          padding: '14px 24px',
+                          borderRadius: '16px',
                           fontWeight: 900,
-                          borderRadius: '10px',
-                          padding: '2px 6px',
-                          minWidth: '16px',
-                          height: '16px',
+                          fontSize: '14px',
+                          cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          boxShadow: '0 2px 8px rgba(239, 68, 68, 0.35)',
-                          animation: 'pulse 1.5s infinite',
-                          marginLeft: '4px'
-                        }}>
-                          {sidebarNotificationsCount}
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      Sidebar ausblenden <ChevronRight size={16} />
-                    </>
-                  )}
-                </button>
-              </div>
-              <TeacherDashboard 
-                userId={user.id} 
-                hideHeader={true} 
-                viewMode="student" 
-                onTabChange={setActiveStudentTab}
-                isSidebarCollapsed={isSidebarCollapsed}
-                setIsSidebarCollapsed={setIsSidebarCollapsed}
-                onSidebarNotificationsChange={setSidebarNotificationsCount}
-                onFoundBand={(form, mySlot) => {
-                  console.log('[DEBUG-Groovelab] setSuggestingSkill (manual click) in TeacherDashboard onFoundBand');
-                  setSuggestingSkill({
-                    ...mySlot,
-                    isLeader: true,
-                    leaderName: 'Du',
-                    song_id: form.song?.id || form.song_id,
-                    songs: { id: form.song?.id || form.song_id, title: form.song?.title },
-                    formation_group: form.groupKey || form.id,
-                    members: form.members
-                  });
-                  setFoundingName(generateRandomBandName());
-                }}
-              />
+                          gap: '8px',
+                          boxShadow: '0 8px 20px rgba(234, 179, 8, 0.25)',
+                          transition: 'transform 0.2s',
+                          fontFamily: '"Outfit", sans-serif'
+                        }}
+                        className="hover-scale"
+                      >
+                        <Play size={16} fill="#0f172a" />
+                        Übebereich öffnen
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => {
+                        setActiveStudentTab('repertoire');
+                        localStorage.setItem('groovelab_active_tab', 'repertoire');
+                      }}
+                      style={{
+                        background: '#ffffff',
+                        color: '#475569',
+                        border: '1.5px solid #e2e8f0',
+                        padding: '14px 24px',
+                        borderRadius: '16px',
+                        fontWeight: 800,
+                        fontSize: '14px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        transition: 'all 0.15s',
+                        fontFamily: '"Outfit", sans-serif'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Award size={16} />
+                      Mein Repertoire ansehen
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <TeacherDashboard 
+                  userId={user.id} 
+                  hideHeader={true} 
+                  viewMode="student" 
+                  onTabChange={setActiveStudentTab}
+                  isSidebarCollapsed={isSidebarCollapsed}
+                  setIsSidebarCollapsed={setIsSidebarCollapsed}
+                  onSidebarNotificationsChange={setSidebarNotificationsCount}
+                  onFoundBand={(form, mySlot) => {
+                    console.log('[DEBUG-Groovelab] setSuggestingSkill (manual click) in TeacherDashboard onFoundBand');
+                    setSuggestingSkill({
+                      ...mySlot,
+                      isLeader: true,
+                      leaderName: 'Du',
+                      song_id: form.song?.id || form.song_id,
+                      songs: { id: form.song?.id || form.song_id, title: form.song?.title },
+                      formation_group: form.groupKey || form.id,
+                      members: form.members
+                    });
+                    setFoundingName(generateRandomBandName());
+                  }}
+                />
+              )}
             </div>
           </ErrorBoundary>
         )}
