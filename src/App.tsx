@@ -5358,44 +5358,125 @@ function App() {
                 </div>
                 
                 <div style={{ flex: '1', padding: '48px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  {/* Badge row */}
                   <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px' }}>
-                    <span style={{ background: '#f59e0b', color: 'white', padding: '4px 12px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pro Artist</span>
+                    <span style={{
+                      background: (user.role === 'teacher' || user.role === 'admin') ? '#6366f1' : '#f59e0b',
+                      color: 'white', padding: '4px 12px', borderRadius: '8px',
+                      fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em'
+                    }}>
+                      {(user.role === 'teacher' || user.role === 'admin') ? 'Coach' : 'Pro Artist'}
+                    </span>
                     <span style={{ color: '#94a3b8', fontSize: '0.875rem', fontWeight: 700 }}>{user.schools?.name || 'Groovelab Academy'}</span>
                     <span style={{ color: '#94a3b8', fontSize: '0.875rem', fontWeight: 500 }}>• Mitglied seit {new Date(user.created_at).toLocaleDateString()}</span>
 
-                    <div style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', padding: '4px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 950, display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }}>
-                      <Star size={12} fill="white" /> {userSongs.filter(s => s.progress === 100).length * 100} XP
-                    </div>
+                    {/* XP only for students */}
+                    {user.role === 'student' && (
+                      <div style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', padding: '4px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 950, display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }}>
+                        <Star size={12} fill="white" /> {userSongs.filter(s => s.progress === 100).length * 100} XP
+                      </div>
+                    )}
                   </div>
+
                   <h1 style={{ fontSize: '3.5rem', fontWeight: 900, color: '#1e293b', margin: '0 0 16px 0', letterSpacing: '-0.03em' }}>
                     {user.first_name} {user.last_name?.[0]}.
                   </h1>
 
-                  {/* Instrument Master Counters */}
-                  <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
-                    {['Guitar', 'Drums', 'Keys', 'Bass', 'Vocals'].map(inst => {
-                      const count = userSongs.filter(s => {
-                        const sInst = s.instrument?.toLowerCase();
-                        const target = inst.toLowerCase();
-                        let match = false;
-                        if (target === 'guitar') match = sInst === 'guitar' || sInst === 'e-gitarre';
-                        else if (target === 'bass') match = sInst === 'bass' || sInst === 'e-bass';
-                        else if (target === 'drums') match = sInst === 'drums' || sInst === 'e-drums';
-                        else if (target === 'keys') match = sInst === 'keys' || sInst === 'piano' || sInst === 'e-piano';
-                        else if (target === 'vocals') match = sInst === 'vocals' || sInst === 'gesang';
-                        else match = sInst === target;
-                        return match && s.progress === 100;
-                      }).length;
-
-                      return (
-                        <div key={inst} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '8px 14px', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
-                          <span style={{ fontSize: '1.25rem' }}>{APP_INSTRUMENT_ICONS[inst as keyof typeof APP_INSTRUMENT_ICONS] || (inst === 'Vocals' ? '🎤' : '🎵')}</span>
-                          <span style={{ fontSize: '1rem', fontWeight: 900, color: count > 0 ? brandColor : '#94a3b8' }}>{count}</span>
+                  {/* Instrument Icons */}
+                  {(user.role === 'teacher' || user.role === 'admin') ? (
+                    // COACH: show only selected instruments, no count
+                    (() => {
+                      const teacherInstruments = (user.instrument || '')
+                        .split(',')
+                        .map((s: string) => s.trim())
+                        .filter(Boolean);
+                      // Map German names to icon keys
+                      const iconKeyMap: Record<string, string> = {
+                        'Gitarre': 'Guitar', 'Bass': 'Bass', 'Drums': 'Drums',
+                        'Vocals': 'Vocals', 'Piano / Keys': 'Keys'
+                      };
+                      return teacherInstruments.length > 0 ? (
+                        <div style={{ display: 'flex', gap: '10px', marginBottom: '24px', flexWrap: 'wrap' }}>
+                          {teacherInstruments.map((inst: string) => (
+                            <div key={inst} style={{
+                              display: 'flex', alignItems: 'center', gap: '8px',
+                              background: '#f8fafc', padding: '8px 16px', borderRadius: '14px',
+                              border: '1px solid #f1f5f9'
+                            }}>
+                              <span style={{ fontSize: '1.25rem' }}>
+                                {APP_INSTRUMENT_ICONS[iconKeyMap[inst] as keyof typeof APP_INSTRUMENT_ICONS] ||
+                                 APP_INSTRUMENT_ICONS[inst as keyof typeof APP_INSTRUMENT_ICONS] || '🎵'}
+                              </span>
+                              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>{inst}</span>
+                            </div>
+                          ))}
                         </div>
-                      );
-                    })}
-                  </div>
-                  
+                      ) : null;
+                    })()
+                  ) : (
+                    // STUDENT: show instrument challenge counters
+                    <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+                      {['Guitar', 'Drums', 'Keys', 'Bass', 'Vocals'].map(inst => {
+                        const count = userSongs.filter(s => {
+                          const sInst = s.instrument?.toLowerCase();
+                          const target = inst.toLowerCase();
+                          let match = false;
+                          if (target === 'guitar') match = sInst === 'guitar' || sInst === 'e-gitarre';
+                          else if (target === 'bass') match = sInst === 'bass' || sInst === 'e-bass';
+                          else if (target === 'drums') match = sInst === 'drums' || sInst === 'e-drums';
+                          else if (target === 'keys') match = sInst === 'keys' || sInst === 'piano' || sInst === 'e-piano';
+                          else if (target === 'vocals') match = sInst === 'vocals' || sInst === 'gesang';
+                          else match = sInst === target;
+                          return match && s.progress === 100;
+                        }).length;
+                        return (
+                          <div key={inst} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '8px 14px', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
+                            <span style={{ fontSize: '1.25rem' }}>{APP_INSTRUMENT_ICONS[inst as keyof typeof APP_INSTRUMENT_ICONS] || (inst === 'Vocals' ? '🎤' : '🎵')}</span>
+                            <span style={{ fontSize: '1rem', fontWeight: 900, color: count > 0 ? brandColor : '#94a3b8' }}>{count}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* COACH: Profile info cards */}
+                  {(user.role === 'teacher' || user.role === 'admin') && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
+                      {user.bio && (
+                        <div style={{ background: '#f8fafc', borderRadius: '14px', padding: '12px 16px', border: '1px solid #f1f5f9' }}>
+                          <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Werdegang</div>
+                          <div style={{ fontSize: '0.85rem', fontWeight: 500, color: '#475569', lineHeight: 1.5 }}>{user.bio}</div>
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                        {user.expertise && (
+                          <div style={{ background: '#f8fafc', borderRadius: '14px', padding: '10px 14px', border: '1px solid #f1f5f9', flex: 1, minWidth: '140px' }}>
+                            <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>Expertise & Stile</div>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>{user.expertise}</div>
+                          </div>
+                        )}
+                        {user.bands && (
+                          <div style={{ background: '#f8fafc', borderRadius: '14px', padding: '10px 14px', border: '1px solid #f1f5f9', flex: 1, minWidth: '140px' }}>
+                            <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>Bands & Projekte</div>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>{user.bands}</div>
+                          </div>
+                        )}
+                        {user.gear && (
+                          <div style={{ background: '#f8fafc', borderRadius: '14px', padding: '10px 14px', border: '1px solid #f1f5f9', flex: 1, minWidth: '140px' }}>
+                            <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>Equipment</div>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>{user.gear}</div>
+                          </div>
+                        )}
+                        {user.listening && (
+                          <div style={{ background: '#fffbeb', borderRadius: '14px', padding: '10px 14px', border: '1px solid #fef3c7', flex: 1, minWidth: '140px' }}>
+                            <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>🎧 Aktuell im Ohr</div>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#92400e' }}>{user.listening}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <button onClick={() => {
                     setEditingProfile({ ...user });
                     setShowEditProfile(true);
