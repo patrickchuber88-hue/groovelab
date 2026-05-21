@@ -863,7 +863,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 localStorage.removeItem('groovelab_station_id');
                 const savedKioskRoomId = localStorage.getItem('groovelab_kiosk_room_id');
                 if (savedKioskRoomId) {
-                  window.location.href = `${window.location.origin}${window.location.pathname}?kiosk_room_id=${savedKioskRoomId}`;
+                  // Navigate to setup mode → shows DeviceSetupScreen
+                  window.location.href = `${window.location.origin}${window.location.pathname}?kiosk_room_id=${savedKioskRoomId}&kiosk_setup=1`;
                 } else {
                   window.location.reload();
                 }

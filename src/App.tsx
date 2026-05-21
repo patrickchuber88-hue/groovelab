@@ -1343,16 +1343,24 @@ function App() {
   const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => sessionStorage.getItem('groovelab_user_id'));
   const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
 
-  // Kiosk Room Auto-Bootstrap: when kiosk_room_id is in the URL, automatically resolve
-  // a station ID for that room and go directly to the QR-scanner (LoginScreen),
-  // bypassing the DeviceSetupScreen completely.
+  // Kiosk Room Auto-Bootstrap: when kiosk_room_id is in the URL WITHOUT kiosk_setup=1,
+  // automatically resolve a station ID for that room and go directly to the QR-scanner.
+  // When kiosk_setup=1 is present (= came from "Beenden" button), show DeviceSetupScreen instead.
+  const urlParamsForKiosk = new URLSearchParams(window.location.search);
+  const kioskRoomIdParam = urlParamsForKiosk.get('kiosk_room_id');
+  const kioskSetupParam = urlParamsForKiosk.get('kiosk_setup');
+
   const [kioskBootstrapping, setKioskBootstrapping] = useState<boolean>(() => {
-    return !!new URLSearchParams(window.location.search).get('kiosk_room_id');
+    // Only auto-bootstrap if kiosk_room_id is present AND kiosk_setup is NOT set
+    return !!kioskRoomIdParam && kioskSetupParam !== '1';
   });
 
   useEffect(() => {
-    const kioskRoomId = new URLSearchParams(window.location.search).get('kiosk_room_id');
-    if (!kioskRoomId) return;
+    const searchParams = new URLSearchParams(window.location.search);
+    const kioskRoomId = searchParams.get('kiosk_room_id');
+    const isSetupMode = searchParams.get('kiosk_setup') === '1';
+    // Skip auto-bootstrap when setup mode is requested
+    if (!kioskRoomId || isSetupMode) return;
 
     const bootstrap = async () => {
       try {
@@ -4464,7 +4472,12 @@ function App() {
     );
   }
 
-  // 1.8 KIOSK ROOM AUTO-BOOTSTRAP (show spinner while resolving station)
+  // 1.8a KIOSK SETUP MODE: kiosk_room_id + kiosk_setup=1 → show DeviceSetupScreen
+  if (kioskRoomIdParam && kioskSetupParam === '1') {
+    return <DeviceSetupScreen />;
+  }
+
+  // 1.8b KIOSK ROOM AUTO-BOOTSTRAP (show spinner while resolving station)
   if (kioskBootstrapping) {
     return (
       <div style={{ position: 'fixed', inset: 0, background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px' }}>
