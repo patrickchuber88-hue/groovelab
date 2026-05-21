@@ -5495,7 +5495,7 @@ function App() {
                             { id: 'So', key: 'sunday' }
                           ];
 
-                          const activeDays = dayConfigs.filter(d => hours[d.key]?.active);
+                          const activeDays = dayConfigs.filter(d => hours[d.key]?.active !== false);
                           
                           if (activeDays.length === 0) {
                             return <div style={{ textAlign: 'center', padding: '24px', color: '#94a3b8', fontSize: '0.8rem' }}>Keine Öffnungszeiten im Setup hinterlegt.</div>;
@@ -5525,8 +5525,8 @@ function App() {
                                   let maxTime = "00:00";
                                   activeDays.forEach(d => {
                                     const h = hours[d.key];
-                                    if (h?.active && h.start && h.start < minTime) minTime = h.start;
-                                    if (h?.active && h.end && h.end > maxTime) maxTime = h.end;
+                                    if (h?.active !== false && h?.start && h.start < minTime) minTime = h.start;
+                                    if (h?.active !== false && h?.end && h.end > maxTime) maxTime = h.end;
                                   });
 
                                   if (minTime === "23:59") minTime = "16:00";
@@ -5568,7 +5568,7 @@ function App() {
                                           const hasTeacher = teachersInSlot.length > 0;
 
                                           const dayHours = hours[day.key];
-                                          const isOpen = dayHours?.active && time >= dayHours.start && time < dayHours.end;
+                                          const isOpen = (dayHours?.active !== false) && time >= (dayHours?.start || '08:00') && time < (dayHours?.end || '20:00');
 
                                           let bgColor = 'white';
                                           let textColor = '#64748b';
@@ -5955,7 +5955,7 @@ function App() {
                             { id: 'So', key: 'sunday' }
                           ];
 
-                          const activeDays = dayConfigs.filter(d => hours[d.key]?.active);
+                          const activeDays = dayConfigs.filter(d => hours[d.key]?.active !== false);
                           
                           if (activeDays.length === 0) {
                             return <div style={{ textAlign: 'center', padding: '24px', color: '#94a3b8', fontSize: '0.8rem' }}>Keine Öffnungszeiten im Setup hinterlegt.</div>;
@@ -5985,8 +5985,8 @@ function App() {
                                   let maxTime = "00:00";
                                   activeDays.forEach(d => {
                                     const h = hours[d.key];
-                                    if (h?.active && h.start && h.start < minTime) minTime = h.start;
-                                    if (h?.active && h.end && h.end > maxTime) maxTime = h.end;
+                                    if (h?.active !== false && h?.start && h.start < minTime) minTime = h.start;
+                                    if (h?.active !== false && h?.end && h.end > maxTime) maxTime = h.end;
                                   });
 
                                   if (minTime === "23:59") minTime = "16:00";
