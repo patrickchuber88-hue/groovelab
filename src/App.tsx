@@ -5757,7 +5757,7 @@ function App() {
                                       <span style={{ fontSize: '1.1rem' }}>👨‍🏫</span>
                                       Anwesende Coaches diese Woche:
                                     </h4>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                                       {Object.entries(groupedPresences).map(([teacherName, presList]) => {
                                         const isPatrick = teacherName.toLowerCase().includes('patrick');
                                         const isBoris = teacherName.toLowerCase().includes('boris');
@@ -5765,24 +5765,25 @@ function App() {
                                         return (
                                           <div key={teacherName} style={{ 
                                             display: 'flex', 
-                                            flexDirection: 'column', 
-                                            gap: '6px', 
+                                            alignItems: 'center',
+                                            flexWrap: 'wrap',
+                                            gap: '6px',
                                             background: '#f8fafc', 
                                             border: '1px solid #f1f5f9', 
-                                            padding: '12px 16px', 
-                                            borderRadius: '16px' 
+                                            padding: '7px 12px', 
+                                            borderRadius: '12px' 
                                           }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: dotColor, flexShrink: 0 }}></div>
-                                              <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#1e293b' }}>{teacherName}</span>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+                                              <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: dotColor }}></div>
+                                              <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#1e293b' }}>{teacherName}</span>
                                             </div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '16px' }}>
-                                              {presList.map((pres, idx) => (
-                                                <div key={idx} style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569' }}>
-                                                  Mögliche Bandprobe: <span style={{ fontWeight: 800, color: '#1e293b' }}>{pres.day}. {pres.rangeStr}</span>
-                                                </div>
-                                              ))}
-                                            </div>
+                                            <span style={{ color: '#cbd5e1', fontSize: '0.7rem' }}>·</span>
+                                            {(presList as any[]).map((pres: any, idx: number) => (
+                                              <span key={idx} style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>
+                                                {idx > 0 && <span style={{ color: '#cbd5e1', marginRight: '4px' }}>·</span>}
+                                                <span style={{ fontWeight: 800, color: '#1e293b' }}>{pres.day}.</span> {pres.rangeStr}
+                                              </span>
+                                            ))}
                                           </div>
                                         );
                                       })}
@@ -6221,7 +6222,7 @@ function App() {
                                       <span style={{ fontSize: '1.1rem' }}>👨‍🏫</span>
                                       Anwesende Coaches diese Woche:
                                     </h4>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                                       {Object.entries(groupedPresences).map(([teacherName, presList]) => {
                                         const isPatrick = teacherName.toLowerCase().includes('patrick');
                                         const isBoris = teacherName.toLowerCase().includes('boris');
@@ -6229,24 +6230,25 @@ function App() {
                                         return (
                                           <div key={teacherName} style={{ 
                                             display: 'flex', 
-                                            flexDirection: 'column', 
-                                            gap: '6px', 
+                                            alignItems: 'center',
+                                            flexWrap: 'wrap',
+                                            gap: '6px',
                                             background: '#f8fafc', 
                                             border: '1px solid #f1f5f9', 
-                                            padding: '12px 16px', 
-                                            borderRadius: '16px' 
+                                            padding: '7px 12px', 
+                                            borderRadius: '12px' 
                                           }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: dotColor, flexShrink: 0 }}></div>
-                                              <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#1e293b' }}>{teacherName}</span>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+                                              <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: dotColor }}></div>
+                                              <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#1e293b' }}>{teacherName}</span>
                                             </div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '16px' }}>
-                                              {presList.map((pres, idx) => (
-                                                <div key={idx} style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569' }}>
-                                                  Mögliche Bandprobe: <span style={{ fontWeight: 800, color: '#1e293b' }}>{pres.day}. {pres.rangeStr}</span>
-                                                </div>
-                                              ))}
-                                            </div>
+                                            <span style={{ color: '#cbd5e1', fontSize: '0.7rem' }}>·</span>
+                                            {(presList as any[]).map((pres: any, idx: number) => (
+                                              <span key={idx} style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>
+                                                {idx > 0 && <span style={{ color: '#cbd5e1', marginRight: '4px' }}>·</span>}
+                                                <span style={{ fontWeight: 800, color: '#1e293b' }}>{pres.day}.</span> {pres.rangeStr}
+                                              </span>
+                                            ))}
                                           </div>
                                         );
                                       })}
