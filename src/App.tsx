@@ -204,7 +204,10 @@ const generateRandomBandName = () => {
 
 const getRoleColor = (role: string, stationName?: string) => {
   const r = role?.toLowerCase();
-  if (r === 'teacher' || r === 'admin') return '#22c55e'; // Green
+  if (r === 'teacher' || r === 'admin') {
+    if (!stationName) return '#64748b'; // Gray for teachers in Home/no station mode
+    return '#22c55e'; // Green when checked in at a station
+  }
   if (!stationName) return '#64748b'; // Default gray
   
   const match = stationName.match(/\d+/);
@@ -2035,11 +2038,15 @@ function App() {
     };
   }, [session?.id, user?.role]);
 
-  // Periodic Geolocation Check (Auto Checkout if outside Geofence) - Bypassed per user request
+  // Periodic Geolocation Check (Auto Checkout if outside Geofence)
   useEffect(() => {
-    // Always bypass geofence checks
-    console.log('[Geofence Monitor] Geofence check bypassed per user request.');
-    return;
+    const schoolData = Array.isArray(user?.schools) ? user.schools[0] : user?.schools;
+    const bypassGeofence = schoolData?.opening_hours?.geofence_bypass === true;
+
+    if (bypassGeofence) {
+      console.log('[Geofence Monitor] Geofence check bypassed per academy settings.');
+      return;
+    }
 
     const checkGeofence = async () => {
       console.log('[Geofence Monitor] Verifying student physical location...');
@@ -5121,7 +5128,7 @@ function App() {
               }}>
                 <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'white' }}></div>
                 <span style={{ color: 'white', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  {(user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'teacher') ? (session?.stations?.name || 'Coach Modus') : (locationMode === 'lab' ? `Labor (${session?.stations?.name || 'iPad'})` : 'Home')}
+                  {(user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'teacher') ? (session?.stations?.name || 'Home') : (locationMode === 'lab' ? `Labor (${session?.stations?.name || 'iPad'})` : 'Home')}
                 </span>
               </div>
 

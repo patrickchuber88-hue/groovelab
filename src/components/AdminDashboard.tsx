@@ -5890,6 +5890,24 @@ function DeviceSetupScreen({
     }
   }, [rooms, selectedRoomId]);
 
+  useEffect(() => {
+    if (school) {
+      setName(school.name || '');
+      setLat(school.latitude?.toString() || '');
+      setLng(school.longitude?.toString() || '');
+      setRadius(school.geofence_radius_meters?.toString() || '100');
+      setHours(school.opening_hours || {
+        monday: { start: '08:00', end: '20:00', active: true },
+        tuesday: { start: '08:00', end: '20:00', active: true },
+        wednesday: { start: '08:00', end: '20:00', active: true },
+        thursday: { start: '08:00', end: '20:00', active: true },
+        friday: { start: '08:00', end: '20:00', active: true },
+        saturday: { start: '10:00', end: '16:00', active: false },
+        sunday: { start: '10:00', end: '16:00', active: false }
+      });
+    }
+  }, [school]);
+
   const days = [
     { id: 'monday', label: 'Montag' },
     { id: 'tuesday', label: 'Dienstag' },
@@ -6549,6 +6567,42 @@ function DeviceSetupScreen({
                 >
                   <div style={{ fontWeight: 800, fontSize: '0.85rem', color: hours.enforce_hours === false ? brandColor : '#1e293b', marginBottom: '2px' }}>Flexible Öffnungszeiten</div>
                   <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Labor-Login mit Geotracking AUCH außerhalb der Öffnungszeiten erlaubt.</div>
+                </button>
+              </div>
+
+              <div style={{ height: '1px', background: '#e2e8f0', margin: '16px 0' }} />
+
+              <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '10px' }}>Geofencing (Standort-Prüfung)</label>
+              <div style={{ display: 'flex', gap: '16px' }}>
+                <button 
+                  onClick={() => setHours({ ...hours, geofence_bypass: false })}
+                  style={{ 
+                    flex: 1,
+                    padding: '12px',
+                    borderRadius: '12px',
+                    border: `2px solid ${hours.geofence_bypass !== true ? brandColor : '#e2e8f0'}`,
+                    background: hours.geofence_bypass !== true ? `${brandColor}05` : 'white',
+                    cursor: 'pointer',
+                    textAlign: 'left'
+                  }}
+                >
+                  <div style={{ fontWeight: 800, fontSize: '0.85rem', color: hours.geofence_bypass !== true ? brandColor : '#1e293b', marginBottom: '2px' }}>Geofencing Aktivieren (Standard)</div>
+                  <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Beim Login wird der Standort des Geräts abgefragt. Nur wenn der Standort des Geräts und der des Groove Lab Raums übereinstimmen, wird er im Live Lab eingeloggt und sichtbar.</div>
+                </button>
+                <button 
+                  onClick={() => setHours({ ...hours, geofence_bypass: true })}
+                  style={{ 
+                    flex: 1,
+                    padding: '12px',
+                    borderRadius: '12px',
+                    border: `2px solid ${hours.geofence_bypass === true ? brandColor : '#e2e8f0'}`,
+                    background: hours.geofence_bypass === true ? `${brandColor}05` : 'white',
+                    cursor: 'pointer',
+                    textAlign: 'left'
+                  }}
+                >
+                  <div style={{ fontWeight: 800, fontSize: '0.85rem', color: hours.geofence_bypass === true ? brandColor : '#1e293b', marginBottom: '2px' }}>Geofencing Ausschalten (Bypass)</div>
+                  <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Jeder Login führt direkt ins Live Lab. Die Standortabfrage wird komplett übersprungen.</div>
                 </button>
               </div>
             </div>

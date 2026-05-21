@@ -319,9 +319,86 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         user.school_id = schoolData.id;
       }
 
-      // 2. Geofence Check (Simpel & Stabil) - Bypassed per user request
+      // 2. Geofence Check (Simpel & Stabil)
       let isWithinAnyRoom = true;
-      console.log('[Login] Geofence check bypassed.');
+      const isBypass = schoolData?.opening_hours?.geofence_bypass === true;
+
+      if (!isBypass) {
+        isWithinAnyRoom = false;
+        console.log('[Login] Geofence check active. Fetching current location...');
+        
+        let currentPos = userPos;
+        if (!currentPos && navigator.geolocation) {
+          try {
+            currentPos = await new Promise<{lat: number, lng: number}>((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(
+                (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                (err) => reject(err),
+                { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 }
+              );
+            });
+            setUserPos(currentPos);
+          } catch (e) {
+            console.warn('[Login] Geolocation fetch during scan failed:', e);
+          }
+        }
+
+        if (currentPos) {
+          // 1. Check Rooms (Multi-Point)
+          const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', user.school_id);
+          if (rooms) {
+            for (const room of rooms) {
+              const points = Array.isArray(room.geofence_points) ? room.geofence_points : [];
+              const allCoords = [...points];
+              if (room.latitude && room.longitude) allCoords.push({ lat: room.latitude, lng: room.longitude });
+              
+              for (const pt of allCoords) {
+                if (pt && pt.lat && pt.lng) {
+                  const dist = getDistanceFromLatLonInM(currentPos.lat, currentPos.lng, Number(pt.lat), Number(pt.lng));
+                  if (dist < 100) { 
+                    isWithinAnyRoom = true;
+                    break;
+                  }
+                }
+              }
+              if (isWithinAnyRoom) break;
+            }
+          }
+
+          // 2. School Fallback (Single Point + Radius)
+          if (!isWithinAnyRoom && schoolData?.latitude && schoolData?.longitude) {
+            const distToSchool = getDistanceFromLatLonInM(
+              currentPos.lat, currentPos.lng, 
+              Number(schoolData.latitude), Number(schoolData.longitude)
+            );
+            const radius = schoolData.geofence_radius_meters || 150;
+            if (distToSchool < radius) {
+              isWithinAnyRoom = true;
+            }
+          }
+        } else {
+          console.warn('[Login] Geofence check failed because user position could not be acquired.');
+        }
+
+        setGeoDebug({
+          isWithinAnyRoom,
+          userPos: currentPos,
+          schoolCoords: schoolData ? { lat: schoolData.latitude, lng: schoolData.longitude } : null,
+          distToSchool: (currentPos && schoolData?.latitude && schoolData?.longitude)
+            ? Math.round(getDistanceFromLatLonInM(currentPos.lat, currentPos.lng, Number(schoolData.latitude), Number(schoolData.longitude)))
+            : null,
+          withinHours: true
+        });
+      } else {
+        console.log('[Login] Geofence check bypassed per academy settings.');
+        setGeoDebug({
+          isWithinAnyRoom: true,
+          userPos: null,
+          schoolCoords: schoolData ? { lat: schoolData.latitude, lng: schoolData.longitude } : null,
+          distToSchool: null,
+          withinHours: true
+        });
+      }
 
       console.log(`[Login] Scan successful. Geofence match: ${isWithinAnyRoom}`);
       
