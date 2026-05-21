@@ -5864,7 +5864,7 @@ function DeviceSetupScreen({
   onCleanupPlanning: () => void,
   onResetPlanning: () => void
 }) {
-  const [activeSubTab, setActiveSubTab] = useState<'academy' | 'device' | 'maintenance'>('device');
+  const [activeSubTab, setActiveSubTab] = useState<'academy' | 'device' | 'maintenance'>('academy');
   const [selectedRoomId, setSelectedRoomId] = useState(() => rooms[0]?.id || '');
   const [bookingStationId, setBookingStationId] = useState<string | null>(null);
 
@@ -6506,32 +6506,114 @@ function DeviceSetupScreen({
 
             <div>
               <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '12px' }}>Öffnungszeiten</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '600px' }}>
-                {days.map(day => (
-                  <div key={day.id} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 1fr 100px', alignItems: 'center', gap: '12px', padding: '8px 12px', background: hours[day.id]?.active ? '#f8fafc' : 'transparent', borderRadius: '10px', opacity: hours[day.id]?.active ? 1 : 0.5 }}>
-                    <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.85rem' }}>{day.label}</div>
-                    <input 
-                      type="time" 
-                      value={hours[day.id]?.start || '08:00'} 
-                      disabled={!hours[day.id]?.active}
-                      onChange={e => setHours({...hours, [day.id]: {...(hours[day.id] || {}), start: e.target.value}})}
-                      style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600, fontSize: '0.85rem' }}
-                    />
-                    <input 
-                      type="time" 
-                      value={hours[day.id]?.end || '20:00'} 
-                      disabled={!hours[day.id]?.active}
-                      onChange={e => setHours({...hours, [day.id]: {...(hours[day.id] || {}), end: e.target.value}})}
-                      style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600, fontSize: '0.85rem' }}
-                    />
-                    <button 
-                      onClick={() => setHours({...hours, [day.id]: {...(hours[day.id] || {}), active: !hours[day.id]?.active}})}
-                      style={{ padding: '6px', borderRadius: '8px', border: 'none', background: hours[day.id]?.active ? '#fee2e2' : '#dcfce7', color: hours[day.id]?.active ? '#ef4444' : '#10b981', fontWeight: 800, fontSize: '0.65rem', cursor: 'pointer' }}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', maxWidth: '640px' }}>
+                {days.map((day, idx) => {
+                  const isActive = hours[day.id]?.active !== false; // default open
+                  return (
+                    <div
+                      key={day.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0',
+                        padding: '13px 16px',
+                        background: idx % 2 === 0 ? '#f8fafc' : 'white',
+                        borderRadius: idx === 0 ? '14px 14px 0 0' : idx === days.length - 1 ? '0 0 14px 14px' : '0',
+                        borderBottom: idx < days.length - 1 ? '1px solid #f1f5f9' : 'none',
+                        opacity: isActive ? 1 : 0.55,
+                        transition: 'opacity 0.2s'
+                      }}
                     >
-                      {hours[day.id]?.active ? 'GESCHL.' : 'OFFEN'}
-                    </button>
-                  </div>
-                ))}
+                      {/* Day label */}
+                      <div style={{ width: '110px', fontWeight: 700, color: '#1e293b', fontSize: '0.88rem', flexShrink: 0 }}>{day.label}</div>
+
+                      {/* Time inputs */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                        <input
+                          type="time"
+                          value={hours[day.id]?.start || '08:00'}
+                          disabled={!isActive}
+                          onChange={e => setHours({...hours, [day.id]: {...(hours[day.id] || {}), active: isActive, start: e.target.value}})}
+                          style={{
+                            padding: '6px 10px',
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0',
+                            background: isActive ? 'white' : '#f8fafc',
+                            fontWeight: 600,
+                            fontSize: '0.85rem',
+                            color: isActive ? '#1e293b' : '#94a3b8',
+                            cursor: isActive ? 'text' : 'not-allowed',
+                            outline: 'none',
+                            width: '100px'
+                          }}
+                        />
+                        <span style={{ color: '#94a3b8', fontWeight: 600, fontSize: '0.8rem' }}>–</span>
+                        <input
+                          type="time"
+                          value={hours[day.id]?.end || '20:00'}
+                          disabled={!isActive}
+                          onChange={e => setHours({...hours, [day.id]: {...(hours[day.id] || {}), active: isActive, end: e.target.value}})}
+                          style={{
+                            padding: '6px 10px',
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0',
+                            background: isActive ? 'white' : '#f8fafc',
+                            fontWeight: 600,
+                            fontSize: '0.85rem',
+                            color: isActive ? '#1e293b' : '#94a3b8',
+                            cursor: isActive ? 'text' : 'not-allowed',
+                            outline: 'none',
+                            width: '100px'
+                          }}
+                        />
+                      </div>
+
+                      {/* Apple-style pill toggle */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                        <span style={{
+                          fontSize: '0.7rem',
+                          fontWeight: 800,
+                          letterSpacing: '0.05em',
+                          color: isActive ? '#16a34a' : '#ef4444',
+                          minWidth: '42px',
+                          textAlign: 'right'
+                        }}>
+                          {isActive ? 'OFFEN' : 'ZU'}
+                        </span>
+                        <button
+                          onClick={() => setHours({...hours, [day.id]: {...(hours[day.id] || {}), active: !isActive, start: hours[day.id]?.start || '08:00', end: hours[day.id]?.end || '20:00'}})}
+                          style={{
+                            position: 'relative',
+                            width: '44px',
+                            height: '26px',
+                            borderRadius: '13px',
+                            border: 'none',
+                            background: isActive ? '#22c55e' : '#e2e8f0',
+                            cursor: 'pointer',
+                            transition: 'background 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                            flexShrink: 0,
+                            padding: 0,
+                            outline: 'none',
+                            boxShadow: isActive ? '0 0 0 2px #bbf7d0' : 'none'
+                          }}
+                          aria-label={isActive ? 'Tag schließen' : 'Tag öffnen'}
+                        >
+                          <div style={{
+                            position: 'absolute',
+                            top: '3px',
+                            left: isActive ? '21px' : '3px',
+                            width: '20px',
+                            height: '20px',
+                            borderRadius: '50%',
+                            background: 'white',
+                            boxShadow: '0 1px 4px rgba(0,0,0,0.18)',
+                            transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+                          }} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
