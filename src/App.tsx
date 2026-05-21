@@ -2035,6 +2035,133 @@ function App() {
     };
   }, [session?.id, user?.role]);
 
+  // Periodic Geolocation Check (Auto Checkout if outside Geofence) - Bypassed per user request
+  useEffect(() => {
+    // Always bypass geofence checks
+    console.log('[Geofence Monitor] Geofence check bypassed per user request.');
+    return;
+
+    const checkGeofence = async () => {
+      console.log('[Geofence Monitor] Verifying student physical location...');
+      if (!navigator.geolocation) {
+        console.warn('[Geofence Monitor] Geolocation is not supported by this browser.');
+        return;
+      }
+
+      const downgradeToHome = async () => {
+        console.log('[Geofence Monitor] Student is outside or GPS failed. Downgrading to home mode.');
+        const now = new Date().toISOString();
+        
+        try {
+          if (session?.id) {
+            await supabase
+              .from('sessions')
+              .update({ check_out_time: now })
+              .eq('id', session.id);
+          } else {
+            await supabase
+              .from('sessions')
+              .update({ check_out_time: now })
+              .eq('user_id', user.id)
+              .is('check_out_time', null);
+          }
+        } catch (dbErr) {
+          console.error('[Geofence Monitor] Failed to check out session in DB:', dbErr);
+        }
+
+        setSession(null);
+        setLocationMode('home');
+        sessionStorage.setItem('groovelab_location_mode', 'home');
+
+        const targetTab = user.is_external_vocalist ? 'repertoire' : 'practice';
+        setActiveStudentTab(targetTab);
+        localStorage.setItem('groovelab_active_tab', targetTab);
+
+        alert("Du hast das GrooveLab verlassen. Deine Sitzung wurde automatisch beendet und du bist nun im Home-Modus.");
+      };
+
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const userPos = { lat: position.coords.latitude, lng: position.coords.longitude };
+          console.log(`[Geofence Monitor] Position: ${userPos.lat}, ${userPos.lng}`);
+
+          let isWithinAnyRoom = false;
+          const schoolData = Array.isArray(user.schools) ? user.schools[0] : user.schools;
+          const schoolId = user.school_id || schoolData?.id;
+
+          if (!schoolId) {
+            console.warn('[Geofence Monitor] No school ID associated with the user.');
+            return;
+          }
+
+          try {
+            // 1. Check Rooms (Multi-Point)
+            const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', schoolId);
+            if (rooms) {
+              for (const room of rooms) {
+                const points = Array.isArray(room.geofence_points) ? room.geofence_points : [];
+                const allCoords = [...points];
+                if (room.latitude && room.longitude) allCoords.push({ lat: room.latitude, lng: room.longitude });
+                
+                for (const pt of allCoords) {
+                  if (pt && pt.lat && pt.lng) {
+                    const dist = getDistanceFromLatLonInM(userPos.lat, userPos.lng, Number(pt.lat), Number(pt.lng));
+                    if (dist < 100) { 
+                      isWithinAnyRoom = true;
+                      break;
+                    }
+                  }
+                }
+                if (isWithinAnyRoom) break;
+              }
+            }
+
+            // 2. School Fallback (Single Point + Radius)
+            if (!isWithinAnyRoom && schoolData?.latitude && schoolData?.longitude) {
+              const distToSchool = getDistanceFromLatLonInM(
+                userPos.lat, userPos.lng, 
+                Number(schoolData.latitude), Number(schoolData.longitude)
+              );
+              const radius = schoolData.geofence_radius_meters || 150;
+              if (distToSchool < radius) {
+                isWithinAnyRoom = true;
+              }
+            }
+
+            if (!isWithinAnyRoom) {
+              await downgradeToHome();
+            } else {
+              console.log('[Geofence Monitor] Geofence verified successfully.');
+            }
+          } catch (err) {
+            console.error('[Geofence Monitor] Error during geofence verification:', err);
+          }
+        },
+        async (error) => {
+          console.warn('[Geofence Monitor] Geolocation access failed or timed out:', error.message);
+          await downgradeToHome();
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      );
+    };
+
+    checkGeofence();
+
+    const interval = setInterval(checkGeofence, 60000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkGeofence();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [loggedInUserId, user, locationMode, session?.id, isKioskMode]);
+
   const fetchDashboardData = async (userId: string, isInitial: boolean = false) => {
     try {
       if (isInitial) setLoading(true);
@@ -2559,7 +2686,8 @@ function App() {
                 
                 const isInstSlotFilled = (instName: string) => {
                   const normTarget = normalizeInstrument(instName);
-                  const countRequired = requiredInsts[instName] || 0;
+                  const matchingKey = Object.keys(requiredInsts).find(k => normalizeInstrument(k) === normTarget);
+                  const countRequired = matchingKey ? requiredInsts[matchingKey] : 0;
                   const countFilled = members.filter((m: any) => normalizeInstrument(m.instrument) === normTarget).length;
                   return countFilled >= countRequired;
                 };

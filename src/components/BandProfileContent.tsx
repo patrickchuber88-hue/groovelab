@@ -231,7 +231,8 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
 
         const isInstSlotFilled = (instName: string) => {
           const normTarget = normalize(instName);
-          const countRequired = requiredInsts[instName] || 0;
+          const matchingKey = Object.keys(requiredInsts).find(k => normalize(k) === normTarget);
+          const countRequired = matchingKey ? requiredInsts[matchingKey] : 0;
           const countFilled = membersList.filter((m: any) => normalize(m.instrument) === normTarget).length;
           return countFilled >= countRequired;
         };

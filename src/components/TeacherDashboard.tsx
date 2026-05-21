@@ -29,6 +29,15 @@ const normalizeInstrument = (name: string) => {
   if (n.includes('vocals') || n.includes('gesang')) return 'Vocals';
   return name;
 };
+
+const getNormalizedRequiredInsts = (insts: Record<string, number> | null | undefined) => {
+  const normalized: Record<string, number> = {};
+  if (!insts) return normalized;
+  Object.entries(insts).forEach(([key, val]) => {
+    normalized[normalizeInstrument(key)] = val;
+  });
+  return normalized;
+};
 const renderBandAvatar = (name: string, photoUrl?: string | null, size: string = '64px', borderRadius: string = '18px') => {
   if (photoUrl) {
     return (
@@ -697,7 +706,8 @@ export function TeacherDashboard({
               
               const isInstSlotFilled = (instName: string) => {
                 const normTarget = normalizeInstrument(instName);
-                const countRequired = requiredInsts[instName] || 0;
+                const matchingKey = Object.keys(requiredInsts).find(k => normalizeInstrument(k) === normTarget);
+                const countRequired = matchingKey ? requiredInsts[matchingKey] : 0;
                 const countFilled = membersList.filter((m: any) => normalizeInstrument(m.instrument) === normTarget).length;
                 return countFilled >= countRequired;
               };
@@ -911,7 +921,8 @@ export function TeacherDashboard({
                   // Helper to check if a specific required instrument slot is already fully filled
                   const isInstSlotFilled = (instName: string) => {
                     const normTarget = normalizeInstrument(instName);
-                    const countRequired = requiredInsts[instName] || 0;
+                    const matchingKey = Object.keys(requiredInsts).find(k => normalizeInstrument(k) === normTarget);
+                    const countRequired = matchingKey ? requiredInsts[matchingKey] : 0;
                     const countFilled = members.filter((m: any) => normalizeInstrument(m.instrument) === normTarget).length;
                     return countFilled >= countRequired;
                   };
@@ -1053,7 +1064,8 @@ export function TeacherDashboard({
                 // Helper to check if a specific required instrument slot is already fully filled
                 const isInstSlotFilled = (instName: string) => {
                   const normTarget = normalizeInstrument(instName);
-                  const countRequired = requiredInsts[instName] || 0;
+                  const matchingKey = Object.keys(requiredInsts).find(k => normalizeInstrument(k) === normTarget);
+                  const countRequired = matchingKey ? requiredInsts[matchingKey] : 0;
                   const countFilled = members.filter((m: any) => normalizeInstrument(m.instrument) === normTarget).length;
                   return countFilled >= countRequired;
                 };
