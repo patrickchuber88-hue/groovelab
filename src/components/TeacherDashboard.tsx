@@ -1469,7 +1469,7 @@ export function TeacherDashboard({
     <div style={{ padding: hideHeader ? '0' : '20px 40px', width: '100%', maxWidth: '1800px', margin: '0 auto', background: hideHeader ? 'transparent' : '#f8fafc', minHeight: '100vh' }}>
       
       {/* Trial Banner */}
-      {school?.is_trial && trialDaysLeft !== null && (
+      {viewMode !== 'student' && school?.is_trial && trialDaysLeft !== null && (
         <div style={{
           background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
           color: '#fffbeb',
