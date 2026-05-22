@@ -1623,7 +1623,14 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
               </div>
 
               {/* RIGHT: Sidebar with Shoutbox and Wochenplaner */}
-              <aside style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+              <aside style={{ 
+                display: (width < 1200 && width >= 640) ? 'grid' : 'flex',
+                gridTemplateColumns: (width < 1200 && width >= 640) ? '1fr 1fr' : undefined,
+                flexDirection: (width < 1200 && width >= 640) ? undefined : 'column',
+                gap: '32px',
+                width: '100%',
+                alignItems: 'start'
+              }}>
                 {/* Shoutbox */}
                 <div style={{ ...widgetStyle, display: 'flex', flexDirection: 'column', height: '400px', padding: '24px' }}>
                   <h4 style={{ ...widgetHeaderStyle, fontSize: '0.8rem' }}><Zap size={16} /> Shoutbox <span style={{ opacity: 0.5, fontWeight: 700, fontSize: '0.65rem', marginLeft: '4px' }}>(Mitglieder)</span></h4>

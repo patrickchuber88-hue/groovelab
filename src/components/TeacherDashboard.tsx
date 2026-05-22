@@ -1810,15 +1810,32 @@ export function TeacherDashboard({
                   <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '24px', justifyContent: 'center', width: '100%', position: 'relative' }}>
                     {/* Scaled room blueprint to fit parent width and height without scrolling or overlaps */}
                     <div 
+                      className="blueprint-viewport"
                       style={{ 
-                        width: `${boundWidth * scale}px`,
-                        height: `${boundHeight * scale}px`,
-                        position: 'relative', 
-                        overflow: 'hidden',
+                        flex: 1, 
+                        maxWidth: '100%', 
+                        height: `${maxH}px`, 
+                        overflow: 'auto', 
+                        background: 'rgba(15, 23, 42, 0.01)', 
+                        border: '1.5px dashed rgba(99, 102, 241, 0.15)', 
+                        borderRadius: '24px', 
+                        display: 'flex', 
+                        boxSizing: 'border-box', 
+                        padding: '16px' 
                       }}
                     >
-                      {/* Visual Blueprint Canvas */}
-                      <div style={{
+                      <div 
+                        style={{ 
+                          width: `${boundWidth * scale}px`,
+                          height: `${boundHeight * scale}px`,
+                          position: 'relative', 
+                          overflow: 'hidden',
+                          flexShrink: 0,
+                          margin: 'auto'
+                        }}
+                      >
+                        {/* Visual Blueprint Canvas */}
+                        <div style={{
                         position: 'absolute',
                         left: 0,
                         top: 0,
@@ -1893,22 +1910,25 @@ export function TeacherDashboard({
                         })}
                       </div>
                     </div>
+                    </div>
 
                     {/* Vertical Zoom Control Panel */}
                     <div style={{
+                      position: 'absolute',
+                      right: '16px',
+                      top: '16px',
+                      zIndex: 100,
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
                       gap: '12px',
-                      background: 'rgba(255, 255, 255, 0.45)',
+                      background: 'rgba(255, 255, 255, 0.85)',
                       backdropFilter: 'blur(20px)',
                       WebkitBackdropFilter: 'blur(20px)',
                       border: '1px solid rgba(255, 255, 255, 0.6)',
                       borderRadius: '24px',
                       padding: '16px 12px',
                       boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)',
-                      height: '240px',
-                      justifyContent: 'space-between',
                       width: '64px',
                       flexShrink: 0
                     }}>
@@ -1934,30 +1954,6 @@ export function TeacherDashboard({
                         <ZoomIn size={18} />
                       </button>
 
-                      <div style={{ height: '110px', display: 'flex', justifyContent: 'center', position: 'relative', width: '100%' }}>
-                        <input 
-                          type="range"
-                          min="0.4"
-                          max="2.5"
-                          step="0.05"
-                          value={zoomFactor}
-                          onChange={(e) => handleZoomChange(parseFloat(e.target.value))}
-                          style={{
-                            writingMode: 'vertical-lr',
-                            WebkitAppearance: 'slider-vertical',
-                            width: '12px',
-                            height: '100px',
-                            cursor: 'ns-resize',
-                            accentColor: '#6366f1',
-                            background: 'rgba(99, 102, 241, 0.1)',
-                            borderRadius: '6px',
-                            outline: 'none',
-                            margin: 0,
-                            padding: 0
-                          }}
-                        />
-                      </div>
-
                       <button 
                         onClick={() => handleZoomChange(Math.max(0.4, zoomFactor - 0.1))}
                         style={{
@@ -1980,7 +1976,7 @@ export function TeacherDashboard({
                         <ZoomOut size={18} />
                       </button>
 
-                      <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#64748b', textAlign: 'center', width: '100%' }}>
+                      <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#64748b', textAlign: 'center', width: '100%', marginTop: '4px' }}>
                         {Math.round(zoomFactor * 100)}%
                       </div>
                     </div>
