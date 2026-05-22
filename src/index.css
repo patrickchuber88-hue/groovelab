@@ -499,3 +499,13 @@ body {
   }
 }
 
+
+/* Globale iPad/Touch-Optimierungen für verzögerungsfreie Klicks */
+* {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button, a, [role="button"], [onClick] {
+  cursor: pointer;
+}
