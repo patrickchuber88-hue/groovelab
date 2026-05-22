@@ -2277,70 +2277,6 @@ export function TeacherDashboard({
               </div>
             )}
 
-            {/* Band-Repertoire Planer Widget (Dark-themed purple to match the song card!) - Reordered and hover effect removed */}
-            {openProposals.length > 0 && (
-              <div 
-                className="glass-panel card" 
-                onClick={() => setActiveTab('proposals')}
-                style={{ 
-                  padding: '24px', 
-                  background: 'linear-gradient(135deg, #1e1b4b 0%, #0f0728 100%)', 
-                  border: '1px solid rgba(165, 180, 252, 0.15)',
-                  borderRadius: '32px',
-                  boxShadow: '0 15px 35px rgba(0, 0, 0, 0.2)',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div style={{ 
-                    background: 'rgba(165, 180, 252, 0.05)', 
-                    color: '#a5b4fc', 
-                    padding: '12px', 
-                    borderRadius: '16px',
-                    border: '1px solid rgba(165, 180, 252, 0.15)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                    <Music size={22} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '2px' }}>
-                      Band-Repertoire Planer
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#ffffff' }}>
-                        {openProposals.length > 0 ? (
-                          `${openProposals.length} ${openProposals.length === 1 ? 'offener Song' : 'offene Songs'}`
-                        ) : (
-                          'Keine offenen Songs (Alles aktuell!)'
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                  <div style={{ 
-                    color: '#a5b4fc', 
-                    fontWeight: 900, 
-                    fontSize: '0.7rem', 
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.1em',
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '4px', 
-                    background: 'rgba(165, 180, 252, 0.1)', 
-                    padding: '8px 16px', 
-                    borderRadius: '12px',
-                    border: '1px solid rgba(165, 180, 252, 0.15)',
-                    transition: 'all 0.2s'
-                  }}>
-                    Ansehen →
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Band-Matching Section */}
             <div className="card" style={{ 
@@ -2564,7 +2500,70 @@ export function TeacherDashboard({
                 )}
               </div>
 
-
+            {/* Band-Repertoire Planer Widget (Dark-themed purple to match the song card!) - Reordered and hover effect removed */}
+            {openProposals.length > 0 && (
+              <div 
+                className="glass-panel card" 
+                onClick={() => setActiveTab('proposals')}
+                style={{ 
+                  padding: '24px', 
+                  background: 'linear-gradient(135deg, #1e1b4b 0%, #0f0728 100%)', 
+                  border: '1px solid rgba(165, 180, 252, 0.15)',
+                  borderRadius: '32px',
+                  boxShadow: '0 15px 35px rgba(0, 0, 0, 0.2)',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <div style={{ 
+                    background: 'rgba(165, 180, 252, 0.05)', 
+                    color: '#a5b4fc', 
+                    padding: '12px', 
+                    borderRadius: '16px',
+                    border: '1px solid rgba(165, 180, 252, 0.15)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <Music size={22} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '2px' }}>
+                      Band-Repertoire Planer
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#ffffff' }}>
+                        {openProposals.length > 0 ? (
+                          `${openProposals.length} ${openProposals.length === 1 ? 'offener Song' : 'offene Songs'}`
+                        ) : (
+                          'Keine offenen Songs (Alles aktuell!)'
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ 
+                    color: '#a5b4fc', 
+                    fontWeight: 900, 
+                    fontSize: '0.7rem', 
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.1em',
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '4px', 
+                    background: 'rgba(165, 180, 252, 0.1)', 
+                    padding: '8px 16px', 
+                    borderRadius: '12px',
+                    border: '1px solid rgba(165, 180, 252, 0.15)',
+                    transition: 'all 0.2s'
+                  }}>
+                    Ansehen →
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Band News */}
             {unreadShouts.length > 0 && (
