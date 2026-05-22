@@ -786,3 +786,8 @@ div:hover > .photo-overlay {
     box-shadow: 0 8px 24px rgba(225, 29, 72, 0.35);
   }
 }
+
+.main-wrapper.live-tab-active {
+  overflow-y: hidden !important;
+}
+

@@ -1797,7 +1797,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   ];
 
   const renderLiveTab = () => (
-    <div style={{ marginTop: '0' }}>
+    <div style={{ marginTop: '0', flex: 1, display: 'flex', flexDirection: 'column' }}>
       <TeacherDashboard 
         userId={userId} 
         hideHeader={true} 
@@ -5610,7 +5610,14 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     );
   };
   return (
-    <div style={{ flex: 1, padding: '0px 48px 48px 48px', overflowY: 'auto' }}>
+    <div style={{ 
+      flex: 1, 
+      padding: activeTab === 'live' ? '0px 16px 16px 16px' : '0px 48px 48px 48px', 
+      overflowY: activeTab === 'live' ? 'hidden' : 'auto',
+      height: activeTab === 'live' ? '100%' : 'auto',
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', marginTop: '16px' }}>
         <div>
           <h1 style={{ fontSize: '2rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.03em', margin: 0 }}>

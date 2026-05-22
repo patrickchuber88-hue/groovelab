@@ -5068,7 +5068,7 @@ function App() {
         </div>
       </aside>
 
-      <div className="main-wrapper" style={{ paddingTop: '0' }}>
+      <div className={`main-wrapper ${activeStudentTab === 'live' ? 'live-tab-active' : ''}`} style={{ paddingTop: '0' }}>
         <header className="header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 32px', height: '80px', background: 'transparent' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
             {/* Common Status Pills */}
@@ -5145,11 +5145,11 @@ function App() {
         </header>
 
 
-      <main className="main-content" style={{ overflow: 'auto' }}>
+      <main className="main-content" style={{ overflow: activeStudentTab === 'live' ? 'hidden' : 'auto', flex: 1, display: 'flex', flexDirection: 'column', height: activeStudentTab === 'live' ? '100%' : 'auto' }}>
         {/* Live Lab Tab for Students */}
         {user.role === 'student' && activeStudentTab === 'live' && (
           <ErrorBoundary>
-            <div className="animation-slide-up" style={{ width: '100%', padding: '0px 48px 48px 48px' }}>
+            <div className="animation-slide-up" style={{ width: '100%', padding: '0px 16px 16px 16px', display: 'flex', flexDirection: 'column', flex: 1, height: '100%' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', marginTop: '16px' }}>
                 <h1 style={{ fontSize: '2rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.04em', margin: 0 }}>Live Lab</h1>
                 {locationMode !== 'home' && (

@@ -1590,10 +1590,10 @@ export function TeacherDashboard({
               roomStations.some(s => s.pos_x !== null && s.pos_y !== null);
 
             if (hasCustomLayout) {
-              // Account for the parent dashboard header (approx. 140px)
-              const parentHeaderHeight = 140;
-              const verticalOffset = parentHeaderHeight + (rooms.length > 1 ? 74 : 0);
-              const maxH = Math.max(300, windowHeight - verticalOffset - 80);
+              // Account for the parent dashboard header height
+              const parentHeaderHeight = viewMode === 'student' ? 80 : 90;
+              const verticalOffset = parentHeaderHeight + (rooms.length > 1 ? 54 : 0);
+              const maxH = Math.max(300, windowHeight - verticalOffset - 24);
 
               // 1. Calculate fitting scale for all custom rooms to find the minimum scale (largest layout space required)
               // This ensures that the scale (and thus iPad card size) is completely uniform across all custom layout rooms,
@@ -1615,11 +1615,11 @@ export function TeacherDashboard({
                 }));
                 const minY = Math.min(...rStations.map(s => {
                   const y = (s.pos_y !== null ? s.pos_y : 50) * (1000 / aspect) / 100;
-                  return y - 125; // Safe top padding to prevent label clipping
+                  return y - 110; // Safe top padding to prevent label clipping
                 }));
                 const maxY = Math.max(...rStations.map(s => {
                   const y = (s.pos_y !== null ? s.pos_y : 50) * (1000 / aspect) / 100;
-                  return y + 115; // Safe bottom padding to prevent card shadow/border clipping
+                  return y + 110; // Safe bottom padding to prevent card shadow/border clipping
                 }));
 
                 const bW = Math.max(100, maxX - minX);
@@ -1646,11 +1646,11 @@ export function TeacherDashboard({
               }));
               const minBoundY = Math.min(...roomStations.map(s => {
                 const y = (s.pos_y !== null ? s.pos_y : 50) * (1000 / rawRoomAspectRatio) / 100;
-                return y - 125;
+                return y - 110;
               }));
               const maxBoundY = Math.max(...roomStations.map(s => {
                 const y = (s.pos_y !== null ? s.pos_y : 50) * (1000 / rawRoomAspectRatio) / 100;
-                return y + 115;
+                return y + 110;
               }));
 
               const boundWidth = Math.max(100, maxBoundX - minBoundX);
@@ -1662,7 +1662,7 @@ export function TeacherDashboard({
               return (
                 <div 
                   ref={containerRef}
-                  style={{ display: 'flex', flexDirection: 'column', gap: rooms.length > 1 ? '16px' : '0px', maxWidth: '850px', width: '100%', alignItems: 'center' }}
+                  style={{ display: 'flex', flexDirection: 'column', gap: rooms.length > 1 ? '16px' : '0px', maxWidth: 'none', width: '100%', alignItems: 'center' }}
                 >
                   {/* Toolbar Row */}
                   {rooms.length > 1 && (
