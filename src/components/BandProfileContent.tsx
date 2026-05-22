@@ -1137,6 +1137,19 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
               
               {/* LEFT: Band Repertoire-Planer (Compacted & Collapsible) */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <h3 style={{ 
+                  fontSize: '0.8rem', 
+                  fontWeight: 950, 
+                  color: 'white', 
+                  textTransform: 'uppercase', 
+                  letterSpacing: '0.15em', 
+                  margin: '0 0 4px 8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <Music size={16} color={brandColor} /> Band-Repertoire-Planer
+                </h3>
                 {/* Premium Collapsible Band Header */}
                 <div 
                   onClick={() => setIsRepertoireCollapsed(prev => !prev)}
@@ -1156,12 +1169,37 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                     {renderBandAvatar(selectedBandForProfile.name, selectedBandForProfile.photo_url, '48px', '12px')}
                     <div>
-                      <h3 style={{ fontSize: '1.2rem', fontWeight: 950, color: 'white', margin: 0, letterSpacing: '-0.01em' }}>
-                        {selectedBandForProfile.name}
-                      </h3>
-                      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '2px' }}>
-                        {activeProposals.length} {activeProposals.length === 1 ? 'offener Song' : 'offene Songs'}
-                      </div>
+                      {isRepertoireCollapsed ? (
+                        activeProposals.length > 0 ? (
+                          <>
+                            <h3 style={{ fontSize: '1.2rem', fontWeight: 950, color: 'white', margin: 0, letterSpacing: '-0.01em' }}>
+                              {activeProposals[0].songs?.title || 'Unbekannter Song'}
+                            </h3>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '2px' }}>
+                              {activeProposals[0].songs?.artist || 'Unbekannter Interpret'}
+                              {activeProposals.length > 1 && ` (+ ${activeProposals.length - 1} weitere)`}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <h3 style={{ fontSize: '1.2rem', fontWeight: 950, color: 'white', margin: 0, letterSpacing: '-0.01em' }}>
+                              Keine offenen Song-Vorschläge
+                            </h3>
+                            <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '2px' }}>
+                              Repertoire-Planer leer
+                            </div>
+                          </>
+                        )
+                      ) : (
+                        <>
+                          <h3 style={{ fontSize: '1.2rem', fontWeight: 950, color: 'white', margin: 0, letterSpacing: '-0.01em' }}>
+                            Offene Song-Vorschläge
+                          </h3>
+                          <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '2px' }}>
+                            {activeProposals.length} {activeProposals.length === 1 ? 'offener Song' : 'offene Songs'}
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 
