@@ -1593,143 +1593,34 @@ export function TeacherDashboard({
               // Account for the parent dashboard header (approx. 140px)
               const parentHeaderHeight = 140;
               const verticalOffset = parentHeaderHeight + (rooms.length > 1 ? 74 : 0);
-              const maxH = Math.max(300, windowHeight - verticalOffset - 60);
+              const maxH = Math.max(300, windowHeight - verticalOffset - 80);
 
-              // Calculate viewport aspect ratio and clamp to a stable landscape range [1.2, 1.8]
-              const availableAspectRatio = containerWidth / maxH;
-              const canvasAspectRatio = Math.max(1.2, Math.min(1.8, availableAspectRatio));
+              const rawRoomAspectRatio = (activeRoom && activeRoom.room_width && activeRoom.room_height)
+                ? activeRoom.room_width / activeRoom.room_height
+                : 1.0;
 
-              // Calculate resolved collision-free coordinates inside the 1000px canvas space
-              const canvasWidth = 1000;
-              const canvasHeight = 1000 / canvasAspectRatio;
+              // Calculate bounding box of all nodes in reference coordinates (1000px width reference)
+              const minBoundX = Math.min(...roomStations.map(s => {
+                const x = (s.pos_x !== null ? s.pos_x : 50) * 10;
+                return x - 90;
+              }));
+              const maxBoundX = Math.max(...roomStations.map(s => {
+                const x = (s.pos_x !== null ? s.pos_x : 50) * 10;
+                return x + 90;
+              }));
+              const minBoundY = Math.min(...roomStations.map(s => {
+                const y = (s.pos_y !== null ? s.pos_y : 50) * (1000 / rawRoomAspectRatio) / 100;
+                return y - 115;
+              }));
+              const maxBoundY = Math.max(...roomStations.map(s => {
+                const y = (s.pos_y !== null ? s.pos_y : 50) * (1000 / rawRoomAspectRatio) / 100;
+                return y + 95;
+              }));
 
-              // Prepare raw elements
-              const rawItems = roomStations.map(station => {
-                const sName = station.name || '';
-                const isTeacher = sName.toLowerCase().includes('lehrer') || sName.toLowerCase().includes('teacher');
-                const posLeftOriginal = station.pos_x !== null ? station.pos_x : 50;
-                const posTopOriginal = station.pos_y !== null ? station.pos_y : 50;
+              const boundWidth = Math.max(100, maxBoundX - minBoundX);
+              const boundHeight = Math.max(100, maxBoundY - minBoundY);
 
-                const x = (posLeftOriginal / 100) * canvasWidth;
-                const y = (posTopOriginal / 100) * canvasHeight;
-
-                // Card/Node dimensions inside the 1000px coordinate system
-                const w = isTeacher ? 180 : 180;
-                const h = isTeacher ? 220 : 180;
-
-                return {
-                  id: station.id,
-                  station,
-                  isTeacher,
-                  x,
-                  y,
-                  w,
-                  h
-                };
-              });
-
-              // Squeeze coordinates closer together and center the group in the canvas ("zusammenschieben")
-              if (rawItems.length > 0) {
-                const xs = rawItems.map(item => item.x);
-                const ys = rawItems.map(item => item.y);
-                const minX = Math.min(...xs);
-                const maxX = Math.max(...xs);
-                const minY = Math.min(...ys);
-                const maxY = Math.max(...ys);
-
-                const stationsCenterX = (minX + maxX) / 2;
-                const stationsCenterY = (minY + maxY) / 2;
-
-                // Squeeze distances by 35%
-                const compressionFactor = 0.65;
-                rawItems.forEach(item => {
-                  item.x = stationsCenterX + (item.x - stationsCenterX) * compressionFactor;
-                  item.y = stationsCenterY + (item.y - stationsCenterY) * compressionFactor;
-                });
-
-                // Re-calculate compressed center and center it within the canvas
-                const newXs = rawItems.map(item => item.x);
-                const newYs = rawItems.map(item => item.y);
-                const newMinX = Math.min(...newXs);
-                const newMaxX = Math.max(...newXs);
-                const newMinY = Math.min(...newYs);
-                const newMaxY = Math.max(...newYs);
-
-                const newStationsCenterX = (newMinX + newMaxX) / 2;
-                const newStationsCenterY = (newMinY + newMaxY) / 2;
-
-                const shiftX = (canvasWidth / 2) - newStationsCenterX;
-                const shiftY = (canvasHeight / 2) - newStationsCenterY;
-
-                rawItems.forEach(item => {
-                  item.x += shiftX;
-                  item.y += shiftY;
-                });
-              }
-
-              // Helper to clamp a single item to canvas margins safely
-              const clampItem = (item: any) => {
-                const marginX = Math.min(item.w / 2 + 10, canvasWidth / 2 - 5);
-                const marginY = Math.min(item.h / 2 + 10, canvasHeight / 2 - 5);
-                item.x = Math.max(marginX, Math.min(canvasWidth - marginX, item.x));
-                item.y = Math.max(marginY, Math.min(canvasHeight - marginY, item.y));
-              };
-
-              // Resolve overlaps using a relaxation loop
-              const resolvedItems = [...rawItems];
-              // Pre-clamp raw items to bounds before relaxation
-              resolvedItems.forEach(clampItem);
-
-              for (let iter = 0; iter < 25; iter++) {
-                let moved = false;
-                for (let i = 0; i < resolvedItems.length; i++) {
-                  for (let j = i + 1; j < resolvedItems.length; j++) {
-                    const a = resolvedItems[i];
-                    const b = resolvedItems[j];
-
-                    // Gap of 16px to prevent them touching too closely
-                    const hWidth = (a.w + b.w) / 2 + 16;
-                    const hHeight = (a.h + b.h) / 2 + 16;
-                    const dx = b.x - a.x;
-                    const dy = b.y - a.y;
-                    const absDx = Math.abs(dx);
-                    const absDy = Math.abs(dy);
-
-                    if (absDx < hWidth && absDy < hHeight) {
-                      moved = true;
-                      const overlapX = hWidth - absDx;
-                      const overlapY = hHeight - absDy;
-
-                      if (overlapX < overlapY) {
-                        const pushX = overlapX / 2;
-                        const sign = dx >= 0 ? 1 : -1;
-                        b.x += pushX * sign;
-                        a.x -= pushX * sign;
-                      } else {
-                        const pushY = overlapY / 2;
-                        const sign = dy >= 0 ? 1 : -1;
-                        b.y += pushY * sign;
-                        a.y -= pushY * sign;
-                      }
-                      
-                      // Clamp immediately inside the loop after pushing
-                      clampItem(a);
-                      clampItem(b);
-                    }
-                  }
-                }
-                if (!moved) break;
-              }
-
-              // Constrain back to canvas margins
-              const finalPositions = new Map<string, { x: number; y: number }>();
-              resolvedItems.forEach(item => {
-                finalPositions.set(item.id, { x: item.x, y: item.y });
-              });
-
-              const scaleW = containerWidth / 1000;
-              const scaleH = maxH / canvasHeight;
-              const scale = Math.max(0.1, Math.min(scaleW, scaleH));
+              const scale = Math.min(containerWidth / boundWidth, maxH / boundHeight);
 
               return (
                 <div 
@@ -1772,8 +1663,8 @@ export function TeacherDashboard({
                   {/* Scaled room blueprint to fit parent width and height without scrolling or overlaps */}
                   <div 
                     style={{ 
-                      width: `${1000 * scale}px`,
-                      height: `${canvasHeight * scale}px`,
+                      width: `${boundWidth * scale}px`,
+                      height: `${boundHeight * scale}px`,
                       position: 'relative', 
                       overflow: 'hidden',
                       margin: '0 auto'
@@ -1784,8 +1675,8 @@ export function TeacherDashboard({
                       position: 'absolute',
                       left: 0,
                       top: 0,
-                      width: '1000px',
-                      height: `${canvasHeight}px`,
+                      width: `${boundWidth}px`,
+                      height: `${boundHeight}px`,
                       transform: `scale(${scale})`,
                       transformOrigin: 'top left',
                       background: 'transparent',
@@ -1795,14 +1686,20 @@ export function TeacherDashboard({
                       overflow: 'visible'
                     }}>
 
-                      {resolvedItems.map(item => {
-                        const { station, isTeacher } = item;
+                      {roomStations.map(station => {
                         const sName = station.name || '';
+                        const isTeacher = sName.toLowerCase().includes('lehrer') || sName.toLowerCase().includes('teacher');
                         const instColor = station.color && station.color !== '#e5e7eb' && station.color !== '#e2e8f0'
                           ? station.color
                           : getStationColor(sName);
 
-                        const pos = finalPositions.get(station.id) || { x: item.x, y: item.y };
+                        // Calculate raw center coordinates in reference space
+                        const x = (station.pos_x !== null ? station.pos_x : 50) * 10;
+                        const y = (station.pos_y !== null ? station.pos_y : 50) * (1000 / rawRoomAspectRatio) / 100;
+
+                        // Align center coordinates relative to the bounding box
+                        const alignedX = x - minBoundX;
+                        const alignedY = y - minBoundY;
 
                         if (isTeacher) {
                           return (
@@ -1810,8 +1707,8 @@ export function TeacherDashboard({
                               key={station.id} 
                               style={{
                                 position: 'absolute',
-                                left: `${pos.x}px`,
-                                top: `${pos.y}px`,
+                                left: `${alignedX}px`,
+                                top: `${alignedY}px`,
                                 transform: 'translate(-50%, -50%)',
                                 zIndex: 100
                               }}
@@ -1829,8 +1726,8 @@ export function TeacherDashboard({
                             key={station.id} 
                             style={{
                               position: 'absolute',
-                              left: `${pos.x}px`,
-                              top: `${pos.y}px`,
+                              left: `${alignedX}px`,
+                              top: `${alignedY}px`,
                               transform: 'translate(-50%, -50%)',
                               width: '180px',
                               zIndex: 10
