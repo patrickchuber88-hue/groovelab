@@ -2540,11 +2540,11 @@ export function TeacherDashboard({
             {/* Band-Repertoire Planer Widget (Very compact & Light-themed purple!) */}
             {openProposals.length > 0 && (
               <div 
-                className="card" 
+                className="glass-panel card" 
                 onClick={() => setActiveTab('proposals')}
                 style={{ 
-                  padding: '18px 24px', 
-                  background: 'linear-gradient(135deg, #f5f3ff 0%, #fae8ff 100%)', 
+                  padding: '24px', 
+                  background: '#faf5ff', 
                   border: '1px solid #e9d5ff',
                   borderRadius: '32px',
                   boxShadow: '0 10px 30px rgba(139, 92, 246, 0.05)',
@@ -2556,15 +2556,7 @@ export function TeacherDashboard({
                 
                 
               >
-                <div style={{
-                  position: 'absolute',
-                  top: '-20px',
-                  right: '-20px',
-                  width: '80px',
-                  height: '80px',
-                  background: 'radial-gradient(circle, rgba(168, 85, 247, 0.2) 0%, transparent 70%)',
-                  pointerEvents: 'none'
-                }} />
+
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div style={{ 
