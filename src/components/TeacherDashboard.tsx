@@ -525,6 +525,80 @@ export function TeacherDashboard({
   const [selectedRoomId, setSelectedRoomId] = useState<string>('');
   const [zoomFactor, setZoomFactor] = useState<number>(1.0);
 
+  // Custom room display order persisted in localStorage
+  const [customRoomOrder, setCustomRoomOrder] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('groovelab_rooms_order');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return [];
+  });
+  const [draggedRoomId, setDraggedRoomId] = useState<string | null>(null);
+  const [dragOverRoomId, setDragOverRoomId] = useState<string | null>(null);
+
+  const sortRooms = (roomsList: any[]) => {
+    if (customRoomOrder.length === 0) return roomsList;
+    const orderMap = new Map(customRoomOrder.map((id, index) => [id, index]));
+    return [...roomsList].sort((a, b) => {
+      const indexA = orderMap.has(a.id) ? orderMap.get(a.id)! : 9999;
+      const indexB = orderMap.has(b.id) ? orderMap.get(b.id)! : 9999;
+      return indexA - indexB;
+    });
+  };
+
+  const handleDragStart = (e: React.DragEvent, roomId: string) => {
+    setDraggedRoomId(roomId);
+    e.dataTransfer.setData('text/plain', roomId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDragEnter = (e: React.DragEvent, roomId: string) => {
+    e.preventDefault();
+    if (draggedRoomId && draggedRoomId !== roomId) {
+      setDragOverRoomId(roomId);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverRoomId(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetRoomId: string) => {
+    e.preventDefault();
+    const sourceRoomId = e.dataTransfer.getData('text/plain') || draggedRoomId;
+    if (!sourceRoomId || sourceRoomId === targetRoomId) {
+      setDragOverRoomId(null);
+      return;
+    }
+
+    const sortedRooms = sortRooms(rooms);
+    const sourceIndex = sortedRooms.findIndex(r => r.id === sourceRoomId);
+    const targetIndex = sortedRooms.findIndex(r => r.id === targetRoomId);
+
+    if (sourceIndex === -1 || targetIndex === -1) {
+      setDragOverRoomId(null);
+      return;
+    }
+
+    const newSorted = [...sortedRooms];
+    const [removed] = newSorted.splice(sourceIndex, 1);
+    newSorted.splice(targetIndex, 0, removed);
+
+    const newOrder = newSorted.map(r => r.id);
+    setCustomRoomOrder(newOrder);
+    localStorage.setItem('groovelab_rooms_order', JSON.stringify(newOrder));
+    setDragOverRoomId(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedRoomId(null);
+    setDragOverRoomId(null);
+  };
+
   useEffect(() => {
     if (selectedRoomId) {
       const savedZoom = localStorage.getItem(`groovelab_room_zoom_${selectedRoomId}`);
@@ -661,7 +735,9 @@ export function TeacherDashboard({
           if (savedRoomId && rData.some(r => r.id === savedRoomId)) {
             setSelectedRoomId(savedRoomId);
           } else {
-            setSelectedRoomId(rData[0].id);
+            // Sort using the current custom order logic
+            const sorted = sortRooms(rData);
+            setSelectedRoomId(sorted[0].id);
           }
         }
         const roomIds = rData?.map(r => r.id) || [];
@@ -1748,7 +1824,7 @@ export function TeacherDashboard({
               }).filter((s): s is number => s !== null);
 
               if (customLayoutScales.length > 0) {
-                unifiedScale = Math.min(...customLayoutScales);
+                unifiedScale = Math.min(1.0, ...customLayoutScales);
               }
 
               const rawRoomAspectRatio = (activeRoom && activeRoom.room_width && activeRoom.room_height)
@@ -1776,24 +1852,34 @@ export function TeacherDashboard({
                   {/* Toolbar Row */}
                   {rooms.length > 1 && (
                     <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '6px', borderRadius: '16px', alignSelf: 'flex-start', marginBottom: '8px' }}>
-                      {rooms.map(room => {
+                      {sortRooms(rooms).map(room => {
                         const isSelected = room.id === selectedRoomId;
+                        const isDragged = draggedRoomId === room.id;
+                        const isDragOver = dragOverRoomId === room.id;
                         return (
                           <button
                             key={room.id}
+                            draggable="true"
+                            onDragStart={(e) => handleDragStart(e, room.id)}
+                            onDragOver={handleDragOver}
+                            onDragEnter={(e) => handleDragEnter(e, room.id)}
+                            onDragLeave={handleDragLeave}
+                            onDrop={(e) => handleDrop(e, room.id)}
+                            onDragEnd={handleDragEnd}
                             onClick={() => {
                               setSelectedRoomId(room.id);
                               localStorage.setItem('groovelab_teacher_selected_room_id', room.id);
                             }}
                             style={{
-                              border: 'none',
-                              background: isSelected ? 'white' : 'transparent',
+                              border: isSelected ? 'none' : (isDragOver ? '2px dashed #6366f1' : 'none'),
+                              background: isSelected ? 'white' : (isDragOver ? 'rgba(99, 102, 241, 0.05)' : 'transparent'),
                               color: isSelected ? '#1e293b' : '#64748b',
                               padding: '8px 16px',
                               borderRadius: '12px',
                               fontSize: '0.85rem',
                               fontWeight: 800,
-                              cursor: 'pointer',
+                              cursor: isDragged ? 'grabbing' : 'grab',
+                              opacity: isDragged ? 0.5 : 1,
                               boxShadow: isSelected ? '0 4px 10px rgba(0,0,0,0.05)' : 'none',
                               transition: 'all 0.2s'
                             }}
@@ -1813,6 +1899,7 @@ export function TeacherDashboard({
                       className="blueprint-viewport"
                       style={{ 
                         flex: 1, 
+                        minWidth: 0,
                         maxWidth: '100%', 
                         height: `${maxH}px`, 
                         overflow: 'auto', 
@@ -1991,24 +2078,34 @@ export function TeacherDashboard({
                 {/* Room Switcher */}
                 {rooms.length > 1 && (
                   <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '6px', borderRadius: '16px', alignSelf: 'flex-start', marginBottom: '8px' }}>
-                    {rooms.map(room => {
+                    {sortRooms(rooms).map(room => {
                       const isSelected = room.id === selectedRoomId;
+                      const isDragged = draggedRoomId === room.id;
+                      const isDragOver = dragOverRoomId === room.id;
                       return (
                         <button
                           key={room.id}
+                          draggable="true"
+                          onDragStart={(e) => handleDragStart(e, room.id)}
+                          onDragOver={handleDragOver}
+                          onDragEnter={(e) => handleDragEnter(e, room.id)}
+                          onDragLeave={handleDragLeave}
+                          onDrop={(e) => handleDrop(e, room.id)}
+                          onDragEnd={handleDragEnd}
                           onClick={() => {
                             setSelectedRoomId(room.id);
                             localStorage.setItem('groovelab_teacher_selected_room_id', room.id);
                           }}
                           style={{
-                            border: 'none',
-                            background: isSelected ? 'white' : 'transparent',
+                            border: isSelected ? 'none' : (isDragOver ? '2px dashed #6366f1' : 'none'),
+                            background: isSelected ? 'white' : (isDragOver ? 'rgba(99, 102, 241, 0.05)' : 'transparent'),
                             color: isSelected ? '#1e293b' : '#64748b',
                             padding: '8px 16px',
                             borderRadius: '12px',
                             fontSize: '0.85rem',
                             fontWeight: 800,
-                            cursor: 'pointer',
+                            cursor: isDragged ? 'grabbing' : 'grab',
+                            opacity: isDragged ? 0.5 : 1,
                             boxShadow: isSelected ? '0 4px 10px rgba(0,0,0,0.05)' : 'none',
                             transition: 'all 0.2s'
                           }}
