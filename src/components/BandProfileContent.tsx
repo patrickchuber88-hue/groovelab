@@ -123,6 +123,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
 
   const [songProposals, setSongProposals] = useState<any[]>([]);
   const [expandedProposalIds, setExpandedProposalIds] = useState<Record<string, boolean>>({});
+  const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
   const toggleProposalExpand = (proposalId: string) => {
     setExpandedProposalIds(prev => ({
       ...prev,
@@ -358,6 +359,77 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
       return true;
     });
   }, [songProposals, selectedBandForProfile.song_id, checkIfFullyMastered]);
+
+  // Sort active proposals: primary key is occupied instrument slots (descending), secondary key is mastered slots (descending)
+  const sortedActiveProposals = useMemo(() => {
+    const scoredProposals = activeProposals.map(prop => {
+      const instrumentation = prop.songs?.instrumentation || {};
+      const order = ['E-Gitarre', 'E-Drums', 'E-Piano', 'E-Bass'];
+      const allInsts = [...order, ...Object.keys(instrumentation).filter(k => !order.includes(normalize(k)))];
+
+      let occupiedCount = 0;
+      let masteredCount = 0;
+      let totalSlotsCount = 0;
+      const uniqueOccupants = new Map<string, any>();
+
+      allInsts.forEach(instName => {
+        const normTarget = normalize(instName);
+        if (normTarget === 'Vocals') return;
+        const count = instrumentation[instName] || 0;
+        for (let i = 1; i <= (count as number); i++) {
+          totalSlotsCount++;
+          const occupantSlot = prop.band_song_slots?.find((s: any) => normalize(s.instrument) === normTarget && s.part_number === i);
+          
+          const membersWithInst = (selectedBandForProfile.band_members || []).filter((m: any) => normalize(m.instrument) === normTarget);
+          const member = membersWithInst[i - 1];
+          const memberUser = member?.users || member?.profiles;
+          const uFromBand = memberUser ? (Array.isArray(memberUser) ? memberUser[0] : memberUser) : null;
+          
+          const occupantUser = occupantSlot?.users || occupantSlot?.profiles;
+          const uFromSlot = occupantUser ? (Array.isArray(occupantUser) ? occupantUser[0] : occupantUser) : null;
+          
+          const offeredUser = occupantSlot?.offeredTo?.users || occupantSlot?.offeredTo?.profiles;
+          const uFromOffer = offeredUser ? (Array.isArray(offeredUser) ? offeredUser[0] : offeredUser) : null;
+          
+          const u = uFromSlot || uFromOffer || uFromBand;
+
+          if (u) {
+            occupiedCount++;
+            uniqueOccupants.set(u.id, u);
+
+            const skills = u.user_song_skills || [];
+            const isMastered = skills.some((sk: any) => 
+              String(sk.song_id) === String(prop.song_id) && 
+              normalize(sk.instrument) === normTarget && 
+              (sk.part_number || 1) === i &&
+              ((sk.progress_percent || 0) >= 100 || sk.is_stage_ready === true)
+            );
+            if (isMastered) {
+              masteredCount++;
+            }
+          }
+        }
+      });
+
+      return {
+        prop,
+        occupiedCount,
+        masteredCount,
+        totalSlotsCount,
+        uniqueOccupants: Array.from(uniqueOccupants.values())
+      };
+    });
+
+    // Sort by occupiedCount descending, then masteredCount descending
+    scoredProposals.sort((a, b) => {
+      if (b.occupiedCount !== a.occupiedCount) {
+        return b.occupiedCount - a.occupiedCount;
+      }
+      return b.masteredCount - a.masteredCount;
+    });
+
+    return scoredProposals;
+  }, [activeProposals, selectedBandForProfile.band_members]);
 
   const fetchShoutbox = async () => {
     try {
@@ -1157,329 +1229,431 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                 }}>
                   <Music size={16} color={brandColor} /> Band-Repertoire-Planer
                 </h3>
-                {/* Premium Collapsible Band Header */}
-                <div 
-                  onClick={() => setIsRepertoireCollapsed(prev => !prev)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '16px 28px',
-                    background: 'linear-gradient(90deg, #1e1b4b 0%, #110e3b 100%)',
-                    border: '1px solid rgba(165, 180, 252, 0.15)',
-                    borderRadius: '24px',
-                    cursor: 'pointer',
-                    boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    {renderBandAvatar(selectedBandForProfile.name, selectedBandForProfile.photo_url, '48px', '12px')}
-                    <div>
-                      {isRepertoireCollapsed ? (
-                        activeProposals.length > 0 ? (
-                          <>
-                            <h3 style={{ fontSize: '1.2rem', fontWeight: 950, color: 'white', margin: 0, letterSpacing: '-0.01em' }}>
-                              {activeProposals[0].songs?.title || 'Unbekannter Song'}
-                            </h3>
-                            <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '2px' }}>
-                              {activeProposals[0].songs?.artist || 'Unbekannter Interpret'}
-                              {activeProposals.length > 1 && ` (+ ${activeProposals.length - 1} weitere)`}
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <h3 style={{ fontSize: '1.2rem', fontWeight: 950, color: 'white', margin: 0, letterSpacing: '-0.01em' }}>
-                              Keine offenen Song-Vorschläge
-                            </h3>
-                            <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '2px' }}>
-                              Repertoire-Planer leer
-                            </div>
-                          </>
-                        )
-                      ) : (
-                        <>
-                          <h3 style={{ fontSize: '1.2rem', fontWeight: 950, color: 'white', margin: 0, letterSpacing: '-0.01em' }}>
-                            Offene Song-Vorschläge
-                          </h3>
-                          <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '2px' }}>
-                            {activeProposals.length} {activeProposals.length === 1 ? 'offener Song' : 'offene Songs'}
-                          </div>
-                        </>
-                      )}
-                    </div>
+                {/* Static title section */}
+                <div style={{ paddingLeft: '8px', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 950, color: 'white', margin: 0, letterSpacing: '-0.01em' }}>
+                    Offene Song-Vorschläge
                   </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ 
-                      fontSize: '0.65rem', 
-                      fontWeight: 900, 
-                      color: '#a5b4fc', 
-                      textTransform: 'uppercase', 
-                      letterSpacing: '0.1em',
-                      background: 'rgba(165, 180, 252, 0.1)',
-                      padding: '6px 12px',
-                      borderRadius: '12px'
-                    }}>
-                      {isRepertoireCollapsed ? 'Ausklappen' : 'Einklappen'}
-                    </span>
-                    <div style={{ 
-                      color: '#a5b4fc', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center',
-                      transition: 'transform 0.3s ease',
-                      transform: isRepertoireCollapsed ? 'rotate(0deg)' : 'rotate(180deg)'
-                    }}>
-                      <ChevronDown size={20} />
-                    </div>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '2px' }}>
+                    {sortedActiveProposals.length} {sortedActiveProposals.length === 1 ? 'offener Song' : 'offene Songs'}
                   </div>
                 </div>
 
-                {/* Grouped proposals list */}
-                {!isRepertoireCollapsed && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingLeft: '8px' }}>
-                    {activeProposals.length === 0 ? (
-                      <div style={{ padding: '40px 20px', textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '24px', border: '1px dashed rgba(255,255,255,0.1)' }}>
-                        <div style={{ fontSize: '2rem', marginBottom: '12px' }}>🎵</div>
-                        <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'white' }}>Noch keine Song-Vorschläge</div>
-                      </div>
-                    ) : (
-                      activeProposals.map(prop => {
-                        const song = prop.songs;
-                        const isPro = prop.difficulty_level === 'original' || prop.difficulty_level === 'pro';
-                        const levelText = isPro ? 'PRO' : 'STARTER';
+                {/* Individual Collapsible Songcards */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingLeft: '8px' }}>
+                  {sortedActiveProposals.length === 0 ? (
+                    <div style={{ padding: '40px 20px', textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '24px', border: '1px dashed rgba(255,255,255,0.1)' }}>
+                      <div style={{ fontSize: '2rem', marginBottom: '12px' }}>🎵</div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'white' }}>Noch keine Song-Vorschläge</div>
+                    </div>
+                  ) : (
+                    sortedActiveProposals.map(({ prop, occupiedCount, masteredCount, totalSlotsCount, uniqueOccupants }) => {
+                      const song = prop.songs;
+                      const isExpanded = !!expandedProposalIds[prop.id];
+                      const isHovered = hoveredCardId === prop.id;
 
-                        const instrumentation = prop.songs?.instrumentation || {};
-                        const slots: any[] = [];
-                        const order = ['E-Gitarre', 'E-Drums', 'E-Piano', 'E-Bass'];
-                        const allInsts = [...order, ...Object.keys(instrumentation).filter(k => !order.includes(normalize(k)))];
+                      const isPro = prop.difficulty_level === 'original' || prop.difficulty_level === 'pro';
+                      const levelText = isPro ? 'PRO' : 'STARTER';
+                      const levelColor = isPro ? '#c084fc' : '#f59e0b';
+                      const levelBg = isPro ? 'rgba(168, 85, 247, 0.15)' : 'rgba(245, 158, 11, 0.15)';
+                      const levelBorder = isPro ? 'rgba(168, 85, 247, 0.3)' : 'rgba(245, 158, 11, 0.3)';
 
-                        // 1. Regular Instruments
-                        allInsts.forEach(instName => {
-                          const normTarget = normalize(instName);
-                          if (normTarget === 'Vocals') return;
-                          const count = instrumentation[instName] || 0;
-                          for (let i = 1; i <= (count as number); i++) {
-                            const occupant = prop.band_song_slots?.find((s: any) => normalize(s.instrument) === normTarget && s.part_number === i);
-                            slots.push({ inst: instName, part: i, occupant });
-                          }
-                        });
+                      const occupiedText = `${occupiedCount}/${totalSlotsCount} Besetzt`;
+                      const masteryText = `${masteredCount}/${occupiedCount || 1} Gemeistert`;
 
-                        return (
-                          <div key={prop.id} style={{ 
+                      const instrumentation = prop.songs?.instrumentation || {};
+                      const slots: any[] = [];
+                      const order = ['E-Gitarre', 'E-Drums', 'E-Piano', 'E-Bass'];
+                      const allInsts = [...order, ...Object.keys(instrumentation).filter(k => !order.includes(normalize(k)))];
+
+                      // 1. Regular Instruments
+                      allInsts.forEach(instName => {
+                        const normTarget = normalize(instName);
+                        if (normTarget === 'Vocals') return;
+                        const count = instrumentation[instName] || 0;
+                        for (let i = 1; i <= (count as number); i++) {
+                          const occupant = prop.band_song_slots?.find((s: any) => normalize(s.instrument) === normTarget && s.part_number === i);
+                          slots.push({ inst: instName, part: i, occupant });
+                        }
+                      });
+
+                      return (
+                        <div 
+                          key={prop.id} 
+                          style={{ 
                             background: 'linear-gradient(135deg, #1e1b4b 0%, #0f0728 100%)', 
                             borderRadius: '28px', 
-                            border: '1px solid rgba(165, 180, 252, 0.1)',
-                            boxShadow: '0 15px 35px rgba(0, 0, 0, 0.2)',
-                            display: 'grid',
-                            gridTemplateColumns: width < 900 ? '1fr' : '320px 1fr',
+                            border: isHovered 
+                              ? '1px solid rgba(165, 180, 252, 0.3)' 
+                              : '1px solid rgba(165, 180, 252, 0.1)',
+                            boxShadow: isHovered 
+                              ? '0 15px 35px rgba(165, 180, 252, 0.15)' 
+                              : '0 15px 35px rgba(0, 0, 0, 0.2)',
+                            display: 'flex',
+                            flexDirection: 'column',
                             overflow: 'hidden',
-                            minHeight: '260px'
-                          }}>
-                            {/* Left Panel: Band & Song Info */}
-                            <div style={{ 
-                              padding: '32px', 
-                              background: 'rgba(255, 255, 255, 0.03)', 
-                              borderRight: width < 900 ? 'none' : '1px solid rgba(255, 255, 255, 0.05)',
-                              borderBottom: width < 900 ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                          }}
+                        >
+                          {/* COLLAPSED HEADER (CLICKABLE) */}
+                          <div
+                            onClick={() => toggleProposalExpand(prop.id)}
+                            onMouseEnter={() => setHoveredCardId(prop.id)}
+                            onMouseLeave={() => setHoveredCardId(null)}
+                            style={{
                               display: 'flex',
-                              flexDirection: 'column',
+                              alignItems: 'center',
                               justifyContent: 'space-between',
-                              gap: '24px'
-                            }}>
-                              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                                {renderBandAvatar(selectedBandForProfile.name, selectedBandForProfile.photo_url, '56px', '16px')}
-                                <div>
-                                  <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '2px' }}>
-                                    Deine Band
-                                  </div>
-                                  <div style={{ fontSize: '1.2rem', fontWeight: 950, color: 'white', letterSpacing: '-0.02em' }}>
-                                    {selectedBandForProfile.name}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div>
-                                <span style={{ 
-                                  background: 'rgba(168, 85, 247, 0.15)', 
-                                  color: '#c084fc', 
-                                  border: '1px solid rgba(168, 85, 247, 0.3)',
-                                  padding: '4px 10px', 
-                                  borderRadius: '8px', 
-                                  fontSize: '0.6rem', 
-                                  fontWeight: 900,
-                                  textTransform: 'uppercase',
-                                  letterSpacing: '0.08em',
-                                  display: 'inline-block',
-                                  marginBottom: '8px'
+                              padding: '16px 28px',
+                              background: isHovered 
+                                ? 'linear-gradient(90deg, #25225c 0%, #18144b 100%)' 
+                                : 'linear-gradient(90deg, #1e1b4b 0%, #110e3b 100%)',
+                              borderBottom: isExpanded ? '1px solid rgba(165, 180, 252, 0.15)' : 'none',
+                              cursor: 'pointer',
+                              boxShadow: isHovered 
+                                ? '0 4px 20px rgba(165, 180, 252, 0.15)' 
+                                : 'none',
+                              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                              gap: '20px',
+                              flexWrap: width < 768 ? 'wrap' : 'nowrap'
+                            }}
+                          >
+                            {/* Left: Cover & Song Info */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: 0 }}>
+                              {song?.photo_url ? (
+                                <img 
+                                  src={song.photo_url} 
+                                  style={{ width: '48px', height: '48px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0 }} 
+                                  alt="" 
+                                />
+                              ) : (
+                                <div style={{ 
+                                  width: '48px', 
+                                  height: '48px', 
+                                  borderRadius: '12px', 
+                                  background: 'rgba(165, 180, 252, 0.1)', 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'center',
+                                  border: '1px solid rgba(165, 180, 252, 0.2)',
+                                  flexShrink: 0
                                 }}>
-                                  Abstimmung läuft
-                                </span>
-                                <h3 style={{ fontSize: '1.4rem', fontWeight: 1000, color: 'white', margin: '0 0 4px 0', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-                                  {song?.title}
-                                </h3>
-                                <p style={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.8rem', margin: 0 }}>
-                                  {song?.artist || 'Unbekannt'}
-                                </p>
-                              </div>
-
-                              <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'rgba(255,255,255,0.3)' }}>
-                                Vorgeschlagen von:<br/>
-                                <span style={{ color: brandColor, fontWeight: 950 }}>{(Array.isArray(prop.suggested_by_user) ? prop.suggested_by_user[0] : prop.suggested_by_user)?.first_name || 'System'}</span>
+                                  <Music size={20} color="#a5b4fc" />
+                                </div>
+                              )}
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <h4 style={{ fontSize: '1.15rem', fontWeight: 950, color: 'white', margin: 0, letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {song?.title || 'Unbekannter Song'}
+                                </h4>
+                                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {song?.artist || 'Unbekannter Interpret'}
+                                </div>
                               </div>
                             </div>
 
-                            {/* Right Panel: Slot Grid */}
-                            <div style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <h4 style={{ fontSize: '0.75rem', fontWeight: 950, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>
-                                  Instrumenten-Belegung & Freischaltung
-                                </h4>
-                                <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8' }}>
-                                  Level: <strong style={{ color: isPro ? '#c084fc' : '#f59e0b', textTransform: 'uppercase' }}>{levelText}</strong>
+                            {/* Right: Badges, Avatars, rotating chevron */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexShrink: 0, flexWrap: 'wrap', justifyContent: width < 768 ? 'flex-start' : 'flex-end' }}>
+                              {/* Badges */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ 
+                                  background: levelBg, 
+                                  color: levelColor, 
+                                  border: `1px solid ${levelBorder}`,
+                                  padding: '4px 10px', 
+                                  borderRadius: '10px', 
+                                  fontSize: '0.65rem', 
+                                  fontWeight: 900,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.08em'
+                                }}>
+                                  {levelText}
+                                </span>
+                                <span style={{ 
+                                  fontSize: '0.65rem', 
+                                  fontWeight: 900, 
+                                  color: '#38bdf8', 
+                                  background: 'rgba(56, 189, 248, 0.15)',
+                                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                                  padding: '4px 10px', 
+                                  borderRadius: '10px'
+                                }}>
+                                  {occupiedText}
+                                </span>
+                                <span style={{ 
+                                  fontSize: '0.65rem', 
+                                  fontWeight: 900, 
+                                  color: '#34d399', 
+                                  background: 'rgba(52, 211, 153, 0.15)',
+                                  border: '1px solid rgba(52, 211, 153, 0.3)',
+                                  padding: '4px 10px', 
+                                  borderRadius: '10px'
+                                }}>
+                                  {masteryText}
                                 </span>
                               </div>
 
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'center', justifyContent: 'flex-start', flex: 1 }}>
-                                {slots.map((slot, idx) => {
-                                  const normTarget = normalize(slot.inst);
-                                  const membersWithInst = (selectedBandForProfile.band_members || []).filter((m: any) => normalize(m.instrument) === normTarget);
-                                  const member = membersWithInst[slot.part - 1];
-                                  const memberUser = member?.users || member?.profiles;
-                                  const uFromBand = memberUser ? (Array.isArray(memberUser) ? memberUser[0] : memberUser) : null;
-                                  
-                                  const occupantUser = slot.occupant?.users || slot.occupant?.profiles;
-                                  const uFromSlot = occupantUser ? (Array.isArray(occupantUser) ? occupantUser[0] : occupantUser) : null;
-                                  
-                                  const offeredUser = slot.offeredTo?.users || slot.offeredTo?.profiles;
-                                  const uFromOffer = offeredUser ? (Array.isArray(offeredUser) ? offeredUser[0] : offeredUser) : null;
-                                  
-                                  const u = uFromSlot || uFromOffer || uFromBand;
-                                  const isMe = u?.id === user?.id;
-                                  const isPendingOffer = !!slot.offeredTo;
-                                  
-                                  const skills = u?.user_song_skills || [];
-                                  const isMastered = skills.some((sk: any) => 
-                                    sk.song_id === prop.song_id && 
-                                    normalize(sk.instrument) === normTarget && 
-                                    (sk.part_number || 1) === slot.part &&
-                                    (sk.progress_percent >= 100 || sk.is_stage_ready)
-                                  );
+                              {/* Overlapping occupant avatars */}
+                              {uniqueOccupants.length > 0 && (
+                                <div style={{ display: 'flex', alignItems: 'center', paddingLeft: '8px' }}>
+                                  {uniqueOccupants.map((u, uIdx) => (
+                                    <img
+                                      key={u.id}
+                                      src={u.photo_url || '/avatar_ghost.jpg'}
+                                      alt={u.first_name}
+                                      title={u.first_name}
+                                      style={{
+                                        width: '28px',
+                                        height: '28px',
+                                        borderRadius: '50%',
+                                        border: '2px solid #110e3b',
+                                        marginLeft: uIdx === 0 ? '0' : '-8px',
+                                        objectFit: 'cover',
+                                        zIndex: 10 - uIdx,
+                                      }}
+                                    />
+                                  ))}
+                                </div>
+                              )}
 
-                                  const instLabel = (instrumentation[slot.inst] || 0) > 1 ? `${slot.inst} ${slot.part}` : slot.inst;
-
-                                  return (
-                                    <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '80px', position: 'relative' }}>
-                                      <div style={{ 
-                                        width: '64px', height: '64px', borderRadius: '18px', 
-                                        background: u ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.03)', 
-                                        border: isPendingOffer 
-                                          ? (isMe ? '3px dashed #eab308' : '2px dashed rgba(234, 179, 8, 0.4)')
-                                          : ((isMe || isMastered) ? `3px solid #ef4444` : (u ? '1px solid rgba(255,255,255,0.1)' : '2px dashed rgba(255,255,255,0.2)')),
-                                        boxShadow: isMe ? '0 0 15px rgba(239, 68, 68, 0.3)' : 'none',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
-                                        filter: (u && !isMastered && !isPendingOffer) ? 'grayscale(100%)' : 'none',
-                                        opacity: (u && !isMastered && !isPendingOffer) ? 0.6 : 1
-                                      }}>
-                                        {u ? (
-                                          <div style={{ width: '100%', height: '100%', position: 'relative', filter: isPendingOffer ? 'opacity(0.7) grayscale(30%)' : 'none' }}>
-                                            <img 
-                                              src={u.photo_url || '/avatar_ghost.jpg'} 
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                if ((window as any).openUserProfile) {
-                                                  (window as any).openUserProfile(u);
-                                                }
-                                              }}
-                                              style={{ width: '100%', height: '100%', borderRadius: '15px', objectFit: 'cover', cursor: 'pointer' }} 
-                                              className="hover-scale-mini"
-                                              alt="" 
-                                            />
-                                            {isMastered && !isPendingOffer && (
-                                              <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: '#22c55e', color: 'white', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', zIndex: 10 }}>
-                                                <Check size={12} strokeWidth={4} />
-                                              </div>
-                                            )}
-                                          </div>
-                                        ) : (
-                                          <div style={{ fontSize: '1.4rem', opacity: 0.2 }}>
-                                            {slot.isVocal ? <Mic size={18} /> : (APP_INSTRUMENT_ICONS[slot.inst] || <Plus size={18} />)}
-                                          </div>
-                                        )}
-                                      </div>
-                                      <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px', width: '100%' }}>
-                                        <div style={{ fontSize: '0.65rem', fontWeight: 950, color: isPendingOffer ? '#eab308' : (u ? 'white' : 'rgba(255,255,255,0.3)'), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
-                                          {u ? u.first_name : instLabel}
-                                        </div>
-                                        {(u || isPendingOffer) && (
-                                          <div style={{ fontSize: '0.45rem', fontWeight: 800, color: isPendingOffer ? 'rgba(234, 179, 8, 0.7)' : 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>
-                                            {isPendingOffer ? 'Angeboten' : instLabel}
-                                          </div>
-                                        )}
-                                      </div>
-                                      
-                                      {isPendingOffer && isMe && (
-                                        <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
-                                          <button 
-                                            onClick={async (e) => {
-                                              e.stopPropagation();
-                                              const { error } = await supabase.from('band_song_slots').insert({
-                                                band_song_id: prop.id,
-                                                user_id: user.id,
-                                                instrument: 'Vocals',
-                                                part_number: slot.part,
-                                                status: 'accepted'
-                                              });
-                                              if (error) alert('Fehler: ' + error.message);
-                                              else fetchSongProposals();
-                                            }}
-                                            style={{ background: '#22c55e', color: 'white', border: 'none', borderRadius: '4px', padding: '2px 6px', fontSize: '0.5rem', fontWeight: 900, cursor: 'pointer' }}
-                                          >
-                                            JA 🎤
-                                          </button>
-                                          <button 
-                                            onClick={async (e) => {
-                                              e.stopPropagation();
-                                              const { error } = await supabase.from('band_song_slots').insert({
-                                                band_song_id: prop.id,
-                                                user_id: user.id,
-                                                instrument: 'Vocals',
-                                                part_number: slot.part,
-                                                status: 'declined'
-                                              });
-                                              if (error) alert('Fehler: ' + error.message);
-                                              else fetchSongProposals();
-                                            }}
-                                            style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', padding: '2px 6px', fontSize: '0.5rem', fontWeight: 900, cursor: 'pointer' }}
-                                          >
-                                            NEIN
-                                          </button>
-                                        </div>
-                                      )}
-                                      
-                                      {slot.isVocal && slot.isOpen && !u && (
-                                        <button 
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            joinSongProposal(prop.id, 'Vocals', slot.part);
-                                          }}
-                                          style={{ background: brandColor, color: 'white', border: 'none', borderRadius: '4px', padding: '2px 6px', fontSize: '0.5rem', fontWeight: 900, cursor: 'pointer', marginTop: '4px' }}
-                                        >
-                                          SINGEN 🎤
-                                        </button>
-                                      )}
-                                    </div>
-                                  );
-                                })}
+                              {/* Action text & Chevron */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <span style={{ 
+                                  fontSize: '0.65rem', 
+                                  fontWeight: 900, 
+                                  color: '#a5b4fc', 
+                                  textTransform: 'uppercase', 
+                                  letterSpacing: '0.1em',
+                                  background: 'rgba(165, 180, 252, 0.1)',
+                                  padding: '6px 12px',
+                                  borderRadius: '12px'
+                                }}>
+                                  {isExpanded ? 'Einklappen' : 'Ausklappen'}
+                                </span>
+                                <div style={{ 
+                                  color: '#a5b4fc', 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'center',
+                                  transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                  transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)'
+                                }}>
+                                  <ChevronDown size={20} />
+                                </div>
                               </div>
                             </div>
                           </div>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
+
+                          {/* EXPANDED CONTENT BODY */}
+                          {isExpanded && (
+                            <div style={{ 
+                              display: 'grid',
+                              gridTemplateColumns: width < 900 ? '1fr' : '320px 1fr',
+                              minHeight: '260px'
+                            }}>
+                              {/* Left Panel: Band & Song Info */}
+                              <div style={{ 
+                                padding: '32px', 
+                                background: 'rgba(255, 255, 255, 0.03)', 
+                                borderRight: width < 900 ? 'none' : '1px solid rgba(255, 255, 255, 0.05)',
+                                borderBottom: width < 900 ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'space-between',
+                                gap: '24px'
+                              }}>
+                                <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                                  {renderBandAvatar(selectedBandForProfile.name, selectedBandForProfile.photo_url, '56px', '16px')}
+                                  <div>
+                                    <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '2px' }}>
+                                      Deine Band
+                                    </div>
+                                    <div style={{ fontSize: '1.2rem', fontWeight: 950, color: 'white', letterSpacing: '-0.02em' }}>
+                                      {selectedBandForProfile.name}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <span style={{ 
+                                    background: 'rgba(168, 85, 247, 0.15)', 
+                                    color: '#c084fc', 
+                                    border: '1px solid rgba(168, 85, 247, 0.3)',
+                                    padding: '4px 10px', 
+                                    borderRadius: '8px', 
+                                    fontSize: '0.6rem', 
+                                    fontWeight: 900,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.08em',
+                                    display: 'inline-block',
+                                    marginBottom: '8px'
+                                  }}>
+                                    Abstimmung läuft
+                                  </span>
+                                  <h3 style={{ fontSize: '1.4rem', fontWeight: 1000, color: 'white', margin: '0 0 4px 0', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+                                    {song?.title}
+                                  </h3>
+                                  <p style={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.8rem', margin: 0 }}>
+                                    {song?.artist || 'Unbekannt'}
+                                  </p>
+                                </div>
+
+                                <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'rgba(255,255,255,0.3)' }}>
+                                  Vorgeschlagen von:<br/>
+                                  <span style={{ color: brandColor, fontWeight: 950 }}>{(Array.isArray(prop.suggested_by_user) ? prop.suggested_by_user[0] : prop.suggested_by_user)?.first_name || 'System'}</span>
+                                </div>
+                              </div>
+
+                              {/* Right Panel: Slot Grid */}
+                              <div style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <h4 style={{ fontSize: '0.75rem', fontWeight: 950, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>
+                                    Instrumenten-Belegung & Freischaltung
+                                  </h4>
+                                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8' }}>
+                                    Level: <strong style={{ color: isPro ? '#c084fc' : '#f59e0b', textTransform: 'uppercase' }}>{levelText}</strong>
+                                  </span>
+                                </div>
+
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'center', justifyContent: 'flex-start', flex: 1 }}>
+                                  {slots.map((slot, idx) => {
+                                    const normTarget = normalize(slot.inst);
+                                    const membersWithInst = (selectedBandForProfile.band_members || []).filter((m: any) => normalize(m.instrument) === normTarget);
+                                    const member = membersWithInst[slot.part - 1];
+                                    const memberUser = member?.users || member?.profiles;
+                                    const uFromBand = memberUser ? (Array.isArray(memberUser) ? memberUser[0] : memberUser) : null;
+                                    
+                                    const occupantUser = slot.occupant?.users || slot.occupant?.profiles;
+                                    const uFromSlot = occupantUser ? (Array.isArray(occupantUser) ? occupantUser[0] : occupantUser) : null;
+                                    
+                                    const offeredUser = slot.offeredTo?.users || slot.offeredTo?.profiles;
+                                    const uFromOffer = offeredUser ? (Array.isArray(offeredUser) ? offeredUser[0] : offeredUser) : null;
+                                    
+                                    const u = uFromSlot || uFromOffer || uFromBand;
+                                    const isMe = u?.id === user?.id;
+                                    const isPendingOffer = !!slot.offeredTo;
+                                    
+                                    const skills = u?.user_song_skills || [];
+                                    const isMastered = skills.some((sk: any) => 
+                                      sk.song_id === prop.song_id && 
+                                      normalize(sk.instrument) === normTarget && 
+                                      (sk.part_number || 1) === slot.part &&
+                                      (sk.progress_percent >= 100 || sk.is_stage_ready)
+                                    );
+
+                                    const instLabel = (instrumentation[slot.inst] || 0) > 1 ? `${slot.inst} ${slot.part}` : slot.inst;
+
+                                    return (
+                                      <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '80px', position: 'relative' }}>
+                                        <div style={{ 
+                                          width: '64px', height: '64px', borderRadius: '18px', 
+                                          background: u ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.03)', 
+                                          border: isPendingOffer 
+                                            ? (isMe ? '3px dashed #eab308' : '2px dashed rgba(234, 179, 8, 0.4)')
+                                            : ((isMe || isMastered) ? `3px solid #ef4444` : (u ? '1px solid rgba(255,255,255,0.1)' : '2px dashed rgba(255,255,255,0.2)')),
+                                          boxShadow: isMe ? '0 0 15px rgba(239, 68, 68, 0.3)' : 'none',
+                                          display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+                                          filter: (u && !isMastered && !isPendingOffer) ? 'grayscale(100%)' : 'none',
+                                          opacity: (u && !isMastered && !isPendingOffer) ? 0.6 : 1
+                                        }}>
+                                          {u ? (
+                                            <div style={{ width: '100%', height: '100%', position: 'relative', filter: isPendingOffer ? 'opacity(0.7) grayscale(30%)' : 'none' }}>
+                                              <img 
+                                                src={u.photo_url || '/avatar_ghost.jpg'} 
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  if ((window as any).openUserProfile) {
+                                                    (window as any).openUserProfile(u);
+                                                  }
+                                                }}
+                                                style={{ width: '100%', height: '100%', borderRadius: '15px', objectFit: 'cover', cursor: 'pointer' }} 
+                                                className="hover-scale-mini"
+                                                alt="" 
+                                              />
+                                              {isMastered && !isPendingOffer && (
+                                                <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: '#22c55e', color: 'white', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', zIndex: 10 }}>
+                                                  <Check size={12} strokeWidth={4} />
+                                                </div>
+                                              )}
+                                            </div>
+                                          ) : (
+                                            <div style={{ fontSize: '1.4rem', opacity: 0.2 }}>
+                                              {slot.isVocal ? <Mic size={18} /> : (APP_INSTRUMENT_ICONS[slot.inst] || <Plus size={18} />)}
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px', width: '100%' }}>
+                                          <div style={{ fontSize: '0.65rem', fontWeight: 950, color: isPendingOffer ? '#eab308' : (u ? 'white' : 'rgba(255,255,255,0.3)'), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                                            {u ? u.first_name : instLabel}
+                                          </div>
+                                          {(u || isPendingOffer) && (
+                                            <div style={{ fontSize: '0.45rem', fontWeight: 800, color: isPendingOffer ? 'rgba(234, 179, 8, 0.7)' : 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>
+                                              {isPendingOffer ? 'Angeboten' : instLabel}
+                                            </div>
+                                          )}
+                                        </div>
+                                        
+                                        {isPendingOffer && isMe && (
+                                          <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                                            <button 
+                                              onClick={async (e) => {
+                                                e.stopPropagation();
+                                                const { error } = await supabase.from('band_song_slots').insert({
+                                                  band_song_id: prop.id,
+                                                  user_id: user.id,
+                                                  instrument: 'Vocals',
+                                                  part_number: slot.part,
+                                                  status: 'accepted'
+                                                });
+                                                if (error) alert('Fehler: ' + error.message);
+                                                else fetchSongProposals();
+                                              }}
+                                              style={{ background: '#22c55e', color: 'white', border: 'none', borderRadius: '4px', padding: '2px 6px', fontSize: '0.5rem', fontWeight: 900, cursor: 'pointer' }}
+                                            >
+                                              JA 🎤
+                                            </button>
+                                            <button 
+                                              onClick={async (e) => {
+                                                e.stopPropagation();
+                                                const { error } = await supabase.from('band_song_slots').insert({
+                                                  band_song_id: prop.id,
+                                                  user_id: user.id,
+                                                  instrument: 'Vocals',
+                                                  part_number: slot.part,
+                                                  status: 'declined'
+                                                });
+                                                if (error) alert('Fehler: ' + error.message);
+                                                else fetchSongProposals();
+                                              }}
+                                              style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', padding: '2px 6px', fontSize: '0.5rem', fontWeight: 900, cursor: 'pointer' }}
+                                            >
+                                              NEIN
+                                            </button>
+                                          </div>
+                                        )}
+                                        
+                                        {slot.isVocal && slot.isOpen && !u && (
+                                          <button 
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              joinSongProposal(prop.id, 'Vocals', slot.part);
+                                            }}
+                                            style={{ background: brandColor, color: 'white', border: 'none', borderRadius: '4px', padding: '2px 6px', fontSize: '0.5rem', fontWeight: 900, cursor: 'pointer', marginTop: '4px' }}
+                                          >
+                                            SINGEN 🎤
+                                          </button>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
 
               {/* RIGHT: Sidebar with Shoutbox and Wochenplaner */}
