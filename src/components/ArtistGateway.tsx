@@ -162,8 +162,8 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
             justifyContent: 'center',
             transition: 'all 0.3s'
           }}
-          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+          
+          
         >
           <X size={24} />
         </button>
@@ -274,8 +274,8 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
               transition: 'all 0.2s',
               letterSpacing: '0.02em'
             }}
-            onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'}
-            onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+            
+            
           >
             BÜHNE FREI – ZUM DASHBOARD 🚀
           </button>

@@ -1526,8 +1526,8 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                                      opacity: 0.8,
                                                      transition: 'opacity 0.2s'
                                                    }}
-                                                   onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-                                                   onMouseLeave={(e) => e.currentTarget.style.opacity = '0.8'}
+                                                   
+                                                   
                                                  >
                                                    Aussteigen ❌
                                                  </button>
@@ -1559,14 +1559,8 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                                  cursor: 'pointer',
                                                  transition: 'all 0.2s'
                                                }}
-                                               onMouseEnter={(e) => {
-                                                 e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
-                                                 e.currentTarget.style.borderColor = brandColor;
-                                               }}
-                                               onMouseLeave={(e) => {
-                                                 e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)';
-                                                 e.currentTarget.style.borderColor = `${brandColor}66`;
-                                               }}
+                                               
+                                               
                                              >
                                                <div style={{
                                                  width: '24px',

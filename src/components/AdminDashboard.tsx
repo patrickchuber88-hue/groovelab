@@ -1862,8 +1862,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                               setMemberToSearch('');
                             }}
                             style={{ padding: '10px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.85rem', fontWeight: 600, borderBottom: '1px solid #f1f5f9' }}
-                            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                            
+                            
                           >
                             <img src={s.photo_url || '/avatar_ghost.jpg'} style={{ width: '24px', height: '24px', borderRadius: '50%' }} />
                             {s.first_name} {s.last_name}
@@ -1939,12 +1939,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 gap: '6px',
                 border: '1px solid ' + (selectedCoachId === 'all' ? brandColor : '#e2e8f0')
               }}
-              onMouseEnter={e => {
-                if (selectedCoachId !== 'all') e.currentTarget.style.borderColor = brandColor;
-              }}
-              onMouseLeave={e => {
-                if (selectedCoachId !== 'all') e.currentTarget.style.borderColor = '#e2e8f0';
-              }}
+              
+              
             >
               Alle Coaches
             </button>
@@ -1965,12 +1961,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 gap: '6px',
                 border: '1px solid ' + (selectedCoachId === 'none' ? brandColor : '#e2e8f0')
               }}
-              onMouseEnter={e => {
-                if (selectedCoachId !== 'none') e.currentTarget.style.borderColor = brandColor;
-              }}
-              onMouseLeave={e => {
-                if (selectedCoachId !== 'none') e.currentTarget.style.borderColor = '#e2e8f0';
-              }}
+              
+              
             >
               Ohne Coach
             </button>
@@ -1995,12 +1987,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     gap: '8px',
                     border: '1px solid ' + (isSelected ? brandColor : '#e2e8f0')
                   }}
-                  onMouseEnter={e => {
-                    if (!isSelected) e.currentTarget.style.borderColor = brandColor;
-                  }}
-                  onMouseLeave={e => {
-                    if (!isSelected) e.currentTarget.style.borderColor = '#e2e8f0';
-                  }}
+                  
+                  
                 >
                   <img 
                     src={t.photo_url || '/avatar_ghost.jpg'} 
@@ -2058,8 +2046,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     background: 'white', borderRadius: '24px', padding: '20px 24px', border: '1px solid #f1f5f9', boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
                     display: 'grid', gridTemplateColumns: 'auto 1fr auto auto auto', alignItems: 'center', gap: '24px', cursor: 'pointer', transition: 'all 0.2s'
                   }}
-                  onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
-                  onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                  
+                  
                 >
                   <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
                     {band.photo_url ? (
@@ -2129,8 +2117,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                       }
                     }}
                     style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#ef4444', padding: '10px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s' }}
-                    onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
-                    onMouseLeave={e => e.currentTarget.style.background = '#fef2f2'}
+                    
+                    
                     title="Band auflösen"
                   >
                     <Trash2 size={18} />
@@ -2205,8 +2193,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                               fetchData();
                             }}
                             style={{ width: '100%', padding: '8px', borderRadius: '8px', border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', textAlign: 'left' }}
-                            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                            
+                            
                           >
                             <div style={{ width: '28px', height: '28px', borderRadius: '50%', overflow: 'hidden' }}>
                               <img src={s.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -2506,14 +2494,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   transition: 'transform 0.2s, box-shadow 0.2s', 
                   cursor: 'default' 
                 }} 
-                onMouseEnter={e => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02)';
-                }} 
-                onMouseLeave={e => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.02), 0 8px 10px -6px rgba(0, 0, 0, 0.02)';
-                }}
+                 
+                
               >
                 <div 
                   onClick={() => fetchStudentProfile(s)}
@@ -2588,8 +2570,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                       alignItems: 'center',
                       justifyContent: 'center'
                     }} 
-                    onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'} 
-                    onMouseLeave={e => e.currentTarget.style.background = '#f1f5f9'} 
+                     
+                     
                     title="Bearbeiten"
                   >
                     <Pencil size={18} />
@@ -2608,8 +2590,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                       alignItems: 'center',
                       justifyContent: 'center'
                     }} 
-                    onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'} 
-                    onMouseLeave={e => e.currentTarget.style.background = '#f1f5f9'} 
+                     
+                     
                     title="QR Code"
                   >
                     <QrCode size={18} />
@@ -2628,8 +2610,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                       alignItems: 'center',
                       justifyContent: 'center'
                     }} 
-                    onMouseEnter={e => { e.currentTarget.style.background = '#fee2e2'; e.currentTarget.style.color = '#ef4444'; }} 
-                    onMouseLeave={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#ef4444'; }} 
+                     
+                     
                     title="Löschen"
                   >
                     <Trash2 size={18} />
@@ -2827,7 +2809,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               </div>
 
             <div style={{ display: 'flex', gap: '16px', marginTop: '12px' }}>
-              <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '20px', borderRadius: '20px', fontWeight: 900, fontSize: '1.1rem', cursor: 'pointer', boxShadow: `0 10px 30px ${brandColor}30`, transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>Änderungen speichern</button>
+              <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '20px', borderRadius: '20px', fontWeight: 900, fontSize: '1.1rem', cursor: 'pointer', boxShadow: `0 10px 30px ${brandColor}30`, transition: 'all 0.2s' }}  >Änderungen speichern</button>
               <button type="button" onClick={() => setEditingTeacher(null)} style={{ flex: 1, background: 'white', color: '#64748b', border: '1px solid #e2e8f0', padding: '20px', borderRadius: '20px', fontWeight: 800, cursor: 'pointer' }}>Abbrechen</button>
             </div>
           </form>
@@ -2935,8 +2917,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               
               {/* Action buttons */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }} onClick={e => e.stopPropagation()}>
-                <button onClick={() => setSelectedQRUser(t)} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '12px', borderRadius: '14px', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'} onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}><QrCode size={20} /></button>
-                <button onClick={() => handleDeleteTeacher(t.id)} style={{ background: '#fff1f2', border: '1px solid #fecaca', padding: '12px', borderRadius: '14px', cursor: 'pointer', color: '#ef4444', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = '#ffe4e6'} onMouseLeave={e => e.currentTarget.style.background = '#fff1f2'}><Trash2 size={20} /></button>
+                <button onClick={() => setSelectedQRUser(t)} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '12px', borderRadius: '14px', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s' }}  ><QrCode size={20} /></button>
+                <button onClick={() => handleDeleteTeacher(t.id)} style={{ background: '#fff1f2', border: '1px solid #fecaca', padding: '12px', borderRadius: '14px', cursor: 'pointer', color: '#ef4444', transition: 'all 0.2s' }}  ><Trash2 size={20} /></button>
               </div>
             </div>
             );
@@ -3253,14 +3235,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                               transition: 'all 0.15s ease',
                               outline: 'none'
                             }}
-                            onMouseEnter={e => {
-                              e.currentTarget.style.borderColor = '#94a3b8';
-                              e.currentTarget.style.background = '#f8fafc';
-                            }}
-                            onMouseLeave={e => {
-                              e.currentTarget.style.borderColor = '#cbd5e1';
-                              e.currentTarget.style.background = '#ffffff';
-                            }}
+                            
+                            
                           >
                             <span style={{
                               width: '10px',
@@ -3338,18 +3314,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                         transition: 'all 0.15s',
                                         outline: 'none'
                                       }}
-                                      onMouseEnter={e => {
-                                        if (!isSelected) {
-                                          e.currentTarget.style.background = '#f8fafc';
-                                          e.currentTarget.style.color = '#1e293b';
-                                        }
-                                      }}
-                                      onMouseLeave={e => {
-                                        if (!isSelected) {
-                                          e.currentTarget.style.background = 'transparent';
-                                          e.currentTarget.style.color = '#475569';
-                                        }
-                                      }}
+                                      
+                                      
                                     >
                                       <span style={{
                                         width: '10px',
@@ -3367,7 +3333,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                             </>
                           )}
                         </div>
-                        <button onClick={() => handleDeleteStation(station.id)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} onMouseEnter={e => e.currentTarget.style.color = '#ef4444'} onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}>
+                        <button onClick={() => handleDeleteStation(station.id)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}  >
                           <Trash2 size={14} />
                         </button>
                       </div>
@@ -3760,8 +3726,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     else norm[k] = v;
                   });
                   setEditingSong({...song, instrumentation: norm});
-                }} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '12px', borderRadius: '12px', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'} onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}><Pencil size={20} /></button>
-                <button onClick={() => handleDeleteSong(song.id)} style={{ background: '#fff1f2', border: '1px solid #fecaca', padding: '12px', borderRadius: '12px', cursor: 'pointer', color: '#ef4444', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = '#ffe4e6'} onMouseLeave={e => e.currentTarget.style.background = '#fff1f2'}><Trash2 size={20} /></button>
+                }} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '12px', borderRadius: '12px', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s' }}  ><Pencil size={20} /></button>
+                <button onClick={() => handleDeleteSong(song.id)} style={{ background: '#fff1f2', border: '1px solid #fecaca', padding: '12px', borderRadius: '12px', cursor: 'pointer', color: '#ef4444', transition: 'all 0.2s' }}  ><Trash2 size={20} /></button>
               </div>
             </div>
           ))}
@@ -4895,8 +4861,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           <button 
             onClick={saveAsImage} 
             style={{ width: '100%', background: brandColor, color: 'white', border: 'none', padding: '20px', borderRadius: '24px', fontWeight: 900, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginTop: '24px', boxShadow: `0 15px 35px ${brandColor}50`, transition: 'all 0.2s' }} 
-            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} 
-            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+             
+            
           >
             <Download size={24} /> Ausweis als JPEG speichern
           </button>
@@ -5018,8 +4984,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             <button 
               onClick={() => setCustomizingRoom(null)} 
               style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s' }}
-              onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'}
-              onMouseLeave={e => e.currentTarget.style.background = '#f1f5f9'}
+              
+              
             >
               <X size={20} />
             </button>
@@ -5220,8 +5186,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 <button 
                   onClick={handleApplyDefaultGrid}
                   style={{ width: '100%', background: '#ffffff', color: '#1e293b', border: '1.5px solid #cbd5e1', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', transition: 'all 0.2s' }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = brandColor}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = '#cbd5e1'}
+                  
+                  
                 >
                   ✨ Symmetrisches Standard-Raster anwenden
                 </button>
@@ -5388,8 +5354,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 boxShadow: '0 8px 20px rgba(0,0,0,0.1)', 
                 transition: 'all 0.2s' 
               }}
-              onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
-              onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+              
+              
             >
               Speichern & Schließen
             </button>
@@ -6012,20 +5978,8 @@ function DeviceSetupScreen({
           transform: isCurrentDevice ? 'none' : 'translateY(0px)',
           userSelect: 'none'
         }}
-        onMouseEnter={e => {
-          if (!isCurrentDevice) {
-            e.currentTarget.style.transform = 'translateY(-3px)';
-            e.currentTarget.style.borderColor = `${brandColor}40`;
-            e.currentTarget.style.boxShadow = '0 20px 25px -5px rgba(148, 163, 184, 0.1), 0 10px 10px -5px rgba(148, 163, 184, 0.04)';
-          }
-        }}
-        onMouseLeave={e => {
-          if (!isCurrentDevice) {
-            e.currentTarget.style.transform = 'translateY(0px)';
-            e.currentTarget.style.borderColor = '#f1f5f9';
-            e.currentTarget.style.boxShadow = '0 4px 20px -2px rgba(148, 163, 184, 0.06), 0 2px 4px -1px rgba(148, 163, 184, 0.03)';
-          }
-        }}
+        
+        
       >
         {isCurrentDevice && (
           <div style={{
@@ -6151,8 +6105,8 @@ function DeviceSetupScreen({
                 justifyContent: 'center',
                 gap: '4px'
               }}
-              onMouseEnter={e => e.currentTarget.style.background = '#fecaca'}
-              onMouseLeave={e => e.currentTarget.style.background = '#fee2e2'}
+              
+              
             >
               <span>🔌</span> Kopplung aufheben
             </button>
@@ -6377,8 +6331,8 @@ function DeviceSetupScreen({
                       alignItems: 'center',
                       gap: '6px'
                     }}
-                    onMouseEnter={e => e.currentTarget.style.filter = 'brightness(1.05)'}
-                    onMouseLeave={e => e.currentTarget.style.filter = 'none'}
+                    
+                    
                   >
                     Kopieren
                   </button>
@@ -6742,8 +6696,8 @@ function DeviceSetupScreen({
                   cursor: 'pointer',
                   transition: 'all 0.15s'
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
-                onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                
+                
               >
                 Wochenplan bereinigen (Datenleichen entfernen)
               </button>
@@ -6766,8 +6720,8 @@ function DeviceSetupScreen({
                   cursor: 'pointer',
                   transition: 'all 0.15s'
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
-                onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                
+                
               >
                 Wochenplan komplett leeren
               </button>
@@ -6809,8 +6763,8 @@ function DeviceSetupScreen({
                   cursor: 'pointer',
                   transition: 'all 0.15s'
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
-                onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                
+                
               >
                 Übe-Statistiken zurücksetzen
               </button>

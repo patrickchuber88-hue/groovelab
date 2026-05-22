@@ -946,8 +946,8 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px', minWidth: '200px', paddingTop: '40px' }}>
               {!activeSkill.is_pending_approval && !activeSkill.is_stage_ready && localProgress >= 90 && (
                 <button 
-                  onMouseEnter={() => setIsChallengeHovered(true)}
-                  onMouseLeave={() => setIsChallengeHovered(false)}
+                  
+                  
                   onClick={() => onSubmitForApproval({ ...activeSkill, progress: localProgress })} 
                   style={{ 
                     width: '100%', padding: '18px', borderRadius: '20px', 
@@ -4585,8 +4585,8 @@ function App() {
               boxShadow: '0 4px 12px rgba(255,255,255,0.1)',
               transition: 'all 0.2s'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-            onMouseLeave={(e) => e.currentTarget.style.transform = 'none'}
+            
+            
           >
             Abmelden
           </button>
@@ -6680,14 +6680,8 @@ function App() {
                             marginRight: 'auto',
                             transition: 'all 0.2s'
                           }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = '#fef2f2';
-                            e.currentTarget.style.borderColor = '#fca5a5';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'transparent';
-                            e.currentTarget.style.borderColor = '#fee2e2';
-                          }}
+                          
+                          
                         >
                           <Trash2 size={16} /> Für mich löschen
                         </button>
@@ -7746,8 +7740,8 @@ function App() {
                                       cursor: 'pointer', transition: 'all 0.2s ease',
                                       flexShrink: 0
                                     }}
-                                    onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
-                                    onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                                    
+                                    
                                   >
                                     {renderBandAvatar(form.originBand.name, form.originBand.photo_url, '64px', '18px')}
                                     <div>
@@ -8371,8 +8365,8 @@ function App() {
                         fontWeight: 800, cursor: 'pointer', fontSize: '0.75rem',
                         transition: 'all 0.2s'
                       }}
-                      onMouseEnter={e => { if (libraryAlphaFilter !== letter) e.currentTarget.style.background = '#f1f5f9'; }}
-                      onMouseLeave={e => { if (libraryAlphaFilter !== letter) e.currentTarget.style.background = 'transparent'; }}
+                      
+                      
                     >
                       {letter}
                     </button>
@@ -8520,18 +8514,8 @@ function App() {
                                 boxShadow: '0 4px 10px rgba(0,0,0,0.02)',
                                 transition: 'all 0.2s ease' 
                               }}
-                              onMouseEnter={e => {
-                                e.currentTarget.style.background = '#f8fafc';
-                                e.currentTarget.style.borderColor = '#cbd5e1';
-                                e.currentTarget.style.transform = 'translateY(-1px)';
-                                e.currentTarget.style.boxShadow = '0 6px 15px rgba(0,0,0,0.04)';
-                              }}
-                              onMouseLeave={e => {
-                                e.currentTarget.style.background = '#ffffff';
-                                e.currentTarget.style.borderColor = '#e2e8f0';
-                                e.currentTarget.style.transform = 'none';
-                                e.currentTarget.style.boxShadow = '0 4px 10px rgba(0,0,0,0.02)';
-                              }}
+                              
+                              
                             >
                               <Plus size={18} color="#f59e0b" strokeWidth={3} />
                               <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>Üben</span>
@@ -8583,16 +8567,8 @@ function App() {
                         willChange: 'transform',
                         backfaceVisibility: 'hidden'
                       }}
-                      onMouseEnter={e => {
-                        e.currentTarget.style.transform = 'translateY(-8px)';
-                        e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.06)';
-                        e.currentTarget.style.borderColor = `${brandColor}30`;
-                      }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = 'none';
-                        e.currentTarget.style.borderColor = '#f1f5f9';
-                      }}
+                      
+                      
                     >
                       <div style={{ 
                         position: 'absolute', 
@@ -8942,8 +8918,8 @@ function App() {
                     boxShadow: `0 8px 20px ${brandColor}20`,
                     transition: 'all 0.2s'
                   }}
-                  onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
-                  onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                  
+                  
                 >
                   ZURÜCK ZUM DASHBOARD
                 </button>
@@ -9029,8 +9005,8 @@ function App() {
                             key={band.id}
                             onClick={() => handleSuggestToBand(band.id, suggestingSkill)}
                             style={{ width: '100%', background: 'white', border: '1px solid #e2e8f0', padding: '16px', borderRadius: '16px', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}
-                            onMouseEnter={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = brandColor; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+                            
+                            
                           >
                             <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: brandColor, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 }}>{band.name?.[0]}</div>
                             <div style={{ flex: 1 }}>
@@ -9159,8 +9135,8 @@ function App() {
                       transition: 'all 0.2s',
                       boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.borderColor = '#94a3b8'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                    
+                    
                   >
                     <Users size={18} /> NEUE FORMATION SUCHEN
                   </button>

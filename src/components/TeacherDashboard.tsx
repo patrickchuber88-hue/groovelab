@@ -241,8 +241,8 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
                 flexShrink: 0,
                 marginLeft: '4px'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.background = '#fee2e2'}
-              onMouseLeave={(e) => e.currentTarget.style.background = '#fef2f2'}
+              
+              
             >
               Logout
             </button>
@@ -2083,18 +2083,8 @@ export function TeacherDashboard({
                               cursor: viewMode === 'student' ? 'pointer' : 'default',
                               transition: 'all 0.2s ease-in-out'
                             }}
-                            onMouseEnter={(e) => {
-                              if (viewMode === 'student') {
-                                e.currentTarget.style.borderColor = 'rgba(251, 191, 36, 0.6)';
-                                e.currentTarget.style.boxShadow = '0 8px 25px rgba(180, 83, 9, 0.08)';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (viewMode === 'student') {
-                                e.currentTarget.style.borderColor = 'rgba(254, 243, 199, 0.4)';
-                                e.currentTarget.style.boxShadow = '0 4px 15px rgba(180, 83, 9, 0.02)';
-                              }
-                            }}
+                            
+                            
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                               <div style={{ flex: 1 }}>
@@ -2293,8 +2283,8 @@ export function TeacherDashboard({
                         fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer', textTransform: 'uppercase',
                         boxShadow: '0 2px 5px rgba(0,0,0,0.02)', transition: 'all 0.2s'
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                      
+                      
                     >
                       Alle lesen
                     </button>
@@ -2507,8 +2497,8 @@ export function TeacherDashboard({
                               cursor: 'pointer',
                               transition: 'all 0.2s'
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = '#e2e8f0'}
-                            onMouseLeave={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                            
+                            
                           >
                             Üben
                           </button>
@@ -2529,8 +2519,8 @@ export function TeacherDashboard({
                               boxShadow: '0 4px 12px rgba(34, 197, 94, 0.2)',
                               transition: 'all 0.2s'
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                            
+                            
                           >
                             GO!
                           </button>
@@ -2563,14 +2553,8 @@ export function TeacherDashboard({
                   position: 'relative',
                   overflow: 'hidden'
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#c084fc';
-                  e.currentTarget.style.boxShadow = '0 15px 35px rgba(139, 92, 246, 0.15)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#e9d5ff';
-                  e.currentTarget.style.boxShadow = '0 10px 30px rgba(139, 92, 246, 0.05)';
-                }}
+                
+                
               >
                 <div style={{
                   position: 'absolute',
@@ -2646,8 +2630,8 @@ export function TeacherDashboard({
                   cursor: 'pointer',
                   transition: 'all 0.2s'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                
+                
               >
                 <User size={20} color="#ef4444" />
                 <span style={{ color: '#ef4444', fontWeight: 900, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Alle Ausloggen</span>
@@ -2676,8 +2660,8 @@ export function TeacherDashboard({
                 boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
                 transition: 'all 0.2s'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.transform = 'translateX(-4px)'}
-              onMouseLeave={(e) => e.currentTarget.style.transform = 'translateX(0)'}
+              
+              
             >
               ← Zurück zum Live Lab
             </button>
@@ -2751,16 +2735,8 @@ export function TeacherDashboard({
                           boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
                           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
                         }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = 'translateY(-2px)';
-                          e.currentTarget.style.border = '1px solid rgba(165, 180, 252, 0.3)';
-                          e.currentTarget.style.boxShadow = '0 12px 30px rgba(0, 0, 0, 0.2)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.border = '1px solid rgba(165, 180, 252, 0.15)';
-                          e.currentTarget.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.1)';
-                        }}
+                        
+                        
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                           {renderBandAvatar(band.name, band.photo_url, '48px', '12px')}

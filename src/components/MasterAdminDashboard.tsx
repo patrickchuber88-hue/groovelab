@@ -288,14 +288,8 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
               transition: 'all 0.2s',
               boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#f8fafc';
-              e.currentTarget.style.borderColor = '#cbd5e1';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#ffffff';
-              e.currentTarget.style.borderColor = '#e2e8f0';
-            }}
+            
+            
           >
             <RefreshCw size={18} />
           </button>
@@ -317,8 +311,8 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
               boxShadow: '0 8px 20px rgba(239, 68, 68, 0.15)',
               transition: 'all 0.2s'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+            
+            
           >
             <LogOut size={16} /> Abmelden
           </button>
@@ -553,20 +547,8 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                             boxShadow: '0 2px 5px rgba(0,0,0,0.01)',
                             transition: 'all 0.25s'
                           }}
-                          onMouseEnter={(e) => {
-                            if (copiedId !== school.id) {
-                              e.currentTarget.style.background = '#fef9c3';
-                              e.currentTarget.style.borderColor = '#fef08a';
-                              e.currentTarget.style.color = '#ca8a04';
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (copiedId !== school.id) {
-                              e.currentTarget.style.background = '#ffffff';
-                              e.currentTarget.style.borderColor = '#e2e8f0';
-                              e.currentTarget.style.color = '#475569';
-                            }
-                          }}
+                          
+                          
                         >
                           {copiedId === school.id ? (
                             <>
@@ -631,8 +613,8 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                                 cursor: 'pointer',
                                 transition: 'all 0.2s'
                               }}
-                              onMouseEnter={(e) => e.currentTarget.style.color = '#ca8a04'}
-                              onMouseLeave={(e) => e.currentTarget.style.color = '#94a3b8'}
+                              
+                              
                             >
                               <Edit2 size={16} />
                             </button>
@@ -647,8 +629,8 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                                 cursor: 'pointer',
                                 transition: 'all 0.2s'
                               }}
-                              onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
-                              onMouseLeave={(e) => e.currentTarget.style.color = '#94a3b8'}
+                              
+                              
                             >
                               <Trash2 size={16} />
                             </button>
@@ -806,14 +788,8 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                   justifyContent: 'center',
                   gap: '8px'
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
-                  e.currentTarget.style.boxShadow = '0 12px 28px rgba(234, 179, 8, 0.35)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'none';
-                  e.currentTarget.style.boxShadow = '0 8px 24px rgba(234, 179, 8, 0.25)';
-                }}
+                
+                
               >
                 {creating ? 'Wird angelegt...' : (
                   <>
@@ -957,14 +933,8 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                   justifyContent: 'center',
                   gap: '8px'
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
-                  e.currentTarget.style.boxShadow = '0 12px 28px rgba(15, 23, 42, 0.25)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'none';
-                  e.currentTarget.style.boxShadow = '0 8px 24px rgba(15, 23, 42, 0.15)';
-                }}
+                
+                
               >
                 {updatingAdmin ? 'Wird gespeichert...' : 'Zugangsdaten speichern'}
               </button>

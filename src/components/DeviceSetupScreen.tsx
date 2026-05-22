@@ -678,8 +678,8 @@ export function DeviceSetupScreen() {
                 color: '#64748b',
                 transition: 'all 0.2s'
               }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.background = '#e2e8f0'; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#f1f5f9'; }}
+              
+              
             >
               <X size={20} />
             </button>
@@ -786,14 +786,8 @@ export function DeviceSetupScreen() {
                   gap: '8px',
                   marginTop: '10px'
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                  e.currentTarget.style.boxShadow = '0 12px 28px rgba(15, 23, 42, 0.25)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'none';
-                  e.currentTarget.style.boxShadow = '0 8px 24px rgba(15, 23, 42, 0.15)';
-                }}
+                
+                
               >
                 {adminLoginLoading ? 'Verifiziere...' : 'Einloggen'}
               </button>

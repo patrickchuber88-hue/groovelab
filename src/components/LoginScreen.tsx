@@ -917,8 +917,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         <span 
           onClick={() => setShowPrivacy(true)} 
           style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
-          onMouseEnter={e => e.currentTarget.style.color = '#eab308'} 
-          onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}
+           
+          
         >
           Datenschutz
         </span>
@@ -926,8 +926,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         <span 
           onClick={() => setShowImpressum(true)} 
           style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
-          onMouseEnter={e => e.currentTarget.style.color = '#eab308'} 
-          onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}
+           
+          
         >
           Impressum
         </span>
@@ -980,8 +980,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 color: '#64748b',
                 transition: 'all 0.2s'
               }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.background = '#e2e8f0'; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#f1f5f9'; }}
+              
+              
             >
               <X size={20} />
             </button>
@@ -1081,8 +1081,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 color: '#64748b',
                 transition: 'all 0.2s'
               }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.background = '#e2e8f0'; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#f1f5f9'; }}
+              
+              
             >
               <X size={20} />
             </button>
@@ -1193,8 +1193,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 color: '#64748b',
                 transition: 'all 0.2s'
               }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.background = '#e2e8f0'; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#f1f5f9'; }}
+              
+              
             >
               <X size={20} />
             </button>
@@ -1301,14 +1301,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   gap: '8px',
                   marginTop: '10px'
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                  e.currentTarget.style.boxShadow = '0 12px 28px rgba(15, 23, 42, 0.25)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'none';
-                  e.currentTarget.style.boxShadow = '0 8px 24px rgba(15, 23, 42, 0.15)';
-                }}
+                
+                
               >
                 {adminLoginLoading ? 'Verifiziere...' : 'Einloggen'}
               </button>
@@ -1411,14 +1405,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   justifyContent: 'center',
                   gap: '8px'
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                  e.currentTarget.style.boxShadow = '0 12px 24px rgba(22, 163, 74, 0.35)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'none';
-                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(22, 163, 74, 0.25)';
-                }}
+                
+                
               >
                 Ja, im Live Lab anmelden
               </button>
@@ -1441,12 +1429,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   justifyContent: 'center',
                   gap: '8px'
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#e2e8f0';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '#f1f5f9';
-                }}
+                
+                
               >
                 Nein, nur Ansicht (ohne Einchecken)
               </button>

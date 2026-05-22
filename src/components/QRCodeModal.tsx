@@ -261,8 +261,8 @@ export function QRCodeModal({ user, onClose }: QRCodeModalProps) {
             transition: 'all 0.2s',
             marginTop: '24px'
           }}
-          onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
-          onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+          
+          
         >
           <Download size={24} /> Ausweis als JPEG speichern
         </button>
