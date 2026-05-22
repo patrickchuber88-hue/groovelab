@@ -4710,21 +4710,47 @@ function App() {
     return matchesSearch && matchesAlpha;
   });
 
-  const getTeacherColorStyle = (teachersInSlot: any[], loggedInUserId: string | undefined) => {
-    const hasPatrick = teachersInSlot.some(t => (t.profiles?.first_name || '').toLowerCase().includes('patrick'));
-    const hasBoris = teachersInSlot.some(t => (t.profiles?.first_name || '').toLowerCase().includes('boris'));
+  const getTeacherTheme = (name: string, userId: string) => {
+    const nameLower = (name || '').toLowerCase();
+    if (nameLower.includes('patrick')) {
+      return {
+        solidBg: '#f59e0b', solidBorder: '#d97706',
+        lightBg: 'rgba(245, 158, 11, 0.12)', lightBorder: 'rgba(245, 158, 11, 0.5)', lightText: '#d97706'
+      };
+    }
+    if (nameLower.includes('boris')) {
+      return {
+        solidBg: '#10b981', solidBorder: '#059669',
+        lightBg: 'rgba(16, 185, 129, 0.12)', lightBorder: 'rgba(16, 185, 129, 0.5)', lightText: '#059669'
+      };
+    }
+    
+    const palettes = [
+      { solidBg: '#3b82f6', solidBorder: '#2563eb', lightBg: 'rgba(59, 130, 246, 0.12)', lightBorder: 'rgba(59, 130, 246, 0.5)', lightText: '#2563eb' }, // Blue
+      { solidBg: '#8b5cf6', solidBorder: '#7c3aed', lightBg: 'rgba(139, 92, 246, 0.12)', lightBorder: 'rgba(139, 92, 246, 0.5)', lightText: '#7c3aed' }, // Violet
+      { solidBg: '#ec4899', solidBorder: '#db2777', lightBg: 'rgba(236, 72, 153, 0.12)', lightBorder: 'rgba(236, 72, 153, 0.5)', lightText: '#db2777' }, // Pink
+      { solidBg: '#14b8a6', solidBorder: '#0d9488', lightBg: 'rgba(20, 184, 166, 0.12)', lightBorder: 'rgba(20, 184, 166, 0.5)', lightText: '#0d9488' }, // Teal
+      { solidBg: '#f43f5e', solidBorder: '#e11d48', lightBg: 'rgba(244, 63, 94, 0.12)', lightBorder: 'rgba(244, 63, 94, 0.5)', lightText: '#e11d48' }, // Rose
+    ];
+    
+    let hash = 0;
+    for (let i = 0; i < nameLower.length; i++) {
+      hash = nameLower.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % palettes.length;
+    return palettes[index];
+  };
 
-    if (hasPatrick && hasBoris) {
+  const getTeacherColorStyle = (teachersInSlot: any[], loggedInUserId: string | undefined) => {
+    if (teachersInSlot.length > 1) {
       const containsMe = teachersInSlot.some(t => t.user_id === loggedInUserId);
       if (containsMe) {
-        // Current user is one of them - show solid gradient
         return {
           bgColor: 'linear-gradient(135deg, #f59e0b 0%, #10b981 100%)',
           border: '1px solid #cbd5e1',
           textColor: 'white'
         };
       } else {
-        // Neither is current user - show light gradient
         return {
           bgColor: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(16, 185, 129, 0.12) 100%)',
           border: '1px dashed #cbd5e1',
@@ -4733,54 +4759,24 @@ function App() {
       }
     }
 
-    // Single teacher or default
     const primaryTeacher = teachersInSlot[0];
     const teacherName = (primaryTeacher?.profiles?.first_name || '').toLowerCase();
     const isMe = primaryTeacher?.user_id === loggedInUserId;
+    
+    const theme = getTeacherTheme(teacherName, primaryTeacher?.user_id || '');
 
-    if (teacherName.includes('patrick')) {
-      if (isMe) {
-        return {
-          bgColor: '#f59e0b',
-          border: '1px solid #d97706',
-          textColor: 'white'
-        };
-      } else {
-        return {
-          bgColor: 'rgba(245, 158, 11, 0.12)',
-          border: '1px dashed rgba(245, 158, 11, 0.5)',
-          textColor: '#d97706'
-        };
-      }
-    } else if (teacherName.includes('boris')) {
-      if (isMe) {
-        return {
-          bgColor: '#10b981',
-          border: '1px solid #059669',
-          textColor: 'white'
-        };
-      } else {
-        return {
-          bgColor: 'rgba(16, 185, 129, 0.12)',
-          border: '1px dashed rgba(16, 185, 129, 0.5)',
-          textColor: '#059669'
-        };
-      }
+    if (isMe) {
+      return {
+        bgColor: theme.solidBg,
+        border: `1px solid ${theme.solidBorder}`,
+        textColor: 'white'
+      };
     } else {
-      // Default fallback (e.g. Purple / Indigo)
-      if (isMe) {
-        return {
-          bgColor: '#6366f1',
-          border: '1px solid #4f46e5',
-          textColor: 'white'
-        };
-      } else {
-        return {
-          bgColor: 'rgba(99, 102, 241, 0.12)',
-          border: '1px dashed rgba(99, 102, 241, 0.5)',
-          textColor: '#4f46e5'
-        };
-      }
+      return {
+        bgColor: theme.lightBg,
+        border: `1px dashed ${theme.lightBorder}`,
+        textColor: theme.lightText
+      };
     }
   };
 

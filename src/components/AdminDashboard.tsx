@@ -6459,6 +6459,29 @@ function DeviceSetupScreen({
             </div>
 
             <div>
+              <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '6px' }}>Individuelles Impressum (Optional)</label>
+              <textarea 
+                value={hours.impressum || ''}
+                onChange={e => setHours({...hours, impressum: e.target.value})}
+                placeholder="Individuelle Angaben zum Impressum für diese Schule..."
+                style={{ 
+                  width: '100%', 
+                  padding: '10px 12px', 
+                  borderRadius: '10px', 
+                  border: '1px solid #e2e8f0', 
+                  background: 'white', 
+                  fontWeight: 600, 
+                  fontSize: '0.9rem',
+                  minHeight: '120px',
+                  resize: 'vertical'
+                }}
+              />
+              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '6px' }}>
+                Wird auf der Login-Seite des Kiosks und für Einladungslinks dieser Schule angezeigt. Falls leer, wird das Standard-Impressum (Manuel Wagner) angezeigt.
+              </div>
+            </div>
+
+            <div>
               <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '12px' }}>Öffnungszeiten</label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', maxWidth: '640px' }}>
                 {days.map((day, idx) => {

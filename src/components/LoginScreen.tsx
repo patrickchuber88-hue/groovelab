@@ -101,43 +101,49 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const inviteSchoolId = urlParams.get('invite_school_id');
   
   const [schoolName, setSchoolName] = useState<string>('');
+  const [schoolData, setSchoolData] = useState<any>(null);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [registeredUser, setRegisteredUser] = useState<any>(null);
   const [loadingSchool, setLoadingSchool] = useState(false);
   const [signingUp, setSigningUp] = useState(false);
 
+  let effectiveStationId = kioskStationId || localStorage.getItem('groovelab_station_id');
+  if (effectiveStationId === 'skip') effectiveStationId = null;
+
   useEffect(() => {
-    async function loadSchoolName() {
-      if (!inviteSchoolId) return;
+    async function loadSchoolInfo() {
       try {
         setLoadingSchool(true);
-        const { data, error } = await supabase.from('schools').select('name').eq('id', inviteSchoolId).maybeSingle();
-        if (error) throw error;
-        if (data) setSchoolName(data.name);
+        if (inviteSchoolId) {
+          const { data, error } = await supabase.from('schools').select('*').eq('id', inviteSchoolId).maybeSingle();
+          if (!error && data) {
+            setSchoolName(data.name);
+            setSchoolData(data);
+          }
+        } else if (effectiveStationId) {
+          const { data: stData, error: stError } = await supabase
+            .from('stations')
+            .select('rooms(schools(*))')
+            .eq('id', effectiveStationId)
+            .maybeSingle() as any;
+            
+          if (!stError && stData?.rooms?.schools) {
+            const sc = Array.isArray(stData.rooms.schools) ? stData.rooms.schools[0] : stData.rooms.schools;
+            if (sc) {
+              setSchoolName(sc.name);
+              setSchoolData(sc);
+            }
+          }
+        }
       } catch (err) {
-        console.error("Error loading invite school name:", err);
+        console.error("Error loading school info:", err);
       } finally {
         setLoadingSchool(false);
       }
     }
-    loadSchoolName();
-  }, [inviteSchoolId]);
-
-  const [userPos, setUserPos] = useState<{lat: number, lng: number} | null>(null);
-  
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => setUserPos({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        (err) => console.warn('[Login] Initial geo fetch failed:', err),
-        { enableHighAccuracy: true, maximumAge: 30000 }
-      );
-    }
-  }, []);
-
-  let effectiveStationId = kioskStationId || localStorage.getItem('groovelab_station_id');
-  if (effectiveStationId === 'skip') effectiveStationId = null;
+    loadSchoolInfo();
+  }, [inviteSchoolId, effectiveStationId]);
 
   const finalizeLogin = async (user: any, stationId: string | null, isWithinAnyRoom: boolean, hidePresence = false) => {
     try {
@@ -404,6 +410,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       
       const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
       if (isTeacher) {
+        if (user.is_observer) {
+          // Hospitanten are always sent to home mode without prompt
+          await finalizeLogin(user, effectiveStationId, isWithinAnyRoom, true);
+          return;
+        }
+
         setPendingTeacherUser({ user, isWithinAnyRoom });
         setShowTeacherChoiceModal(true);
         setLoading(false);
@@ -1106,38 +1118,46 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               gap: '16px',
               textAlign: 'left'
             }}>
-              <div>
-                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>Angaben gemäß § 5 TMG</h4>
-                <p style={{ margin: 0 }}>
-                  Manuel Wagner<br/>
-                  Friedrichstr. 33<br/>
-                  79713 Bad Säckingen
-                </p>
-              </div>
+              {schoolData?.opening_hours?.impressum ? (
+                <div style={{ whiteSpace: 'pre-wrap' }}>
+                  {schoolData.opening_hours.impressum}
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>Angaben gemäß § 5 TMG</h4>
+                    <p style={{ margin: 0 }}>
+                      Manuel Wagner<br/>
+                      Friedrichstr. 33<br/>
+                      79713 Bad Säckingen
+                    </p>
+                  </div>
 
-              <div>
-                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>Kontakt</h4>
-                <p style={{ margin: 0 }}>
-                  Mo-Fr: 08-15 Uhr<br/>
-                  Telefon: 07761 – 2416<br/>
-                  E-Mail: info@musaek.de
-                </p>
-              </div>
+                  <div>
+                    <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>Kontakt</h4>
+                    <p style={{ margin: 0 }}>
+                      Mo-Fr: 08-15 Uhr<br/>
+                      Telefon: 07761 – 2416<br/>
+                      E-Mail: info@musaek.de
+                    </p>
+                  </div>
 
-              <div>
-                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>EU-Streitschlichtung</h4>
-                <p style={{ margin: 0 }}>
-                  Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: <a href="https://ec.europa.eu/consumers/odr/" target="_blank" rel="noopener noreferrer" style={{ color: '#eab308', textDecoration: 'underline' }}>https://ec.europa.eu/consumers/odr/</a>.<br/>
-                  Unsere E-Mail-Adresse finden Sie oben im Impressum.
-                </p>
-              </div>
+                  <div>
+                    <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>EU-Streitschlichtung</h4>
+                    <p style={{ margin: 0 }}>
+                      Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: <a href="https://ec.europa.eu/consumers/odr/" target="_blank" rel="noopener noreferrer" style={{ color: '#eab308', textDecoration: 'underline' }}>https://ec.europa.eu/consumers/odr/</a>.<br/>
+                      Unsere E-Mail-Adresse finden Sie oben im Impressum.
+                    </p>
+                  </div>
 
-              <div>
-                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>Verbraucherstreitbeilegung / Universalschlichtungsstelle</h4>
-                <p style={{ margin: 0 }}>
-                  Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.
-                </p>
-              </div>
+                  <div>
+                    <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>Verbraucherstreitbeilegung / Universalschlichtungsstelle</h4>
+                    <p style={{ margin: 0 }}>
+                      Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

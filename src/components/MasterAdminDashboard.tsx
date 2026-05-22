@@ -33,6 +33,8 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
   // Editing State
   const [editingSchoolId, setEditingSchoolId] = useState<string | null>(null);
   const [editingSchoolName, setEditingSchoolName] = useState<string>('');
+  const [editingSchoolColor, setEditingSchoolColor] = useState<string>('');
+  const [editingSchoolLogo, setEditingSchoolLogo] = useState<string>('');
 
   // Master Admin Credentials State
   const [adminUser, setAdminUser] = useState<any>(null);
@@ -73,15 +75,24 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
     }
   };
 
-  const handleUpdateSchoolName = async (schoolId: string) => {
+  const handleUpdateSchool = async (schoolId: string) => {
     if (!editingSchoolName.trim()) return;
     try {
       const { error } = await supabase
         .from('schools')
-        .update({ name: editingSchoolName.trim() })
+        .update({ 
+          name: editingSchoolName.trim(),
+          primary_color: editingSchoolColor,
+          logo_url: editingSchoolLogo
+        })
         .eq('id', schoolId);
       if (error) throw error;
-      setSchools(prev => prev.map(s => s.id === schoolId ? { ...s, name: editingSchoolName.trim() } : s));
+      setSchools(prev => prev.map(s => s.id === schoolId ? { 
+        ...s, 
+        name: editingSchoolName.trim(),
+        primary_color: editingSchoolColor,
+        logo_url: editingSchoolLogo
+      } : s));
       setEditingSchoolId(null);
     } catch (err: any) {
       alert('Fehler beim Aktualisieren: ' + err.message);
@@ -444,11 +455,12 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                             {school.name.substring(0, 2).toUpperCase()}
                           </div>
                           {editingSchoolId === school.id ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
                               <input
                                 type="text"
                                 value={editingSchoolName}
                                 onChange={(e) => setEditingSchoolName(e.target.value)}
+                                placeholder="Schulname"
                                 style={{
                                   padding: '8px 12px',
                                   borderRadius: '8px',
@@ -460,6 +472,21 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                                   boxSizing: 'border-box'
                                 }}
                                 autoFocus
+                              />
+                              <input
+                                type="text"
+                                value={editingSchoolLogo}
+                                onChange={(e) => setEditingSchoolLogo(e.target.value)}
+                                placeholder="Logo URL (optional)"
+                                style={{
+                                  padding: '8px 12px',
+                                  borderRadius: '8px',
+                                  border: '1.5px solid #e2e8f0',
+                                  fontSize: '0.8rem',
+                                  outline: 'none',
+                                  width: '100%',
+                                  boxSizing: 'border-box'
+                                }}
                               />
                               <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontFamily: 'monospace' }}>
                                 {school.id}
@@ -478,16 +505,41 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                         </div>
                       </td>
                       <td style={{ padding: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{
-                            width: '16px',
-                            height: '16px',
-                            borderRadius: '50%',
-                            background: school.primary_color,
-                            border: '1.5px solid rgba(0,0,0,0.05)'
-                          }}></div>
-                          <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: '#475569', fontWeight: 600 }}>{school.primary_color}</span>
-                        </div>
+                        {editingSchoolId === school.id ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <input
+                              type="color"
+                              value={editingSchoolColor}
+                              onChange={(e) => setEditingSchoolColor(e.target.value)}
+                              style={{ width: '28px', height: '28px', padding: 0, border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                            />
+                            <input
+                              type="text"
+                              value={editingSchoolColor}
+                              onChange={(e) => setEditingSchoolColor(e.target.value)}
+                              style={{
+                                width: '80px',
+                                padding: '6px',
+                                borderRadius: '6px',
+                                border: '1.5px solid #e2e8f0',
+                                fontSize: '0.8rem',
+                                fontFamily: 'monospace',
+                                outline: 'none'
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{
+                              width: '16px',
+                              height: '16px',
+                              borderRadius: '50%',
+                              background: school.primary_color,
+                              border: '1.5px solid rgba(0,0,0,0.05)'
+                            }}></div>
+                            <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: '#475569', fontWeight: 600 }}>{school.primary_color}</span>
+                          </div>
+                        )}
                       </td>
                       <td style={{ padding: '16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -565,7 +617,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                         {editingSchoolId === school.id ? (
                           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                             <button
-                              onClick={() => handleUpdateSchoolName(school.id)}
+                              onClick={() => handleUpdateSchool(school.id)}
                               style={{
                                 padding: '6px 12px',
                                 borderRadius: '8px',
@@ -603,6 +655,8 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                               onClick={() => {
                                 setEditingSchoolId(school.id);
                                 setEditingSchoolName(school.name);
+                                setEditingSchoolColor(school.primary_color || '#3b82f6');
+                                setEditingSchoolLogo(school.logo_url || '');
                               }}
                               style={{
                                 padding: '8px',
