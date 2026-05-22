@@ -990,7 +990,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
           <div 
             style={{
               position: 'fixed', top: 0, right: 0, bottom: 0,
-              width: '100%', maxWidth: '550px',
+              width: '100%', maxWidth: '50vw', minWidth: '550px',
               background: '#ffffff',
               zIndex: 9999,
               boxShadow: '-10px 0 40px rgba(0,0,0,0.15)',
