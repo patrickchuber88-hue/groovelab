@@ -5757,9 +5757,8 @@ function App() {
                                     </h4>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                                       {Object.entries(groupedPresences).map(([teacherName, presList]) => {
-                                        const isPatrick = teacherName.toLowerCase().includes('patrick');
-                                        const isBoris = teacherName.toLowerCase().includes('boris');
-                                        const dotColor = isPatrick ? '#f59e0b' : isBoris ? '#10b981' : '#6366f1';
+                                        const theme = getTeacherTheme(teacherName, '');
+                                        const dotColor = theme.solidBg;
                                         return (
                                           <div key={teacherName} style={{ 
                                             display: 'flex', 
@@ -6222,9 +6221,8 @@ function App() {
                                     </h4>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                                       {Object.entries(groupedPresences).map(([teacherName, presList]) => {
-                                        const isPatrick = teacherName.toLowerCase().includes('patrick');
-                                        const isBoris = teacherName.toLowerCase().includes('boris');
-                                        const dotColor = isPatrick ? '#f59e0b' : isBoris ? '#10b981' : '#6366f1';
+                                        const theme = getTeacherTheme(teacherName, '');
+                                        const dotColor = theme.solidBg;
                                         return (
                                           <div key={teacherName} style={{ 
                                             display: 'flex', 
