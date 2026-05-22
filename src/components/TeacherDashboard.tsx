@@ -239,8 +239,8 @@ const getCompressedRoomCoordinates = (rStations: any[], aspect: number): Compres
     }
   }
 
-  // Limit compression factor to be between 0.68 and 1.0
-  const F = Math.max(0.68, Math.min(1.0, F_min));
+  // Limit compression factor to be between 0.68 and 1.5
+  const F = Math.max(0.68, Math.min(1.5, F_min));
 
   // 4. Calculate compressed coordinates
   const compressedStations = rawCoords.map(c => {
@@ -1678,39 +1678,9 @@ export function TeacherDashboard({
 
   if (!teacher) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b', fontWeight: 600 }}>Lade Zentrale...</div>;
 
-  const school = teacher.schools;
-  let trialDaysLeft = null;
-  if (school?.is_trial && school?.trial_ends_at) {
-    const end = new Date(school.trial_ends_at).getTime();
-    const now = new Date().getTime();
-    trialDaysLeft = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
-  }
-
   return (
     <div style={{ padding: hideHeader ? '0' : '20px 40px', width: '100%', maxWidth: '1800px', margin: '0 auto', background: hideHeader ? 'transparent' : '#f8fafc', minHeight: '100vh' }}>
       
-      {/* Trial Banner */}
-      {viewMode !== 'student' && school?.is_trial && trialDaysLeft !== null && (
-        <div style={{
-          background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
-          color: '#fffbeb',
-          padding: '12px 24px',
-          borderRadius: '16px',
-          marginBottom: '24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '12px',
-          boxShadow: '0 4px 15px rgba(245, 158, 11, 0.2)'
-        }}>
-          <AlertCircle size={20} fill="#fffbeb" color="#f59e0b" />
-          <strong style={{ fontSize: '0.95rem', fontWeight: 800 }}>
-            {trialDaysLeft > 0 
-              ? `Diese Schule befindet sich in der Probezeit. Sie endet in ${trialDaysLeft} Tag(en).`
-              : `Die Probezeit ist abgelaufen. Der Login für Schüler ist derzeit nicht möglich.`}
-          </strong>
-        </div>
-      )}
       {selectedCoachProfile && <TeacherDetailModal teacher={selectedCoachProfile} onClose={() => setSelectedCoachProfile(null)} />}
       {selectedStudentProfile && (
         <StudentDetailModal 

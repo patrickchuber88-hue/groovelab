@@ -5308,12 +5308,14 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                         cursor: 'grab',
                         zIndex: isSelected ? 100 : 10,
                         touchAction: 'none',
-                        userSelect: 'none'
+                        userSelect: 'none',
+                        width: '18%',
+                        aspectRatio: '180 / 210'
                       }}
                     >
                       <div style={{
-                        width: '90px',
-                        height: '90px',
+                        width: '100%',
+                        height: '100%',
                         background: isSelected ? `${instColor}25` : 'rgba(30, 41, 59, 0.85)',
                         backdropFilter: 'blur(4px)',
                         border: isSelected ? `2.5px solid ${instColor}` : `1.5px solid ${isUnplaced ? '#f97316' : '#475569'}`,
@@ -5330,18 +5332,18 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                         transition: 'border-color 0.2s, background-color 0.2s',
                         animation: isUnplaced ? 'pulse-orange 2s infinite' : 'none'
                       }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Tablet size={12} color={instColor} />
-                          <span style={{ fontSize: '0.75rem', fontWeight: 800 }}>{station.name}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', maxWidth: '100%', overflow: 'hidden' }}>
+                          <Tablet size={12} color={instColor} style={{ flexShrink: 0 }} />
+                          <span style={{ fontSize: '0.75rem', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{station.name}</span>
                         </div>
                         {station.instrument && (
-                          <span style={{ fontSize: '0.6rem', fontWeight: 700, opacity: 0.8, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <span style={{ fontSize: '0.6rem', fontWeight: 700, opacity: 0.8, display: 'flex', alignItems: 'center', gap: '3px', maxWidth: '100%', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
                             {station.instrument === 'E-Piano' && '🎹'}
                             {station.instrument === 'E-Drums' && '🥁'}
                             {station.instrument === 'E-Gitarre' && '🎸'}
                             {station.instrument === 'E-Bass' && '🎸'}
                             {station.instrument === 'Vocals' && '🎤'}
-                            {station.instrument}
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{station.instrument}</span>
                           </span>
                         )}
                         {isUnplaced && (

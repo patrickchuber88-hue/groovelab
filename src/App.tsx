@@ -4935,7 +4935,13 @@ function App() {
     return presenceList;
   };
 
-
+  const school = Array.isArray(user?.schools) ? user.schools[0] : user?.schools;
+  let trialDaysLeft = null;
+  if (school?.is_trial && school?.trial_ends_at) {
+    const end = new Date(school.trial_ends_at).getTime();
+    const now = new Date().getTime();
+    trialDaysLeft = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+  }
 
   return (
     <div className="app-layout">
@@ -5138,6 +5144,24 @@ function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
             {/* Common Status Pills */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {/* Trial Pill */}
+              {(user?.role === 'teacher' || user?.role === 'admin') && school?.is_trial && trialDaysLeft !== null && (
+                <div style={{ 
+                  display: 'flex', alignItems: 'center', gap: '8px', 
+                  background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)', 
+                  padding: '8px 16px', borderRadius: '12px', 
+                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)',
+                  color: 'white'
+                }}>
+                  <AlertCircle size={14} color="white" />
+                  <span style={{ color: 'white', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {trialDaysLeft > 0 
+                      ? `Probezeit: ${trialDaysLeft} ${trialDaysLeft === 1 ? 'Tag' : 'Tage'}`
+                      : 'Probezeit abgelaufen'}
+                  </span>
+                </div>
+              )}
+
                {/* Location Pill */}
                <div style={{ 
                 display: 'flex', alignItems: 'center', gap: '8px', 
