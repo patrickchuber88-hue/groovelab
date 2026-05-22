@@ -122,6 +122,13 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
 
 
   const [songProposals, setSongProposals] = useState<any[]>([]);
+  const [expandedProposalIds, setExpandedProposalIds] = useState<Record<string, boolean>>({});
+  const toggleProposalExpand = (proposalId: string) => {
+    setExpandedProposalIds(prev => ({
+      ...prev,
+      [proposalId]: !prev[proposalId]
+    }));
+  };
   const [isRepertoireCollapsed, setIsRepertoireCollapsed] = useState(false);
   const [shoutboxMessages, setShoutboxMessages] = useState<any[]>([]);
   const [newShoutMessage, setNewShoutMessage] = useState('');
