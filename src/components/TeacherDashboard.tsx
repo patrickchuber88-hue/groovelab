@@ -156,6 +156,119 @@ const getStationColor = (name: string | null | undefined) => {
   return '#64748b';
 };
 
+interface CompressedCoordsResult {
+  stations: Array<{
+    id: string;
+    x: number;
+    y: number;
+    cx: number;
+    cy: number;
+    rawStation: any;
+  }>;
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  F: number;
+}
+
+const getCompressedRoomCoordinates = (rStations: any[], aspect: number): CompressedCoordsResult => {
+  if (rStations.length === 0) {
+    return {
+      stations: [],
+      minX: 0,
+      maxX: 0,
+      minY: 0,
+      maxY: 0,
+      F: 1.0
+    };
+  }
+
+  // 1. Calculate raw coordinates in reference space (width reference 1000px)
+  const rawCoords = rStations.map(s => {
+    const x = (s.pos_x !== null ? s.pos_x : 50) * 10;
+    const y = (s.pos_y !== null ? s.pos_y : 50) * (1000 / aspect) / 100;
+    return { id: s.id, x, y, rawStation: s };
+  });
+
+  if (rawCoords.length <= 1) {
+    const x = rawCoords[0]?.x || 500;
+    const y = rawCoords[0]?.y || (500 / aspect);
+    return {
+      stations: rawCoords.map(c => ({ ...c, cx: c.x, cy: c.y })),
+      minX: x - 90,
+      maxX: x + 90,
+      minY: y - 110,
+      maxY: y + 110,
+      F: 1.0
+    };
+  }
+
+  // 2. Find center of the bounding box of raw station centers
+  const xs = rawCoords.map(c => c.x);
+  const ys = rawCoords.map(c => c.y);
+  const minRawX = Math.min(...xs);
+  const maxRawX = Math.max(...xs);
+  const minRawY = Math.min(...ys);
+  const maxRawY = Math.max(...ys);
+
+  const centerX = (minRawX + maxRawX) / 2;
+  const centerY = (minRawY + maxRawY) / 2;
+
+  // 3. Compute F_min to prevent overlaps
+  let F_min = 0.0;
+  for (let i = 0; i < rawCoords.length; i++) {
+    for (let j = i + 1; j < rawCoords.length; j++) {
+      const dx = Math.abs(rawCoords[i].x - rawCoords[j].x);
+      const dy = Math.abs(rawCoords[i].y - rawCoords[j].y);
+
+      let pairF = 1.0;
+      if (dx === 0 && dy === 0) {
+        pairF = 1.0;
+      } else if (dx === 0) {
+        pairF = 205 / dy;
+      } else if (dy === 0) {
+        pairF = 185 / dx;
+      } else {
+        pairF = Math.min(185 / dx, 205 / dy);
+      }
+
+      if (pairF > F_min) {
+        F_min = pairF;
+      }
+    }
+  }
+
+  // Limit compression factor to be between 0.60 and 1.0
+  const F = Math.max(0.60, Math.min(1.0, F_min));
+
+  // 4. Calculate compressed coordinates
+  const compressedStations = rawCoords.map(c => {
+    const cx = centerX + (c.x - centerX) * F;
+    const cy = centerY + (c.y - centerY) * F;
+    return {
+      ...c,
+      cx,
+      cy
+    };
+  });
+
+  // 5. Calculate new bounding box limits based on compressed coordinates
+  const minX = Math.min(...compressedStations.map(c => c.cx - 90));
+  const maxX = Math.max(...compressedStations.map(c => c.cx + 90));
+  const minY = Math.min(...compressedStations.map(c => c.cy - 110));
+  const maxY = Math.max(...compressedStations.map(c => c.cy + 110));
+
+  return {
+    stations: compressedStations,
+    minX,
+    maxX,
+    minY,
+    maxY,
+    F
+  };
+};
+
 const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProfileSelect, onLogout, hasHelpRequest, customName }: { 
   num: number, color: string, inst: string, sess: any, isMe: boolean, viewMode: string, onProfileSelect: (u: any) => void, onLogout: (id: string) => void, hasHelpRequest?: boolean, customName?: string
 }) => {
@@ -1605,22 +1718,7 @@ export function TeacherDashboard({
                 if (!rHasLayout) return null;
 
                 const aspect = r.room_width / r.room_height;
-                const minX = Math.min(...rStations.map(s => {
-                  const x = (s.pos_x !== null ? s.pos_x : 50) * 10;
-                  return x - 90;
-                }));
-                const maxX = Math.max(...rStations.map(s => {
-                  const x = (s.pos_x !== null ? s.pos_x : 50) * 10;
-                  return x + 90;
-                }));
-                const minY = Math.min(...rStations.map(s => {
-                  const y = (s.pos_y !== null ? s.pos_y : 50) * (1000 / aspect) / 100;
-                  return y - 110; // Safe top padding to prevent label clipping
-                }));
-                const maxY = Math.max(...rStations.map(s => {
-                  const y = (s.pos_y !== null ? s.pos_y : 50) * (1000 / aspect) / 100;
-                  return y + 110; // Safe bottom padding to prevent card shadow/border clipping
-                }));
+                const { minX, maxX, minY, maxY } = getCompressedRoomCoordinates(rStations, aspect);
 
                 const bW = Math.max(100, maxX - minX);
                 const bH = Math.max(100, maxY - minY);
@@ -1635,23 +1733,12 @@ export function TeacherDashboard({
                 ? activeRoom.room_width / activeRoom.room_height
                 : 1.0;
 
-              // Calculate bounding box of all nodes in reference coordinates (1000px width reference) for active room
-              const minBoundX = Math.min(...roomStations.map(s => {
-                const x = (s.pos_x !== null ? s.pos_x : 50) * 10;
-                return x - 90;
-              }));
-              const maxBoundX = Math.max(...roomStations.map(s => {
-                const x = (s.pos_x !== null ? s.pos_x : 50) * 10;
-                return x + 90;
-              }));
-              const minBoundY = Math.min(...roomStations.map(s => {
-                const y = (s.pos_y !== null ? s.pos_y : 50) * (1000 / rawRoomAspectRatio) / 100;
-                return y - 110;
-              }));
-              const maxBoundY = Math.max(...roomStations.map(s => {
-                const y = (s.pos_y !== null ? s.pos_y : 50) * (1000 / rawRoomAspectRatio) / 100;
-                return y + 110;
-              }));
+              // Calculate bounding box and compressed coordinates of all nodes for active room
+              const compressedActiveLayout = getCompressedRoomCoordinates(roomStations, rawRoomAspectRatio);
+              const minBoundX = compressedActiveLayout.minX;
+              const maxBoundX = compressedActiveLayout.maxX;
+              const minBoundY = compressedActiveLayout.minY;
+              const maxBoundY = compressedActiveLayout.maxY;
 
               const boundWidth = Math.max(100, maxBoundX - minBoundX);
               const boundHeight = Math.max(100, maxBoundY - minBoundY);
@@ -1723,20 +1810,16 @@ export function TeacherDashboard({
                       overflow: 'visible'
                     }}>
 
-                      {roomStations.map(station => {
-                        const sName = station.name || '';
+                      {compressedActiveLayout.stations.map(station => {
+                        const sName = station.rawStation.name || '';
                         const isTeacher = sName.toLowerCase().includes('lehrer') || sName.toLowerCase().includes('teacher');
-                        const instColor = station.color && station.color !== '#e5e7eb' && station.color !== '#e2e8f0'
-                          ? station.color
+                        const instColor = station.rawStation.color && station.rawStation.color !== '#e5e7eb' && station.rawStation.color !== '#e2e8f0'
+                          ? station.rawStation.color
                           : getStationColor(sName);
 
-                        // Calculate raw center coordinates in reference space
-                        const x = (station.pos_x !== null ? station.pos_x : 50) * 10;
-                        const y = (station.pos_y !== null ? station.pos_y : 50) * (1000 / rawRoomAspectRatio) / 100;
-
                         // Align center coordinates relative to the bounding box
-                        const alignedX = x - minBoundX;
-                        const alignedY = y - minBoundY;
+                        const alignedX = station.cx - minBoundX;
+                        const alignedY = station.cy - minBoundY;
 
                         if (isTeacher) {
                           return (
@@ -1772,9 +1855,9 @@ export function TeacherDashboard({
                           >
                             <StationNode
                               num={num}
-                              customName={station.name}
+                              customName={station.rawStation.name}
                               color={instColor}
-                              inst={station.instrument || 'Tablet'}
+                              inst={station.rawStation.instrument || 'Tablet'}
                               sess={sess}
                               isMe={sess?.user_id === userId}
                               viewMode={viewMode}
