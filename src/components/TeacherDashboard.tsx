@@ -453,6 +453,16 @@ export function TeacherDashboard({
   }, [sidebarNotificationsCount, onSidebarNotificationsChange]);
 
   const [containerWidth, setContainerWidth] = useState(1000);
+  const [windowHeight, setWindowHeight] = useState(window.innerHeight);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowHeight(window.innerHeight);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const observerRef = useRef<ResizeObserver | null>(null);
   const containerRef = useCallback((node: HTMLDivElement | null) => {
     if (observerRef.current) {
@@ -1697,8 +1707,17 @@ export function TeacherDashboard({
                 finalPositions.set(item.id, { x: item.x, y: item.y });
               });
 
+              const verticalOffset = (hideHeader ? 0 : 160) + (rooms.length > 1 ? 74 : 0);
+              const maxH = Math.max(300, windowHeight - verticalOffset - 40);
+              const scaleW = containerWidth / 1000;
+              const scaleH = maxH / canvasHeight;
+              const scale = Math.max(0.1, Math.min(scaleW, scaleH));
+
               return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: rooms.length > 1 ? '16px' : '0px', maxWidth: '850px', width: '100%' }}>
+                <div 
+                  ref={containerRef}
+                  style={{ display: 'flex', flexDirection: 'column', gap: rooms.length > 1 ? '16px' : '0px', maxWidth: '850px', width: '100%', alignItems: 'center' }}
+                >
                   {/* Toolbar Row */}
                   {rooms.length > 1 && (
                     <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '6px', borderRadius: '16px', alignSelf: 'flex-start', marginBottom: '8px' }}>
@@ -1732,14 +1751,14 @@ export function TeacherDashboard({
                     </div>
                   )}
 
-                  {/* Scaled room blueprint to fit parent width without scrolling or overlaps */}
+                  {/* Scaled room blueprint to fit parent width and height without scrolling or overlaps */}
                   <div 
-                    ref={containerRef}
                     style={{ 
-                      width: '100%', 
+                      width: `${1000 * scale}px`,
+                      height: `${canvasHeight * scale}px`,
                       position: 'relative', 
                       overflow: 'hidden',
-                      aspectRatio: `${croppedAspectRatio}`
+                      margin: '0 auto'
                     }}
                   >
                     {/* Visual Blueprint Canvas */}
@@ -1748,8 +1767,8 @@ export function TeacherDashboard({
                       left: 0,
                       top: 0,
                       width: '1000px',
-                      height: `${1000 * (1 / croppedAspectRatio)}px`,
-                      transform: `scale(${containerWidth / 1000})`,
+                      height: `${canvasHeight}px`,
+                      transform: `scale(${scale})`,
                       transformOrigin: 'top left',
                       background: 'transparent',
                       border: 'none',

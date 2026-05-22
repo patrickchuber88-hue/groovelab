@@ -5223,6 +5223,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 style={{
                   position: 'relative',
                   width: '100%',
+                  maxWidth: (roomHeight && roomHeight > 0) ? `min(100%, calc(55vh * (${roomWidth} / ${roomHeight})))` : '100%',
                   backgroundColor: '#0f172a', // Sleek architectural layout background
                   backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.15) 1.5px, transparent 1.5px)',
                   backgroundSize: '24px 24px',
