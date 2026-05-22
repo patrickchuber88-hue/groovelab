@@ -941,7 +941,11 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     const { error } = await supabase.from('users').update({
       first_name: editingStudent.first_name,
       last_name: editingStudent.last_name,
-      birth_date: editingStudent.birth_date
+      birth_date: editingStudent.birth_date,
+      status: editingStudent.status || 'active',
+      is_trial: editingStudent.is_trial || false,
+      trial_ends_at: editingStudent.trial_ends_at || null,
+      contract_ends_at: editingStudent.contract_ends_at || null
     }).eq('id', editingStudent.id);
     
     if (error) alert('Fehler: ' + error.message);
@@ -2361,8 +2365,35 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           <form onSubmit={handleUpdateStudent} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: '#fffbeb', border: `1px solid #fde68a`, borderRadius: '20px' }}>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#b45309' }}>Schüler bearbeiten</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <input required placeholder="Vorname" value={editingStudent.first_name} onChange={e => setEditingStudent({...editingStudent, first_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
-              <input required placeholder="Nachname" value={editingStudent.last_name} onChange={e => setEditingStudent({...editingStudent, last_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
+              <input required placeholder="Vorname" value={editingStudent.first_name || ''} onChange={e => setEditingStudent({...editingStudent, first_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
+              <input required placeholder="Nachname" value={editingStudent.last_name || ''} onChange={e => setEditingStudent({...editingStudent, last_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Status</label>
+                <select value={editingStudent.status || 'active'} onChange={e => setEditingStudent({...editingStudent, status: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }}>
+                  <option value="active">Aktiv</option>
+                  <option value="bypass">Bypass (Login gesperrt)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', justifyContent: 'center' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 700, color: '#1e293b' }}>
+                  <input type="checkbox" checked={editingStudent.is_trial || false} onChange={e => setEditingStudent({...editingStudent, is_trial: e.target.checked})} />
+                  In Probezeit
+                </label>
+              </div>
+
+              {editingStudent.is_trial && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Probezeit Ende</label>
+                  <input type="date" value={editingStudent.trial_ends_at ? new Date(editingStudent.trial_ends_at).toISOString().split('T')[0] : ''} onChange={e => setEditingStudent({...editingStudent, trial_ends_at: e.target.value || null})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Vertragsende</label>
+                <input type="date" value={editingStudent.contract_ends_at ? new Date(editingStudent.contract_ends_at).toISOString().split('T')[0] : ''} onChange={e => setEditingStudent({...editingStudent, contract_ends_at: e.target.value || null})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
+              </div>
             </div>
 
             <div style={{ display: 'flex', gap: '12px' }}>

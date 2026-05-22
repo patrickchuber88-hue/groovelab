@@ -168,23 +168,50 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       
       if (!isMaster) {
         if (schoolData?.is_paused || schoolData?.status === 'suspended') {
-          alert("Login ist aktuell nicht möglich (Status gesperrt oder pausiert). Du wurdest im Home-Modus angemeldet.");
-          isHome = true;
-          // Note: The user requested: "Danach login für Schüler und Lehrer verweigern und automatisch in den bypass modus wechseln. Schüler und Lehrer bekommen angezeigt: Login ist aktuell nicht möglich"
-          // So we set isHome = true (bypass mode) instead of returning!
+          alert("Login ist aktuell nicht möglich (Status gesperrt oder pausiert).");
+          await supabase.auth.signOut();
+          setLoading(false);
+          return;
         } else if (schoolData?.is_trial && schoolData?.trial_ends_at) {
           const trialEnd = new Date(schoolData.trial_ends_at).getTime();
           const nowMs = new Date().getTime();
           if (nowMs > trialEnd) {
-            alert("Login ist aktuell nicht möglich (Probezeit abgelaufen). Du wurdest im Home-Modus angemeldet.");
-            isHome = true;
+            alert("Login ist aktuell nicht möglich (Probezeit abgelaufen).");
+            await supabase.auth.signOut();
+            setLoading(false);
+            return;
           }
         } else if (!schoolData?.is_trial && schoolData?.contract_ends_at) {
           const contractEnd = new Date(schoolData.contract_ends_at).getTime();
           const nowMs = new Date().getTime();
           if (nowMs > contractEnd) {
-            alert("Login ist aktuell nicht möglich (Vertrag abgelaufen). Du wurdest im Home-Modus angemeldet.");
-            isHome = true;
+            alert("Login ist aktuell nicht möglich (Vertrag abgelaufen).");
+            await supabase.auth.signOut();
+            setLoading(false);
+            return;
+          }
+        } else if (user.status === 'bypass') {
+          alert("Dein Login ist aktuell gesperrt.");
+          await supabase.auth.signOut();
+          setLoading(false);
+          return;
+        } else if (user.is_trial && user.trial_ends_at) {
+          const trialEnd = new Date(user.trial_ends_at).getTime();
+          const nowMs = new Date().getTime();
+          if (nowMs > trialEnd) {
+            alert("Dein Login ist aktuell nicht möglich (Probezeit abgelaufen).");
+            await supabase.auth.signOut();
+            setLoading(false);
+            return;
+          }
+        } else if (!user.is_trial && user.contract_ends_at) {
+          const contractEnd = new Date(user.contract_ends_at).getTime();
+          const nowMs = new Date().getTime();
+          if (nowMs > contractEnd) {
+            alert("Dein Login ist aktuell nicht möglich (Vertrag abgelaufen).");
+            await supabase.auth.signOut();
+            setLoading(false);
+            return;
           }
         }
       }

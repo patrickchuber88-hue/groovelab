@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { 
   Shield, Plus, Copy, Check, Trash2, Users, Monitor, 
   MapPin, LogOut, RefreshCw, Layers, Award, Clock, Music,
-  Edit2
+  Edit2, Settings, Sliders
 } from 'lucide-react';
 
 interface School {
@@ -169,7 +169,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
       ] = await Promise.all([
         supabase.from('users').select('role, school_id'),
         supabase.from('songs').select('school_id'),
-        supabase.from('bands').select('school_id'),
+        supabase.from('bands').select('school_id, name'),
         supabase.from('sessions').select('*', { count: 'exact', head: true })
       ]);
 
@@ -189,7 +189,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
           teachers: users?.filter(u => u.school_id === school.id && (u.role === 'teacher' || u.role === 'admin')).length || 0,
           students: users?.filter(u => u.school_id === school.id && u.role === 'student').length || 0,
           songs: songs?.filter(s => s.school_id === school.id).length || 0,
-          bands: bands?.filter(b => b.school_id === school.id).length || 0
+          bands: bands?.filter(b => b.school_id === school.id && b.name !== '__SYSTEM_ANNOUNCEMENTS__').length || 0
         };
       });
       setSchoolStats(sStats);
@@ -469,10 +469,29 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                 </thead>
                 <tbody>
                   {schools.map((school) => (
-                    <tr key={school.id} style={{ 
-                      borderBottom: '1px solid #f1f5f9',
-                      transition: 'background 0.2s',
-                    }}>
+                    <tr 
+                      key={school.id} 
+                      onClick={() => {
+                        setSelectedSchool(school);
+                        setEditName(school.name);
+                        setEditColor(school.primary_color || '#3b82f6');
+                        setEditLogo(school.logo_url || '');
+                        setEditStatus(school.status || 'active');
+                        setEditIsTrial(school.is_trial ?? true);
+                        setEditTrialEndsAt(school.trial_ends_at ? new Date(school.trial_ends_at).toISOString().split('T')[0] : '');
+                        setEditContractEndsAt(school.contract_ends_at ? new Date(school.contract_ends_at).toISOString().split('T')[0] : '');
+                        setEditMaxTeachers(school.max_teachers ?? 2);
+                        setEditMaxStudents(school.max_students ?? 6);
+                        setEditMaxSongs(school.max_songs ?? 5);
+                      }}
+                      style={{ 
+                        borderBottom: '1px solid #f1f5f9',
+                        transition: 'background 0.2s',
+                        cursor: 'pointer'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
+                      onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                    >
                       <td style={{ padding: '16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <div style={{
@@ -512,11 +531,11 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                             <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: '#475569', fontWeight: 600 }}>{school.primary_color}</span>
                           </div>
                       </td>
-                      <td style={{ padding: '16px' }}>
+                      <td style={{ padding: '16px' }} onClick={(e) => e.stopPropagation()}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <button
                             type="button"
-                            onClick={() => handleToggleSchoolPause(school.id, school.is_paused)}
+                            onClick={(e) => { e.stopPropagation(); handleToggleSchoolPause(school.id, school.is_paused); }}
                             style={{
                               position: 'relative',
                               width: '46px',
@@ -552,9 +571,9 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                           </span>
                         </div>
                       </td>
-                      <td style={{ padding: '16px' }}>
+                      <td style={{ padding: '16px' }} onClick={(e) => e.stopPropagation()}>
                         <button
-                          onClick={() => copyInviteLink(school.id)}
+                          onClick={(e) => { e.stopPropagation(); copyInviteLink(school.id); }}
                           style={{
                             padding: '8px 14px',
                             borderRadius: '10px',
@@ -570,8 +589,6 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                             boxShadow: '0 2px 5px rgba(0,0,0,0.01)',
                             transition: 'all 0.25s'
                           }}
-                          
-                          
                         >
                           {copiedId === school.id ? (
                             <>
@@ -584,21 +601,12 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                           )}
                         </button>
                       </td>
-                      <td style={{ padding: '16px', textAlign: 'right' }}>
+                      <td style={{ padding: '16px', textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
                           <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
                             <button
-                              onClick={() => {
-                                setSelectedSchool(school);
-                                setEditName(school.name);
-                                setEditColor(school.primary_color || '#3b82f6');
-                                setEditLogo(school.logo_url || '');
-                                setEditStatus(school.status || 'active');
-                                setEditIsTrial(school.is_trial ?? true);
-                                setEditTrialEndsAt(school.trial_ends_at ? new Date(school.trial_ends_at).toISOString().split('T')[0] : '');
-                                setEditContractEndsAt(school.contract_ends_at ? new Date(school.contract_ends_at).toISOString().split('T')[0] : '');
-                                setEditMaxTeachers(school.max_teachers ?? 2);
-                                setEditMaxStudents(school.max_students ?? 6);
-                                setEditMaxSongs(school.max_songs ?? 5);
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteSchool(school.id, school.name);
                               }}
                               style={{
                                 padding: '8px',
@@ -609,20 +617,8 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                                 cursor: 'pointer',
                                 transition: 'all 0.2s'
                               }}
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteSchool(school.id, school.name)}
-                              style={{
-                                padding: '8px',
-                                borderRadius: '8px',
-                                background: 'transparent',
-                                border: 'none',
-                                color: '#94a3b8',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
-                              }}
+                              onMouseOver={(e) => e.currentTarget.style.color = '#ef4444'}
+                              onMouseOut={(e) => e.currentTarget.style.color = '#94a3b8'}
                             >
                               <Trash2 size={16} />
                             </button>
@@ -967,175 +963,221 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
       
       {/* School Edit Modal */}
       {selectedSchool && (
-        <div style={{
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(15, 23, 42, 0.4)',
-          backdropFilter: 'blur(10px)',
-          WebkitBackdropFilter: 'blur(10px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-          padding: '20px'
-        }}>
-          <div style={{
-            background: '#ffffff',
-            borderRadius: '24px',
-            width: '100%',
-            maxWidth: '650px',
-            maxHeight: '90vh',
-            overflowY: 'auto',
-            padding: '32px',
-            boxShadow: '0 25px 50px rgba(0,0,0,0.15)',
-            border: '1px solid rgba(0,0,0,0.05)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: '#1e293b' }}>
-                Schule bearbeiten: {selectedSchool.name}
-              </h2>
+        <>
+          <div 
+            style={{
+              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(15, 23, 42, 0.3)',
+              backdropFilter: 'blur(4px)',
+              WebkitBackdropFilter: 'blur(4px)',
+              zIndex: 9998,
+              transition: 'opacity 0.3s ease'
+            }}
+            onClick={() => setSelectedSchool(null)}
+          />
+          <div 
+            style={{
+              position: 'fixed', top: 0, right: 0, bottom: 0,
+              width: '100%', maxWidth: '550px',
+              background: '#ffffff',
+              zIndex: 9999,
+              boxShadow: '-10px 0 40px rgba(0,0,0,0.15)',
+              display: 'flex', flexDirection: 'column',
+              animation: 'slideIn 0.3s ease-out forwards',
+              overflow: 'hidden' // So the header bg doesn't spill
+            }}
+          >
+            <style dangerouslySetInnerHTML={{__html: `
+              @keyframes slideIn {
+                from { transform: translateX(100%); }
+                to { transform: translateX(0); }
+              }
+            `}} />
+            
+            {/* Hero Header */}
+            <div style={{
+              position: 'relative',
+              background: editColor || '#3b82f6',
+              padding: '40px 32px 60px',
+              color: '#ffffff'
+            }}>
               <button 
                 onClick={() => setSelectedSchool(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '4px' }}
+                style={{ 
+                  position: 'absolute', top: '16px', right: '16px', 
+                  background: 'rgba(255,255,255,0.2)', 
+                  border: 'none', cursor: 'pointer', 
+                  color: '#ffffff', width: '36px', height: '36px', 
+                  borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'background 0.2s'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
+                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
               >
-                <Trash2 size={24} style={{ display: 'none' }} /> {/* Just to have a close icon space, actually I'll use a text X or something */}
-                <span style={{ fontSize: '1.5rem', fontWeight: 600 }}>×</span>
+                <span style={{ fontSize: '1.5rem', fontWeight: 600, lineHeight: 1 }}>×</span>
               </button>
-            </div>
-
-            {/* Stats Row */}
-            <div style={{
-              display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '32px'
-            }}>
-              {[
-                { label: 'Lehrer', value: schoolStats[selectedSchool.id]?.teachers || 0 },
-                { label: 'Schüler', value: schoolStats[selectedSchool.id]?.students || 0 },
-                { label: 'Bands', value: schoolStats[selectedSchool.id]?.bands || 0 },
-                { label: 'Songs', value: schoolStats[selectedSchool.id]?.songs || 0 }
-              ].map((s, i) => (
-                <div key={i} style={{
-                  background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', textAlign: 'center'
-                }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.label}</div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b', marginTop: '4px' }}>{s.value}</div>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               
-              {/* General Settings */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: '#f8fafc', padding: '24px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
-                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#1e293b' }}>Allgemein & Branding</h3>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Name</label>
-                  <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', boxSizing: 'border-box' }} />
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
+              <h2 style={{ margin: '0 0 8px 0', fontSize: '2rem', fontWeight: 900, letterSpacing: '-0.02em', textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                {selectedSchool.name}
+              </h2>
+              <p style={{ margin: 0, fontSize: '0.9rem', opacity: 0.9, fontWeight: 500 }}>
+                {editStatus === 'active' ? '🟢 Aktiv' : '🔴 Gesperrt (Bypass)'} {editIsTrial ? ' • ⏳ Probezeit' : ''}
+              </p>
+            </div>
+
+            {/* Logo Avatar overlapping */}
+            <div style={{ padding: '0 32px', marginTop: '-40px', position: 'relative', zIndex: 10, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+              <div style={{
+                width: '80px', height: '80px', 
+                background: '#ffffff', borderRadius: '20px', 
+                boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: '8px', border: '2px solid #f8fafc'
+              }}>
+                {editLogo ? (
+                  <img src={editLogo} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                ) : (
+                  <span style={{ fontSize: '2rem' }}>🏫</span>
+                )}
+              </div>
+            </div>
+
+            {/* Scrollable Content */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
+              
+              {/* Stats Row */}
+              <div style={{
+                display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '32px'
+              }}>
+                {[
+                  { label: 'Lehrer', value: schoolStats[selectedSchool.id]?.teachers || 0 },
+                  { label: 'Schüler', value: schoolStats[selectedSchool.id]?.students || 0 },
+                  { label: 'Bands', value: schoolStats[selectedSchool.id]?.bands || 0 },
+                  { label: 'Songs', value: schoolStats[selectedSchool.id]?.songs || 0 }
+                ].map((s, i) => (
+                  <div key={i} style={{
+                    background: '#f8fafc', padding: '16px 12px', borderRadius: '16px', border: '1px solid #e2e8f0', textAlign: 'center'
+                  }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.label}</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#1e293b', marginTop: '4px' }}>{s.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                
+                {/* General Settings */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <h3 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Settings size={20} color={editColor || '#3b82f6'} /> Identität & Marke
+                  </h3>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Primary Color</label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <input type="color" value={editColor} onChange={(e) => setEditColor(e.target.value)} style={{ width: '42px', height: '42px', padding: 0, border: 'none', borderRadius: '8px', cursor: 'pointer' }} />
-                      <input type="text" value={editColor} onChange={(e) => setEditColor(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1.5px solid #cbd5e1' }} />
+                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Name der Schule</label>
+                    <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1.5px solid #cbd5e1', boxSizing: 'border-box', fontSize: '1rem', fontWeight: 500, outline: 'none' }} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Hauptfarbe</label>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input type="color" value={editColor} onChange={(e) => setEditColor(e.target.value)} style={{ width: '46px', height: '46px', padding: 0, border: 'none', borderRadius: '10px', cursor: 'pointer' }} />
+                        <input type="text" value={editColor} onChange={(e) => setEditColor(e.target.value)} style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }} />
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Logo URL</label>
+                      <input type="text" value={editLogo} onChange={(e) => setEditLogo(e.target.value)} placeholder="https://..." style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1.5px solid #cbd5e1', boxSizing: 'border-box', fontSize: '0.9rem', outline: 'none' }} />
                     </div>
                   </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Logo URL</label>
-                    <input type="text" value={editLogo} onChange={(e) => setEditLogo(e.target.value)} placeholder="https://..." style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1.5px solid #cbd5e1', boxSizing: 'border-box' }} />
-                  </div>
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Status (Login Freigabe)</label>
-                  <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', outline: 'none' }}>
-                    <option value="active">Aktiv (Login erlaubt)</option>
-                    <option value="suspended">Gesperrt (Login verweigert)</option>
-                  </select>
-                </div>
-              </div>
 
-              {/* Trial & Contract */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: '#f8fafc', padding: '24px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#1e293b' }}>Probezeit & Vertrag</h3>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem', color: '#1e293b' }}>
-                    <input type="checkbox" checked={editIsTrial} onChange={(e) => setEditIsTrial(e.target.checked)} style={{ width: '18px', height: '18px' }} />
-                    Probezeit aktiv
-                  </label>
-                </div>
-                
-                {editIsTrial && (
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Probezeit Enddatum</label>
-                    <input type="date" value={editTrialEndsAt} onChange={(e) => setEditTrialEndsAt(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', boxSizing: 'border-box' }} />
-                    <p style={{ margin: '6px 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>Nach diesem Datum ist kein Login mehr möglich, bis ein Abo aktiviert wird.</p>
-                  </div>
-                )}
-                
-                {!editIsTrial && (
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Vertragslaufzeit bis (Optional)</label>
-                    <input type="date" value={editContractEndsAt} onChange={(e) => setEditContractEndsAt(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', boxSizing: 'border-box' }} />
-                  </div>
-                )}
-              </div>
+                <hr style={{ border: 'none', borderTop: '1px solid #e2e8f0', margin: '8px 0' }} />
 
-              {/* Limits */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: '#f8fafc', padding: '24px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
-                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#1e293b' }}>Ressourcen Limits</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Max Lehrer</label>
-                    <input type="number" min="0" value={editMaxTeachers} onChange={(e) => setEditMaxTeachers(parseInt(e.target.value) || 0)} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1.5px solid #cbd5e1', boxSizing: 'border-box' }} />
+                {/* Status & Contract */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Shield size={20} color={editColor || '#3b82f6'} /> Zugang & Verträge
+                    </h3>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem', color: '#1e293b', background: '#f1f5f9', padding: '6px 12px', borderRadius: '20px' }}>
+                      <input type="checkbox" checked={editIsTrial} onChange={(e) => setEditIsTrial(e.target.checked)} style={{ width: '16px', height: '16px', accentColor: editColor || '#3b82f6' }} />
+                      Probezeit aktiv
+                    </label>
                   </div>
+                  
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Max Schüler</label>
-                    <input type="number" min="0" value={editMaxStudents} onChange={(e) => setEditMaxStudents(parseInt(e.target.value) || 0)} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1.5px solid #cbd5e1', boxSizing: 'border-box' }} />
+                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Genereller Login-Status</label>
+                    <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1.5px solid #cbd5e1', outline: 'none', fontSize: '0.95rem', fontWeight: 600, color: editStatus === 'active' ? '#16a34a' : '#dc2626', background: editStatus === 'active' ? '#f0fdf4' : '#fef2f2' }}>
+                      <option value="active">🟢 Aktiv (Login am Kiosk erlaubt)</option>
+                      <option value="suspended">🔴 Gesperrt (Erzwingt Bypass / Home-Modus)</option>
+                    </select>
                   </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Max Songs</label>
-                    <input type="number" min="0" value={editMaxSongs} onChange={(e) => setEditMaxSongs(parseInt(e.target.value) || 0)} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1.5px solid #cbd5e1', boxSizing: 'border-box' }} />
+
+                  {editIsTrial ? (
+                    <div style={{ background: '#fffbeb', padding: '16px', borderRadius: '12px', border: '1px solid #fde68a' }}>
+                      <label style={{ display: 'block', fontSize: '0.85rem', color: '#b45309', fontWeight: 800, marginBottom: '6px' }}>⏳ Probezeit Enddatum</label>
+                      <input type="date" value={editTrialEndsAt} onChange={(e) => setEditTrialEndsAt(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1.5px solid #fcd34d', boxSizing: 'border-box', outline: 'none', background: '#fff' }} />
+                      <p style={{ margin: '8px 0 0 0', fontSize: '0.8rem', color: '#92400e' }}>Nach diesem Datum werden Logins verweigert, bis auf "Aktiv" umgestellt wird.</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Vertragslaufzeit bis (Optional)</label>
+                      <input type="date" value={editContractEndsAt} onChange={(e) => setEditContractEndsAt(e.target.value)} style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1.5px solid #cbd5e1', boxSizing: 'border-box', outline: 'none' }} />
+                    </div>
+                  )}
+                </div>
+
+                <hr style={{ border: 'none', borderTop: '1px solid #e2e8f0', margin: '8px 0' }} />
+
+                {/* Limits */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <h3 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Sliders size={20} color={editColor || '#3b82f6'} /> Kontingente (Limits)
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Max Lehrer</label>
+                      <input type="number" min="0" value={editMaxTeachers} onChange={(e) => setEditMaxTeachers(parseInt(e.target.value) || 0)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1', boxSizing: 'border-box', outline: 'none' }} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Max Schüler</label>
+                      <input type="number" min="0" value={editMaxStudents} onChange={(e) => setEditMaxStudents(parseInt(e.target.value) || 0)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1', boxSizing: 'border-box', outline: 'none' }} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Max Songs</label>
+                      <input type="number" min="0" value={editMaxSongs} onChange={(e) => setEditMaxSongs(parseInt(e.target.value) || 0)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1', boxSizing: 'border-box', outline: 'none' }} />
+                    </div>
                   </div>
                 </div>
-              </div>
 
+              </div>
             </div>
 
-            {/* Actions */}
-            <div style={{ display: 'flex', gap: '12px', marginTop: '32px', justifyContent: 'flex-end' }}>
+            {/* Actions (Sticky Footer) */}
+            <div style={{ padding: '24px 32px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
               <button
                 onClick={() => setSelectedSchool(null)}
                 style={{
-                  padding: '12px 24px',
-                  borderRadius: '12px',
-                  background: '#f1f5f9',
-                  color: '#475569',
-                  border: 'none',
-                  fontWeight: 700,
-                  fontSize: '0.95rem',
-                  cursor: 'pointer'
+                  padding: '14px 24px', borderRadius: '12px', background: '#e2e8f0', color: '#475569', border: 'none', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer', transition: 'background 0.2s'
                 }}
+                onMouseOver={(e) => e.currentTarget.style.background = '#cbd5e1'}
+                onMouseOut={(e) => e.currentTarget.style.background = '#e2e8f0'}
               >
                 Abbrechen
               </button>
               <button
                 onClick={handleSaveSchoolDetails}
                 style={{
-                  padding: '12px 24px',
-                  borderRadius: '12px',
-                  background: '#22c55e',
-                  color: '#ffffff',
-                  border: 'none',
-                  fontWeight: 800,
-                  fontSize: '0.95rem',
-                  cursor: 'pointer',
-                  boxShadow: '0 8px 16px rgba(34, 197, 94, 0.2)'
+                  padding: '14px 32px', borderRadius: '12px', background: editColor || '#3b82f6', color: '#ffffff', border: 'none', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer', boxShadow: `0 8px 16px ${editColor ? editColor+'40' : 'rgba(59, 130, 246, 0.3)'}`, transition: 'transform 0.1s'
                 }}
+                onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.97)'}
+                onMouseUp={(e) => e.currentTarget.style.transform = 'none'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'none'}
               >
                 Änderungen Speichern
               </button>
             </div>
           </div>
-        </div>
+        </>
       )}
 
       
