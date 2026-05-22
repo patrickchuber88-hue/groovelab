@@ -4860,6 +4860,21 @@ function App() {
     return presenceList;
   };
 
+  const adminDashboardMemo = useMemo(() => {
+    return user ? (
+      <AdminDashboard 
+        userId={user.id} 
+        onLogout={handleLogout} 
+        forceTab={activeStudentTab}
+        onTabChange={(tabId: any) => setActiveStudentTab(tabId)}
+        onOpenBandProfile={(band: any) => {
+          setSelectedBandForProfile(band);
+          setShowBandProfile(true);
+        }}
+      />
+    ) : null;
+  }, [user?.id, handleLogout, activeStudentTab]);
+
   return (
     <div className="app-layout">
       {toastMessage && (
@@ -6334,18 +6349,7 @@ function App() {
         {/* Admin/Teacher Section Tabs (Unified) */}
         {((user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'teacher')) && ['live', 'students', 'team', 'rooms', 'songs', 'stats', 'gallery', 'setup', 'bands'].includes(activeStudentTab) && (
           <ErrorBoundary key={activeStudentTab}>
-            {useMemo(() => (
-              <AdminDashboard 
-                userId={user.id} 
-                onLogout={handleLogout} 
-                forceTab={activeStudentTab}
-                onTabChange={(tabId: any) => setActiveStudentTab(tabId)}
-                onOpenBandProfile={(band: any) => {
-                  setSelectedBandForProfile(band);
-                  setShowBandProfile(true);
-                }}
-              />
-            ), [user.id, handleLogout, activeStudentTab])}
+            {adminDashboardMemo}
           </ErrorBoundary>
         )}
 
