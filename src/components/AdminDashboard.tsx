@@ -1829,7 +1829,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Coach / Leitung</label>
                   <select value={newBand.coach_id} onChange={e => setNewBand({...newBand, coach_id: e.target.value})} style={{ padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700 }}>
-                    {teachers.map(t => <option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>)}
+                    {teachers.filter(t => !t.is_observer).map(t => <option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>)}
                   </select>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1974,7 +1974,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             >
               Ohne Coach
             </button>
-            {teachers.map(t => {
+            {teachers.filter(t => !t.is_observer).map(t => {
               const isSelected = selectedCoachId === t.id;
               return (
                 <button 
@@ -5517,7 +5517,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', fontWeight: 700, background: 'white' }}
                 >
                   <option value="">Kein Coach / Automatisch</option>
-                  {teachers.map(t => (
+                  {teachers.filter(t => !t.is_observer).map(t => (
                     <option key={t.id} value={t.id}>{t.first_name} {t.last_name || ''}</option>
                   ))}
                 </select>
