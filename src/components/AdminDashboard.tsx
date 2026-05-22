@@ -9,6 +9,23 @@ import {
 } from 'recharts';
 import { renderInstrumentIcon } from '../utils/instruments';
 
+const DEFAULT_IMPRESSUM = `Angaben gemäß § 5 TMG
+Manuel Wagner
+Friedrichstr. 33
+79713 Bad Säckingen
+
+Kontakt
+Mo-Fr: 08-15 Uhr
+Telefon: 07761 – 2416
+E-Mail: info@musaek.de
+
+EU-Streitschlichtung
+Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: https://ec.europa.eu/consumers/odr/.
+Unsere E-Mail-Adresse finden Sie oben im Impressum.
+
+Verbraucherstreitbeilegung / Universalschlichtungsstelle
+Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.`;
+
 const INSTRUMENT_COLORS: Record<string, string> = {
   "Guitar": "#ef4444", "E-Gitarre": "#ef4444",
   "Bass": "#eab308", "E-Bass": "#eab308", 
@@ -4696,7 +4713,6 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           quality: 0.95, 
           backgroundColor: '#ffffff',
           cacheBust: true,
-          useCORS: true,
           pixelRatio: 2,
         });
         const link = document.createElement('a');
@@ -6415,7 +6431,7 @@ function DeviceSetupScreen({
             <div>
               <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '6px' }}>Individuelles Impressum (Optional)</label>
               <textarea 
-                value={hours.impressum || ''}
+                value={hours.impressum ?? DEFAULT_IMPRESSUM}
                 onChange={e => setHours({...hours, impressum: e.target.value})}
                 placeholder="Individuelle Angaben zum Impressum für diese Schule..."
                 style={{ 

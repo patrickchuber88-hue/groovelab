@@ -159,15 +159,37 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const finalizeLogin = async (user: any, stationId: string | null, isWithinAnyRoom: boolean, hidePresence = false) => {
     try {
       setLoading(true);
+      let finalStationId = null;
+      let isHome = false;
+
       const schoolData = Array.isArray(user.schools) ? user.schools[0] : user.schools;
       const isMaster = user.is_master_admin === true;
-      if (schoolData?.is_paused && !isMaster) {
-        alert("Diese Schule ist vorübergehend pausiert/deaktiviert. Login derzeit nicht möglich.");
-        setLoading(false);
-        return;
-      }
-      const now = new Date().toISOString();
       const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
+      
+      if (!isMaster) {
+        if (schoolData?.is_paused || schoolData?.status === 'suspended') {
+          alert("Login ist aktuell nicht möglich (Status gesperrt oder pausiert). Du wurdest im Home-Modus angemeldet.");
+          isHome = true;
+          // Note: The user requested: "Danach login für Schüler und Lehrer verweigern und automatisch in den bypass modus wechseln. Schüler und Lehrer bekommen angezeigt: Login ist aktuell nicht möglich"
+          // So we set isHome = true (bypass mode) instead of returning!
+        } else if (schoolData?.is_trial && schoolData?.trial_ends_at) {
+          const trialEnd = new Date(schoolData.trial_ends_at).getTime();
+          const nowMs = new Date().getTime();
+          if (nowMs > trialEnd) {
+            alert("Login ist aktuell nicht möglich (Probezeit abgelaufen). Du wurdest im Home-Modus angemeldet.");
+            isHome = true;
+          }
+        } else if (!schoolData?.is_trial && schoolData?.contract_ends_at) {
+          const contractEnd = new Date(schoolData.contract_ends_at).getTime();
+          const nowMs = new Date().getTime();
+          if (nowMs > contractEnd) {
+            alert("Login ist aktuell nicht möglich (Vertrag abgelaufen). Du wurdest im Home-Modus angemeldet.");
+            isHome = true;
+          }
+        }
+      }
+      
+      const now = new Date().toISOString();
       
       if (isTeacher) {
         if (hidePresence) {
@@ -176,9 +198,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           sessionStorage.setItem('groovelab_teacher_hide_presence', 'false');
         }
       }
-      
-      let finalStationId = null;
-      let isHome = false;
 
       // 1. Determine finalStationId and lookup teacher station if needed
       if (isTeacher) {

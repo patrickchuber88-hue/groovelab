@@ -13,6 +13,13 @@ interface School {
   primary_color: string;
   created_at?: string;
   is_paused?: boolean;
+  status?: string;
+  is_trial?: boolean;
+  trial_ends_at?: string | null;
+  contract_ends_at?: string | null;
+  max_teachers?: number;
+  max_students?: number;
+  max_songs?: number;
 }
 
 interface MasterAdminDashboardProps {
@@ -51,6 +58,20 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
     totalStudents: 0,
     totalSessions: 0
   });
+  const [schoolStats, setSchoolStats] = useState<Record<string, { teachers: number, students: number, songs: number, bands: number }>>({});
+  
+  // Selected School Modal State
+  const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editColor, setEditColor] = useState('#3b82f6');
+  const [editLogo, setEditLogo] = useState('');
+  const [editStatus, setEditStatus] = useState('active');
+  const [editIsTrial, setEditIsTrial] = useState(false);
+  const [editTrialEndsAt, setEditTrialEndsAt] = useState('');
+  const [editContractEndsAt, setEditContractEndsAt] = useState('');
+  const [editMaxTeachers, setEditMaxTeachers] = useState(2);
+  const [editMaxStudents, setEditMaxStudents] = useState(6);
+  const [editMaxSongs, setEditMaxSongs] = useState(5);
 
   useEffect(() => {
     fetchSchoolsAndStats();
@@ -75,25 +96,32 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
     }
   };
 
-  const handleUpdateSchool = async (schoolId: string) => {
-    if (!editingSchoolName.trim()) return;
+  const handleSaveSchoolDetails = async () => {
+    if (!selectedSchool || !editName.trim()) return;
     try {
+      const updates = { 
+        name: editName.trim(),
+        primary_color: editColor,
+        logo_url: editLogo,
+        status: editStatus,
+        is_trial: editIsTrial,
+        trial_ends_at: editIsTrial ? editTrialEndsAt || null : null,
+        contract_ends_at: editContractEndsAt || null,
+        max_teachers: editMaxTeachers,
+        max_students: editMaxStudents,
+        max_songs: editMaxSongs
+      };
+
       const { error } = await supabase
         .from('schools')
-        .update({ 
-          name: editingSchoolName.trim(),
-          primary_color: editingSchoolColor,
-          logo_url: editingSchoolLogo
-        })
-        .eq('id', schoolId);
+        .update(updates)
+        .eq('id', selectedSchool.id);
+        
       if (error) throw error;
-      setSchools(prev => prev.map(s => s.id === schoolId ? { 
-        ...s, 
-        name: editingSchoolName.trim(),
-        primary_color: editingSchoolColor,
-        logo_url: editingSchoolLogo
-      } : s));
-      setEditingSchoolId(null);
+      
+      setSchools(prev => prev.map(s => s.id === selectedSchool.id ? { ...s, ...updates } : s));
+      setSelectedSchool(null);
+      alert('Schule erfolgreich aktualisiert!');
     } catch (err: any) {
       alert('Fehler beim Aktualisieren: ' + err.message);
     }
@@ -125,7 +153,6 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
     try {
       setLoading(true);
       
-      // 1. Fetch schools
       const { data: schoolData, error: schoolErr } = await supabase
         .from('schools')
         .select('*')
@@ -134,19 +161,17 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
       if (schoolErr) throw schoolErr;
       setSchools(schoolData || []);
 
-      // 2. Fetch all users for global stats
-      const { data: users, error: userErr } = await supabase
-        .from('users')
-        .select('role');
-        
-      if (userErr) throw userErr;
-
-      // 3. Fetch active sessions count
-      const { count: sessionCount, error: sessionErr } = await supabase
-        .from('sessions')
-        .select('*', { count: 'exact', head: true });
-        
-      if (sessionErr) throw sessionErr;
+      const [
+        { data: users },
+        { data: songs },
+        { data: bands },
+        { count: sessionCount }
+      ] = await Promise.all([
+        supabase.from('users').select('role, school_id'),
+        supabase.from('songs').select('school_id'),
+        supabase.from('bands').select('school_id'),
+        supabase.from('sessions').select('*', { count: 'exact', head: true })
+      ]);
 
       const teachersCount = users?.filter(u => u.role === 'teacher' || u.role === 'admin').length || 0;
       const studentsCount = users?.filter(u => u.role === 'student').length || 0;
@@ -157,6 +182,17 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
         totalStudents: studentsCount,
         totalSessions: sessionCount || 0
       });
+
+      const sStats: Record<string, { teachers: number, students: number, songs: number, bands: number }> = {};
+      schoolData?.forEach(school => {
+        sStats[school.id] = {
+          teachers: users?.filter(u => u.school_id === school.id && (u.role === 'teacher' || u.role === 'admin')).length || 0,
+          students: users?.filter(u => u.school_id === school.id && u.role === 'student').length || 0,
+          songs: songs?.filter(s => s.school_id === school.id).length || 0,
+          bands: bands?.filter(b => b.school_id === school.id).length || 0
+        };
+      });
+      setSchoolStats(sStats);
       
     } catch (err: any) {
       console.error('Fehler beim Laden der Master-Daten:', err.message);
@@ -454,81 +490,17 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                           }}>
                             {school.name.substring(0, 2).toUpperCase()}
                           </div>
-                          {editingSchoolId === school.id ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
-                              <input
-                                type="text"
-                                value={editingSchoolName}
-                                onChange={(e) => setEditingSchoolName(e.target.value)}
-                                placeholder="Schulname"
-                                style={{
-                                  padding: '8px 12px',
-                                  borderRadius: '8px',
-                                  border: '1.5px solid #eab308',
-                                  fontSize: '0.9rem',
-                                  fontWeight: 600,
-                                  outline: 'none',
-                                  width: '100%',
-                                  boxSizing: 'border-box'
-                                }}
-                                autoFocus
-                              />
-                              <input
-                                type="text"
-                                value={editingSchoolLogo}
-                                onChange={(e) => setEditingSchoolLogo(e.target.value)}
-                                placeholder="Logo URL (optional)"
-                                style={{
-                                  padding: '8px 12px',
-                                  borderRadius: '8px',
-                                  border: '1.5px solid #e2e8f0',
-                                  fontSize: '0.8rem',
-                                  outline: 'none',
-                                  width: '100%',
-                                  boxSizing: 'border-box'
-                                }}
-                              />
-                              <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontFamily: 'monospace' }}>
-                                {school.id}
-                              </div>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1e293b' }}>
+                              {school.name}
                             </div>
-                          ) : (
-                            <div>
-                              <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1e293b' }}>
-                                {school.name}
-                              </div>
-                              <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontFamily: 'monospace', marginTop: '2px' }}>
-                                {school.id}
-                              </div>
+                            <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontFamily: 'monospace', marginTop: '2px' }}>
+                              {school.id}
                             </div>
-                          )}
+                          </div>
                         </div>
                       </td>
                       <td style={{ padding: '16px' }}>
-                        {editingSchoolId === school.id ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <input
-                              type="color"
-                              value={editingSchoolColor}
-                              onChange={(e) => setEditingSchoolColor(e.target.value)}
-                              style={{ width: '28px', height: '28px', padding: 0, border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                            />
-                            <input
-                              type="text"
-                              value={editingSchoolColor}
-                              onChange={(e) => setEditingSchoolColor(e.target.value)}
-                              style={{
-                                width: '80px',
-                                padding: '6px',
-                                borderRadius: '6px',
-                                border: '1.5px solid #e2e8f0',
-                                fontSize: '0.8rem',
-                                fontFamily: 'monospace',
-                                outline: 'none'
-                              }}
-                            />
-                          </div>
-                        ) : (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <div style={{
                               width: '16px',
@@ -539,7 +511,6 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                             }}></div>
                             <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: '#475569', fontWeight: 600 }}>{school.primary_color}</span>
                           </div>
-                        )}
                       </td>
                       <td style={{ padding: '16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -614,49 +585,20 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                         </button>
                       </td>
                       <td style={{ padding: '16px', textAlign: 'right' }}>
-                        {editingSchoolId === school.id ? (
-                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                            <button
-                              onClick={() => handleUpdateSchool(school.id)}
-                              style={{
-                                padding: '6px 12px',
-                                borderRadius: '8px',
-                                background: '#22c55e',
-                                color: '#ffffff',
-                                border: 'none',
-                                fontWeight: 700,
-                                fontSize: '0.8rem',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
-                              }}
-                            >
-                              Speichern
-                            </button>
-                            <button
-                              onClick={() => setEditingSchoolId(null)}
-                              style={{
-                                padding: '6px 12px',
-                                borderRadius: '8px',
-                                background: '#e2e8f0',
-                                color: '#475569',
-                                border: 'none',
-                                fontWeight: 700,
-                                fontSize: '0.8rem',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
-                              }}
-                            >
-                              Abbrechen
-                            </button>
-                          </div>
-                        ) : (
                           <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
                             <button
                               onClick={() => {
-                                setEditingSchoolId(school.id);
-                                setEditingSchoolName(school.name);
-                                setEditingSchoolColor(school.primary_color || '#3b82f6');
-                                setEditingSchoolLogo(school.logo_url || '');
+                                setSelectedSchool(school);
+                                setEditName(school.name);
+                                setEditColor(school.primary_color || '#3b82f6');
+                                setEditLogo(school.logo_url || '');
+                                setEditStatus(school.status || 'active');
+                                setEditIsTrial(school.is_trial ?? true);
+                                setEditTrialEndsAt(school.trial_ends_at ? new Date(school.trial_ends_at).toISOString().split('T')[0] : '');
+                                setEditContractEndsAt(school.contract_ends_at ? new Date(school.contract_ends_at).toISOString().split('T')[0] : '');
+                                setEditMaxTeachers(school.max_teachers ?? 2);
+                                setEditMaxStudents(school.max_students ?? 6);
+                                setEditMaxSongs(school.max_songs ?? 5);
                               }}
                               style={{
                                 padding: '8px',
@@ -667,8 +609,6 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                                 cursor: 'pointer',
                                 transition: 'all 0.2s'
                               }}
-                              
-                              
                             >
                               <Edit2 size={16} />
                             </button>
@@ -683,14 +623,11 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                                 cursor: 'pointer',
                                 transition: 'all 0.2s'
                               }}
-                              
-                              
                             >
                               <Trash2 size={16} />
                             </button>
                           </div>
-                        )}
-                      </td>
+                        </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1027,6 +964,180 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
         </div>
 
       </div>
+      
+      {/* School Edit Modal */}
+      {selectedSchool && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(15, 23, 42, 0.4)',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '24px',
+            width: '100%',
+            maxWidth: '650px',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            padding: '32px',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.15)',
+            border: '1px solid rgba(0,0,0,0.05)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: '#1e293b' }}>
+                Schule bearbeiten: {selectedSchool.name}
+              </h2>
+              <button 
+                onClick={() => setSelectedSchool(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '4px' }}
+              >
+                <Trash2 size={24} style={{ display: 'none' }} /> {/* Just to have a close icon space, actually I'll use a text X or something */}
+                <span style={{ fontSize: '1.5rem', fontWeight: 600 }}>×</span>
+              </button>
+            </div>
+
+            {/* Stats Row */}
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '32px'
+            }}>
+              {[
+                { label: 'Lehrer', value: schoolStats[selectedSchool.id]?.teachers || 0 },
+                { label: 'Schüler', value: schoolStats[selectedSchool.id]?.students || 0 },
+                { label: 'Bands', value: schoolStats[selectedSchool.id]?.bands || 0 },
+                { label: 'Songs', value: schoolStats[selectedSchool.id]?.songs || 0 }
+              ].map((s, i) => (
+                <div key={i} style={{
+                  background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', textAlign: 'center'
+                }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.label}</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b', marginTop: '4px' }}>{s.value}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              
+              {/* General Settings */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: '#f8fafc', padding: '24px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#1e293b' }}>Allgemein & Branding</h3>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Name</label>
+                  <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', boxSizing: 'border-box' }} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Primary Color</label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input type="color" value={editColor} onChange={(e) => setEditColor(e.target.value)} style={{ width: '42px', height: '42px', padding: 0, border: 'none', borderRadius: '8px', cursor: 'pointer' }} />
+                      <input type="text" value={editColor} onChange={(e) => setEditColor(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1.5px solid #cbd5e1' }} />
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Logo URL</label>
+                    <input type="text" value={editLogo} onChange={(e) => setEditLogo(e.target.value)} placeholder="https://..." style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1.5px solid #cbd5e1', boxSizing: 'border-box' }} />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Status (Login Freigabe)</label>
+                  <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', outline: 'none' }}>
+                    <option value="active">Aktiv (Login erlaubt)</option>
+                    <option value="suspended">Gesperrt (Login verweigert)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Trial & Contract */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: '#f8fafc', padding: '24px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#1e293b' }}>Probezeit & Vertrag</h3>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem', color: '#1e293b' }}>
+                    <input type="checkbox" checked={editIsTrial} onChange={(e) => setEditIsTrial(e.target.checked)} style={{ width: '18px', height: '18px' }} />
+                    Probezeit aktiv
+                  </label>
+                </div>
+                
+                {editIsTrial && (
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Probezeit Enddatum</label>
+                    <input type="date" value={editTrialEndsAt} onChange={(e) => setEditTrialEndsAt(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', boxSizing: 'border-box' }} />
+                    <p style={{ margin: '6px 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>Nach diesem Datum ist kein Login mehr möglich, bis ein Abo aktiviert wird.</p>
+                  </div>
+                )}
+                
+                {!editIsTrial && (
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Vertragslaufzeit bis (Optional)</label>
+                    <input type="date" value={editContractEndsAt} onChange={(e) => setEditContractEndsAt(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', boxSizing: 'border-box' }} />
+                  </div>
+                )}
+              </div>
+
+              {/* Limits */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: '#f8fafc', padding: '24px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#1e293b' }}>Ressourcen Limits</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Max Lehrer</label>
+                    <input type="number" min="0" value={editMaxTeachers} onChange={(e) => setEditMaxTeachers(parseInt(e.target.value) || 0)} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1.5px solid #cbd5e1', boxSizing: 'border-box' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Max Schüler</label>
+                    <input type="number" min="0" value={editMaxStudents} onChange={(e) => setEditMaxStudents(parseInt(e.target.value) || 0)} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1.5px solid #cbd5e1', boxSizing: 'border-box' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Max Songs</label>
+                    <input type="number" min="0" value={editMaxSongs} onChange={(e) => setEditMaxSongs(parseInt(e.target.value) || 0)} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1.5px solid #cbd5e1', boxSizing: 'border-box' }} />
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: '12px', marginTop: '32px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setSelectedSchool(null)}
+                style={{
+                  padding: '12px 24px',
+                  borderRadius: '12px',
+                  background: '#f1f5f9',
+                  color: '#475569',
+                  border: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.95rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleSaveSchoolDetails}
+                style={{
+                  padding: '12px 24px',
+                  borderRadius: '12px',
+                  background: '#22c55e',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontWeight: 800,
+                  fontSize: '0.95rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 8px 16px rgba(34, 197, 94, 0.2)'
+                }}
+              >
+                Änderungen Speichern
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       
       {/* Global CSS injection for loading spinner */}
       <style dangerouslySetInnerHTML={{__html: `
