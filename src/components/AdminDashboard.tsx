@@ -2512,14 +2512,15 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                       justifyContent: 'center',
                       overflow: 'hidden',
                       border: '2px solid white',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                      position: 'relative'
                     }}>
+                      <span style={{ fontSize: '1.25rem', fontWeight: 900, color: brandColor, position: 'absolute', zIndex: 0 }}>{s.first_name?.[0]}</span>
                       <img 
                         src={s.photo_url || '/avatar_ghost.jpg'} 
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'relative', zIndex: 1 }}
                         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                       />
-                      <span style={{ fontSize: '1.25rem', fontWeight: 900, color: brandColor }}>{s.first_name?.[0]}</span>
                     </div>
                     <div style={{
                       position: 'absolute',
