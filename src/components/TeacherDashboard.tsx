@@ -239,8 +239,8 @@ const getCompressedRoomCoordinates = (rStations: any[], aspect: number): Compres
     }
   }
 
-  // Limit compression factor to be between 0.60 and 1.0
-  const F = Math.max(0.60, Math.min(1.0, F_min));
+  // Limit compression factor to be between 0.68 and 1.0
+  const F = Math.max(0.68, Math.min(1.0, F_min));
 
   // 4. Calculate compressed coordinates
   const compressedStations = rawCoords.map(c => {

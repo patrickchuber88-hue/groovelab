@@ -4277,6 +4277,9 @@ function App() {
   };
 
   const handleLogout = async (updateDb = true) => {
+    const currentUser = user;
+    const currentSession = session;
+
     try {
       if (loggedInUserId) {
         // Mark user as offline IMMEDIATELY for dashboard
@@ -4284,16 +4287,80 @@ function App() {
         await supabase.from('users').update({ last_seen: pastDate }).eq('id', loggedInUserId);
       }
 
-      if (updateDb && session?.id) {
+      if (updateDb && currentSession?.id) {
         // Session beenden in DB
         await supabase
           .from('sessions')
           .update({ check_out_time: new Date().toISOString() })
-          .eq('id', session.id);
+          .eq('id', currentSession.id);
       }
     } catch (err) {
       console.error('Logout error:', err);
     }
+
+    // Detect if device is a kiosk
+    const storedKioskRoomId = localStorage.getItem('groovelab_kiosk_room_id');
+    const storedStationId = localStorage.getItem('groovelab_station_id');
+    const isKiosk = !!storedKioskRoomId || (!!storedStationId && storedStationId !== 'skip');
+
+    if (isKiosk) {
+      let roomId = storedKioskRoomId;
+
+      // Fallback 1: Lookup room ID from active station ID in stations table
+      if (!roomId) {
+        const activeStationId = currentSession?.station_id || storedStationId;
+        if (activeStationId && activeStationId !== 'skip') {
+          try {
+            const { data: stationData } = await supabase
+              .from('stations')
+              .select('room_id')
+              .eq('id', activeStationId)
+              .single();
+            if (stationData?.room_id) {
+              roomId = stationData.room_id;
+            }
+          } catch (err) {
+            console.error('[Logout] Error resolving room from station:', err);
+          }
+        }
+      }
+
+      // Fallback 2: Lookup first room for user's school ID
+      if (!roomId && currentUser?.school_id) {
+        try {
+          const { data: roomData } = await supabase
+            .from('rooms')
+            .select('id')
+            .eq('school_id', currentUser.school_id)
+            .order('created_at', { ascending: true })
+            .limit(1);
+          if (roomData && roomData.length > 0) {
+            roomId = roomData[0].id;
+          }
+        } catch (err) {
+          console.error('[Logout] Error resolving room from school:', err);
+        }
+      }
+
+      if (roomId) {
+        console.log('[Logout] Kiosk redirect to room:', roomId);
+        localStorage.removeItem('groovelab_station_id');
+        localStorage.setItem('groovelab_kiosk_room_id', roomId);
+
+        // Clear local credentials/states
+        setLoggedInUserId(null);
+        setUser(null);
+        setSession(null);
+        sessionStorage.removeItem('groovelab_user_id');
+        sessionStorage.removeItem('groovelab_location_mode');
+        localStorage.removeItem('groovelab_active_tab');
+
+        // Redirect
+        window.location.replace(`${window.location.origin}${window.location.pathname}?kiosk_room_id=${roomId}`);
+        return;
+      }
+    }
+
     setLoggedInUserId(null);
     setUser(null);
     setSession(null);
