@@ -188,9 +188,8 @@ export function QRCodeModal({ user, onClose }: QRCodeModalProps) {
             }}>
               <img 
                 src={avatarDataUrl || '/avatar_ghost.jpg'} 
-                onLoad={handleImageLoad}
-                crossOrigin="anonymous"
                 alt="Profile"
+                crossOrigin={avatarDataUrl?.startsWith('data:') ? undefined : 'anonymous'}
                 style={{ 
                   width: '100%', 
                   height: '100%', 

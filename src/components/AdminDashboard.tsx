@@ -1597,7 +1597,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
 
   const [studentBands, setStudentBands] = useState<any[]>([]);
-  const [studentDetailTab, setStudentDetailTab] = useState<'profile' | 'logbook'>('profile');
+  const [studentDetailTab, setStudentDetailTab] = useState<'profile' | 'logbook' | 'contract'>('profile');
   const [showFullPhoto, setShowFullPhoto] = useState(false);
 
   const fetchStudentProfile = async (student: any) => {
@@ -2609,7 +2609,14 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                     <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '1.15rem', letterSpacing: '-0.02em' }}>{s.first_name} {s.last_name}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontFamily: 'monospace', fontWeight: 600 }}>ID: {s.id.split('-')[0].toUpperCase()}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontFamily: 'monospace', fontWeight: 600 }}>ID: {s.id.split('-')[0].toUpperCase()}</div>
+                      {s.is_trial && (
+                        <div style={{ padding: '2px 6px', background: '#fef2f2', color: '#ef4444', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 800 }}>
+                          ⏳ IN PROBEZEIT
+                        </div>
+                      )}
+                    </div>
                     <div style={{ 
                       display: 'inline-flex', 
                       alignItems: 'center', 
@@ -4346,6 +4353,27 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             >
               <Clock size={16} /> Logbuch & Notizen
             </button>
+            <button
+              onClick={() => setStudentDetailTab('contract')}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '8px 16px',
+                fontSize: '0.9rem',
+                fontWeight: 900,
+                color: studentDetailTab === 'contract' ? brandColor : '#94a3b8',
+                borderBottom: studentDetailTab === 'contract' ? `3px solid ${brandColor}` : '3px solid transparent',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.2s',
+                marginBottom: '-14px',
+                outline: 'none'
+              }}
+            >
+              <Shield size={16} /> Zugang & Vertrag
+            </button>
           </div>
 
           {/* Tab Content Rendering */}
@@ -4522,7 +4550,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 </section>
               </aside>
             </div>
-          ) : (
+          ) : studentDetailTab === 'logbook' ? (
             /* TAB 2: LOGBUCH & NOTIZEN */
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.1fr', gap: '32px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -4748,7 +4776,109 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 </section>
               </aside>
             </div>
-          )}
+          ) : studentDetailTab === 'contract' ? (
+            /* TAB 3: ZUGANG & VERTRAG */
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '32px' }}>
+              <section style={{ padding: '24px', background: '#f8fafc', borderRadius: '24px', border: '1px solid #f1f5f9' }}>
+                <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.1em', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Shield size={16} /> Zugang & Vertragsdetails
+                </h3>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Genereller Login-Status</label>
+                    <div style={{ display: 'flex', background: '#e2e8f0', borderRadius: '12px', padding: '4px', maxWidth: '400px' }}>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const updates = { status: 'active' };
+                          await supabase.from('users').update(updates).eq('id', selectedStudent.id);
+                          setSelectedStudent({...selectedStudent, status: 'active'});
+                          setStudents(students.map(s => s.id === selectedStudent.id ? {...s, status: 'active'} : s));
+                        }}
+                        style={{
+                          flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
+                          background: (selectedStudent.status || 'active') === 'active' ? '#ffffff' : 'transparent',
+                          color: (selectedStudent.status || 'active') === 'active' ? '#16a34a' : '#64748b',
+                          fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
+                          boxShadow: (selectedStudent.status || 'active') === 'active' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                        }}
+                      >
+                        ✅ Aktiv
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const updates = { status: 'bypass' };
+                          await supabase.from('users').update(updates).eq('id', selectedStudent.id);
+                          setSelectedStudent({...selectedStudent, status: 'bypass'});
+                          setStudents(students.map(s => s.id === selectedStudent.id ? {...s, status: 'bypass'} : s));
+                        }}
+                        style={{
+                          flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
+                          background: selectedStudent.status === 'bypass' ? '#ffffff' : 'transparent',
+                          color: selectedStudent.status === 'bypass' ? '#ef4444' : '#64748b',
+                          fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
+                          boxShadow: selectedStudent.status === 'bypass' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                        }}
+                      >
+                        🚫 Gesperrt (Bypass)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', justifyContent: 'center' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 700, color: '#1e293b' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={selectedStudent.is_trial || false} 
+                        onChange={async (e) => {
+                          const val = e.target.checked;
+                          await supabase.from('users').update({ is_trial: val }).eq('id', selectedStudent.id);
+                          setSelectedStudent({...selectedStudent, is_trial: val});
+                          setStudents(students.map(s => s.id === selectedStudent.id ? {...s, is_trial: val} : s));
+                        }} 
+                      />
+                      In Probezeit
+                    </label>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', maxWidth: '600px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Probezeit Ende</label>
+                      <input 
+                        type="date" 
+                        value={selectedStudent.trial_ends_at ? new Date(selectedStudent.trial_ends_at).toISOString().split('T')[0] : ''} 
+                        onChange={async (e) => {
+                          const val = e.target.value || null;
+                          await supabase.from('users').update({ trial_ends_at: val }).eq('id', selectedStudent.id);
+                          setSelectedStudent({...selectedStudent, trial_ends_at: val});
+                          setStudents(students.map(s => s.id === selectedStudent.id ? {...s, trial_ends_at: val} : s));
+                        }} 
+                        style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} 
+                        disabled={!selectedStudent.is_trial}
+                      />
+                    </div>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Vertragsende</label>
+                      <input 
+                        type="date" 
+                        value={selectedStudent.contract_ends_at ? new Date(selectedStudent.contract_ends_at).toISOString().split('T')[0] : ''} 
+                        onChange={async (e) => {
+                          const val = e.target.value || null;
+                          await supabase.from('users').update({ contract_ends_at: val }).eq('id', selectedStudent.id);
+                          setSelectedStudent({...selectedStudent, contract_ends_at: val});
+                          setStudents(students.map(s => s.id === selectedStudent.id ? {...s, contract_ends_at: val} : s));
+                        }} 
+                        style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} 
+                      />
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          ) : null}
         </div>
         {showFullPhoto && (
           <div 
