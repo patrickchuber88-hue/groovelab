@@ -956,8 +956,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
   };
 
   const widgetStyle: React.CSSProperties = {
-    background: 'rgba(25, 25, 25, 0.4)',
-    backdropFilter: 'blur(40px) saturate(180%)',
+    background: 'rgba(30, 30, 30, 0.85)',
     borderRadius: '40px',
     padding: '32px',
     border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -982,8 +981,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
   };
 
    const glassButtonStyle: React.CSSProperties = {
-    background: 'rgba(35, 35, 35, 0.65)',
-    backdropFilter: 'blur(25px)',
+    background: 'rgba(35, 35, 35, 0.95)',
     border: '1px solid rgba(255, 255, 255, 0.12)',
     borderRadius: '12px',
     color: 'white',
@@ -1027,7 +1025,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
              </div>
              
              {user && !isSharedView && (
-                <button onClick={() => setShowBandProfile(false)} style={{ position: 'absolute', top: 30, right: 30, background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', width: '40px', height: '40px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+                <button onClick={() => setShowBandProfile(false)} style={{ position: 'absolute', top: 30, right: 30, background: 'rgba(30,30,30,0.85)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', width: '40px', height: '40px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, touchAction: 'manipulation' }}>
                    <X size={20} />
                 </button>
              )}
@@ -1038,12 +1036,12 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                        {renderBandAvatar(selectedBandForProfile.name, selectedBandForProfile.photo_url, '100%', '100%')}
 
                        {/* BAND Badge Integrated into Photo - Bottom Left */}
-                       <div style={{ position: 'absolute', bottom: '20px', left: '20px', background: 'rgba(35, 35, 35, 0.9)', backdropFilter: 'blur(10px)', color: 'white', padding: '6px 12px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 950, textTransform: 'uppercase', boxShadow: '0 10px 20px rgba(0,0,0,0.3)', zIndex: 11, border: '1px solid rgba(255,255,255,0.1)' }}>BAND</div>
+                       <div style={{ position: 'absolute', bottom: '20px', left: '20px', background: 'rgba(35, 35, 35, 0.9)', color: 'white', padding: '6px 12px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 950, textTransform: 'uppercase', boxShadow: '0 10px 20px rgba(0,0,0,0.3)', zIndex: 11, border: '1px solid rgba(255,255,255,0.1)' }}>BAND</div>
 
                        {canEdit && (
                           <button 
                             onClick={() => { setAvatarPickerType('band'); setShowAvatarPicker(true); }}
-                            style={{ position: 'absolute', bottom: '12px', right: '12px', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', width: '36px', height: '36px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}
+                            style={{ position: 'absolute', bottom: '12px', right: '12px', background: 'rgba(30,30,30,0.85)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', width: '36px', height: '36px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, touchAction: 'manipulation' }}
                             className="hover-scale"
                           >
                             <Camera size={18} />
@@ -1060,7 +1058,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
 
                           {/* Genre Label - Only show if present */}
                           {selectedBandForProfile.genre && (
-                            <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)', color: 'white', padding: '6px 12px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 950, textTransform: 'uppercase', border: '1px solid rgba(255,255,255,0.1)' }}>{selectedBandForProfile.genre}</div>
+                            <div style={{ background: 'rgba(30,30,30,0.85)', color: 'white', padding: '6px 12px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 950, textTransform: 'uppercase', border: '1px solid rgba(255,255,255,0.1)' }}>{selectedBandForProfile.genre}</div>
                           )}
                        </div>
                        
@@ -1121,7 +1119,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                </button>
                             )}
                              {canEdit && !isSharedView && (
-                               <div style={{ display: 'flex', background: 'rgba(35, 35, 35, 0.65)', backdropFilter: 'blur(25px)', padding: '4px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.12)', touchAction: 'manipulation' }}>
+                               <div style={{ display: 'flex', background: 'rgba(35, 35, 35, 0.95)', padding: '4px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.12)', touchAction: 'manipulation' }}>
                                  <button onClick={() => setBandProfileView('public')} style={{ background: bandProfileView === 'public' ? 'rgba(255,255,255,0.1)' : 'transparent', color: 'white', border: 'none', padding: '6px 14px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 950, cursor: 'pointer', transition: 'all 0.2s', touchAction: 'manipulation' }}>PUBLIC</button>
                                  <button onClick={() => setBandProfileView('backstage')} style={{ background: bandProfileView === 'backstage' ? brandColor : 'transparent', color: bandProfileView === 'backstage' ? 'black' : 'white', border: 'none', padding: '6px 14px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 950, cursor: 'pointer', transition: 'all 0.2s', touchAction: 'manipulation' }}>BACKSTAGE</button>
                                </div>
@@ -1136,7 +1134,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
           {bandProfileView === "backstage" && !isSharedView ? (            <div style={{ display: 'grid', gridTemplateColumns: width < 1200 ? '1fr' : 'minmax(0, 1fr) 400px', gap: '40px', alignItems: 'start' }}>
               
               {/* LEFT: Band Repertoire-Planer (Compacted) */}
-              <section style={{ ...widgetStyle, padding: '24px', gap: '20px' }}>
+              <section style={{ ...widgetStyle, background: 'rgba(168, 85, 247, 0.15)', border: '1px solid rgba(168, 85, 247, 0.3)', padding: '24px', gap: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h3 style={{ ...widgetHeaderStyle, margin: 0, fontSize: '0.9rem' }}><Zap size={18} color={brandColor} fill="currentColor" /> Band Repertoire-Planer</h3>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
