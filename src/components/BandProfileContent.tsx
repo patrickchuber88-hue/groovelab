@@ -1371,17 +1371,6 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                 <span style={{ 
                                   fontSize: '0.65rem', 
                                   fontWeight: 900, 
-                                  color: '#38bdf8', 
-                                  background: 'rgba(56, 189, 248, 0.15)',
-                                  border: '1px solid rgba(56, 189, 248, 0.3)',
-                                  padding: '4px 10px', 
-                                  borderRadius: '10px'
-                                }}>
-                                  {occupiedText}
-                                </span>
-                                <span style={{ 
-                                  fontSize: '0.65rem', 
-                                  fontWeight: 900, 
                                   color: '#34d399', 
                                   background: 'rgba(52, 211, 153, 0.15)',
                                   border: '1px solid rgba(52, 211, 153, 0.3)',
@@ -1391,29 +1380,6 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                   {masteryText}
                                 </span>
                               </div>
-
-                              {/* Overlapping occupant avatars */}
-                              {uniqueOccupants.length > 0 && (
-                                <div style={{ display: 'flex', alignItems: 'center', paddingLeft: '8px' }}>
-                                  {uniqueOccupants.map((u, uIdx) => (
-                                    <img
-                                      key={u.id}
-                                      src={u.photo_url || '/avatar_ghost.jpg'}
-                                      alt={u.first_name}
-                                      title={u.first_name}
-                                      style={{
-                                        width: '28px',
-                                        height: '28px',
-                                        borderRadius: '50%',
-                                        border: '2px solid #110e3b',
-                                        marginLeft: uIdx === 0 ? '0' : '-8px',
-                                        objectFit: 'cover',
-                                        zIndex: 10 - uIdx,
-                                      }}
-                                    />
-                                  ))}
-                                </div>
-                              )}
 
                               {/* Action text & Chevron */}
                               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

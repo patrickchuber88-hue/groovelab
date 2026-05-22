@@ -1590,34 +1590,18 @@ export function TeacherDashboard({
               roomStations.some(s => s.pos_x !== null && s.pos_y !== null);
 
             if (hasCustomLayout) {
-              const placedStations = roomStations.filter(s => s.pos_x !== null && s.pos_y !== null);
-              const minX = placedStations.length > 0 ? Math.min(...placedStations.map(s => s.pos_x as number)) : 0;
-              const maxX = placedStations.length > 0 ? Math.max(...placedStations.map(s => s.pos_x as number)) : 100;
-              const minY = placedStations.length > 0 ? Math.min(...placedStations.map(s => s.pos_y as number)) : 0;
-              const maxY = placedStations.length > 0 ? Math.max(...placedStations.map(s => s.pos_y as number)) : 100;
+              // Account for the parent dashboard header (approx. 140px)
+              const parentHeaderHeight = 140;
+              const verticalOffset = parentHeaderHeight + (rooms.length > 1 ? 74 : 0);
+              const maxH = Math.max(300, windowHeight - verticalOffset - 60);
 
-              // 14% horizontal / 14% vertical padding to create standard spacing and edge margins
-              const padX = 14;
-              const padY = 14;
-
-              const viewportMinX = Math.max(0, minX - padX);
-              const viewportMaxX = Math.min(100, maxX + padX);
-              const viewportMinY = Math.max(0, minY - padY);
-              const viewportMaxY = Math.min(100, maxY + padY);
-
-              const viewportWidth = viewportMaxX - viewportMinX;
-              const viewportHeight = viewportMaxY - viewportMinY;
-
-              const safeViewportWidth = Math.max(15, viewportWidth);
-              const safeViewportHeight = Math.max(15, viewportHeight);
-
-              const croppedAspectRatio = activeRoom
-                ? (activeRoom.room_width * safeViewportWidth) / (activeRoom.room_height * safeViewportHeight)
-                : 1.5;
+              // Calculate viewport aspect ratio and clamp to a stable landscape range [1.2, 1.8]
+              const availableAspectRatio = containerWidth / maxH;
+              const canvasAspectRatio = Math.max(1.2, Math.min(1.8, availableAspectRatio));
 
               // Calculate resolved collision-free coordinates inside the 1000px canvas space
               const canvasWidth = 1000;
-              const canvasHeight = 1000 / croppedAspectRatio;
+              const canvasHeight = 1000 / canvasAspectRatio;
 
               // Prepare raw elements
               const rawItems = roomStations.map(station => {
@@ -1626,11 +1610,8 @@ export function TeacherDashboard({
                 const posLeftOriginal = station.pos_x !== null ? station.pos_x : 50;
                 const posTopOriginal = station.pos_y !== null ? station.pos_y : 50;
 
-                const posLeftPct = safeViewportWidth > 0 ? ((posLeftOriginal - viewportMinX) / safeViewportWidth) * 100 : 50;
-                const posTopPct = safeViewportHeight > 0 ? ((posTopOriginal - viewportMinY) / safeViewportHeight) * 100 : 50;
-
-                const x = (posLeftPct / 100) * canvasWidth;
-                const y = (posTopPct / 100) * canvasHeight;
+                const x = (posLeftOriginal / 100) * canvasWidth;
+                const y = (posTopOriginal / 100) * canvasHeight;
 
                 // Card/Node dimensions inside the 1000px coordinate system
                 const w = isTeacher ? 180 : 180;
@@ -1647,10 +1628,49 @@ export function TeacherDashboard({
                 };
               });
 
-              // Helper to clamp a single item to canvas margins
+              // Squeeze coordinates closer together and center the group in the canvas ("zusammenschieben")
+              if (rawItems.length > 0) {
+                const xs = rawItems.map(item => item.x);
+                const ys = rawItems.map(item => item.y);
+                const minX = Math.min(...xs);
+                const maxX = Math.max(...xs);
+                const minY = Math.min(...ys);
+                const maxY = Math.max(...ys);
+
+                const stationsCenterX = (minX + maxX) / 2;
+                const stationsCenterY = (minY + maxY) / 2;
+
+                // Squeeze distances by 35%
+                const compressionFactor = 0.65;
+                rawItems.forEach(item => {
+                  item.x = stationsCenterX + (item.x - stationsCenterX) * compressionFactor;
+                  item.y = stationsCenterY + (item.y - stationsCenterY) * compressionFactor;
+                });
+
+                // Re-calculate compressed center and center it within the canvas
+                const newXs = rawItems.map(item => item.x);
+                const newYs = rawItems.map(item => item.y);
+                const newMinX = Math.min(...newXs);
+                const newMaxX = Math.max(...newXs);
+                const newMinY = Math.min(...newYs);
+                const newMaxY = Math.max(...newYs);
+
+                const newStationsCenterX = (newMinX + newMaxX) / 2;
+                const newStationsCenterY = (newMinY + newMaxY) / 2;
+
+                const shiftX = (canvasWidth / 2) - newStationsCenterX;
+                const shiftY = (canvasHeight / 2) - newStationsCenterY;
+
+                rawItems.forEach(item => {
+                  item.x += shiftX;
+                  item.y += shiftY;
+                });
+              }
+
+              // Helper to clamp a single item to canvas margins safely
               const clampItem = (item: any) => {
-                const marginX = item.w / 2 + 10;
-                const marginY = item.h / 2 + 10;
+                const marginX = Math.min(item.w / 2 + 10, canvasWidth / 2 - 5);
+                const marginY = Math.min(item.h / 2 + 10, canvasHeight / 2 - 5);
                 item.x = Math.max(marginX, Math.min(canvasWidth - marginX, item.x));
                 item.y = Math.max(marginY, Math.min(canvasHeight - marginY, item.y));
               };
@@ -1707,8 +1727,6 @@ export function TeacherDashboard({
                 finalPositions.set(item.id, { x: item.x, y: item.y });
               });
 
-              const verticalOffset = (hideHeader ? 0 : 160) + (rooms.length > 1 ? 74 : 0);
-              const maxH = Math.max(300, windowHeight - verticalOffset - 40);
               const scaleW = containerWidth / 1000;
               const scaleH = maxH / canvasHeight;
               const scale = Math.max(0.1, Math.min(scaleW, scaleH));
