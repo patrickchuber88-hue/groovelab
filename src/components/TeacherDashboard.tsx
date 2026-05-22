@@ -1849,48 +1849,108 @@ export function TeacherDashboard({
                   ref={containerRef}
                   style={{ display: 'flex', flexDirection: 'column', gap: rooms.length > 1 ? '16px' : '0px', maxWidth: 'none', width: '100%', alignItems: 'center' }}
                 >
-                  {/* Toolbar Row */}
-                  {rooms.length > 1 && (
-                    <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '6px', borderRadius: '16px', alignSelf: 'flex-start', marginBottom: '8px' }}>
-                      {sortRooms(rooms).map(room => {
-                        const isSelected = room.id === selectedRoomId;
-                        const isDragged = draggedRoomId === room.id;
-                        const isDragOver = dragOverRoomId === room.id;
-                        return (
-                          <button
-                            key={room.id}
-                            draggable="true"
-                            onDragStart={(e) => handleDragStart(e, room.id)}
-                            onDragOver={handleDragOver}
-                            onDragEnter={(e) => handleDragEnter(e, room.id)}
-                            onDragLeave={handleDragLeave}
-                            onDrop={(e) => handleDrop(e, room.id)}
-                            onDragEnd={handleDragEnd}
-                            onClick={() => {
-                              setSelectedRoomId(room.id);
-                              localStorage.setItem('groovelab_teacher_selected_room_id', room.id);
-                            }}
-                            style={{
-                              border: isSelected ? 'none' : (isDragOver ? '2px dashed #6366f1' : 'none'),
-                              background: isSelected ? 'white' : (isDragOver ? 'rgba(99, 102, 241, 0.05)' : 'transparent'),
-                              color: isSelected ? '#1e293b' : '#64748b',
-                              padding: '8px 16px',
-                              borderRadius: '12px',
-                              fontSize: '0.85rem',
-                              fontWeight: 800,
-                              cursor: isDragged ? 'grabbing' : 'grab',
-                              opacity: isDragged ? 0.5 : 1,
-                              boxShadow: isSelected ? '0 4px 10px rgba(0,0,0,0.05)' : 'none',
-                              transition: 'all 0.2s'
-                            }}
-                            className="hover-scale-mini"
-                          >
-                            {room.name}
-                          </button>
-                        );
-                      })}
+                  {/* Toolbar Row with Room Switcher and Magnifier Zoom Panel */}
+                  <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '16px', flexWrap: 'wrap' }}>
+                    {rooms.length > 1 ? (
+                      <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '6px', borderRadius: '16px' }}>
+                        {sortRooms(rooms).map(room => {
+                          const isSelected = room.id === selectedRoomId;
+                          const isDragged = draggedRoomId === room.id;
+                          const isDragOver = dragOverRoomId === room.id;
+                          return (
+                            <button
+                              key={room.id}
+                              draggable="true"
+                              onDragStart={(e) => handleDragStart(e, room.id)}
+                              onDragOver={handleDragOver}
+                              onDragEnter={(e) => handleDragEnter(e, room.id)}
+                              onDragLeave={handleDragLeave}
+                              onDrop={(e) => handleDrop(e, room.id)}
+                              onDragEnd={handleDragEnd}
+                              onClick={() => {
+                                setSelectedRoomId(room.id);
+                                localStorage.setItem('groovelab_teacher_selected_room_id', room.id);
+                              }}
+                              style={{
+                                border: isSelected ? 'none' : (isDragOver ? '2px dashed #6366f1' : 'none'),
+                                background: isSelected ? 'white' : (isDragOver ? 'rgba(99, 102, 241, 0.05)' : 'transparent'),
+                                color: isSelected ? '#1e293b' : '#64748b',
+                                padding: '8px 16px',
+                                borderRadius: '12px',
+                                fontSize: '0.85rem',
+                                fontWeight: 800,
+                                cursor: isDragged ? 'grabbing' : 'grab',
+                                opacity: isDragged ? 0.5 : 1,
+                                boxShadow: isSelected ? '0 4px 10px rgba(0,0,0,0.05)' : 'none',
+                                transition: 'all 0.2s'
+                              }}
+                              className="hover-scale-mini"
+                            >
+                              {room.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div />
+                    )}
+
+                    {/* Magnifier Zoom Panel */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: '#f1f5f9',
+                      padding: '6px',
+                      borderRadius: '16px'
+                    }}>
+                      <button 
+                        onClick={() => handleZoomChange(Math.max(0.4, zoomFactor - 0.1))}
+                        style={{
+                          background: 'white',
+                          border: '1px solid rgba(0, 0, 0, 0.05)',
+                          borderRadius: '12px',
+                          width: '36px',
+                          height: '36px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#64748b',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                          transition: 'all 0.2s'
+                        }}
+                        className="hover-scale-mini"
+                        title="Verkleinern"
+                      >
+                        <ZoomOut size={18} />
+                      </button>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#64748b', padding: '0 8px', minWidth: '48px', textAlign: 'center' }}>
+                        {Math.round(zoomFactor * 100)}%
+                      </span>
+                      <button 
+                        onClick={() => handleZoomChange(Math.min(2.5, zoomFactor + 0.1))}
+                        style={{
+                          background: 'white',
+                          border: '1px solid rgba(0, 0, 0, 0.05)',
+                          borderRadius: '12px',
+                          width: '36px',
+                          height: '36px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#64748b',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                          transition: 'all 0.2s'
+                        }}
+                        className="hover-scale-mini"
+                        title="Vergrößern"
+                      >
+                        <ZoomIn size={18} />
+                      </button>
                     </div>
-                  )}
+                  </div>
 
                   {/* Horizontal Flex Wrapper for Blueprint Layout and Slider */}
                   <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '24px', justifyContent: 'center', width: '100%', position: 'relative' }}>
@@ -1998,74 +2058,6 @@ export function TeacherDashboard({
                     </div>
                     </div>
 
-                    {/* Vertical Zoom Control Panel */}
-                    <div style={{
-                      position: 'absolute',
-                      right: '16px',
-                      top: '16px',
-                      zIndex: 100,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '12px',
-                      background: 'rgba(255, 255, 255, 0.85)',
-                      backdropFilter: 'blur(20px)',
-                      WebkitBackdropFilter: 'blur(20px)',
-                      border: '1px solid rgba(255, 255, 255, 0.6)',
-                      borderRadius: '24px',
-                      padding: '16px 12px',
-                      boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)',
-                      width: '64px',
-                      flexShrink: 0
-                    }}>
-                      <button 
-                        onClick={() => handleZoomChange(Math.min(2.5, zoomFactor + 0.1))}
-                        style={{
-                          background: 'white',
-                          border: '1px solid rgba(0, 0, 0, 0.05)',
-                          borderRadius: '12px',
-                          width: '36px',
-                          height: '36px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#64748b',
-                          cursor: 'pointer',
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
-                          transition: 'all 0.2s'
-                        }}
-                        className="hover-scale-mini"
-                        title="Vergrößern"
-                      >
-                        <ZoomIn size={18} />
-                      </button>
-
-                      <button 
-                        onClick={() => handleZoomChange(Math.max(0.4, zoomFactor - 0.1))}
-                        style={{
-                          background: 'white',
-                          border: '1px solid rgba(0, 0, 0, 0.05)',
-                          borderRadius: '12px',
-                          width: '36px',
-                          height: '36px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#64748b',
-                          cursor: 'pointer',
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
-                          transition: 'all 0.2s'
-                        }}
-                        className="hover-scale-mini"
-                        title="Verkleinern"
-                      >
-                        <ZoomOut size={18} />
-                      </button>
-
-                      <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#64748b', textAlign: 'center', width: '100%', marginTop: '4px' }}>
-                        {Math.round(zoomFactor * 100)}%
-                      </div>
-                    </div>
                   </div>
                 </div>
               );
