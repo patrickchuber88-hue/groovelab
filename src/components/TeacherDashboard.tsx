@@ -600,8 +600,8 @@ export function TeacherDashboard({
   };
 
   useEffect(() => {
-    if (selectedRoomId) {
-      const savedZoom = localStorage.getItem(`groovelab_room_zoom_${selectedRoomId}`);
+    if (selectedRoomId && userId) {
+      const savedZoom = localStorage.getItem(`groovelab_room_zoom_${userId}_${selectedRoomId}`);
       if (savedZoom) {
         const parsed = parseFloat(savedZoom);
         if (!isNaN(parsed)) {
@@ -611,12 +611,12 @@ export function TeacherDashboard({
       }
     }
     setZoomFactor(1.0);
-  }, [selectedRoomId]);
+  }, [selectedRoomId, userId]);
 
   const handleZoomChange = (value: number) => {
     setZoomFactor(value);
-    if (selectedRoomId) {
-      localStorage.setItem(`groovelab_room_zoom_${selectedRoomId}`, value.toString());
+    if (selectedRoomId && userId) {
+      localStorage.setItem(`groovelab_room_zoom_${userId}_${selectedRoomId}`, value.toString());
     }
   };
   
