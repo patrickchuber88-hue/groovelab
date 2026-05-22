@@ -1595,11 +1595,47 @@ export function TeacherDashboard({
               const verticalOffset = parentHeaderHeight + (rooms.length > 1 ? 74 : 0);
               const maxH = Math.max(300, windowHeight - verticalOffset - 80);
 
+              // 1. Calculate fitting scale for all custom rooms to find the minimum scale (largest layout space required)
+              // This ensures that the scale (and thus iPad card size) is completely uniform across all custom layout rooms,
+              // while guaranteeing that even the largest room fits completely within the screen boundaries without overflow.
+              let unifiedScale = 1.0;
+              const customLayoutScales = rooms.map(r => {
+                const rStations = stations.filter(s => s.room_id === r.id);
+                const rHasLayout = r.room_width && r.room_height && rStations.some(s => s.pos_x !== null && s.pos_y !== null);
+                if (!rHasLayout) return null;
+
+                const aspect = r.room_width / r.room_height;
+                const minX = Math.min(...rStations.map(s => {
+                  const x = (s.pos_x !== null ? s.pos_x : 50) * 10;
+                  return x - 90;
+                }));
+                const maxX = Math.max(...rStations.map(s => {
+                  const x = (s.pos_x !== null ? s.pos_x : 50) * 10;
+                  return x + 90;
+                }));
+                const minY = Math.min(...rStations.map(s => {
+                  const y = (s.pos_y !== null ? s.pos_y : 50) * (1000 / aspect) / 100;
+                  return y - 125; // Safe top padding to prevent label clipping
+                }));
+                const maxY = Math.max(...rStations.map(s => {
+                  const y = (s.pos_y !== null ? s.pos_y : 50) * (1000 / aspect) / 100;
+                  return y + 115; // Safe bottom padding to prevent card shadow/border clipping
+                }));
+
+                const bW = Math.max(100, maxX - minX);
+                const bH = Math.max(100, maxY - minY);
+                return Math.min(containerWidth / bW, maxH / bH);
+              }).filter((s): s is number => s !== null);
+
+              if (customLayoutScales.length > 0) {
+                unifiedScale = Math.min(...customLayoutScales);
+              }
+
               const rawRoomAspectRatio = (activeRoom && activeRoom.room_width && activeRoom.room_height)
                 ? activeRoom.room_width / activeRoom.room_height
                 : 1.0;
 
-              // Calculate bounding box of all nodes in reference coordinates (1000px width reference)
+              // Calculate bounding box of all nodes in reference coordinates (1000px width reference) for active room
               const minBoundX = Math.min(...roomStations.map(s => {
                 const x = (s.pos_x !== null ? s.pos_x : 50) * 10;
                 return x - 90;
@@ -1610,17 +1646,18 @@ export function TeacherDashboard({
               }));
               const minBoundY = Math.min(...roomStations.map(s => {
                 const y = (s.pos_y !== null ? s.pos_y : 50) * (1000 / rawRoomAspectRatio) / 100;
-                return y - 115;
+                return y - 125;
               }));
               const maxBoundY = Math.max(...roomStations.map(s => {
                 const y = (s.pos_y !== null ? s.pos_y : 50) * (1000 / rawRoomAspectRatio) / 100;
-                return y + 95;
+                return y + 115;
               }));
 
               const boundWidth = Math.max(100, maxBoundX - minBoundX);
               const boundHeight = Math.max(100, maxBoundY - minBoundY);
 
-              const scale = Math.min(containerWidth / boundWidth, maxH / boundHeight);
+              // Use the unified scale to keep elements exactly the same size across all custom layout rooms
+              const scale = unifiedScale;
 
               return (
                 <div 
