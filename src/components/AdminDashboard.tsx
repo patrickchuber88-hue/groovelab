@@ -264,7 +264,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           url = `${url}${separator}cb=${Date.now()}`;
         }
         
-        const response = await fetch(url);
+        const response = await fetch(url, { mode: 'cors', cache: 'no-cache' });
         if (!response.ok) throw new Error('Network response was not ok');
         const blob = await response.blob();
         
@@ -4451,55 +4451,6 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                       <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#475569' }}>Konto aktiv</span>
                     </div>
                     <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>Registriert seit: {new Date(selectedStudent.created_at).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
-                    
-                    {/* Toggle Messages Sidebar Menu */}
-                    <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <span style={{ fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>Nachrichten-Menü</span>
-                        <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 500 }}>Sidebar-Tab für Schüler aktivieren</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          const newValue = selectedStudent.show_messages_menu !== false ? false : true;
-                          const updatedStudent = { ...selectedStudent, show_messages_menu: newValue };
-                          setSelectedStudent(updatedStudent);
-                          setStudents(prev => prev.map(s => s.id === selectedStudent.id ? updatedStudent : s));
-                          
-                          const { error } = await supabase
-                            .from('users')
-                            .update({ show_messages_menu: newValue })
-                            .eq('id', selectedStudent.id);
-                            
-                          if (error) {
-                            alert("Fehler beim Speichern: " + error.message);
-                          }
-                        }}
-                        style={{
-                          width: '46px',
-                          height: '24px',
-                          borderRadius: '12px',
-                          background: selectedStudent.show_messages_menu !== false ? brandColor : '#cbd5e1',
-                          border: 'none',
-                          cursor: 'pointer',
-                          position: 'relative',
-                          padding: '2px',
-                          transition: 'background-color 0.2s ease',
-                          display: 'flex',
-                          alignItems: 'center'
-                        }}
-                      >
-                        <div style={{
-                          width: '20px',
-                          height: '20px',
-                          borderRadius: '50%',
-                          background: 'white',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                          transform: selectedStudent.show_messages_menu !== false ? 'translateX(22px)' : 'translateX(0px)',
-                          transition: 'transform 0.2s ease'
-                        }} />
-                      </button>
-                    </div>
                   </div>
                 </section>
 
@@ -4744,6 +4695,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           quality: 0.95, 
           backgroundColor: '#ffffff',
           cacheBust: true,
+          useCORS: true,
+          pixelRatio: 2,
         });
         const link = document.createElement('a');
         link.download = `Groovelab_ID_${selectedQRUser.first_name}.jpg`;
