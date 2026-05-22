@@ -230,8 +230,36 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       setRoomWidth(customizingRoom.room_width || 10.0);
       setRoomHeight(customizingRoom.room_height || 8.0);
       setActiveEditStationId(null);
+
+      // Check if Lehrer iPad exists for this room
+      const roomStations = stations.filter(s => s.room_id === customizingRoom.id);
+      const hasLehrer = roomStations.some(s => {
+        const name = (s.name || '').toLowerCase();
+        return name.includes('lehrer') || name.includes('teacher');
+      });
+
+      if (!hasLehrer) {
+        const createMissingLehrer = async () => {
+          const { data, error } = await supabase.from('stations').insert({
+            room_id: customizingRoom.id,
+            name: 'Lehrer iPad',
+            color: '#22c55e',
+            instrument: 'Tablet',
+            pos_x: 50,
+            pos_y: 50
+          }).select().single();
+          
+          if (!error && data) {
+            setStations(prev => {
+              if (prev.some(s => s.id === data.id)) return prev;
+              return [...prev, data];
+            });
+          }
+        };
+        createMissingLehrer();
+      }
     }
-  }, [customizingRoom]);
+  }, [customizingRoom?.id, stations]);
 
   useEffect(() => {
     if (activeEditStationId) {
@@ -1189,13 +1217,28 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     }
 
     if (roomData) { 
+      const stationsToInsert = [];
+      
+      // Always add Teacher iPad
+      stationsToInsert.push({
+        room_id: roomData.id,
+        name: 'Lehrer iPad',
+        color: '#22c55e',
+        instrument: 'Tablet',
+        pos_x: 50,
+        pos_y: 50
+      });
+
       if (newRoomStationCount > 0) {
-        const bulkStations = Array.from({ length: newRoomStationCount }).map((_, i) => ({
-          room_id: roomData.id,
-          name: `iPad ${i + 1}`
-        }));
-        await supabase.from('stations').insert(bulkStations);
+        for (let i = 0; i < newRoomStationCount; i++) {
+          stationsToInsert.push({
+            room_id: roomData.id,
+            name: `iPad ${i + 1}`
+          });
+        }
       }
+
+      await supabase.from('stations').insert(stationsToInsert);
 
       fetchData();
       setShowAddRoom(false); 
@@ -5268,17 +5311,19 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                       }}
                     >
                       <div style={{
+                        width: '90px',
+                        height: '90px',
                         background: isSelected ? `${instColor}25` : 'rgba(30, 41, 59, 0.85)',
                         backdropFilter: 'blur(4px)',
                         border: isSelected ? `2.5px solid ${instColor}` : `1.5px solid ${isUnplaced ? '#f97316' : '#475569'}`,
                         borderRadius: '20px',
-                        padding: '8px 16px',
+                        padding: '8px',
                         color: 'white',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
+                        justifyContent: 'center',
                         gap: '4px',
-                        minWidth: '95px',
                         textAlign: 'center',
                         boxShadow: isSelected ? `0 10px 25px -5px ${instColor}50` : '0 4px 10px rgba(0,0,0,0.3)',
                         transition: 'border-color 0.2s, background-color 0.2s',
