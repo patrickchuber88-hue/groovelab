@@ -1906,7 +1906,7 @@ export function TeacherDashboard({
                         background: 'rgba(15, 23, 42, 0.01)', 
                         border: '1.5px dashed rgba(99, 102, 241, 0.15)', 
                         borderRadius: '24px', 
-                        display: 'flex', 
+                        display: 'block', 
                         boxSizing: 'border-box', 
                         padding: '16px' 
                       }}
@@ -1917,8 +1917,7 @@ export function TeacherDashboard({
                           height: `${boundHeight * scale}px`,
                           position: 'relative', 
                           overflow: 'hidden',
-                          flexShrink: 0,
-                          margin: 'auto'
+                          margin: '0 auto'
                         }}
                       >
                         {/* Visual Blueprint Canvas */}
