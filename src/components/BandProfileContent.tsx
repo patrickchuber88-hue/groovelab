@@ -1121,9 +1121,9 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                </button>
                             )}
                              {canEdit && !isSharedView && (
-                               <div style={{ display: 'flex', background: 'rgba(35, 35, 35, 0.65)', backdropFilter: 'blur(25px)', padding: '4px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.12)' }}>
-                                 <button onClick={() => setBandProfileView('public')} style={{ background: bandProfileView === 'public' ? 'rgba(255,255,255,0.1)' : 'transparent', color: 'white', border: 'none', padding: '6px 14px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 950, cursor: 'pointer', transition: 'all 0.2s' }}>PUBLIC</button>
-                                 <button onClick={() => setBandProfileView('backstage')} style={{ background: bandProfileView === 'backstage' ? brandColor : 'transparent', color: bandProfileView === 'backstage' ? 'black' : 'white', border: 'none', padding: '6px 14px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 950, cursor: 'pointer', transition: 'all 0.2s' }}>BACKSTAGE</button>
+                               <div style={{ display: 'flex', background: 'rgba(35, 35, 35, 0.65)', backdropFilter: 'blur(25px)', padding: '4px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.12)', touchAction: 'manipulation' }}>
+                                 <button onClick={() => setBandProfileView('public')} style={{ background: bandProfileView === 'public' ? 'rgba(255,255,255,0.1)' : 'transparent', color: 'white', border: 'none', padding: '6px 14px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 950, cursor: 'pointer', transition: 'all 0.2s', touchAction: 'manipulation' }}>PUBLIC</button>
+                                 <button onClick={() => setBandProfileView('backstage')} style={{ background: bandProfileView === 'backstage' ? brandColor : 'transparent', color: bandProfileView === 'backstage' ? 'black' : 'white', border: 'none', padding: '6px 14px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 950, cursor: 'pointer', transition: 'all 0.2s', touchAction: 'manipulation' }}>BACKSTAGE</button>
                                </div>
                              )}
                          </div>

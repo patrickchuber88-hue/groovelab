@@ -9691,7 +9691,7 @@ function App() {
       )}
 
       {showBandProfile && selectedBandForProfile && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: '#09090b', overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: '#09090b', overflowY: "auto", WebkitOverflowScrolling: "touch", WebkitTransform: 'translate3d(0,0,0)', transform: 'translate3d(0,0,0)' }}>
             <BandProfileContent 
               selectedBandForProfile={selectedBandForProfile} 
               user={user} 
