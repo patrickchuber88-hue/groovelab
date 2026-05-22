@@ -2368,12 +2368,36 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               <input required placeholder="Vorname" value={editingStudent.first_name || ''} onChange={e => setEditingStudent({...editingStudent, first_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
               <input required placeholder="Nachname" value={editingStudent.last_name || ''} onChange={e => setEditingStudent({...editingStudent, last_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
               
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Status</label>
-                <select value={editingStudent.status || 'active'} onChange={e => setEditingStudent({...editingStudent, status: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }}>
-                  <option value="active">Aktiv</option>
-                  <option value="bypass">Bypass (Login gesperrt)</option>
-                </select>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', gridColumn: '1 / -1' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Genereller Login-Status</label>
+                <div style={{ display: 'flex', background: '#e2e8f0', borderRadius: '12px', padding: '4px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setEditingStudent({...editingStudent, status: 'active'})}
+                    style={{
+                      flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
+                      background: (editingStudent.status || 'active') === 'active' ? '#ffffff' : 'transparent',
+                      color: (editingStudent.status || 'active') === 'active' ? '#16a34a' : '#64748b',
+                      fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
+                      boxShadow: (editingStudent.status || 'active') === 'active' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                    }}
+                  >
+                    ✅ Aktiv
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingStudent({...editingStudent, status: 'bypass'})}
+                    style={{
+                      flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
+                      background: editingStudent.status === 'bypass' ? '#ffffff' : 'transparent',
+                      color: editingStudent.status === 'bypass' ? '#ef4444' : '#64748b',
+                      fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
+                      boxShadow: editingStudent.status === 'bypass' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                    }}
+                  >
+                    🚫 Gesperrt (Bypass)
+                  </button>
+                </div>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', justifyContent: 'center' }}>
@@ -2800,10 +2824,34 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Status & Rolle</label>
-              <select value={editingTeacher.role} onChange={e => setEditingTeacher({...editingTeacher, role: e.target.value})} style={{ width: '100%', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 700, fontSize: '1rem' }}>
-                <option value="teacher">Lehrkraft / Coach</option>
-                <option value="admin">Lehrer (Admin-Zugriff)</option>
-              </select>
+              <div style={{ display: 'flex', background: '#e2e8f0', borderRadius: '16px', padding: '4px' }}>
+                <button
+                  type="button"
+                  onClick={() => setEditingTeacher({...editingTeacher, role: 'teacher'})}
+                  style={{
+                    flex: 1, padding: '12px', border: 'none', borderRadius: '12px',
+                    background: editingTeacher.role === 'teacher' ? '#ffffff' : 'transparent',
+                    color: editingTeacher.role === 'teacher' ? brandColor : '#64748b',
+                    fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s',
+                    boxShadow: editingTeacher.role === 'teacher' ? '0 4px 6px rgba(0,0,0,0.05)' : 'none'
+                  }}
+                >
+                  Lehrkraft / Coach
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingTeacher({...editingTeacher, role: 'admin'})}
+                  style={{
+                    flex: 1, padding: '12px', border: 'none', borderRadius: '12px',
+                    background: editingTeacher.role === 'admin' ? '#ffffff' : 'transparent',
+                    color: editingTeacher.role === 'admin' ? '#ef4444' : '#64748b',
+                    fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s',
+                    boxShadow: editingTeacher.role === 'admin' ? '0 4px 6px rgba(0,0,0,0.05)' : 'none'
+                  }}
+                >
+                  Lehrer (Admin)
+                </button>
+              </div>
             </div>
 
             <div>
