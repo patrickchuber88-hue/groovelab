@@ -2571,43 +2571,38 @@ export function TeacherDashboard({
             {/* Band-Repertoire Planer Widget (Very compact & Light-themed purple!) */}
             {openProposals.length > 0 && (
               <div 
-                className="glass-panel card" 
+                className="glass-panel card hover-scale" 
                 onClick={() => setActiveTab('proposals')}
                 style={{ 
                   padding: '24px', 
-                  background: '#faf5ff', 
-                  border: '1px solid #e9d5ff',
+                  background: 'white', 
+                  border: '1px solid #e2e8f0',
                   borderRadius: '32px',
-                  boxShadow: '0 10px 30px rgba(139, 92, 246, 0.05)',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.04)',
                   cursor: 'pointer',
                   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                   position: 'relative',
                   overflow: 'hidden'
                 }}
-                
-                
               >
-
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                   <div style={{ 
-                    background: 'rgba(168, 85, 247, 0.15)', 
-                    color: '#7c3aed', 
-                    padding: '8px', 
-                    borderRadius: '12px',
+                    background: 'rgba(0,0,0,0.04)', 
+                    color: brandColor, 
+                    padding: '12px', 
+                    borderRadius: '16px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.2)'
                   }}>
-                    <Music size={18} />
+                    <Music size={22} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '0.65rem', fontWeight: 1000, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '2px' }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '2px' }}>
                       Band-Repertoire Planer
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '0.9rem', fontWeight: 950, color: '#1e1b4b' }}>
+                      <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b' }}>
                         {openProposals.length > 0 ? (
                           `${openProposals.length} ${openProposals.length === 1 ? 'offener Song' : 'offene Songs'}`
                         ) : (
@@ -2616,7 +2611,7 @@ export function TeacherDashboard({
                       </span>
                     </div>
                   </div>
-                  <div style={{ color: '#7c3aed', fontWeight: 950, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                  <div style={{ color: brandColor, fontWeight: 900, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.02)', padding: '8px 16px', borderRadius: '20px' }}>
                     Ansehen →
                   </div>
                 </div>
