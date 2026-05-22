@@ -107,6 +107,17 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [registeredUser, setRegisteredUser] = useState<any>(null);
   const [loadingSchool, setLoadingSchool] = useState(false);
   const [signingUp, setSigningUp] = useState(false);
+  const [userPos, setUserPos] = useState<{lat: number, lng: number} | null>(null);
+  
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setUserPos({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        (err) => console.warn('[Login] Initial geo fetch failed:', err),
+        { enableHighAccuracy: true, maximumAge: 30000 }
+      );
+    }
+  }, []);
 
   let effectiveStationId = kioskStationId || localStorage.getItem('groovelab_station_id');
   if (effectiveStationId === 'skip') effectiveStationId = null;
