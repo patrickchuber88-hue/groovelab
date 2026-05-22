@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
 import { renderInstrumentIcon } from '../utils/instruments';
@@ -282,7 +282,7 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
   }, [sess?.check_in_time]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', height: '100%', width: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', height: '100%', width: '100%', paddingTop: '12px' }}>
       <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '6px' }}>
         <Music size={14} /> {inst}
       </div>
@@ -523,6 +523,28 @@ export function TeacherDashboard({
   const [collapsedBands, setCollapsedBands] = useState<Record<string, boolean>>({});
   const [rooms, setRooms] = useState<any[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string>('');
+  const [zoomFactor, setZoomFactor] = useState<number>(1.0);
+
+  useEffect(() => {
+    if (selectedRoomId) {
+      const savedZoom = localStorage.getItem(`groovelab_room_zoom_${selectedRoomId}`);
+      if (savedZoom) {
+        const parsed = parseFloat(savedZoom);
+        if (!isNaN(parsed)) {
+          setZoomFactor(parsed);
+          return;
+        }
+      }
+    }
+    setZoomFactor(1.0);
+  }, [selectedRoomId]);
+
+  const handleZoomChange = (value: number) => {
+    setZoomFactor(value);
+    if (selectedRoomId) {
+      localStorage.setItem(`groovelab_room_zoom_${selectedRoomId}`, value.toString());
+    }
+  };
   
   const [lastSeenCounts, setLastSeenCounts] = useState(() => {
     try {
@@ -1743,8 +1765,8 @@ export function TeacherDashboard({
               const boundWidth = Math.max(100, maxBoundX - minBoundX);
               const boundHeight = Math.max(100, maxBoundY - minBoundY);
 
-              // Use the unified scale to keep elements exactly the same size across all custom layout rooms
-              const scale = unifiedScale;
+              // Use the unified scale scaled by manual zoomFactor
+              const scale = unifiedScale * zoomFactor;
 
               return (
                 <div 
@@ -1784,44 +1806,64 @@ export function TeacherDashboard({
                     </div>
                   )}
 
-                  {/* Scaled room blueprint to fit parent width and height without scrolling or overlaps */}
-                  <div 
-                    style={{ 
-                      width: `${boundWidth * scale}px`,
-                      height: `${boundHeight * scale}px`,
-                      position: 'relative', 
-                      overflow: 'hidden',
-                      margin: '0 auto'
-                    }}
-                  >
-                    {/* Visual Blueprint Canvas */}
-                    <div style={{
-                      position: 'absolute',
-                      left: 0,
-                      top: 0,
-                      width: `${boundWidth}px`,
-                      height: `${boundHeight}px`,
-                      transform: `scale(${scale})`,
-                      transformOrigin: 'top left',
-                      background: 'transparent',
-                      border: 'none',
-                      borderRadius: '0px',
-                      boxShadow: 'none',
-                      overflow: 'visible'
-                    }}>
+                  {/* Horizontal Flex Wrapper for Blueprint Layout and Slider */}
+                  <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '24px', justifyContent: 'center', width: '100%', position: 'relative' }}>
+                    {/* Scaled room blueprint to fit parent width and height without scrolling or overlaps */}
+                    <div 
+                      style={{ 
+                        width: `${boundWidth * scale}px`,
+                        height: `${boundHeight * scale}px`,
+                        position: 'relative', 
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {/* Visual Blueprint Canvas */}
+                      <div style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        width: `${boundWidth}px`,
+                        height: `${boundHeight}px`,
+                        transform: `scale(${scale})`,
+                        transformOrigin: 'top left',
+                        background: 'transparent',
+                        border: 'none',
+                        borderRadius: '0px',
+                        boxShadow: 'none',
+                        overflow: 'visible'
+                      }}>
 
-                      {compressedActiveLayout.stations.map(station => {
-                        const sName = station.rawStation.name || '';
-                        const isTeacher = sName.toLowerCase().includes('lehrer') || sName.toLowerCase().includes('teacher');
-                        const instColor = station.rawStation.color && station.rawStation.color !== '#e5e7eb' && station.rawStation.color !== '#e2e8f0'
-                          ? station.rawStation.color
-                          : getStationColor(sName);
+                        {compressedActiveLayout.stations.map(station => {
+                          const sName = station.rawStation.name || '';
+                          const isTeacher = sName.toLowerCase().includes('lehrer') || sName.toLowerCase().includes('teacher');
+                          const instColor = station.rawStation.color && station.rawStation.color !== '#e5e7eb' && station.rawStation.color !== '#e2e8f0'
+                            ? station.rawStation.color
+                            : getStationColor(sName);
 
-                        // Align center coordinates relative to the bounding box
-                        const alignedX = station.cx - minBoundX;
-                        const alignedY = station.cy - minBoundY;
+                          // Align center coordinates relative to the bounding box
+                          const alignedX = station.cx - minBoundX;
+                          const alignedY = station.cy - minBoundY;
 
-                        if (isTeacher) {
+                          if (isTeacher) {
+                            return (
+                              <div 
+                                key={station.id} 
+                                style={{
+                                  position: 'absolute',
+                                  left: `${alignedX}px`,
+                                  top: `${alignedY}px`,
+                                  transform: 'translate(-50%, -50%)',
+                                  zIndex: 100
+                                }}
+                              >
+                                <CoachesNode coaches={coaches} onProfileSelect={setSelectedCoachProfile} />
+                              </div>
+                            );
+                          }
+
+                          const sess = activeSessions.find(se => se.station_id === station.id);
+                          const num = parseInt(sName.match(/\d+/)?.[0] || '1');
+
                           return (
                             <div 
                               key={station.id} 
@@ -1830,44 +1872,117 @@ export function TeacherDashboard({
                                 left: `${alignedX}px`,
                                 top: `${alignedY}px`,
                                 transform: 'translate(-50%, -50%)',
-                                zIndex: 100
+                                width: '180px',
+                                zIndex: 10
                               }}
                             >
-                              <CoachesNode coaches={coaches} onProfileSelect={setSelectedCoachProfile} />
+                              <StationNode
+                                num={num}
+                                customName={station.rawStation.name}
+                                color={instColor}
+                                inst={station.rawStation.instrument || 'Tablet'}
+                                sess={sess}
+                                isMe={sess?.user_id === userId}
+                                viewMode={viewMode}
+                                onProfileSelect={setSelectedStudentProfile}
+                                onLogout={handleLogoutStudent}
+                                hasHelpRequest={helpRequests.some(r => r.station_id === station.id)}
+                              />
                             </div>
                           );
-                        }
+                        })}
+                      </div>
+                    </div>
 
-                        const sess = activeSessions.find(se => se.station_id === station.id);
-                        const num = parseInt(sName.match(/\d+/)?.[0] || '1');
+                    {/* Vertical Zoom Control Panel */}
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '12px',
+                      background: 'rgba(255, 255, 255, 0.45)',
+                      backdropFilter: 'blur(20px)',
+                      WebkitBackdropFilter: 'blur(20px)',
+                      border: '1px solid rgba(255, 255, 255, 0.6)',
+                      borderRadius: '24px',
+                      padding: '16px 12px',
+                      boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)',
+                      height: '240px',
+                      justifyContent: 'space-between',
+                      width: '64px',
+                      flexShrink: 0
+                    }}>
+                      <button 
+                        onClick={() => handleZoomChange(Math.min(2.5, zoomFactor + 0.1))}
+                        style={{
+                          background: 'white',
+                          border: '1px solid rgba(0, 0, 0, 0.05)',
+                          borderRadius: '12px',
+                          width: '36px',
+                          height: '36px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#64748b',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                          transition: 'all 0.2s'
+                        }}
+                        className="hover-scale-mini"
+                        title="Vergrößern"
+                      >
+                        <ZoomIn size={18} />
+                      </button>
 
-                        return (
-                          <div 
-                            key={station.id} 
-                            style={{
-                              position: 'absolute',
-                              left: `${alignedX}px`,
-                              top: `${alignedY}px`,
-                              transform: 'translate(-50%, -50%)',
-                              width: '180px',
-                              zIndex: 10
-                            }}
-                          >
-                            <StationNode
-                              num={num}
-                              customName={station.rawStation.name}
-                              color={instColor}
-                              inst={station.rawStation.instrument || 'Tablet'}
-                              sess={sess}
-                              isMe={sess?.user_id === userId}
-                              viewMode={viewMode}
-                              onProfileSelect={setSelectedStudentProfile}
-                              onLogout={handleLogoutStudent}
-                              hasHelpRequest={helpRequests.some(r => r.station_id === station.id)}
-                            />
-                          </div>
-                        );
-                      })}
+                      <div style={{ height: '110px', display: 'flex', justifyContent: 'center', position: 'relative', width: '100%' }}>
+                        <input 
+                          type="range"
+                          min="0.4"
+                          max="2.5"
+                          step="0.05"
+                          value={zoomFactor}
+                          onChange={(e) => handleZoomChange(parseFloat(e.target.value))}
+                          style={{
+                            writingMode: 'vertical-lr',
+                            WebkitAppearance: 'slider-vertical',
+                            width: '12px',
+                            height: '100px',
+                            cursor: 'ns-resize',
+                            accentColor: '#6366f1',
+                            background: 'rgba(99, 102, 241, 0.1)',
+                            borderRadius: '6px',
+                            outline: 'none',
+                            margin: 0,
+                            padding: 0
+                          }}
+                        />
+                      </div>
+
+                      <button 
+                        onClick={() => handleZoomChange(Math.max(0.4, zoomFactor - 0.1))}
+                        style={{
+                          background: 'white',
+                          border: '1px solid rgba(0, 0, 0, 0.05)',
+                          borderRadius: '12px',
+                          width: '36px',
+                          height: '36px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#64748b',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                          transition: 'all 0.2s'
+                        }}
+                        className="hover-scale-mini"
+                        title="Verkleinern"
+                      >
+                        <ZoomOut size={18} />
+                      </button>
+
+                      <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#64748b', textAlign: 'center', width: '100%' }}>
+                        {Math.round(zoomFactor * 100)}%
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2104,6 +2219,71 @@ export function TeacherDashboard({
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Band-Repertoire Planer Widget (Dark-themed purple to match the song card!) - Reordered and hover effect removed */}
+            {openProposals.length > 0 && (
+              <div 
+                className="glass-panel card" 
+                onClick={() => setActiveTab('proposals')}
+                style={{ 
+                  padding: '24px', 
+                  background: 'linear-gradient(135deg, #1e1b4b 0%, #0f0728 100%)', 
+                  border: '1px solid rgba(165, 180, 252, 0.15)',
+                  borderRadius: '32px',
+                  boxShadow: '0 15px 35px rgba(0, 0, 0, 0.2)',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <div style={{ 
+                    background: 'rgba(165, 180, 252, 0.05)', 
+                    color: '#a5b4fc', 
+                    padding: '12px', 
+                    borderRadius: '16px',
+                    border: '1px solid rgba(165, 180, 252, 0.15)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <Music size={22} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '2px' }}>
+                      Band-Repertoire Planer
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#ffffff' }}>
+                        {openProposals.length > 0 ? (
+                          `${openProposals.length} ${openProposals.length === 1 ? 'offener Song' : 'offene Songs'}`
+                        ) : (
+                          'Keine offenen Songs (Alles aktuell!)'
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ 
+                    color: '#a5b4fc', 
+                    fontWeight: 900, 
+                    fontSize: '0.7rem', 
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.1em',
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '4px', 
+                    background: 'rgba(165, 180, 252, 0.1)', 
+                    padding: '8px 16px', 
+                    borderRadius: '12px',
+                    border: '1px solid rgba(165, 180, 252, 0.15)',
+                    transition: 'all 0.2s'
+                  }}>
+                    Ansehen →
+                  </div>
                 </div>
               </div>
             )}
@@ -2619,71 +2799,6 @@ export function TeacherDashboard({
                     <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, lineHeight: 1.4 }}>Keine offenen Challenges. Alles unter Kontrolle!</div>
                   </div>
                 )}
-              </div>
-            )}
-
-            {/* Band-Repertoire Planer Widget (Dark-themed purple to match the song card!) */}
-            {openProposals.length > 0 && (
-              <div 
-                className="glass-panel card hover-scale" 
-                onClick={() => setActiveTab('proposals')}
-                style={{ 
-                  padding: '24px', 
-                  background: 'linear-gradient(135deg, #1e1b4b 0%, #0f0728 100%)', 
-                  border: '1px solid rgba(165, 180, 252, 0.15)',
-                  borderRadius: '32px',
-                  boxShadow: '0 15px 35px rgba(0, 0, 0, 0.2)',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div style={{ 
-                    background: 'rgba(165, 180, 252, 0.05)', 
-                    color: '#a5b4fc', 
-                    padding: '12px', 
-                    borderRadius: '16px',
-                    border: '1px solid rgba(165, 180, 252, 0.15)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                    <Music size={22} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '2px' }}>
-                      Band-Repertoire Planer
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#ffffff' }}>
-                        {openProposals.length > 0 ? (
-                          `${openProposals.length} ${openProposals.length === 1 ? 'offener Song' : 'offene Songs'}`
-                        ) : (
-                          'Keine offenen Songs (Alles aktuell!)'
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                  <div style={{ 
-                    color: '#a5b4fc', 
-                    fontWeight: 900, 
-                    fontSize: '0.7rem', 
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.1em',
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '4px', 
-                    background: 'rgba(165, 180, 252, 0.1)', 
-                    padding: '8px 16px', 
-                    borderRadius: '12px',
-                    border: '1px solid rgba(165, 180, 252, 0.15)',
-                    transition: 'all 0.2s'
-                  }}>
-                    Ansehen →
-                  </div>
-                </div>
               </div>
             )}
 
