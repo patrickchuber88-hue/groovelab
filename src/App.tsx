@@ -2927,6 +2927,20 @@ function App() {
           return !!song;
         });
         setAllBands(validBands);
+
+        // Fallback: If selectedBandForProfile wasn't found in uniqueBands (e.g. teacher viewing student band)
+        // try to restore it from all bands.
+        if (selectedBandForProfile) {
+          setSelectedBandForProfile((prev: any) => {
+            const foundInAll = bandsData.find((b: any) => b.id === prev?.id);
+            return foundInAll || prev;
+          });
+        } else if (restoredBandId && showBandProfile) {
+          const restoredFromAll = bandsData.find((b: any) => b.id === restoredBandId);
+          if (restoredFromAll) {
+            setSelectedBandForProfile(restoredFromAll);
+          }
+        }
       }
 
       // Lade die Wochenplan-Daten (mit kleiner Verzögerung für State-Stabilität)
@@ -6827,27 +6841,27 @@ function App() {
                             setIsMailComposing(false);
                           }}
                           style={{
-                            background: isSelected ? 'linear-gradient(135deg, #3b82f615 0%, #1d4ed808 100%)' : '#f8fafc',
-                            border: isSelected ? '2px solid #3b82f6' : '2px solid transparent',
+                            background: isSelected ? '#e8f0fe' : '#ffffff',
+                            border: 'none',
                             borderRadius: '16px',
-                            padding: '16px',
+                            padding: '18px',
                             textAlign: 'left',
                             cursor: 'pointer',
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: '6px',
-                            transition: 'all 0.2s',
-                            boxShadow: isSelected ? '0 4px 12px rgba(59,130,246,0.05)' : 'none',
+                            gap: '8px',
+                            transition: 'all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)',
+                            boxShadow: isSelected ? '0 4px 20px rgba(0, 113, 227, 0.15)' : '0 2px 12px rgba(0,0,0,0.04)',
                             position: 'relative',
                             width: '100%'
                           }}
-                          className="hover-scale"
+                          className="hover-scale-mini"
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', gap: '8px' }}>
-                            <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                            <div style={{ fontWeight: 700, fontSize: '1rem', color: isSelected ? '#0071e3' : '#1d1d1f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                               {parsed.title}
                             </div>
-                            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', flexShrink: 0 }}>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 500, color: '#86868b', flexShrink: 0 }}>
                               {new Date(ann.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
                             </div>
                           </div>
@@ -6867,16 +6881,16 @@ function App() {
                           
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', width: '100%' }}>
                             <span style={{ 
-                              fontSize: '0.65rem', 
-                              fontWeight: 800, 
-                              padding: '2px 8px', 
-                              borderRadius: '6px', 
-                              background: parsed.target_type === 'all' ? '#e0f2fe' : parsed.target_type === 'students' ? '#dbeafe' : parsed.target_type === 'teachers' ? '#dcfce7' : '#f3e8ff',
-                              color: parsed.target_type === 'all' ? '#0369a1' : parsed.target_type === 'students' ? '#1d4ed8' : parsed.target_type === 'teachers' ? '#15803d' : '#7e22ce'
+                              fontSize: '0.7rem', 
+                              fontWeight: 600, 
+                              padding: '4px 10px', 
+                              borderRadius: '20px', 
+                              background: '#f5f5f7',
+                              color: '#86868b'
                             }}>
                               {parsed.target_type === 'all' ? 'Alle' : parsed.target_type === 'students' ? 'Schüler' : parsed.target_type === 'teachers' ? 'Lehrer' : 'Auswahl'}
                             </span>
-                            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#86868b', display: 'flex', alignItems: 'center', gap: '3px' }}>
                               👁️ {readCount}{totalTarget > 0 ? `/${totalTarget}` : ''}
                             </span>
                           </div>
@@ -6910,10 +6924,10 @@ function App() {
                     style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
                   >
                     {/* Compose Header */}
-                    <div style={{ padding: '24px 32px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
+                    <div style={{ padding: '24px 32px', borderBottom: '1px solid rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff' }}>
                       <div>
-                        <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: '0' }}>Neue Mitteilung verfassen</h3>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>Sende eine Benachrichtigung an deine Groovelab Community</div>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1d1d1f', margin: '0' }}>Neue Mitteilung verfassen</h3>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#86868b', marginTop: '2px' }}>Sende eine Benachrichtigung an deine Groovelab Community</div>
                       </div>
                       <div style={{ display: 'flex', gap: '10px' }}>
                         <button 
@@ -6926,34 +6940,34 @@ function App() {
                             setSelectedTargetUserIds([]);
                           }}
                           style={{ 
-                            background: '#f1f5f9', 
-                            color: '#475569', 
+                            background: 'transparent', 
+                            color: '#0071e3', 
                             border: 'none', 
                             padding: '10px 20px', 
-                            borderRadius: '12px', 
-                            fontWeight: 800, 
+                            borderRadius: '20px', 
+                            fontWeight: 600, 
                             cursor: 'pointer' 
                           }}
-                          className="hover-scale"
+                          className="hover-scale-mini"
                         >
                           Verwerfen
                         </button>
                         <button 
                           type="submit" 
                           style={{ 
-                            background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', 
+                            background: '#0071e3', 
                             color: 'white', 
                             border: 'none', 
                             padding: '10px 24px', 
-                            borderRadius: '12px', 
-                            fontWeight: 800, 
+                            borderRadius: '20px', 
+                            fontWeight: 600, 
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '8px',
-                            boxShadow: '0 4px 12px rgba(59,130,246,0.2)'
+                            boxShadow: '0 4px 12px rgba(0, 113, 227, 0.2)'
                           }}
-                          className="hover-scale"
+                          className="hover-scale-mini"
                         >
                           <Zap size={16} />
                           Absenden
@@ -6965,14 +6979,14 @@ function App() {
                     <div style={{ flex: 1, overflowY: 'auto', padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
                       {/* Recipient Field */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>An (Empfänger)</label>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>An (Empfänger)</label>
                         <select 
                           value={announcementTarget} 
                           onChange={e => {
                             setAnnouncementTarget(e.target.value as any);
                             setSelectedTargetUserIds([]);
                           }}
-                          style={{ padding: '14px 18px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 850, fontSize: '0.9rem', cursor: 'pointer', outline: 'none' }}
+                          style={{ padding: '16px', borderRadius: '12px', border: 'none', background: '#f5f5f7', fontWeight: 600, fontSize: '0.95rem', cursor: 'pointer', outline: 'none', color: '#1d1d1f' }}
                         >
                           <option value="all">Alle Schüler & Lehrer</option>
                           <option value="students">Nur Schüler</option>
@@ -7036,35 +7050,36 @@ function App() {
 
                       {/* Subject Field */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Betreff</label>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Betreff</label>
                         <input 
                           required 
                           placeholder="Betreffzeile eintragen..." 
                           value={announcementTitle} 
                           onChange={e => setAnnouncementTitle(e.target.value)} 
-                          style={{ padding: '14px 18px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700, fontSize: '0.95rem', outline: 'none' }} 
+                          style={{ padding: '16px', borderRadius: '12px', border: 'none', background: '#f5f5f7', fontWeight: 600, fontSize: '0.95rem', outline: 'none', color: '#1d1d1f' }} 
                         />
                       </div>
 
                       {/* Message Body Field */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
-                        <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Inhalt</label>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Inhalt</label>
                         <textarea 
                           required 
                           placeholder="Schreibe deine Nachricht hier..." 
                           value={announcementMessage} 
                           onChange={e => setAnnouncementMessage(e.target.value)} 
                           style={{ 
-                            padding: '18px', 
-                            borderRadius: '14px', 
-                            border: '1px solid #e2e8f0', 
-                            background: '#f8fafc', 
-                            fontWeight: 600, 
+                            padding: '16px', 
+                            borderRadius: '12px', 
+                            border: 'none', 
+                            background: '#f5f5f7', 
+                            fontWeight: 500, 
                             fontSize: '0.95rem', 
                             resize: 'none',
                             flex: 1,
                             outline: 'none',
-                            lineHeight: 1.6
+                            lineHeight: 1.6,
+                            color: '#1d1d1f'
                           }} 
                         />
                       </div>

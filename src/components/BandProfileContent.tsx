@@ -1134,7 +1134,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
           {bandProfileView === "backstage" && !isSharedView ? (            <div style={{ display: 'grid', gridTemplateColumns: width < 1200 ? '1fr' : 'minmax(0, 1fr) 400px', gap: '40px', alignItems: 'start' }}>
               
               {/* LEFT: Band Repertoire-Planer (Compacted) */}
-              <section style={{ ...widgetStyle, background: 'rgba(168, 85, 247, 0.15)', border: '1px solid rgba(168, 85, 247, 0.3)', padding: '24px', gap: '20px' }}>
+              <section style={{ ...widgetStyle, padding: '24px', gap: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h3 style={{ ...widgetHeaderStyle, margin: 0, fontSize: '0.9rem' }}><Zap size={18} color={brandColor} fill="currentColor" /> Band Repertoire-Planer</h3>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
