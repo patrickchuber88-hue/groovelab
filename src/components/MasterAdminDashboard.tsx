@@ -95,6 +95,18 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
       console.error('Error fetching admin:', err);
     }
   };
+  const parseDate = (d: string | null) => {
+    if (!d) return null;
+    const trimmed = d.trim();
+    if (trimmed.includes('.')) {
+      const parts = trimmed.split('.');
+      if (parts.length === 3) {
+        // Assume DD.MM.YYYY
+        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+      }
+    }
+    return trimmed;
+  };
 
   const handleSaveSchoolDetails = async () => {
     if (!selectedSchool || !editName.trim()) return;
@@ -105,8 +117,8 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
         logo_url: editLogo,
         status: editStatus,
         is_trial: editIsTrial,
-        trial_ends_at: editIsTrial ? editTrialEndsAt || null : null,
-        contract_ends_at: editContractEndsAt || null,
+        trial_ends_at: editIsTrial ? parseDate(editTrialEndsAt) : null,
+        contract_ends_at: parseDate(editContractEndsAt),
         max_teachers: editMaxTeachers,
         max_students: editMaxStudents,
         max_songs: editMaxSongs
@@ -1105,23 +1117,35 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                   </div>
                   
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Genereller Login-Status</label>
-                    <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1.5px solid #cbd5e1', outline: 'none', fontSize: '0.95rem', fontWeight: 600, color: editStatus === 'active' ? '#16a34a' : '#dc2626', background: editStatus === 'active' ? '#f0fdf4' : '#fef2f2' }}>
-                      <option value="active">🟢 Aktiv (Login am Kiosk erlaubt)</option>
-                      <option value="suspended">🔴 Gesperrt (Erzwingt Bypass / Home-Modus)</option>
-                    </select>
+                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '8px' }}>Schul-Zugang (Login)</label>
+                    <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '6px', borderRadius: '14px' }}>
+                      <button 
+                        type="button"
+                        onClick={() => setEditStatus('active')}
+                        style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', background: editStatus === 'active' ? '#fff' : 'transparent', color: editStatus === 'active' ? '#16a34a' : '#64748b', boxShadow: editStatus === 'active' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none' }}
+                      >
+                        ✅ Aktiviert
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setEditStatus('suspended')}
+                        style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', background: editStatus === 'suspended' ? '#fff' : 'transparent', color: editStatus === 'suspended' ? '#dc2626' : '#64748b', boxShadow: editStatus === 'suspended' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none' }}
+                      >
+                        🚫 Gesperrt
+                      </button>
+                    </div>
                   </div>
 
                   {editIsTrial ? (
                     <div style={{ background: '#fffbeb', padding: '16px', borderRadius: '12px', border: '1px solid #fde68a' }}>
                       <label style={{ display: 'block', fontSize: '0.85rem', color: '#b45309', fontWeight: 800, marginBottom: '6px' }}>⏳ Probezeit Enddatum</label>
-                      <input type="date" value={editTrialEndsAt} onChange={(e) => setEditTrialEndsAt(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1.5px solid #fcd34d', boxSizing: 'border-box', outline: 'none', background: '#fff' }} />
-                      <p style={{ margin: '8px 0 0 0', fontSize: '0.8rem', color: '#92400e' }}>Nach diesem Datum werden Logins verweigert, bis auf "Aktiv" umgestellt wird.</p>
+                      <input type="text" placeholder="TT.MM.JJJJ oder YYYY-MM-DD" value={editTrialEndsAt} onChange={(e) => setEditTrialEndsAt(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1.5px solid #fcd34d', boxSizing: 'border-box', outline: 'none', background: '#fff' }} />
+                      <p style={{ margin: '8px 0 0 0', fontSize: '0.8rem', color: '#92400e' }}>Nach diesem Datum werden Logins komplett verweigert.</p>
                     </div>
                   ) : (
                     <div>
                       <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Vertragslaufzeit bis (Optional)</label>
-                      <input type="date" value={editContractEndsAt} onChange={(e) => setEditContractEndsAt(e.target.value)} style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1.5px solid #cbd5e1', boxSizing: 'border-box', outline: 'none' }} />
+                      <input type="text" placeholder="TT.MM.JJJJ oder YYYY-MM-DD" value={editContractEndsAt} onChange={(e) => setEditContractEndsAt(e.target.value)} style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1.5px solid #cbd5e1', boxSizing: 'border-box', outline: 'none' }} />
                     </div>
                   )}
                 </div>
