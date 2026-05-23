@@ -2204,7 +2204,10 @@ export function TeacherDashboard({
             opacity: isSidebarCollapsed ? 0 : 1,
             transform: isSidebarCollapsed ? 'translateX(20px)' : 'translateX(0)',
             pointerEvents: isSidebarCollapsed ? 'none' : 'auto',
-            overflow: 'hidden',
+            overflowY: isSidebarCollapsed ? 'hidden' : 'auto',
+            overflowX: 'hidden',
+            maxHeight: `${windowHeight - 160}px`,
+            paddingRight: '6px',
             transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
           }}>
             {/* Mobile Header (Close Button) */}

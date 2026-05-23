@@ -548,6 +548,21 @@ body {
 }
 
 
+/* Sleek custom scrollbars for the sidebar */
+.live-lab-grid aside::-webkit-scrollbar {
+  width: 6px;
+}
+.live-lab-grid aside::-webkit-scrollbar-track {
+  background: transparent;
+}
+.live-lab-grid aside::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.08);
+  border-radius: 10px;
+}
+.live-lab-grid aside::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.15);
+}
+
 /* Globale iPad/Touch-Optimierungen für verzögerungsfreie Klicks */
 * {
   touch-action: manipulation;

@@ -1437,6 +1437,55 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                   </div>
                 </div>
 
+                <div style={{ marginTop: '4px' }}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Individueller QR-Login Link
+                  </label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      readOnly
+                      value={`${window.location.origin}/?school_id=${selectedSchool.id}`}
+                      style={{
+                        flex: 1,
+                        padding: '10px 12px',
+                        borderRadius: '10px',
+                        border: '1px solid rgba(0,0,0,0.12)',
+                        background: '#f5f5f7',
+                        fontSize: '0.8rem',
+                        fontFamily: 'monospace',
+                        color: '#48484a',
+                        outline: 'none'
+                      }}
+                      onClick={(e) => (e.target as HTMLInputElement).select()}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/?school_id=${selectedSchool.id}`);
+                        alert('QR-Login Link für diese Schule in die Zwischenablage kopiert!');
+                      }}
+                      style={{
+                        background: editColor || '#0071e3',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '10px',
+                        padding: '10px 16px',
+                        fontSize: '0.8rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        transition: 'opacity 0.2s'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.opacity = '0.85'}
+                      onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
+                    >
+                      Kopieren
+                    </button>
+                  </div>
+                  <p style={{ margin: '6px 0 0 0', fontSize: '0.72rem', color: '#8e8e93', lineHeight: '1.4' }}>
+                    Dieser Link öffnet den QR-Code-Scanner direkt gebrandet für diese Schule (z. B. auf Schüler-Endgeräten zu Hause).
+                  </p>
+                </div>
+
                 {editIsTrial ? (
                   <div style={{ background: '#fffbeb', padding: '16px', borderRadius: '12px', border: '1px solid rgba(234, 179, 8, 0.2)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div>

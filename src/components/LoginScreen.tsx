@@ -528,6 +528,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   // Onboarding parameters for invited school coaches
   const urlParams = new URLSearchParams(window.location.search);
   const inviteSchoolId = urlParams.get('invite_school_id');
+  const schoolIdParam = urlParams.get('school_id');
   
   const [schoolName, setSchoolName] = useState<string>('');
   const [schoolData, setSchoolData] = useState<any>(null);
@@ -557,6 +558,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         setLoadingSchool(true);
         if (inviteSchoolId) {
           const { data, error } = await supabase.from('schools').select('*').eq('id', inviteSchoolId).maybeSingle();
+          if (!error && data) {
+            setSchoolName(data.name);
+            setSchoolData(data);
+          }
+        } else if (schoolIdParam) {
+          const { data, error } = await supabase.from('schools').select('*').eq('id', schoolIdParam).maybeSingle();
           if (!error && data) {
             setSchoolName(data.name);
             setSchoolData(data);
