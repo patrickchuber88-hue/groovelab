@@ -172,6 +172,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [galleryStudents, setGalleryStudents] = useState<any[]>([]);
   const [setupRooms, setSetupRooms] = useState<any[]>([]);
   const [setupStations, setSetupStations] = useState<any[]>([]);
+  const [kiosks, setKiosks] = useState<any[] | null>(null);
   const [activeTab, setActiveTab] = useState<string>(() => localStorage.getItem('groovelab_active_tab') || forceTab || 'live');
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -599,6 +600,13 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     setAdmin(adminData);
 
     if (adminData?.school_id) {
+      // Fetch kiosks for the school
+      const { data: kiosksData } = await supabase
+        .from('kiosks')
+        .select('*')
+        .eq('school_id', adminData.school_id);
+      setKiosks(kiosksData || []);
+
       if (activeTab === 'live') {
         const { data: sData } = await supabase
           .from('sessions')
@@ -787,6 +795,57 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       
     return () => { supabase.removeChannel(channel); };
   }, [admin?.school_id]);
+
+  useEffect(() => {
+    if (!admin?.school_id || kiosks === null) return;
+
+    const activeRooms = rooms.length > 0 ? rooms : setupRooms;
+    const activeStations = stations.length > 0 ? stations : setupStations;
+
+    if (activeRooms.length === 0) return;
+
+    const missingKiosks: any[] = [];
+
+    activeRooms.forEach(r => {
+      const exists = kiosks.some(k => k.room_id === r.id && !k.station_id);
+      if (!exists) {
+        missingKiosks.push({
+          school_id: admin.school_id,
+          name: r.name || 'Raum Kiosk',
+          room_id: r.id,
+          station_id: null
+        });
+      }
+    });
+
+    activeStations.forEach(s => {
+      const exists = kiosks.some(k => k.station_id === s.id);
+      if (!exists) {
+        missingKiosks.push({
+          school_id: admin.school_id,
+          name: s.name || 'iPad Kiosk',
+          room_id: s.room_id,
+          station_id: s.id
+        });
+      }
+    });
+
+    if (missingKiosks.length > 0) {
+      const insertKiosks = async () => {
+        const { error } = await supabase.from('kiosks').insert(missingKiosks);
+        if (!error) {
+          const { data: kiosksData } = await supabase
+            .from('kiosks')
+            .select('*')
+            .eq('school_id', admin.school_id);
+          setKiosks(kiosksData || []);
+        } else {
+          console.error('Error auto-creating kiosks:', error);
+        }
+      };
+      insertKiosks();
+    }
+  }, [admin?.school_id, rooms, setupRooms, stations, setupStations, kiosks]);
 
   const fetchStats = async (schoolId: string) => {
     const { count: studentCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('school_id', schoolId).eq('role', 'student');
@@ -4296,6 +4355,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       activeSessions={activeSessions}
       students={students}
       school={admin?.schools}
+      kiosks={kiosks || []}
       onUpdate={() => fetchData()}
       onCleanupPlanning={handleCleanupPlanning}
       onResetPlanning={handleResetAllPlanning}
@@ -5362,8 +5422,14 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     const activeStation = stations.find(s => s.id === activeEditStationId);
     
     // Generate Kiosk URLs
-    const getStationKioskUrl = (id: string) => `${window.location.origin}/?kiosk_station_id=${id}`;
-    const getRoomKioskUrl = (id: string) => `${window.location.origin}/?kiosk_room_id=${id}`;
+    const getStationKioskUrl = (id: string) => {
+      const kiosk = (kiosks || []).find(k => k.station_id === id);
+      return kiosk ? `${window.location.origin}/?kiosk_token=${kiosk.secret_token}` : `${window.location.origin}/?kiosk_station_id=${id}`;
+    };
+    const getRoomKioskUrl = (id: string) => {
+      const kiosk = (kiosks || []).find(k => k.room_id === id && !k.station_id);
+      return kiosk ? `${window.location.origin}/?kiosk_token=${kiosk.secret_token}` : `${window.location.origin}/?kiosk_room_id=${id}`;
+    };
 
     return (
       <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(12px)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
@@ -6225,6 +6291,7 @@ function DeviceSetupScreen({
   activeSessions, 
   students, 
   school,
+  kiosks,
   onUpdate,
   onCleanupPlanning,
   onResetPlanning
@@ -6235,6 +6302,7 @@ function DeviceSetupScreen({
   activeSessions: any[], 
   students: any[], 
   school: any,
+  kiosks: any[],
   onUpdate: () => void,
   onCleanupPlanning: () => void,
   onResetPlanning: () => void
@@ -6313,7 +6381,10 @@ function DeviceSetupScreen({
 
   const roomStations = stations.filter(s => s.room_id === selectedRoomId);
   const activeRoom = rooms.find(r => r.id === selectedRoomId) || rooms[0];
-  const roomKioskUrl = activeRoom ? `${window.location.origin}/?kiosk_room_id=${activeRoom.id}` : '';
+  const activeKiosk = activeRoom ? (kiosks || []).find(k => k.room_id === activeRoom.id && !k.station_id) : null;
+  const roomKioskUrl = activeKiosk 
+    ? `${window.location.origin}/?kiosk_token=${activeKiosk.secret_token}` 
+    : (activeRoom ? `${window.location.origin}/?kiosk_room_id=${activeRoom.id}` : '');
 
   const getStationByNumber = (num: number) => {
     return roomStations.find(s => {

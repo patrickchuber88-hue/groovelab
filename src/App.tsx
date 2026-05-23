@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, LogOut, Award, Users, User, Monitor, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School } from 'lucide-react';
+import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School } from 'lucide-react';
 import { 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer,
   BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell
@@ -1155,7 +1155,20 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
 }
 
 // Auto-setup kiosk mode from URL parameters
-const params = new URLSearchParams(window.location.search);
+const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+const kioskTokenParam = params.get('kiosk_token');
+if (kioskTokenParam) {
+  localStorage.setItem('groovelab_kiosk_token', kioskTokenParam);
+  localStorage.removeItem('groovelab_station_id');
+  localStorage.removeItem('groovelab_kiosk_room_id');
+  sessionStorage.removeItem('groovelab_user_id');
+  // Strip parameter and redirect to clean up URL
+  params.delete('kiosk_token');
+  const newSearch = params.toString();
+  const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '');
+  window.location.replace(newUrl);
+}
+
 const kioskStationId = params.get('kiosk_station_id');
 if (kioskStationId) {
   localStorage.setItem('groovelab_station_id', kioskStationId);
@@ -1350,6 +1363,58 @@ if (typeof window !== 'undefined') {
 function App() {
   const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => sessionStorage.getItem('groovelab_user_id'));
   const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  // States for Kiosk lookup and legal modals
+  const [kioskDetails, setKioskDetails] = useState<any>(null);
+  const [loadingKiosk, setLoadingKiosk] = useState<boolean>(() => typeof window !== 'undefined' ? !!localStorage.getItem('groovelab_kiosk_token') : false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showImpressum, setShowImpressum] = useState(false);
+  const [stationIdFromStorage, setStationIdFromStorage] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('groovelab_station_id') : null);
+
+  // Effect to resolve the kiosk token on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const token = localStorage.getItem('groovelab_kiosk_token');
+    if (!token) {
+      setLoadingKiosk(false);
+      return;
+    }
+    
+    async function loadKiosk() {
+      try {
+        console.log('[KioskResolver] Resolving kiosk token:', token);
+        const { data, error } = await supabase
+          .from('kiosks')
+          .select('*, stations(*), rooms(*)')
+          .eq('secret_token', token)
+          .maybeSingle();
+          
+        if (error) throw error;
+        if (data) {
+          console.log('[KioskResolver] Resolved Kiosk:', data);
+          setKioskDetails(data);
+          if (data.station_id) {
+            localStorage.setItem('groovelab_station_id', data.station_id);
+            setStationIdFromStorage(data.station_id);
+          }
+          if (data.room_id) {
+            localStorage.setItem('groovelab_kiosk_room_id', data.room_id);
+          }
+        } else {
+          console.warn("[KioskResolver] Invalid kiosk token. Clearing kiosk storage.");
+          localStorage.removeItem('groovelab_kiosk_token');
+          localStorage.removeItem('groovelab_station_id');
+          localStorage.removeItem('groovelab_kiosk_room_id');
+          setStationIdFromStorage(null);
+        }
+      } catch (err) {
+        console.error("[KioskResolver] Error loading kiosk details:", err);
+      } finally {
+        setLoadingKiosk(false);
+      }
+    }
+    loadKiosk();
+  }, []);
 
   // Kiosk Room Auto-Bootstrap: when kiosk_room_id is in the URL WITHOUT kiosk_setup=1,
   // automatically resolve a station ID for that room and go directly to the QR-scanner.
@@ -1991,9 +2056,6 @@ function App() {
   const { width, height } = useWindowSize();
 
   const [liveSessionMins, setLiveSessionMins] = useState(0);
-  
-  // Synchronous read to avoid flicker
-  const [stationIdFromStorage] = useState(() => localStorage.getItem('groovelab_station_id'));
 
   useEffect(() => {
     console.log('--- Groovelab Diagnostics ---');
@@ -2023,7 +2085,7 @@ function App() {
     };
   }, [user]);
 
-  const isKioskMode = stationIdFromStorage && stationIdFromStorage !== 'skip';
+  const isKioskMode = (stationIdFromStorage && stationIdFromStorage !== 'skip') || (typeof window !== 'undefined' ? !!localStorage.getItem('groovelab_kiosk_token') : false);
 
   useEffect(() => {
     if (loggedInUserId) {
@@ -4559,6 +4621,16 @@ function App() {
     );
   }
 
+  // 1.7 KIOSK RESOLUTION SPINNER
+  if (loadingKiosk) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px' }}>
+        <div className="animate-spin" style={{ width: '32px', height: '32px', border: '3px solid #e2e8f0', borderTopColor: '#eab308', borderRadius: '50%' }}></div>
+        <div style={{ fontSize: '13px', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Lade Kiosk-Konfiguration…</div>
+      </div>
+    );
+  }
+
   // 1.8a KIOSK SETUP MODE: kiosk_room_id + kiosk_setup=1 → show DeviceSetupScreen
   if (kioskRoomIdParam && kioskSetupParam === '1') {
     return <DeviceSetupScreen />;
@@ -5144,6 +5216,35 @@ function App() {
           >
             <LogOut size={18} color="#ef4444" /> Abmelden
           </button>
+          
+          {/* Legal Links under logout */}
+          <div style={{ 
+            marginTop: '12px', 
+            paddingTop: '12px',
+            borderTop: '1px solid #f1f5f9',
+            display: 'flex', 
+            justifyContent: 'center',
+            gap: '12px', 
+            fontSize: '10px', 
+            fontWeight: 800, 
+            color: '#94a3b8',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em'
+          }}>
+            <span 
+              onClick={() => setShowPrivacy(true)} 
+              style={{ cursor: 'pointer', transition: 'color 0.2s' }}
+            >
+              Datenschutz
+            </span>
+            <span style={{ opacity: 0.5 }}>•</span>
+            <span 
+              onClick={() => setShowImpressum(true)} 
+              style={{ cursor: 'pointer', transition: 'color 0.2s' }}
+            >
+              Impressum
+            </span>
+          </div>
         </div>
       </aside>
 
@@ -6381,6 +6482,23 @@ function App() {
                           ));
                         })()}
                       </div>
+                    </div>
+                    {/* Legal Footer for Mobile / Profile Page */}
+                    <div style={{
+                      marginTop: '24px',
+                      padding: '24px 0',
+                      borderTop: '1px solid #f1f5f9',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '12px'
+                    }}>
+                      <div style={{ display: 'flex', gap: '20px', fontSize: '0.85rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        <span onClick={() => setShowPrivacy(true)} style={{ cursor: 'pointer' }}>Datenschutz</span>
+                        <span style={{ opacity: 0.5 }}>•</span>
+                        <span onClick={() => setShowImpressum(true)} style={{ cursor: 'pointer' }}>Impressum</span>
+                      </div>
+                      <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>GrooveLab App © {new Date().getFullYear()}</span>
                     </div>
                   </div>
                 </>
@@ -9230,6 +9348,222 @@ function App() {
       {/* Modal: QR Code anzeigen */}
       {showQR && user?.qr_token && (
         <QRCodeModal user={user} onClose={() => setShowQR(false)} />
+      )}
+
+      {/* Privacy Policy Modal */}
+      {showPrivacy && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.40)',
+          backdropFilter: 'blur(16px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '32px',
+            boxShadow: '0 30px 80px rgba(15, 23, 42, 0.18)',
+            border: '1px solid #f1f5f9',
+            padding: '36px',
+            maxWidth: '560px',
+            width: '100%',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px'
+          }}>
+            <button 
+              onClick={() => setShowPrivacy(false)} 
+              style={{
+                position: 'absolute',
+                top: '24px',
+                right: '24px',
+                background: '#f1f5f9',
+                border: 'none',
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#64748b',
+                transition: 'all 0.2s'
+              }}
+            >
+              <X size={20} />
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#eab308' }}>
+                <ShieldCheck size={28} />
+              </div>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#0f172a' }}>Datenschutzerklärung</h2>
+                <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>GrooveLab DSGVO Compliance</p>
+              </div>
+            </div>
+
+            <div style={{ 
+              fontSize: '13px', 
+              color: '#475569', 
+              lineHeight: '1.6', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '16px',
+              textAlign: 'left'
+            }}>
+              <div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>1. Allgemeine Hinweise und Pflichtinformationen</h4>
+                <p style={{ margin: 0 }}>Der Schutz Ihrer persönlichen Daten ist uns ein wichtiges Anliegen. GrooveLab speichert Daten zur Bereitstellung der Übungs- und Klassenzimmerplattform nach den Vorgaben der DSGVO. Zur Einhaltung der Datenminimierung werden Nachnamen von Schülern standardmäßig anonymisiert (nur die Initiale wird gespeichert, z.B. Max M.).</p>
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>2. Kamera & QR-Scanner</h4>
+                <p style={{ margin: 0 }}>Die Kamera deines Endgeräts wird ausschließlich lokal im Browser verwendet, um deinen GrooveLab-QR-Ausweis zu scannen. Es werden zu keinem Zeitpunkt Videostreams oder Bilder an Server übertragen oder dort gespeichert.</p>
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>3. Standortermittlung (Geofencing)</h4>
+                <p style={{ margin: 0 }}>GrooveLab prüft beim Einloggen kurz deinen Gerätestandort (GPS), um sicherzustellen, dass du dich im GrooveLab-Raum der Musikschule befindest. Diese Standortdaten werden rein lokal in deinem Browser berechnet und nicht an Server übertragen. In der Datenbank wird lediglich ein Bestätigungswert (Erfolgreich/Fehlgeschlagen) für deine aktive Session hinterlegt. Ein kontinuierliches Bewegungsprofil wird nicht erstellt.</p>
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>4. Rechte der Betroffenen</h4>
+                <p style={{ margin: 0 }}>Sie haben das Recht auf Auskunft, Berichtigung, Sperrung oder Löschung Ihrer Daten. Wenden Sie sich hierzu bitte an die Schulleitung Ihrer Musikakademie.</p>
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>5. Hosting & Datenbank-Infrastruktur</h4>
+                <p style={{ margin: 0 }}>Unsere Anwendung wird auf Servern externer Dienstleister gehostet, um einen sicheren und performanten Betrieb zu gewährleisten. Das Frontend wird über <strong>Vercel</strong> (Vercel Inc.) bereitgestellt, und die Datenbankinfrastruktur läuft über <strong>Supabase</strong> (Supabase Inc.). Mit beiden Dienstleistern wurden die gesetzlich vorgeschriebenen Verträge zur Auftragsverarbeitung (AV-Vertrag nach Art. 28 DSGVO) geschlossen, um den Schutz der Daten zu jeder Zeit zu gewährleisten.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Impressum Modal */}
+      {showImpressum && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.40)',
+          backdropFilter: 'blur(16px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '32px',
+            boxShadow: '0 30px 80px rgba(15, 23, 42, 0.18)',
+            border: '1px solid #f1f5f9',
+            padding: '36px',
+            maxWidth: '560px',
+            width: '100%',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px'
+          }}>
+            <button 
+              onClick={() => setShowImpressum(false)} 
+              style={{
+                position: 'absolute',
+                top: '24px',
+                right: '24px',
+                background: '#f1f5f9',
+                border: 'none',
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#64748b',
+                transition: 'all 0.2s'
+              }}
+            >
+              <X size={20} />
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#eab308' }}>
+                <FileText size={28} />
+              </div>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#0f172a' }}>Impressum</h2>
+                <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gesetzliche Anbieterkennzeichnung</p>
+              </div>
+            </div>
+
+            <div style={{ 
+              fontSize: '13px', 
+              color: '#475569', 
+              lineHeight: '1.6', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '16px',
+              textAlign: 'left'
+            }}>
+              {school?.opening_hours?.impressum ? (
+                <div style={{ whiteSpace: 'pre-wrap' }}>
+                  {school.opening_hours.impressum}
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>Angaben gemäß § 5 TMG / DDG</h4>
+                    <p style={{ margin: 0 }}>
+                      Manuel Wagner<br/>
+                      Friedrichstr. 33<br/>
+                      79713 Bad Säckingen
+                    </p>
+                  </div>
+
+                  <div>
+                    <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>Kontakt</h4>
+                    <p style={{ margin: 0 }}>
+                      Mo-Fr: 08-15 Uhr<br/>
+                      Telefon: 07761 – 2416<br/>
+                      E-Mail: info@musaek.de
+                    </p>
+                  </div>
+
+                  <div>
+                    <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>EU-Streitschlichtung</h4>
+                    <p style={{ margin: 0 }}>
+                      Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: <a href="https://ec.europa.eu/consumers/odr/" target="_blank" rel="noopener noreferrer" style={{ color: '#eab308', textDecoration: 'underline' }}>https://ec.europa.eu/consumers/odr/</a>.<br/>
+                      Unsere E-Mail-Adresse finden Sie oben im Impressum.
+                    </p>
+                  </div>
+
+                  <div>
+                    <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>Verbraucherstreitbeilegung / Universalschlichtungsstelle</h4>
+                    <p style={{ margin: 0 }}>
+                      Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.
+                    </p>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '16px', fontSize: '11px', color: '#94a3b8', fontStyle: 'italic' }}>
+                    Hinweis: Für die konkreten Lehrinhalte, Stundenplanungen und personenbezogenen Daten der Schüler innerhalb der einzelnen Schul-Mandanten ist die jeweilige Musikschule als Vertragspartner der Schüler verantwortlich.
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       )}
       {/* Mobile Bottom Navigation */}
       {/* Mobile Bottom Navigation */}

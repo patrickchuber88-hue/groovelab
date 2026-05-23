@@ -14,9 +14,43 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
   const maxAttempts = 3;
   let lastError: any = null;
   
+  // Create a mutable copy of headers
+  const headers = new Headers(init?.headers);
+  
+  // Dynamically inject security session headers
+  const userId = sessionStorage.getItem('groovelab_user_id');
+  if (userId) {
+    headers.set('x-user-id', userId);
+  }
+  
+  const kioskToken = localStorage.getItem('groovelab_kiosk_token');
+  if (kioskToken) {
+    headers.set('x-kiosk-token', kioskToken);
+  }
+
+  const qrToken = sessionStorage.getItem('groovelab_qr_token');
+  if (qrToken) {
+    headers.set('x-qr-token', qrToken);
+  }
+  
+  // Extract invite school id from URL params if present
+  let inviteSchoolId = null;
+  if (typeof window !== 'undefined') {
+    const urlParams = new URLSearchParams(window.location.search);
+    inviteSchoolId = urlParams.get('invite_school_id');
+  }
+  if (inviteSchoolId) {
+    headers.set('x-invite-school-id', inviteSchoolId);
+  }
+  
+  const newInit = {
+    ...init,
+    headers
+  };
+  
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      return await fetch(input, init);
+      return await fetch(input, newInit);
     } catch (err: any) {
       lastError = err;
       const errMsg = err?.message || String(err);

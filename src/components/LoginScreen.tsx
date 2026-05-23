@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Tablet, ShieldCheck, FileText, X, Check } from 'lucide-react';
+import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User } from 'lucide-react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { getDistanceFromLatLonInM } from '../utils/geo';
 
@@ -42,7 +42,436 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [error, setError] = useState<string | null>(null);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showImpressum, setShowImpressum] = useState(false);
-  
+
+  // Onboarding States
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState(1);
+  const [onboardSchoolName, setOnboardSchoolName] = useState('');
+  const [onboardRepresentedBy, setOnboardRepresentedBy] = useState('');
+  const [onboardStreet, setOnboardStreet] = useState('');
+  const [onboardZip, setOnboardZip] = useState('');
+  const [onboardCity, setOnboardCity] = useState('');
+  const [onboardEmail, setOnboardEmail] = useState('');
+  const [onboardAdminFirstName, setOnboardAdminFirstName] = useState('');
+  const [onboardAdminLastName, setOnboardAdminLastName] = useState('');
+  const [onboardDpaAccepted, setOnboardDpaAccepted] = useState(false);
+  const [onboardCreatedUser, setOnboardCreatedUser] = useState<any>(null);
+  const [onboardIPAddress, setOnboardIPAddress] = useState('unknown');
+
+  const fetchIpAddress = async () => {
+    try {
+      const res = await fetch('https://api.ipify.org?format=json');
+      const data = await res.json();
+      return data.ip || 'unknown';
+    } catch (e) {
+      console.warn("Failed to fetch IP address, using fallback", e);
+      return 'unknown';
+    }
+  };
+
+  const downloadQrCode = () => {
+    if (!onboardCreatedUser) return;
+    const url = `https://chart.googleapis.com/chart?chs=300x300&cht=qr&chl=${onboardCreatedUser.qr_token}`;
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.download = `groovelab_ausweis_${onboardCreatedUser.first_name}_${onboardCreatedUser.last_name}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleOnboardingSubmit = async () => {
+    if (!onboardSchoolName.trim() || !onboardRepresentedBy.trim() || !onboardStreet.trim() || !onboardZip.trim() || !onboardCity.trim() || !onboardEmail.trim() || !onboardAdminFirstName.trim() || !onboardAdminLastName.trim()) {
+      alert("Bitte alle Felder ausfüllen.");
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      // 1. Get client IP address
+      const ip = await fetchIpAddress();
+      setOnboardIPAddress(ip);
+
+      // 2. Create the school
+      const schoolId = crypto.randomUUID();
+      const { data: newSchool, error: schoolErr } = await supabase
+        .from('schools')
+        .insert({
+          id: schoolId,
+          name: onboardSchoolName.trim(),
+          represented_by: onboardRepresentedBy.trim(),
+          street: onboardStreet.trim(),
+          zip_code: onboardZip.trim(),
+          city: onboardCity.trim(),
+          email: onboardEmail.trim(),
+          primary_color: '#3b82f6'
+        })
+        .select()
+        .single();
+
+      if (schoolErr) throw schoolErr;
+
+      // 3. Create the admin user
+      const adminId = crypto.randomUUID();
+      const adminQrToken = crypto.randomUUID();
+      const { data: newAdmin, error: adminErr } = await supabase
+        .from('users')
+        .insert({
+          id: adminId,
+          school_id: schoolId,
+          role: 'admin',
+          first_name: onboardAdminFirstName.trim(),
+          last_name: onboardAdminLastName.trim(),
+          qr_token: adminQrToken
+        })
+        .select()
+        .single();
+
+      if (adminErr) throw adminErr;
+
+      // 4. Log the DPA Agreement
+      const { error: dpaErr } = await supabase
+        .from('dpa_agreements')
+        .insert({
+          school_id: schoolId,
+          user_id: adminId,
+          dpa_version: 'v1.0-DSGVO',
+          ip_address: ip
+        });
+
+      if (dpaErr) throw dpaErr;
+
+      // Save admin info to display QR code in step 3
+      setOnboardCreatedUser({
+        first_name: onboardAdminFirstName.trim(),
+        last_name: onboardAdminLastName.trim(),
+        qr_token: adminQrToken,
+        schoolName: onboardSchoolName.trim()
+      });
+      setOnboardingStep(3);
+    } catch (err: any) {
+      console.error("Onboarding failed:", err);
+      alert("Fehler bei der Registrierung: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderOnboardingScreen = () => {
+    return (
+      <div style={{ 
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: '#f8fafc', 
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        zIndex: 9999,
+        overflowY: 'auto'
+      }}>
+        <div style={{
+          width: '100%',
+          maxWidth: onboardingStep === 2 ? '650px' : '550px',
+          background: '#ffffff',
+          borderRadius: '40px',
+          padding: '40px',
+          boxShadow: '0 30px 80px rgba(15, 23, 42, 0.06)',
+          border: '1px solid #f1f5f9',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '24px',
+          maxHeight: '90vh',
+          overflowY: 'auto'
+        }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#eab308' }}>
+              <School size={28} />
+            </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>Musikschule Onboarding</h2>
+              <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                {onboardingStep === 1 && "Schritt 1: Stammdaten & Administrator"}
+                {onboardingStep === 2 && "Schritt 2: AV-Vertrag (DPA)"}
+                {onboardingStep === 3 && "Schritt 3: Abschluss & Login-Ausweis"}
+              </p>
+            </div>
+          </div>
+
+          {onboardingStep === 1 && (
+            <form onSubmit={(e) => { e.preventDefault(); setOnboardingStep(2); }} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Name der Schule *</label>
+                  <input type="text" required value={onboardSchoolName} onChange={e => setOnboardSchoolName(e.target.value)} placeholder="z.B. GrooveLab Musikakademie" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Vertreten durch (Schulleitung) *</label>
+                  <input type="text" required value={onboardRepresentedBy} onChange={e => setOnboardRepresentedBy(e.target.value)} placeholder="z.B. Dr. Armin Wagner" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>E-Mail-Adresse *</label>
+                  <input type="email" required value={onboardEmail} onChange={e => setOnboardEmail(e.target.value)} placeholder="leitung@musikschule.de" style={inputStyle} />
+                </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Straße & Hausnummer *</label>
+                    <input type="text" required value={onboardStreet} onChange={e => setOnboardStreet(e.target.value)} placeholder="Hauptstr. 12" style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>PLZ *</label>
+                    <input type="text" required value={onboardZip} onChange={e => setOnboardZip(e.target.value)} placeholder="79713" style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Ort *</label>
+                    <input type="text" required value={onboardCity} onChange={e => setOnboardCity(e.target.value)} placeholder="Bad Säckingen" style={inputStyle} />
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px', marginTop: '8px' }}>
+                  <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Administrator / Erstes Lehrer-Konto</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Vorname *</label>
+                      <input type="text" required value={onboardAdminFirstName} onChange={e => setOnboardAdminFirstName(e.target.value)} placeholder="Max" style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Nachname *</label>
+                      <input type="text" required value={onboardAdminLastName} onChange={e => setOnboardAdminLastName(e.target.value)} placeholder="Mustermann" style={inputStyle} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+                <button type="button" onClick={() => { setShowOnboarding(false); setOnboardingStep(1); }} style={backButtonStyle}>Abbrechen</button>
+                <button type="submit" style={nextButtonStyle}>
+                  Weiter zu Schritt 2 <ArrowRight size={16} />
+                </button>
+              </div>
+            </form>
+          )}
+
+          {onboardingStep === 2 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ 
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '16px',
+                padding: '20px',
+                maxHeight: '260px',
+                overflowY: 'auto',
+                fontSize: '12px',
+                lineHeight: '1.6',
+                color: '#334155',
+                textAlign: 'left'
+              }}>
+                <h4 style={{ margin: '0 0 10px 0', fontWeight: 800, fontSize: '13px' }}>AV-VERTRAG (VEREINBARUNG ZUR AUFTRAGSVERARBEITUNG NACH ART. 28 DSGVO)</h4>
+                <p><strong>Vertragspartner:</strong><br/>
+                Plattformbetreiber: GrooveLab App (nachfolgend „Auftragnehmer“)<br/>
+                Musikschule: {onboardSchoolName || 'unbenannt'} (nachfolgend „Auftraggeber“)</p>
+                
+                <h5 style={{ margin: '12px 0 6px 0', fontWeight: 800 }}>§ 1 Gegenstand und Dauer der Verarbeitung</h5>
+                <p>Der Auftragnehmer stellt dem Auftraggeber die Software-Plattform „GrooveLab App“ als digitales Logbuch- und Raumverwaltungssystem zur Verfügung. Die Verarbeitung umfasst personenbezogene Daten der Schüler (standardmäßig anonymisierte Nachnamen) und Coaches (Check-ins, Lernfortschritte) des Auftraggebers.</p>
+                
+                <h5 style={{ margin: '12px 0 6px 0', fontWeight: 800 }}>§ 2 Technische und Organisatorische Maßnahmen (TOM)</h5>
+                <p>Der Auftragnehmer sichert angemessene technische und organisatorische Maßnahmen nach Art. 32 DSGVO zu, um die Datensicherheit und Vertraulichkeit zu gewährleisten (z.B. Row Level Security Mandantentrennung, verschlüsselte Verbindungen). Die Datenverarbeitung erfolgt in der EU (Supabase & Vercel).</p>
+                
+                <h5 style={{ margin: '12px 0 6px 0', fontWeight: 800 }}>§ 3 Pflichten des Auftragnehmers</h5>
+                <p>Die Verarbeitung der Daten erfolgt ausschließlich weisungsgebunden im Rahmen des vertraglich vereinbarten Verwendungszwecks. Der Auftragnehmer verpflichtet sein Personal auf Vertraulichkeit und unterstützt den Auftraggeber bei Betroffenenrechten und Audits nach bestem Wissen.</p>
+                
+                <h5 style={{ margin: '12px 0 6px 0', fontWeight: 800 }}>§ 4 Pflichten des Auftraggebers</h5>
+                <p>Der Auftraggeber ist die „verantwortliche Stelle“ im Sinne der DSGVO und stellt sicher, dass für die Eingabe der Schüler- und Lehrerdaten eine gesetzliche Grundlage oder Einwilligung vorliegt.</p>
+              </div>
+
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'flex-start', 
+                gap: '12px',
+                background: '#fefcbf',
+                border: '1px solid #fef08a',
+                padding: '16px',
+                borderRadius: '16px'
+              }}>
+                <input 
+                  type="checkbox" 
+                  id="dpa-accept-checkbox"
+                  checked={onboardDpaAccepted}
+                  onChange={(e) => setOnboardDpaAccepted(e.target.checked)}
+                  style={{ marginTop: '3px', cursor: 'pointer', width: '18px', height: '18px' }}
+                />
+                <label htmlFor="dpa-accept-checkbox" style={{ fontSize: '12px', color: '#854d0e', fontWeight: 700, cursor: 'pointer', textAlign: 'left', lineHeight: '1.4' }}>
+                  Ich bestätige die Vereinbarung zur Auftragsverarbeitung (AV-Vertrag / DPA) hiermit rechtsverbindlich für die oben genannte Musikschule „{onboardSchoolName}“ und erkläre, dass ich zur Schulleitung gehöre bzw. zeichnungsberechtigt bin.
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button type="button" onClick={() => setOnboardingStep(1)} style={backButtonStyle}>Zurück</button>
+                <button 
+                  type="button" 
+                  disabled={!onboardDpaAccepted || loading} 
+                  onClick={handleOnboardingSubmit} 
+                  style={{
+                    ...nextButtonStyle,
+                    opacity: (!onboardDpaAccepted || loading) ? 0.5 : 1,
+                    cursor: (!onboardDpaAccepted || loading) ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {loading ? "Verarbeite..." : "Registrierung abschließen"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {onboardingStep === 3 && onboardCreatedUser && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', textAlign: 'center' }}>
+              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#22c55e', marginBottom: '8px' }}>
+                <Check size={36} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 900, color: '#16a34a' }}>Registrierung erfolgreich!</h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b', fontWeight: 600 }}>Die Schule „{onboardCreatedUser.schoolName}“ wurde erfolgreich angelegt.</p>
+              </div>
+
+              {/* Admin Ausweis Card */}
+              <div style={{
+                background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                borderRadius: '32px',
+                padding: '24px',
+                width: '320px',
+                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                color: 'white',
+                border: '1px solid rgba(255,255,255,0.08)'
+              }}>
+                <div style={{ fontSize: '10px', fontWeight: 900, color: '#eab308', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '16px' }}>GrooveLab Admin-Ausweis</div>
+                
+                {/* QR Code Container */}
+                <div style={{
+                  background: 'white',
+                  borderRadius: '24px',
+                  padding: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.1)'
+                }}>
+                  <img 
+                    src={`https://chart.googleapis.com/chart?chs=180x180&cht=qr&chl=${onboardCreatedUser.qr_token}`} 
+                    alt="Admin QR Ausweis" 
+                    style={{ width: '180px', height: '180px', display: 'block', borderRadius: '12px' }}
+                  />
+                </div>
+
+                <div style={{ marginTop: '16px', fontWeight: 800, fontSize: '1.1rem' }}>
+                  {onboardCreatedUser.first_name} {onboardCreatedUser.last_name}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', marginTop: '2px' }}>
+                  Administrator
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', maxWidth: '320px' }}>
+                <button 
+                  onClick={downloadQrCode} 
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    borderRadius: '16px',
+                    border: '1px solid #e2e8f0',
+                    background: 'white',
+                    color: '#475569',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <Download size={16} /> Ausweis herunterladen (QR)
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowOnboarding(false);
+                    setOnboardingStep(1);
+                    setOnboardDpaAccepted(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    borderRadius: '16px',
+                    border: 'none',
+                    background: '#eab308',
+                    color: '#0f172a',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Zurück zum Login-Bildschirm
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    boxSizing: 'border-box',
+    padding: '12px 14px',
+    borderRadius: '10px',
+    background: '#f8fafc',
+    border: '1px solid #cbd5e1',
+    color: '#0f172a',
+    fontSize: '0.9rem',
+    outline: 'none',
+    fontWeight: 700,
+    fontFamily: 'Inter, system-ui, sans-serif'
+  };
+
+  const backButtonStyle: React.CSSProperties = {
+    flex: 1,
+    padding: '14px',
+    borderRadius: '12px',
+    background: 'white',
+    border: '1px solid #e2e8f0',
+    color: '#64748b',
+    fontWeight: 800,
+    fontSize: '0.9rem',
+    cursor: 'pointer',
+    transition: 'all 0.2s'
+  };
+
+  const nextButtonStyle: React.CSSProperties = {
+    flex: 2,
+    padding: '14px',
+    borderRadius: '12px',
+    background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+    border: 'none',
+    color: '#0f172a',
+    fontWeight: 800,
+    fontSize: '0.9rem',
+    cursor: 'pointer',
+    boxShadow: '0 8px 20px rgba(234, 179, 8, 0.2)',
+    transition: 'all 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px'
+  };
+
   // Secret Master Admin click combo state
   const [logoClicks, setLogoClicks] = useState(0);
   const [showAdminModal, setShowAdminModal] = useState(false);
@@ -377,11 +806,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       console.log('[Login] Starting scan for token:', qrToken);
 
       // 1. User finden
+      sessionStorage.setItem('groovelab_qr_token', qrToken);
       const { data: user, error: userErr } = await supabase
         .from('users')
         .select('*, schools(*)')
         .eq('qr_token', qrToken)
         .single();
+      sessionStorage.removeItem('groovelab_qr_token');
 
       if (userErr || !user) throw new Error('Nutzer nicht gefunden.');
 
@@ -717,6 +1148,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     );
   }
 
+  if (showOnboarding) {
+    return renderOnboardingScreen();
+  }
+
   return (
     <div style={{ 
       position: 'fixed',
@@ -1007,6 +1442,33 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           </button>
         )}
       </div>
+
+      {!effectiveStationId && (
+        <button
+          onClick={() => setShowOnboarding(true)}
+          style={{
+            marginTop: '24px',
+            padding: '12px 24px',
+            borderRadius: '20px',
+            background: 'rgba(255, 255, 255, 0.8)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid #e2e8f0',
+            color: '#64748b',
+            fontWeight: 800,
+            fontSize: '12px',
+            textTransform: 'uppercase',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.02)'
+          }}
+          className="hover-scale"
+        >
+          <School size={16} /> Musikschule registrieren
+        </button>
+      )}
 
       {/* Legal Footer */}
       <div style={{ 
