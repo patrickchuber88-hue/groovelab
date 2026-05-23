@@ -5239,60 +5239,11 @@ function App() {
         {user.role === 'student' && activeStudentTab === 'live' && (
           <ErrorBoundary>
             <div className="animation-slide-up" style={{ width: '100%', padding: '0px 16px 16px 16px', display: 'flex', flexDirection: 'column', flex: 1, height: '100%' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', marginTop: '16px' }}>
-                <h1 style={{ fontSize: '2rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.04em', margin: 0 }}>Live Lab</h1>
-                {locationMode !== 'home' && (
-                  <button 
-                    onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                    style={{
-                      background: 'white',
-                      border: '1.5px solid #e2e8f0',
-                      padding: '8px 16px',
-                      borderRadius: '12px',
-                      fontSize: '0.85rem',
-                      fontWeight: 800,
-                      color: '#475569',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-                      transition: 'all 0.15s'
-                    }}
-                    className="hover-scale"
-                  >
-                    {isSidebarCollapsed ? (
-                      <>
-                        <ChevronLeft size={16} /> Sidebar einblenden
-                        {sidebarNotificationsCount > 0 && (
-                          <span style={{
-                            background: '#ef4444',
-                            color: 'white',
-                            fontSize: '0.7rem',
-                            fontWeight: 900,
-                            borderRadius: '10px',
-                            padding: '2px 6px',
-                            minWidth: '16px',
-                            height: '16px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            boxShadow: '0 2px 8px rgba(239, 68, 68, 0.35)',
-                            animation: 'pulse 1.5s infinite',
-                            marginLeft: '4px'
-                          }}>
-                            {sidebarNotificationsCount}
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        Sidebar ausblenden <ChevronRight size={16} />
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
+              {locationMode === 'home' && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', marginTop: '16px' }}>
+                  <h1 style={{ fontSize: '2rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.04em', margin: 0 }}>Live Lab</h1>
+                </div>
+              )}
               
               {locationMode === 'home' ? (
                 <div style={{

@@ -5620,47 +5620,18 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       display: 'flex',
       flexDirection: 'column'
     }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', marginTop: '16px' }}>
-        <div>
-          <h1 style={{ fontSize: '2rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.03em', margin: 0 }}>
-            {sidebarItems.find(i => i.id === activeTab)?.label}
-          </h1>
-          <p style={{ color: '#94a3b8', fontSize: '0.9rem', fontWeight: 500, marginTop: '2px' }}>
-            {(admin as any)?.schools?.name} • Management Dashboard
-          </p>
-        </div>
-        {activeTab === 'live' && (
-          <button
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            style={{
-              background: 'white',
-              border: '1.5px solid #e2e8f0',
-              padding: '8px 16px',
-              borderRadius: '12px',
-              fontSize: '0.85rem',
-              fontWeight: 800,
-              color: '#475569',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-              transition: 'all 0.15s'
-            }}
-            className="hover-scale"
-          >
-            {isSidebarCollapsed ? (
-              <>
-                <ChevronLeft size={16} /> Sidebar einblenden
-              </>
-            ) : (
-              <>
-                Sidebar ausblenden <ChevronRight size={16} />
-              </>
-            )}
-          </button>
-        )}
-      </header>
+      {activeTab !== 'live' && (
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', marginTop: '16px' }}>
+          <div>
+            <h1 style={{ fontSize: '2rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.03em', margin: 0 }}>
+              {sidebarItems.find(i => i.id === activeTab)?.label}
+            </h1>
+            <p style={{ color: '#94a3b8', fontSize: '0.9rem', fontWeight: 500, marginTop: '2px' }}>
+              {(admin as any)?.schools?.name} • Management Dashboard
+            </p>
+          </div>
+        </header>
+      )}
 
       {activeTab === 'live' && renderLiveTab()}
       {activeTab === 'bands' && renderBandsTab()}

@@ -1773,7 +1773,7 @@ export function TeacherDashboard({
             if (hasCustomLayout) {
               // Account for the parent dashboard header height
               const parentHeaderHeight = viewMode === 'student' ? 80 : 90;
-              const verticalOffset = parentHeaderHeight + (rooms.length > 1 ? 54 : 0);
+              const verticalOffset = parentHeaderHeight + (!hideHeader && rooms.length > 1 ? 54 : 0);
               const maxH = Math.max(300, windowHeight - verticalOffset - 24);
 
               // 1. Calculate fitting scale for all custom rooms to find the minimum scale (largest layout space required)
@@ -1819,108 +1819,278 @@ export function TeacherDashboard({
                   ref={containerRef}
                   style={{ display: 'flex', flexDirection: 'column', gap: rooms.length > 1 ? '16px' : '0px', maxWidth: 'none', width: '100%', alignItems: 'center' }}
                 >
-                  {/* Toolbar Row with Room Switcher and Magnifier Zoom Panel */}
-                  <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '16px', flexWrap: 'wrap' }}>
-                    {rooms.length > 1 ? (
-                      <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '6px', borderRadius: '16px' }}>
-                        {sortRooms(rooms).map(room => {
-                          const isSelected = room.id === selectedRoomId;
-                          const isDragged = draggedRoomId === room.id;
-                          const isDragOver = dragOverRoomId === room.id;
-                          return (
-                            <button
-                              key={room.id}
-                              draggable="true"
-                              onDragStart={(e) => handleDragStart(e, room.id)}
-                              onDragOver={handleDragOver}
-                              onDragEnter={(e) => handleDragEnter(e, room.id)}
-                              onDragLeave={handleDragLeave}
-                              onDrop={(e) => handleDrop(e, room.id)}
-                              onDragEnd={handleDragEnd}
-                              onClick={() => {
-                                setSelectedRoomId(room.id);
-                                localStorage.setItem('groovelab_teacher_selected_room_id', room.id);
-                              }}
-                              style={{
-                                border: isSelected ? 'none' : (isDragOver ? '2px dashed #6366f1' : 'none'),
-                                background: isSelected ? 'white' : (isDragOver ? 'rgba(99, 102, 241, 0.05)' : 'transparent'),
-                                color: isSelected ? '#1e293b' : '#64748b',
-                                padding: '8px 16px',
-                                borderRadius: '12px',
-                                fontSize: '0.85rem',
-                                fontWeight: 800,
-                                cursor: isDragged ? 'grabbing' : 'grab',
-                                opacity: isDragged ? 0.5 : 1,
-                                boxShadow: isSelected ? '0 4px 10px rgba(0,0,0,0.05)' : 'none',
-                                transition: 'all 0.2s'
-                              }}
-                              className="hover-scale-mini"
-                            >
-                              {room.name}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div />
-                    )}
-
-                    {/* Magnifier Zoom Panel */}
+                  {/* Unified Header Row / Toolbar Row */}
+                  {hideHeader ? (
                     <div style={{
                       display: 'flex',
+                      justifyContent: 'space-between',
                       alignItems: 'center',
-                      gap: '8px',
-                      background: '#f1f5f9',
-                      padding: '6px',
-                      borderRadius: '16px'
+                      width: '100%',
+                      marginBottom: '16px',
+                      gap: '16px',
+                      flexWrap: 'wrap'
                     }}>
-                      <button 
-                        onClick={() => handleZoomChange(Math.max(0.4, zoomFactor - 0.1))}
-                        style={{
-                          background: 'white',
-                          border: '1px solid rgba(0, 0, 0, 0.05)',
-                          borderRadius: '12px',
-                          width: '36px',
-                          height: '36px',
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
+                        <h1 style={{ fontSize: '2rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.04em', margin: 0 }}>
+                          Live Lab
+                        </h1>
+                        
+                        {/* Room Switcher inline next to title */}
+                        {rooms.length > 1 && (
+                          <div style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '5px', borderRadius: '14px' }}>
+                            {sortRooms(rooms).map(room => {
+                              const isSelected = room.id === selectedRoomId;
+                              const isDragged = draggedRoomId === room.id;
+                              const isDragOver = dragOverRoomId === room.id;
+                              return (
+                                <button
+                                  key={room.id}
+                                  draggable="true"
+                                  onDragStart={(e) => handleDragStart(e, room.id)}
+                                  onDragOver={handleDragOver}
+                                  onDragEnter={(e) => handleDragEnter(e, room.id)}
+                                  onDragLeave={handleDragLeave}
+                                  onDrop={(e) => handleDrop(e, room.id)}
+                                  onDragEnd={handleDragEnd}
+                                  onClick={() => {
+                                    setSelectedRoomId(room.id);
+                                    localStorage.setItem('groovelab_teacher_selected_room_id', room.id);
+                                  }}
+                                  style={{
+                                    border: isSelected ? 'none' : (isDragOver ? '2px dashed #6366f1' : 'none'),
+                                    background: isSelected ? 'white' : (isDragOver ? 'rgba(99, 102, 241, 0.05)' : 'transparent'),
+                                    color: isSelected ? '#1e293b' : '#64748b',
+                                    padding: '6px 12px',
+                                    borderRadius: '10px',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 800,
+                                    cursor: isDragged ? 'grabbing' : 'grab',
+                                    opacity: isDragged ? 0.5 : 1,
+                                    boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
+                                    transition: 'all 0.2s'
+                                  }}
+                                  className="hover-scale-mini"
+                                >
+                                  {room.name}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Magnifier Zoom Panel inline */}
+                        <div style={{
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#64748b',
-                          cursor: 'pointer',
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
-                          transition: 'all 0.2s'
-                        }}
-                        className="hover-scale-mini"
-                        title="Verkleinern"
-                      >
-                        <ZoomOut size={18} />
-                      </button>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#64748b', padding: '0 8px', minWidth: '48px', textAlign: 'center' }}>
-                        {Math.round(zoomFactor * 100)}%
-                      </span>
-                      <button 
-                        onClick={() => handleZoomChange(Math.min(2.5, zoomFactor + 0.1))}
-                        style={{
-                          background: 'white',
-                          border: '1px solid rgba(0, 0, 0, 0.05)',
-                          borderRadius: '12px',
-                          width: '36px',
-                          height: '36px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#64748b',
-                          cursor: 'pointer',
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
-                          transition: 'all 0.2s'
-                        }}
-                        className="hover-scale-mini"
-                        title="Vergrößern"
-                      >
-                        <ZoomIn size={18} />
-                      </button>
+                          gap: '6px',
+                          background: '#f1f5f9',
+                          padding: '5px',
+                          borderRadius: '14px'
+                        }}>
+                          <button 
+                            onClick={() => handleZoomChange(Math.max(0.4, zoomFactor - 0.1))}
+                            style={{
+                              background: 'white',
+                              border: '1px solid rgba(0, 0, 0, 0.05)',
+                              borderRadius: '10px',
+                              width: '30px',
+                              height: '30px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#64748b',
+                              cursor: 'pointer',
+                              boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
+                              transition: 'all 0.2s'
+                            }}
+                            className="hover-scale-mini"
+                            title="Verkleinern"
+                          >
+                            <ZoomOut size={15} />
+                          </button>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', padding: '0 6px', minWidth: '40px', textAlign: 'center' }}>
+                            {Math.round(zoomFactor * 100)}%
+                          </span>
+                          <button 
+                            onClick={() => handleZoomChange(Math.min(2.5, zoomFactor + 0.1))}
+                            style={{
+                              background: 'white',
+                              border: '1px solid rgba(0, 0, 0, 0.05)',
+                              borderRadius: '10px',
+                              width: '30px',
+                              height: '30px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#64748b',
+                              cursor: 'pointer',
+                              boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
+                              transition: 'all 0.2s'
+                            }}
+                            className="hover-scale-mini"
+                            title="Vergrößern"
+                          >
+                            <ZoomIn size={15} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Sidebar toggle button on the far right */}
+                      {setIsSidebarCollapsed && (
+                        <button
+                          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                          style={{
+                            background: 'white',
+                            border: '1.5px solid #e2e8f0',
+                            padding: '8px 16px',
+                            borderRadius: '12px',
+                            fontSize: '0.85rem',
+                            fontWeight: 800,
+                            color: '#475569',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                            transition: 'all 0.15s'
+                          }}
+                          className="hover-scale"
+                        >
+                          {isSidebarCollapsed ? (
+                            <>
+                              <ChevronLeft size={16} /> Sidebar einblenden
+                              {viewMode === 'student' && sidebarNotificationsCount > 0 && (
+                                <span style={{
+                                  background: '#ef4444',
+                                  color: 'white',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 900,
+                                  borderRadius: '10px',
+                                  padding: '2px 6px',
+                                  minWidth: '16px',
+                                  height: '16px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  boxShadow: '0 2px 8px rgba(239, 68, 68, 0.35)',
+                                  animation: 'pulse 1.5s infinite',
+                                  marginLeft: '4px'
+                                }}>
+                                  {sidebarNotificationsCount}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              Sidebar ausblenden <ChevronRight size={16} />
+                            </>
+                          )}
+                        </button>
+                      )}
                     </div>
-                  </div>
+                  ) : (
+                    <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '16px', flexWrap: 'wrap' }}>
+                      {rooms.length > 1 ? (
+                        <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '6px', borderRadius: '16px' }}>
+                          {sortRooms(rooms).map(room => {
+                            const isSelected = room.id === selectedRoomId;
+                            const isDragged = draggedRoomId === room.id;
+                            const isDragOver = dragOverRoomId === room.id;
+                            return (
+                              <button
+                                key={room.id}
+                                draggable="true"
+                                onDragStart={(e) => handleDragStart(e, room.id)}
+                                onDragOver={handleDragOver}
+                                onDragEnter={(e) => handleDragEnter(e, room.id)}
+                                onDragLeave={handleDragLeave}
+                                onDrop={(e) => handleDrop(e, room.id)}
+                                onDragEnd={handleDragEnd}
+                                onClick={() => {
+                                  setSelectedRoomId(room.id);
+                                  localStorage.setItem('groovelab_teacher_selected_room_id', room.id);
+                                }}
+                                style={{
+                                  border: isSelected ? 'none' : (isDragOver ? '2px dashed #6366f1' : 'none'),
+                                  background: isSelected ? 'white' : (isDragOver ? 'rgba(99, 102, 241, 0.05)' : 'transparent'),
+                                  color: isSelected ? '#1e293b' : '#64748b',
+                                  padding: '8px 16px',
+                                  borderRadius: '12px',
+                                  fontSize: '0.85rem',
+                                  fontWeight: 800,
+                                  cursor: isDragged ? 'grabbing' : 'grab',
+                                  opacity: isDragged ? 0.5 : 1,
+                                  boxShadow: isSelected ? '0 4px 10px rgba(0,0,0,0.05)' : 'none',
+                                  transition: 'all 0.2s'
+                                }}
+                                className="hover-scale-mini"
+                              >
+                                {room.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div />
+                      )}
+
+                      {/* Magnifier Zoom Panel */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: '#f1f5f9',
+                        padding: '6px',
+                        borderRadius: '16px'
+                      }}>
+                        <button 
+                          onClick={() => handleZoomChange(Math.max(0.4, zoomFactor - 0.1))}
+                          style={{
+                            background: 'white',
+                            border: '1px solid rgba(0, 0, 0, 0.05)',
+                            borderRadius: '12px',
+                            width: '36px',
+                            height: '36px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#64748b',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                            transition: 'all 0.2s'
+                          }}
+                          className="hover-scale-mini"
+                          title="Verkleinern"
+                        >
+                          <ZoomOut size={18} />
+                        </button>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#64748b', padding: '0 8px', minWidth: '48px', textAlign: 'center' }}>
+                          {Math.round(zoomFactor * 100)}%
+                        </span>
+                        <button 
+                          onClick={() => handleZoomChange(Math.min(2.5, zoomFactor + 0.1))}
+                          style={{
+                            background: 'white',
+                            border: '1px solid rgba(0, 0, 0, 0.05)',
+                            borderRadius: '12px',
+                            width: '36px',
+                            height: '36px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#64748b',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                            transition: 'all 0.2s'
+                          }}
+                          className="hover-scale-mini"
+                          title="Vergrößern"
+                        >
+                          <ZoomIn size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Horizontal Flex Wrapper for Blueprint Layout and Slider */}
                   <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '24px', justifyContent: 'center', width: '100%', position: 'relative' }}>
@@ -1933,7 +2103,7 @@ export function TeacherDashboard({
                         maxWidth: '100%', 
                         height: `${maxH}px`, 
                         overflow: 'auto', 
-                        background: 'rgba(15, 23, 42, 0.01)', 
+                        background: 'transparent', 
                         border: '1.5px dashed rgba(99, 102, 241, 0.15)', 
                         borderRadius: '24px', 
                         display: 'block', 
@@ -2500,70 +2670,7 @@ export function TeacherDashboard({
                 )}
               </div>
 
-            {/* Band-Repertoire Planer Widget (Dark-themed purple to match the song card!) - Reordered and hover effect removed */}
-            {openProposals.length > 0 && (
-              <div 
-                className="glass-panel card" 
-                onClick={() => setActiveTab('proposals')}
-                style={{ 
-                  padding: '24px', 
-                  background: 'linear-gradient(135deg, #1e1b4b 0%, #0f0728 100%)', 
-                  border: '1px solid rgba(165, 180, 252, 0.15)',
-                  borderRadius: '32px',
-                  boxShadow: '0 15px 35px rgba(0, 0, 0, 0.2)',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div style={{ 
-                    background: 'rgba(165, 180, 252, 0.05)', 
-                    color: '#a5b4fc', 
-                    padding: '12px', 
-                    borderRadius: '16px',
-                    border: '1px solid rgba(165, 180, 252, 0.15)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                    <Music size={22} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '2px' }}>
-                      Band-Repertoire Planer
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#ffffff' }}>
-                        {openProposals.length > 0 ? (
-                          `${openProposals.length} ${openProposals.length === 1 ? 'offener Song' : 'offene Songs'}`
-                        ) : (
-                          'Keine offenen Songs (Alles aktuell!)'
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                  <div style={{ 
-                    color: '#a5b4fc', 
-                    fontWeight: 900, 
-                    fontSize: '0.7rem', 
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.1em',
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '4px', 
-                    background: 'rgba(165, 180, 252, 0.1)', 
-                    padding: '8px 16px', 
-                    borderRadius: '12px',
-                    border: '1px solid rgba(165, 180, 252, 0.15)',
-                    transition: 'all 0.2s'
-                  }}>
-                    Ansehen →
-                  </div>
-                </div>
-              </div>
-            )}
+
 
             {/* Band News */}
             {unreadShouts.length > 0 && (
@@ -2852,6 +2959,72 @@ export function TeacherDashboard({
                     <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, lineHeight: 1.4 }}>Keine offenen Challenges. Alles unter Kontrolle!</div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Band-Repertoire Planer Widget (Dark-themed purple to match the song card!) - Reordered and hover effect removed */}
+            {openProposals.length > 0 && (
+              <div 
+                className="glass-panel card" 
+                onClick={() => setActiveTab('proposals')}
+                style={{ 
+                  padding: '24px', 
+                  background: 'linear-gradient(135deg, #1e1b4b 0%, #0f0728 100%)', 
+                  border: '1px solid rgba(165, 180, 252, 0.15)',
+                  borderRadius: '32px',
+                  boxShadow: '0 15px 35px rgba(0, 0, 0, 0.2)',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  marginBottom: '16px'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <div style={{ 
+                    background: 'rgba(165, 180, 252, 0.05)', 
+                    color: '#a5b4fc', 
+                    padding: '12px', 
+                    borderRadius: '16px',
+                    border: '1px solid rgba(165, 180, 252, 0.15)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <Music size={22} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '2px' }}>
+                      Band-Repertoire Planer
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#ffffff' }}>
+                        {openProposals.length > 0 ? (
+                          `${openProposals.length} ${openProposals.length === 1 ? 'offener Song' : 'offene Songs'}`
+                        ) : (
+                          'Keine offenen Songs (Alles aktuell!)'
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ 
+                    color: '#a5b4fc', 
+                    fontWeight: 900, 
+                    fontSize: '0.7rem', 
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.1em',
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '4px', 
+                    background: 'rgba(165, 180, 252, 0.1)', 
+                    padding: '8px 16px', 
+                    borderRadius: '12px',
+                    border: '1px solid rgba(165, 180, 252, 0.15)',
+                    transition: 'all 0.2s'
+                  }}>
+                    Ansehen →
+                  </div>
+                </div>
               </div>
             )}
 
