@@ -8151,7 +8151,7 @@ function App() {
                           const bandSongs = band.band_songs || [];
                           
                           bandSongs.forEach((bs: any) => {
-                            if (bs.status !== 'active' && bs.status !== 'proposal') return;
+                            if (bs.status !== 'active') return;
                             
                             const song = bs.songs ? (Array.isArray(bs.songs) ? bs.songs[0] : bs.songs) : null;
                             if (!song) return;
