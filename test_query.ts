@@ -10,8 +10,8 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 async function test() {
   const { data, error } = await supabase
-    .from('band_shoutbox')
-    .select('deleted_by')
+    .from('schools')
+    .select('*')
     .limit(1);
   console.log("Data:", data, "Error:", error);
 }

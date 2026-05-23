@@ -20,6 +20,7 @@ interface School {
   max_teachers?: number;
   max_students?: number;
   max_songs?: number;
+  limits_enabled?: boolean;
 }
 
 interface MasterAdminDashboardProps {
@@ -72,6 +73,8 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
   const [editMaxTeachers, setEditMaxTeachers] = useState(2);
   const [editMaxStudents, setEditMaxStudents] = useState(6);
   const [editMaxSongs, setEditMaxSongs] = useState(5);
+  const [editLimitsEnabled, setEditLimitsEnabled] = useState(false);
+  const [editTrialOption, setEditTrialOption] = useState<'14' | '30' | 'custom'>('custom');
 
   useEffect(() => {
     fetchSchoolsAndStats();
@@ -108,6 +111,21 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
     return trimmed;
   };
 
+  const getFutureDate = (days: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return d.toISOString().split('T')[0]; // YYYY-MM-DD
+  };
+
+  const formatDateDisplay = (dateString: string) => {
+    if (!dateString) return '';
+    const parts = dateString.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}.${parts[1]}.${parts[0]}`;
+    }
+    return dateString;
+  };
+
   const handleSaveSchoolDetails = async () => {
     if (!selectedSchool || !editName.trim()) return;
     try {
@@ -121,7 +139,8 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
         contract_ends_at: parseDate(editContractEndsAt),
         max_teachers: editMaxTeachers,
         max_students: editMaxStudents,
-        max_songs: editMaxSongs
+        max_songs: editMaxSongs,
+        limits_enabled: editLimitsEnabled
       };
 
       const { error } = await supabase
@@ -503,6 +522,8 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                       setEditMaxTeachers(school.max_teachers ?? 2);
                       setEditMaxStudents(school.max_students ?? 6);
                       setEditMaxSongs(school.max_songs ?? 5);
+                      setEditLimitsEnabled(school.limits_enabled ?? false);
+                      setEditTrialOption('custom');
                     }}
                     style={{ 
                       borderRadius: '18px',
@@ -560,7 +581,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                           </span>
                           <span style={{ width: '3px', height: '3px', borderRadius: '50%', background: '#d1d1d6' }}></span>
                           <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#8e8e93' }}>
-                            {teachers} L • {students} S • {bands} B
+                            {teachers} L • {students} S • {bands} B{school.limits_enabled && ' • ⚖️ Limits'}
                           </span>
                         </div>
                       </div>
@@ -684,7 +705,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                   type="text"
                   value={newSchoolName}
                   onChange={(e) => setNewSchoolName(e.target.value)}
-                  placeholder="z.B. Musäk Bad Säckingen"
+                  placeholder="Musterschule"
                   required
                   style={{
                     width: '100%',
@@ -1169,7 +1190,19 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                     <Shield size={18} color={editColor || '#3b82f6'} /> Zugang & Verträge
                   </h3>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 800, fontSize: '0.85rem', color: '#48484a', background: '#f2f2f7', padding: '6px 12px', borderRadius: '100px' }}>
-                    <input type="checkbox" checked={editIsTrial} onChange={(e) => setEditIsTrial(e.target.checked)} style={{ width: '15px', height: '15px', accentColor: editColor || '#3b82f6' }} />
+                    <input 
+                      type="checkbox" 
+                      checked={editIsTrial} 
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setEditIsTrial(checked);
+                        if (checked && !editTrialEndsAt) {
+                          setEditTrialOption('14');
+                          setEditTrialEndsAt(getFutureDate(14));
+                        }
+                      }} 
+                      style={{ width: '15px', height: '15px', accentColor: editColor || '#3b82f6' }} 
+                    />
                     Probezeit aktiv
                   </label>
                 </div>
@@ -1220,10 +1253,86 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                 </div>
 
                 {editIsTrial ? (
-                  <div style={{ background: '#fffbeb', padding: '16px', borderRadius: '12px', border: '1px solid rgba(234, 179, 8, 0.2)' }}>
-                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#b45309', fontWeight: 800, marginBottom: '6px' }}>⏳ Probezeit Enddatum</label>
-                    <input type="text" placeholder="TT.MM.JJJJ oder YYYY-MM-DD" value={editTrialEndsAt} onChange={(e) => setEditTrialEndsAt(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #fcd34d', outline: 'none', background: '#fff', fontSize: '0.9rem', fontWeight: 600 }} />
-                    <p style={{ margin: '6px 0 0 0', fontSize: '0.75rem', color: '#b45309', fontWeight: 600 }}>Logins werden nach diesem Tag automatisch verweigert.</p>
+                  <div style={{ background: '#fffbeb', padding: '16px', borderRadius: '12px', border: '1px solid rgba(234, 179, 8, 0.2)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', color: '#b45309', fontWeight: 800, marginBottom: '8px' }}>⏳ Probezeit Dauer</label>
+                      <div style={{ display: 'flex', background: '#fef3c7', padding: '3px', borderRadius: '8px' }}>
+                        {[
+                          { label: '14 Tage', value: '14' },
+                          { label: '30 Tage', value: '30' },
+                          { label: 'Benutzerdefiniert', value: 'custom' }
+                        ].map((opt) => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => {
+                              setEditTrialOption(opt.value as any);
+                              if (opt.value === '14') {
+                                setEditTrialEndsAt(getFutureDate(14));
+                              } else if (opt.value === '30') {
+                                setEditTrialEndsAt(getFutureDate(30));
+                              }
+                            }}
+                            style={{
+                              flex: 1,
+                              padding: '6px 8px',
+                              borderRadius: '6px',
+                              border: 'none',
+                              fontSize: '0.8rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                              background: editTrialOption === opt.value ? '#ffffff' : 'transparent',
+                              color: editTrialOption === opt.value ? '#b45309' : '#d97706',
+                              boxShadow: editTrialOption === opt.value ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                            }}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', color: '#b45309', fontWeight: 800, marginBottom: '6px' }}>
+                        {editTrialOption === 'custom' ? 'Probezeit Enddatum' : 'Berechnetes Enddatum'}
+                      </label>
+                      {editTrialOption === 'custom' ? (
+                        <input
+                          type="text"
+                          placeholder="TT.MM.JJJJ oder YYYY-MM-DD"
+                          value={editTrialEndsAt}
+                          onChange={(e) => setEditTrialEndsAt(e.target.value)}
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            border: '1.5px solid #fcd34d',
+                            outline: 'none',
+                            background: '#fff',
+                            fontSize: '0.9rem',
+                            fontWeight: 600,
+                            color: '#1d1d1f'
+                          }}
+                        />
+                      ) : (
+                        <div style={{
+                          padding: '10px 12px',
+                          borderRadius: '8px',
+                          background: 'rgba(255, 255, 255, 0.5)',
+                          border: '1.5px solid rgba(252, 211, 77, 0.5)',
+                          fontSize: '0.9rem',
+                          fontWeight: 700,
+                          color: '#b45309'
+                        }}>
+                          {formatDateDisplay(editTrialEndsAt) || 'Kein Datum berechnet'}
+                        </div>
+                      )}
+                      <p style={{ margin: '6px 0 0 0', fontSize: '0.72rem', color: '#b45309', fontWeight: 600 }}>
+                        Logins werden nach diesem Tag automatisch verweigert.
+                      </p>
+                    </div>
                   </div>
                 ) : (
                   <div>
@@ -1241,23 +1350,38 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                 border: '1px solid rgba(0, 0, 0, 0.04)',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '16px'
+                gap: '16px',
+                opacity: editLimitsEnabled ? 1 : 0.8,
+                transition: 'opacity 0.25s ease'
               }}>
-                <h3 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', fontWeight: 800, color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.01em' }}>
-                  <Sliders size={18} color={editColor || '#3b82f6'} /> Kontingente (Limits)
-                </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.01em' }}>
+                    <Sliders size={18} color={editColor || '#3b82f6'} /> Kontingente (Limits)
+                  </h3>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 800, fontSize: '0.85rem', color: '#48484a', background: '#f2f2f7', padding: '6px 12px', borderRadius: '100px' }}>
+                    <input type="checkbox" checked={editLimitsEnabled} onChange={(e) => setEditLimitsEnabled(e.target.checked)} style={{ width: '15px', height: '15px', accentColor: editColor || '#3b82f6' }} />
+                    Limits aktivieren
+                  </label>
+                </div>
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(3, 1fr)', 
+                  gap: '12px',
+                  opacity: editLimitsEnabled ? 1 : 0.45,
+                  pointerEvents: editLimitsEnabled ? 'auto' : 'none',
+                  transition: 'all 0.25s ease'
+                }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Max Lehrer</label>
-                    <input type="number" min="0" value={editMaxTeachers} onChange={(e) => setEditMaxTeachers(parseInt(e.target.value) || 0)} style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.12)', fontSize: '0.9rem', fontWeight: 600, outline: 'none' }} />
+                    <input type="number" min="0" disabled={!editLimitsEnabled} value={editMaxTeachers} onChange={(e) => setEditMaxTeachers(parseInt(e.target.value) || 0)} style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.12)', fontSize: '0.9rem', fontWeight: 600, outline: 'none', background: editLimitsEnabled ? '#ffffff' : '#f5f5f7' }} />
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Max Schüler</label>
-                    <input type="number" min="0" value={editMaxStudents} onChange={(e) => setEditMaxStudents(parseInt(e.target.value) || 0)} style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.12)', fontSize: '0.9rem', fontWeight: 600, outline: 'none' }} />
+                    <input type="number" min="0" disabled={!editLimitsEnabled} value={editMaxStudents} onChange={(e) => setEditMaxStudents(parseInt(e.target.value) || 0)} style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.12)', fontSize: '0.9rem', fontWeight: 600, outline: 'none', background: editLimitsEnabled ? '#ffffff' : '#f5f5f7' }} />
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Max Songs</label>
-                    <input type="number" min="0" value={editMaxSongs} onChange={(e) => setEditMaxSongs(parseInt(e.target.value) || 0)} style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.12)', fontSize: '0.9rem', fontWeight: 600, outline: 'none' }} />
+                    <input type="number" min="0" disabled={!editLimitsEnabled} value={editMaxSongs} onChange={(e) => setEditMaxSongs(parseInt(e.target.value) || 0)} style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.12)', fontSize: '0.9rem', fontWeight: 600, outline: 'none', background: editLimitsEnabled ? '#ffffff' : '#f5f5f7' }} />
                   </div>
                 </div>
               </div>

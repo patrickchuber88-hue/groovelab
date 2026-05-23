@@ -941,6 +941,15 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     e.preventDefault();
     if (!admin?.school_id) return;
     
+    // Check limits if enabled
+    if (admin?.schools?.limits_enabled) {
+      const maxStudents = admin.schools.max_students ?? 6;
+      if (students.length >= maxStudents) {
+        alert(`Limit erreicht! Deine Schule darf maximal ${maxStudents} Schüler registrieren. Kontaktiere deinen Master-Admin.`);
+        return;
+      }
+    }
+    
     const qrToken = crypto.randomUUID();
     
     const { data, error } = await supabase.from('users').insert({
@@ -1123,10 +1132,19 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     setSelectedMembers([]);
     fetchData();
   };
-
   const handleAddTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!admin?.school_id) return;
+
+    // Check limits if enabled
+    if (admin?.schools?.limits_enabled) {
+      const maxTeachers = admin.schools.max_teachers ?? 2;
+      if (teachers.length >= maxTeachers) {
+        alert(`Limit erreicht! Deine Schule darf maximal ${maxTeachers} Lehrer/Admins registrieren. Kontaktiere deinen Master-Admin.`);
+        return;
+      }
+    }
+
     const { data, error } = await supabase.from('users').insert({
       school_id: admin.school_id, 
       role: newTeacher.isAdmin ? 'admin' : 'teacher', 
@@ -1508,6 +1526,15 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const handleAddSong = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!admin?.school_id) return;
+
+    // Check limits if enabled
+    if (admin?.schools?.limits_enabled) {
+      const maxSongs = admin.schools.max_songs ?? 5;
+      if (songs.length >= maxSongs) {
+        alert(`Limit erreicht! Deine Schule darf maximal ${maxSongs} Songs in der Mediathek verwalten. Kontaktiere deinen Master-Admin.`);
+        return;
+      }
+    }
     
     const insertPayload: any = {
       school_id: admin.school_id, 

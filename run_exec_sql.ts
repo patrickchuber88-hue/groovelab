@@ -8,9 +8,9 @@ const supabase = createClient(
 );
 
 async function run() {
-  const sql = `ALTER TABLE songs ADD COLUMN IF NOT EXISTS playalong_url TEXT;`;
-  console.log("Trying exec_sql...");
-  const { data, error } = await supabase.rpc('exec_sql', { query: sql });
+  const sql = `ALTER TABLE schools ADD COLUMN IF NOT EXISTS limits_enabled BOOLEAN DEFAULT false;`;
+  console.log("Trying execute_sql...");
+  const { data, error } = await supabase.rpc('execute_sql', { sql_query: sql });
   console.log("Result:", { data, error });
 }
 run();

@@ -365,14 +365,14 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
         {sess ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, marginTop: '2px' }}>
             <div style={{ 
-              width: '80px', 
-              height: '80px', 
-              borderRadius: '20px', 
+              width: '104px', 
+              height: '104px', 
+              borderRadius: '24px', 
               overflow: 'hidden', 
               border: `2px solid ${color}`, 
               boxShadow: `0 10px 28px ${color}25`, 
               flexShrink: 0, 
-              marginBottom: '6px',
+              marginBottom: '4px',
               transition: 'all 0.3s ease'
             }}>
               <AvatarImage src={sess.users?.photo_url} user={sess.users} />
@@ -2973,7 +2973,7 @@ export function TeacherDashboard({
                   background: 'linear-gradient(135deg, #1e1b4b 0%, #0f0728 100%)', 
                   border: '1px solid rgba(165, 180, 252, 0.15)',
                   borderRadius: '32px',
-                  boxShadow: '0 15px 35px rgba(0, 0, 0, 0.2)',
+                  boxShadow: 'none',
                   cursor: 'pointer',
                   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                   position: 'relative',

@@ -620,6 +620,25 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             if (!firstName.trim() || !lastName.trim()) return;
             try {
               setSigningUp(true);
+              
+              // Check limits if enabled for the school
+              if (schoolData?.limits_enabled) {
+                const { count, error: countErr } = await supabase
+                  .from('users')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('school_id', inviteSchoolId)
+                  .in('role', ['teacher', 'admin']);
+                  
+                if (countErr) throw countErr;
+                
+                const maxTeachers = schoolData.max_teachers ?? 2;
+                if (count !== null && count >= maxTeachers) {
+                  alert(`Registrierung fehlgeschlagen: Das Limit für Lehrer/Admins an dieser Schule (${maxTeachers}) wurde erreicht. Bitte kontaktiere deinen System-Admin.`);
+                  setSigningUp(false);
+                  return;
+                }
+              }
+
               const newQrToken = crypto.randomUUID();
               const newUserId = crypto.randomUUID();
               
@@ -652,7 +671,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 type="text"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                placeholder="z.B. Patrick"
+                placeholder="Max"
                 required
                 style={{
                   width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: '10px',
@@ -668,7 +687,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 type="text"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                placeholder="z.B. Huber"
+                placeholder="Mustermann"
                 required
                 style={{
                   width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: '10px',
