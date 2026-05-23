@@ -779,9 +779,10 @@ export function TeacherDashboard({
         
         const activeCoaches = (allCoaches || []).filter(c => {
           if (c.is_observer) return false; // Hospitanten are never shown in Live Lab
-          const isCurrentTeacher = c.id === userId && !hidePresence && !isHomeMode;
-          const hasSession = trulyActive.some(s => s.user_id === c.id);
-          return isCurrentTeacher || hasSession;
+          if (c.id === userId) {
+            return !hidePresence && !isHomeMode;
+          }
+          return trulyActive.some(s => s.user_id === c.id);
         });
         setCoaches(activeCoaches.map(c => ({ id: c.id, users: c, session: trulyActive.find(s => s.user_id === c.id) })));
 

@@ -228,8 +228,25 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       // 1. Determine finalStationId and lookup teacher station if needed
       if (isTeacher) {
-        const { data: tStation } = await supabase.from('stations').select('id').eq('name', 'Lehrer iPad').maybeSingle();
-        finalStationId = tStation?.id || null;
+        const schoolId = user.school_id || (Array.isArray(user.schools) ? user.schools[0]?.id : user.schools?.id);
+        const { data: tStations } = await supabase
+          .from('stations')
+          .select('id, room_id, name, rooms!inner(school_id)')
+          .eq('name', 'Lehrer iPad')
+          .eq('rooms.school_id', schoolId);
+
+        if (tStations && tStations.length > 0) {
+          let matchedStation = null;
+          if (stationId) {
+            const { data: scanSt } = await supabase.from('stations').select('room_id').eq('id', stationId).maybeSingle();
+            if (scanSt?.room_id) {
+              matchedStation = tStations.find(s => s.room_id === scanSt.room_id);
+            }
+          }
+          finalStationId = (matchedStation || tStations[0]).id;
+        } else {
+          finalStationId = null;
+        }
       } else {
         if (stationId) {
           const { data: curStation } = await supabase.from('stations').select('name').eq('id', stationId).maybeSingle();

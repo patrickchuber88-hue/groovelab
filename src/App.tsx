@@ -5165,13 +5165,15 @@ function App() {
                {/* Location Pill */}
                <div style={{ 
                 display: 'flex', alignItems: 'center', gap: '8px', 
-                background: getRoleColor(user?.role, session?.stations?.name), 
+                background: getRoleColor(user?.role, locationMode === 'lab' ? (session?.stations?.name || 'Labor iPad') : undefined), 
                 padding: '8px 16px', borderRadius: '12px', 
-                boxShadow: `0 4px 12px ${getRoleColor(user?.role, session?.stations?.name)}30`
+                boxShadow: `0 4px 12px ${getRoleColor(user?.role, locationMode === 'lab' ? (session?.stations?.name || 'Labor iPad') : undefined)}30`
               }}>
                 <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'white' }}></div>
                 <span style={{ color: 'white', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  {(user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'teacher') ? (session?.stations?.name || 'Home') : (locationMode === 'lab' ? `Labor (${session?.stations?.name || 'iPad'})` : 'Home')}
+                  {(user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'teacher') 
+                    ? (locationMode === 'lab' ? 'Labor iPad' : 'Home') 
+                    : (locationMode === 'lab' ? `Labor (${session?.stations?.name || 'iPad'})` : 'Home')}
                 </span>
               </div>
 
