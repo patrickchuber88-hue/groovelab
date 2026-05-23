@@ -1451,32 +1451,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         )}
       </div>
 
-      {!effectiveStationId && (
-        <button
-          onClick={() => setShowOnboarding(true)}
-          style={{
-            marginTop: '24px',
-            padding: '12px 24px',
-            borderRadius: '20px',
-            background: 'rgba(255, 255, 255, 0.8)',
-            backdropFilter: 'blur(8px)',
-            border: '1px solid #e2e8f0',
-            color: '#64748b',
-            fontWeight: 800,
-            fontSize: '12px',
-            textTransform: 'uppercase',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.02)'
-          }}
-          className="hover-scale"
-        >
-          <School size={16} /> Musikschule registrieren
-        </button>
-      )}
+      {/* Impressum & Datenschutz Footer */}
 
       {/* Legal Footer */}
       <div style={{ 
