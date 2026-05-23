@@ -32,6 +32,55 @@ CREATE TABLE IF NOT EXISTS public.dpa_agreements (
 );
 
 -- 5. DEFINE RLS HELPER FUNCTIONS
+
+-- Helper: Get kiosk token safely from request headers
+CREATE OR REPLACE FUNCTION public.get_kiosk_token()
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_headers text;
+    v_token text;
+BEGIN
+    v_headers := current_setting('request.headers', true);
+    IF v_headers IS NULL OR v_headers = '' THEN
+        RETURN NULL;
+    END IF;
+    v_token := v_headers::json->>'x-kiosk-token';
+    IF v_token IS NULL OR v_token = '' THEN
+        RETURN NULL;
+    END IF;
+    RETURN v_token::uuid;
+EXCEPTION WHEN OTHERS THEN
+    RETURN NULL;
+END;
+$$;
+
+-- Helper: Get QR token safely from request headers
+CREATE OR REPLACE FUNCTION public.get_qr_token()
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_headers text;
+    v_token text;
+BEGIN
+    v_headers := current_setting('request.headers', true);
+    IF v_headers IS NULL OR v_headers = '' THEN
+        RETURN NULL;
+    END IF;
+    v_token := v_headers::json->>'x-qr-token';
+    IF v_token IS NULL OR v_token = '' THEN
+        RETURN NULL;
+    END IF;
+    RETURN v_token::uuid;
+EXCEPTION WHEN OTHERS THEN
+    RETURN NULL;
+END;
+$$;
+
 -- Helper: Get kiosk school_id
 CREATE OR REPLACE FUNCTION public.get_kiosk_school_id()
 RETURNS uuid
@@ -39,17 +88,17 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
-    v_token text;
+    v_token uuid;
     v_school_id uuid;
 BEGIN
-    v_token := current_setting('request.headers', true)::json->>'x-kiosk-token';
-    IF v_token IS NULL OR v_token = '' THEN
+    v_token := public.get_kiosk_token();
+    IF v_token IS NULL THEN
         RETURN NULL;
     END IF;
     
     SELECT school_id INTO v_school_id
     FROM public.kiosks
-    WHERE secret_token = v_token::uuid;
+    WHERE secret_token = v_token;
     
     RETURN v_school_id;
 EXCEPTION WHEN OTHERS THEN
@@ -64,10 +113,15 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
+    v_headers text;
     v_user_id text;
     v_school_id uuid;
 BEGIN
-    v_user_id := current_setting('request.headers', true)::json->>'x-user-id';
+    v_headers := current_setting('request.headers', true);
+    IF v_headers IS NULL OR v_headers = '' THEN
+        RETURN NULL;
+    END IF;
+    v_user_id := v_headers::json->>'x-user-id';
     IF v_user_id IS NULL OR v_user_id = '' THEN
         RETURN NULL;
     END IF;
@@ -89,10 +143,15 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
+    v_headers text;
     v_user_id text;
     v_is_master boolean;
 BEGIN
-    v_user_id := current_setting('request.headers', true)::json->>'x-user-id';
+    v_headers := current_setting('request.headers', true);
+    IF v_headers IS NULL OR v_headers = '' THEN
+        RETURN false;
+    END IF;
+    v_user_id := v_headers::json->>'x-user-id';
     IF v_user_id IS NULL OR v_user_id = '' THEN
         RETURN false;
     END IF;
@@ -114,6 +173,7 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
+    v_headers text;
     v_user_id text;
     v_role public.user_role;
 BEGIN
@@ -121,7 +181,11 @@ BEGIN
         RETURN true;
     END IF;
 
-    v_user_id := current_setting('request.headers', true)::json->>'x-user-id';
+    v_headers := current_setting('request.headers', true);
+    IF v_headers IS NULL OR v_headers = '' THEN
+        RETURN false;
+    END IF;
+    v_user_id := v_headers::json->>'x-user-id';
     IF v_user_id IS NULL OR v_user_id = '' THEN
         RETURN false;
     END IF;
@@ -217,17 +281,17 @@ CREATE POLICY "schools_insert" ON public.schools FOR INSERT WITH CHECK (true); -
 CREATE POLICY "users_select" ON public.users FOR SELECT USING (
     public.is_master_admin()
     OR (
-        current_setting('request.headers', true)::json->>'x-kiosk-token' IS NOT NULL AND
+        public.get_kiosk_token() IS NOT NULL AND
         EXISTS (
             SELECT 1 FROM public.kiosks k
-            WHERE k.secret_token = (current_setting('request.headers', true)::json->>'x-kiosk-token')::uuid
+            WHERE k.secret_token = public.get_kiosk_token()
             AND k.school_id = users.school_id
         )
     )
     OR (
-        current_setting('request.headers', true)::json->>'x-kiosk-token' IS NULL AND
-        current_setting('request.headers', true)::json->>'x-qr-token' IS NOT NULL AND
-        qr_token = (current_setting('request.headers', true)::json->>'x-qr-token')::uuid
+        public.get_kiosk_token() IS NULL AND
+        public.get_qr_token() IS NOT NULL AND
+        qr_token = public.get_qr_token()
     )
     OR public.check_school_access(school_id)
 );
@@ -370,7 +434,7 @@ CREATE POLICY "lab_planning_all" ON public.lab_planning FOR ALL USING (public.ch
 DROP POLICY IF EXISTS "kiosks_select" ON public.kiosks;
 DROP POLICY IF EXISTS "kiosks_modify" ON public.kiosks;
 CREATE POLICY "kiosks_select" ON public.kiosks FOR SELECT USING (
-    secret_token = (current_setting('request.headers', true)::json->>'x-kiosk-token')::uuid
+    secret_token = public.get_kiosk_token()
     OR public.check_school_access(school_id)
 );
 CREATE POLICY "kiosks_modify" ON public.kiosks FOR ALL USING (
