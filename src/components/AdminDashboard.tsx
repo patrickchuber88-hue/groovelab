@@ -208,6 +208,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [newRoomName, setNewRoomName] = useState('');
   const [newRoomLocation, setNewRoomLocation] = useState<{lat: number, lng: number} | null>(null);
   const [newRoomStationCount, setNewRoomStationCount] = useState(5);
+  const [draggedRoomId, setDraggedRoomId] = useState<string | null>(null);
+  const [dragOverRoomId, setDragOverRoomId] = useState<string | null>(null);
   
   const [showAddStationForRoom, setShowAddStationForRoom] = useState<string | null>(null);
   const [newStationName, setNewStationName] = useState('');
@@ -671,7 +673,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           .from('rooms')
           .select('*')
           .eq('school_id', adminData.school_id)
-          .order('name');
+          .order('sort_order', { ascending: true });
         if (roomsData) setRooms(roomsData);
 
         const { data: stationsData } = await supabase
@@ -746,7 +748,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           setTeachers(allUsers.filter(u => u.role === 'teacher' || u.role === 'admin'));
         }
       } else if (activeTab === 'setup') {
-        const { data: rData } = await supabase.from('rooms').select('*').eq('school_id', adminData.school_id).order('name');
+        const { data: rData } = await supabase.from('rooms').select('*').eq('school_id', adminData.school_id).order('sort_order', { ascending: true });
         setSetupRooms(rData || []);
         const { data: sData } = await supabase.from('stations').select('*, rooms!inner(school_id)').eq('rooms.school_id', adminData.school_id).order('name');
         setSetupStations(sData || []);
@@ -1226,7 +1228,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       school_id: admin.school_id, 
       name: newRoomName,
       latitude: newRoomLocation?.lat,
-      longitude: newRoomLocation?.lng
+      longitude: newRoomLocation?.lng,
+      sort_order: rooms.length
     }).select().single();
     
     if (roomError) {
@@ -1309,6 +1312,88 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     const { error } = await supabase.from('rooms').delete().eq('id', roomId);
     if (error) alert(error.message);
     else fetchData();
+  };
+
+  const handleRoomDragStart = (e: React.DragEvent, roomId: string) => {
+    setDraggedRoomId(roomId);
+    e.dataTransfer.setData('text/plain', roomId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleRoomDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleRoomDragEnter = (e: React.DragEvent, roomId: string) => {
+    e.preventDefault();
+    if (draggedRoomId && draggedRoomId !== roomId) {
+      setDragOverRoomId(roomId);
+    }
+  };
+
+  const handleRoomDragLeave = () => {
+    setDragOverRoomId(null);
+  };
+
+  const handleRoomDrop = async (e: React.DragEvent, targetRoomId: string) => {
+    e.preventDefault();
+    const sourceId = e.dataTransfer.getData('text/plain') || draggedRoomId;
+    if (!sourceId || sourceId === targetRoomId) {
+      setDraggedRoomId(null);
+      setDragOverRoomId(null);
+      return;
+    }
+
+    // Optimistically update local rooms state
+    const sourceIndex = rooms.findIndex(r => r.id === sourceId);
+    const targetIndex = rooms.findIndex(r => r.id === targetRoomId);
+    if (sourceIndex === -1 || targetIndex === -1) {
+      setDraggedRoomId(null);
+      setDragOverRoomId(null);
+      return;
+    }
+
+    const reorderedRooms = [...rooms];
+    const [movedRoom] = reorderedRooms.splice(sourceIndex, 1);
+    reorderedRooms.splice(targetIndex, 0, movedRoom);
+
+    // Reassign sort_order values locally
+    const updatedRooms = reorderedRooms.map((room, idx) => ({
+      ...room,
+      sort_order: idx
+    }));
+
+    setRooms(updatedRooms);
+    setDraggedRoomId(null);
+    setDragOverRoomId(null);
+
+    // Persist reordered sort_order values to the database
+    try {
+      const updatePromises = updatedRooms.map((room, idx) =>
+        supabase
+          .from('rooms')
+          .update({ sort_order: idx })
+          .eq('id', room.id)
+      );
+      await Promise.all(updatePromises);
+      console.log('Successfully reordered rooms in database');
+    } catch (err) {
+      console.error('Error persisting room order:', err);
+      alert('Fehler beim Speichern der Raumreihenfolge.');
+      if (admin?.school_id) {
+        const { data: roomsData } = await supabase
+          .from('rooms')
+          .select('*')
+          .eq('school_id', admin.school_id)
+          .order('sort_order', { ascending: true });
+        if (roomsData) setRooms(roomsData);
+      }
+    }
+  };
+
+  const handleRoomDragEnd = () => {
+    setDraggedRoomId(null);
+    setDragOverRoomId(null);
   };
 
   const handleDeleteStation = async (stationId: string) => {
@@ -3146,14 +3231,52 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '24px' }}>
-          {rooms.map(room => (
-            <div key={room.id} className="glass-panel" style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: `${brandColor}10`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Box size={20} color={brandColor} />
-                  </div>
-                  <div>
+          {rooms.map((room, idx) => {
+            const isSelected = draggedRoomId === room.id;
+            const isDragOver = dragOverRoomId === room.id;
+            return (
+              <div 
+                key={room.id} 
+                className="glass-panel" 
+                draggable="true"
+                onDragStart={(e) => handleRoomDragStart(e, room.id)}
+                onDragOver={handleRoomDragOver}
+                onDragEnter={(e) => handleRoomDragEnter(e, room.id)}
+                onDragLeave={handleRoomDragLeave}
+                onDrop={(e) => handleRoomDrop(e, room.id)}
+                onDragEnd={handleRoomDragEnd}
+                style={{ 
+                  padding: '24px', 
+                  background: isDragOver ? 'rgba(99, 102, 241, 0.03)' : 'white', 
+                  borderRadius: '24px', 
+                  border: isDragOver ? `2px dashed ${brandColor}` : (isSelected ? '2px dashed #94a3b8' : '1px solid #f1f5f9'),
+                  opacity: isSelected ? 0.5 : 1,
+                  cursor: draggedRoomId ? 'grabbing' : 'grab',
+                  transition: 'all 0.2s ease',
+                  boxShadow: isDragOver ? `0 12px 24px -10px ${brandColor}30` : 'none',
+                  position: 'relative'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: idx === 0 ? '#f59e0b15' : `${brandColor}10`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {idx === 0 ? <Box size={20} color="#f59e0b" /> : <Box size={20} color={brandColor} />}
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <span style={{ 
+                          fontSize: '0.7rem', 
+                          fontWeight: 900, 
+                          color: idx === 0 ? '#d97706' : '#64748b', 
+                          background: idx === 0 ? '#fef3c7' : '#f1f5f9', 
+                          padding: '3px 8px', 
+                          borderRadius: '8px',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>
+                          {idx === 0 ? '👑 #1 Hauptraum' : `#${idx + 1}`}
+                        </span>
+                      </div>
                     {editingRoomId === room.id ? (
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         <input 
@@ -3519,7 +3642,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 )}
               </div>
             </div>
-          ))}
+          )})}
         </div>
       </div>
     </div>

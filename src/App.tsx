@@ -1191,14 +1191,16 @@ if (typeof window !== 'undefined') {
           to { opacity: 1; }
         }
         @keyframes appleAlertScaleIn {
-          from { transform: scale(0.9) translateY(10px); opacity: 0; }
+          from { transform: scale(0.95) translateY(10px); opacity: 0; }
           to { transform: scale(1) translateY(0); opacity: 1; }
         }
         .apple-alert-close-btn:hover {
-          background-color: rgba(255, 255, 255, 0.06) !important;
+          transform: translateY(-1px);
+          filter: brightness(1.05);
         }
         .apple-alert-close-btn:active {
-          background-color: rgba(255, 255, 255, 0.1) !important;
+          transform: translateY(0);
+          filter: brightness(0.95);
         }
       `;
       document.head.appendChild(style);
@@ -1210,15 +1212,15 @@ if (typeof window !== 'undefined') {
     overlay.style.position = 'fixed';
     overlay.style.inset = '0';
     overlay.style.zIndex = '999999';
-    overlay.style.background = 'rgba(0, 0, 0, 0.45)';
-    overlay.style.backdropFilter = 'blur(12px)';
-    overlay.style.setProperty('-webkit-backdrop-filter', 'blur(12px)');
+    overlay.style.background = 'rgba(15, 23, 42, 0.3)';
+    overlay.style.backdropFilter = 'blur(8px)';
+    overlay.style.setProperty('-webkit-backdrop-filter', 'blur(8px)');
     overlay.style.display = 'flex';
     overlay.style.alignItems = 'center';
     overlay.style.justifyContent = 'center';
     overlay.style.opacity = '0';
     overlay.style.transition = 'opacity 0.25s ease-out';
-    overlay.style.fontFamily = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+    overlay.style.fontFamily = 'inherit';
 
     // Determine type
     const msgLower = String(message).toLowerCase();
@@ -1227,46 +1229,53 @@ if (typeof window !== 'undefined') {
 
     let iconHtml = '';
     let titleText = 'GrooveLab';
+    let btnBackground = 'linear-gradient(135deg, #10b981, #059669)';
+    let btnShadow = '0 4px 12px rgba(16, 185, 129, 0.2)';
+    
     if (isError) {
       titleText = 'Hinweis';
+      btnBackground = 'linear-gradient(135deg, #ef4444, #dc2626)';
+      btnShadow = '0 4px 12px rgba(239, 68, 68, 0.2)';
       iconHtml = `
-        <div style="width: 52px; height: 52px; border-radius: 50%; background: rgba(255, 69, 58, 0.12); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; border: 1px solid rgba(255, 69, 58, 0.2);">
-          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ff453a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+        <div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(239, 68, 68, 0.08); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; border: 1px solid rgba(239, 68, 68, 0.15);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
         </div>
       `;
     } else if (isSuccess) {
       iconHtml = `
-        <div style="width: 52px; height: 52px; border-radius: 50%; background: rgba(48, 209, 88, 0.12); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; border: 1px solid rgba(48, 209, 88, 0.2);">
-          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#30d158" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+        <div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(16, 185, 129, 0.08); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; border: 1px solid rgba(16, 185, 129, 0.15);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
         </div>
       `;
     } else {
+      btnBackground = 'linear-gradient(135deg, #eab308, #ca8a04)';
+      btnShadow = '0 4px 12px rgba(234, 179, 8, 0.2)';
       iconHtml = `
-        <div style="width: 52px; height: 52px; border-radius: 50%; background: rgba(10, 132, 255, 0.12); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; border: 1px solid rgba(10, 132, 255, 0.2);">
-          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+        <div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(234, 179, 8, 0.08); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; border: 1px solid rgba(234, 179, 8, 0.15);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
         </div>
       `;
     }
 
     // Create alert box
     const alertBox = document.createElement('div');
-    alertBox.style.background = 'rgba(28, 28, 30, 0.85)';
-    alertBox.style.backdropFilter = 'blur(25px) saturate(180%)';
-    alertBox.style.setProperty('-webkit-backdrop-filter', 'blur(25px) saturate(180%)');
-    alertBox.style.borderRadius = '16px';
-    alertBox.style.width = '300px';
-    alertBox.style.maxWidth = '85%';
+    alertBox.style.background = 'rgba(255, 255, 255, 0.95)';
+    alertBox.style.backdropFilter = 'blur(20px)';
+    alertBox.style.setProperty('-webkit-backdrop-filter', 'blur(20px)');
+    alertBox.style.borderRadius = '24px';
+    alertBox.style.width = '320px';
+    alertBox.style.maxWidth = '90%';
     alertBox.style.display = 'flex';
     alertBox.style.flexDirection = 'column';
     alertBox.style.alignItems = 'center';
-    alertBox.style.overflow = 'hidden';
-    alertBox.style.boxShadow = '0 25px 50px rgba(0, 0, 0, 0.55)';
-    alertBox.style.border = '1px solid rgba(255, 255, 255, 0.12)';
-    alertBox.style.color = 'white';
+    alertBox.style.boxShadow = '0 20px 40px rgba(15, 23, 42, 0.15), 0 1px 3px rgba(15, 23, 42, 0.05)';
+    alertBox.style.border = '1px solid rgba(226, 232, 240, 0.8)';
+    alertBox.style.color = '#0f172a';
     alertBox.style.textAlign = 'center';
-    alertBox.style.transform = 'scale(0.92) translateY(10px)';
+    alertBox.style.transform = 'scale(0.95) translateY(10px)';
     alertBox.style.transition = 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease-out';
     alertBox.style.boxSizing = 'border-box';
+    alertBox.style.padding = '28px 24px 24px';
 
     // Safe innerHTML
     const escapedMessage = String(message)
@@ -1278,32 +1287,31 @@ if (typeof window !== 'undefined') {
       .replace(/\n/g, "<br />");
 
     alertBox.innerHTML = `
-      <div style="padding: 24px 20px 22px; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box;">
+      <div style="display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box;">
         ${iconHtml}
-        <div style="font-size: 18px; font-weight: 600; letter-spacing: -0.4px; color: white; margin-bottom: 6px;">
+        <div style="font-size: 1.25rem; font-weight: 900; color: #0f172a; margin-bottom: 8px;">
           ${titleText}
         </div>
-        <div style="font-size: 13.5px; font-weight: 400; color: #e5e5ea; line-height: 1.45; white-space: normal; word-break: break-word;">
+        <div style="font-size: 0.95rem; font-weight: 600; color: #475569; line-height: 1.5; white-space: normal; word-break: break-word; margin-bottom: 24px;">
           ${escapedMessage}
         </div>
+        <button class="apple-alert-close-btn" style="
+          width: 100%;
+          padding: 14px 20px;
+          border-radius: 16px;
+          background: ${btnBackground};
+          border: none;
+          color: white;
+          font-size: 16px;
+          font-weight: 900;
+          cursor: pointer;
+          outline: none;
+          box-shadow: ${btnShadow};
+          transition: all 0.2s ease;
+          -webkit-tap-highlight-color: transparent;
+          font-family: inherit;
+        ">OK</button>
       </div>
-      <button class="apple-alert-close-btn" style="
-        width: 100%;
-        padding: 14px;
-        border-top: 0.5px solid rgba(255, 255, 255, 0.12);
-        background: transparent;
-        border-left: none;
-        border-right: none;
-        border-bottom: none;
-        color: #0a84ff;
-        font-size: 17px;
-        font-weight: 600;
-        cursor: pointer;
-        outline: none;
-        transition: background-color 0.2s;
-        -webkit-tap-highlight-color: transparent;
-        font-family: inherit;
-      ">OK</button>
     `;
 
     overlay.appendChild(alertBox);
@@ -1317,7 +1325,7 @@ if (typeof window !== 'undefined') {
 
     const closeAlert = () => {
       overlay.style.opacity = '0';
-      alertBox.style.transform = 'scale(0.92) translateY(10px)';
+      alertBox.style.transform = 'scale(0.95) translateY(10px)';
       setTimeout(() => {
         overlay.remove();
       }, 250);
@@ -4331,7 +4339,7 @@ function App() {
           .from('rooms')
           .select('id')
           .eq('school_id', schoolId)
-          .order('created_at', { ascending: true })
+          .order('sort_order', { ascending: true })
           .limit(1);
         if (roomData && roomData.length > 0) {
           roomId = roomData[0].id;

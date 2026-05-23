@@ -338,7 +338,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         
         const schoolId = (stationData?.rooms as any)?.school_id;
         if (schoolId) {
-          const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', schoolId);
+          const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', schoolId).order('sort_order', { ascending: true });
           setPrefetchedRooms(rooms);
           console.log(`[Login] Pre-fetched ${rooms?.length} rooms for school: ${schoolId}`);
         }
@@ -425,7 +425,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
         if (currentPos) {
           // 1. Check Rooms (Multi-Point)
-          const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', user.school_id);
+          const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', user.school_id).order('sort_order', { ascending: true });
           if (rooms) {
             for (const room of rooms) {
               const points = Array.isArray(room.geofence_points) ? room.geofence_points : [];

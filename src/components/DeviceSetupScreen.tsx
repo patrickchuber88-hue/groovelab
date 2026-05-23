@@ -148,7 +148,7 @@ export function DeviceSetupScreen() {
       // Persist the resolved school ID to localStorage for stability
       localStorage.setItem('groovelab_school_id', targetSchoolId);
 
-      let roomsQuery = supabase.from('rooms').select('*').order('name');
+      let roomsQuery = supabase.from('rooms').select('*').order('sort_order', { ascending: true });
       if (targetSchoolId) {
         roomsQuery = roomsQuery.eq('school_id', targetSchoolId);
       }
@@ -286,7 +286,7 @@ export function DeviceSetupScreen() {
         <div style={{ textAlign: 'left' }}>
           <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Raum auswählen</label>
           <div style={{ display: 'inline-flex', gap: '6px', background: '#f1f5f9', padding: '5px', borderRadius: '14px', flexWrap: 'wrap' }}>
-            {rooms.map(room => {
+            {rooms.map((room, idx) => {
               const isSelected = room.id === selectedRoomId;
               return (
                 <button
@@ -306,7 +306,7 @@ export function DeviceSetupScreen() {
                   }}
                   className="hover-scale-mini"
                 >
-                  {room.name || 'Unbenannter Raum'}
+                  {idx === 0 ? `👑 #1 Hauptraum - ${room.name || 'Unbenannter Raum'}` : `#${idx + 1} - ${room.name || 'Unbenannter Raum'}`}
                 </button>
               );
             })}

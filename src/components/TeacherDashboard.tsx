@@ -525,79 +525,8 @@ export function TeacherDashboard({
   const [selectedRoomId, setSelectedRoomId] = useState<string>('');
   const [zoomFactor, setZoomFactor] = useState<number>(1.0);
 
-  // Custom room display order persisted in localStorage
-  const [customRoomOrder, setCustomRoomOrder] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('groovelab_rooms_order');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return [];
-  });
-  const [draggedRoomId, setDraggedRoomId] = useState<string | null>(null);
-  const [dragOverRoomId, setDragOverRoomId] = useState<string | null>(null);
+  // We no longer have local room ordering state/handlers because we use the centralized, database-driven sort_order.
 
-  const sortRooms = (roomsList: any[]) => {
-    if (customRoomOrder.length === 0) return roomsList;
-    const orderMap = new Map(customRoomOrder.map((id, index) => [id, index]));
-    return [...roomsList].sort((a, b) => {
-      const indexA = orderMap.has(a.id) ? orderMap.get(a.id)! : 9999;
-      const indexB = orderMap.has(b.id) ? orderMap.get(b.id)! : 9999;
-      return indexA - indexB;
-    });
-  };
-
-  const handleDragStart = (e: React.DragEvent, roomId: string) => {
-    setDraggedRoomId(roomId);
-    e.dataTransfer.setData('text/plain', roomId);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleDragEnter = (e: React.DragEvent, roomId: string) => {
-    e.preventDefault();
-    if (draggedRoomId && draggedRoomId !== roomId) {
-      setDragOverRoomId(roomId);
-    }
-  };
-
-  const handleDragLeave = () => {
-    setDragOverRoomId(null);
-  };
-
-  const handleDrop = (e: React.DragEvent, targetRoomId: string) => {
-    e.preventDefault();
-    const sourceRoomId = e.dataTransfer.getData('text/plain') || draggedRoomId;
-    if (!sourceRoomId || sourceRoomId === targetRoomId) {
-      setDragOverRoomId(null);
-      return;
-    }
-
-    const sortedRooms = sortRooms(rooms);
-    const sourceIndex = sortedRooms.findIndex(r => r.id === sourceRoomId);
-    const targetIndex = sortedRooms.findIndex(r => r.id === targetRoomId);
-
-    if (sourceIndex === -1 || targetIndex === -1) {
-      setDragOverRoomId(null);
-      return;
-    }
-
-    const newSorted = [...sortedRooms];
-    const [removed] = newSorted.splice(sourceIndex, 1);
-    newSorted.splice(targetIndex, 0, removed);
-
-    const newOrder = newSorted.map(r => r.id);
-    setCustomRoomOrder(newOrder);
-    localStorage.setItem('groovelab_rooms_order', JSON.stringify(newOrder));
-    setDragOverRoomId(null);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedRoomId(null);
-    setDragOverRoomId(null);
-  };
 
   useEffect(() => {
     if (selectedRoomId && userId) {
@@ -728,16 +657,18 @@ export function TeacherDashboard({
 
       if (tData?.school_id) {
         // 2. Stations
-        const { data: rData } = await supabase.from('rooms').select('*').eq('school_id', tData.school_id);
+        const { data: rData } = await supabase
+          .from('rooms')
+          .select('*')
+          .eq('school_id', tData.school_id)
+          .order('sort_order', { ascending: true });
         setRooms(rData || []);
         if (rData && rData.length > 0 && !selectedRoomId) {
           const savedRoomId = localStorage.getItem('groovelab_teacher_selected_room_id');
           if (savedRoomId && rData.some(r => r.id === savedRoomId)) {
             setSelectedRoomId(savedRoomId);
           } else {
-            // Sort using the current custom order logic
-            const sorted = sortRooms(rData);
-            setSelectedRoomId(sorted[0].id);
+            setSelectedRoomId(rData[0].id);
           }
         }
         const roomIds = rData?.map(r => r.id) || [];
@@ -1839,40 +1770,30 @@ export function TeacherDashboard({
                         {/* Room Switcher inline next to title */}
                         {rooms.length > 1 && (
                           <div style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '5px', borderRadius: '14px' }}>
-                            {sortRooms(rooms).map(room => {
+                            {rooms.map((room, idx) => {
                               const isSelected = room.id === selectedRoomId;
-                              const isDragged = draggedRoomId === room.id;
-                              const isDragOver = dragOverRoomId === room.id;
                               return (
                                 <button
                                   key={room.id}
-                                  draggable="true"
-                                  onDragStart={(e) => handleDragStart(e, room.id)}
-                                  onDragOver={handleDragOver}
-                                  onDragEnter={(e) => handleDragEnter(e, room.id)}
-                                  onDragLeave={handleDragLeave}
-                                  onDrop={(e) => handleDrop(e, room.id)}
-                                  onDragEnd={handleDragEnd}
                                   onClick={() => {
                                     setSelectedRoomId(room.id);
                                     localStorage.setItem('groovelab_teacher_selected_room_id', room.id);
                                   }}
                                   style={{
-                                    border: isSelected ? 'none' : (isDragOver ? '2px dashed #6366f1' : 'none'),
-                                    background: isSelected ? 'white' : (isDragOver ? 'rgba(99, 102, 241, 0.05)' : 'transparent'),
+                                    border: 'none',
+                                    background: isSelected ? 'white' : 'transparent',
                                     color: isSelected ? '#1e293b' : '#64748b',
                                     padding: '6px 12px',
                                     borderRadius: '10px',
                                     fontSize: '0.8rem',
                                     fontWeight: 800,
-                                    cursor: isDragged ? 'grabbing' : 'grab',
-                                    opacity: isDragged ? 0.5 : 1,
+                                    cursor: 'pointer',
                                     boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
                                     transition: 'all 0.2s'
                                   }}
                                   className="hover-scale-mini"
                                 >
-                                  {room.name}
+                                  {idx === 0 ? `👑 #1 Hauptraum - ${room.name}` : `#${idx + 1} - ${room.name}`}
                                 </button>
                               );
                             })}
@@ -1993,40 +1914,30 @@ export function TeacherDashboard({
                     <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '16px', flexWrap: 'wrap' }}>
                       {rooms.length > 1 ? (
                         <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '6px', borderRadius: '16px' }}>
-                          {sortRooms(rooms).map(room => {
+                          {rooms.map((room, idx) => {
                             const isSelected = room.id === selectedRoomId;
-                            const isDragged = draggedRoomId === room.id;
-                            const isDragOver = dragOverRoomId === room.id;
                             return (
                               <button
                                 key={room.id}
-                                draggable="true"
-                                onDragStart={(e) => handleDragStart(e, room.id)}
-                                onDragOver={handleDragOver}
-                                onDragEnter={(e) => handleDragEnter(e, room.id)}
-                                onDragLeave={handleDragLeave}
-                                onDrop={(e) => handleDrop(e, room.id)}
-                                onDragEnd={handleDragEnd}
                                 onClick={() => {
                                   setSelectedRoomId(room.id);
                                   localStorage.setItem('groovelab_teacher_selected_room_id', room.id);
                                 }}
                                 style={{
-                                  border: isSelected ? 'none' : (isDragOver ? '2px dashed #6366f1' : 'none'),
-                                  background: isSelected ? 'white' : (isDragOver ? 'rgba(99, 102, 241, 0.05)' : 'transparent'),
+                                  border: 'none',
+                                  background: isSelected ? 'white' : 'transparent',
                                   color: isSelected ? '#1e293b' : '#64748b',
                                   padding: '8px 16px',
                                   borderRadius: '12px',
                                   fontSize: '0.85rem',
                                   fontWeight: 800,
-                                  cursor: isDragged ? 'grabbing' : 'grab',
-                                  opacity: isDragged ? 0.5 : 1,
+                                  cursor: 'pointer',
                                   boxShadow: isSelected ? '0 4px 10px rgba(0,0,0,0.05)' : 'none',
                                   transition: 'all 0.2s'
                                 }}
                                 className="hover-scale-mini"
                               >
-                                {room.name}
+                                {idx === 0 ? `👑 #1 Hauptraum - ${room.name}` : `#${idx + 1} - ${room.name}`}
                               </button>
                             );
                           })}
@@ -2210,39 +2121,29 @@ export function TeacherDashboard({
                 {/* Room Switcher */}
                 {rooms.length > 1 && (
                   <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '6px', borderRadius: '16px', alignSelf: 'flex-start', marginBottom: '8px' }}>
-                    {sortRooms(rooms).map(room => {
+                    {rooms.map((room, idx) => {
                       const isSelected = room.id === selectedRoomId;
-                      const isDragged = draggedRoomId === room.id;
-                      const isDragOver = dragOverRoomId === room.id;
                       return (
                         <button
                           key={room.id}
-                          draggable="true"
-                          onDragStart={(e) => handleDragStart(e, room.id)}
-                          onDragOver={handleDragOver}
-                          onDragEnter={(e) => handleDragEnter(e, room.id)}
-                          onDragLeave={handleDragLeave}
-                          onDrop={(e) => handleDrop(e, room.id)}
-                          onDragEnd={handleDragEnd}
                           onClick={() => {
                             setSelectedRoomId(room.id);
                             localStorage.setItem('groovelab_teacher_selected_room_id', room.id);
                           }}
                           style={{
-                            border: isSelected ? 'none' : (isDragOver ? '2px dashed #6366f1' : 'none'),
-                            background: isSelected ? 'white' : (isDragOver ? 'rgba(99, 102, 241, 0.05)' : 'transparent'),
+                            border: 'none',
+                            background: isSelected ? 'white' : 'transparent',
                             color: isSelected ? '#1e293b' : '#64748b',
                             padding: '8px 16px',
                             borderRadius: '12px',
                             fontSize: '0.85rem',
                             fontWeight: 800,
-                            cursor: isDragged ? 'grabbing' : 'grab',
-                            opacity: isDragged ? 0.5 : 1,
+                            cursor: 'pointer',
                             boxShadow: isSelected ? '0 4px 10px rgba(0,0,0,0.05)' : 'none',
                             transition: 'all 0.2s'
                           }}
                         >
-                          {room.name}
+                          {idx === 0 ? `👑 #1 Hauptraum - ${room.name}` : `#${idx + 1} - ${room.name}`}
                         </button>
                       );
                     })}
