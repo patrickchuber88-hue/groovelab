@@ -292,41 +292,43 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#f8fafc',
-      color: '#1e293b',
-      fontFamily: '"Outfit", "Inter", sans-serif',
-      padding: '40px 20px'
+      background: 'radial-gradient(circle at 50% 0%, #fcfdfe 0%, #f4f6fa 100%)',
+      color: '#1d1d1f',
+      fontFamily: '"Outfit", "Inter", -apple-system, sans-serif',
+      padding: '40px 24px',
+      transition: 'all 0.3s ease'
     }}>
-      {/* Premium Header Card */}
+      {/* Premium Apple-Style Header Card */}
       <div style={{
         maxWidth: '1200px',
         margin: '0 auto 40px auto',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        background: 'rgba(255, 255, 255, 0.7)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
+        background: '#ffffff',
         padding: '24px 32px',
         borderRadius: '24px',
-        border: '1px solid rgba(0, 0, 0, 0.05)',
-        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.03)'
+        border: '1px solid rgba(0, 0, 0, 0.04)',
+        boxShadow: '0 8px 30px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.015)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div style={{
             background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
-            padding: '12px',
-            borderRadius: '16px',
-            boxShadow: '0 8px 24px rgba(234, 179, 8, 0.2)'
+            padding: '14px',
+            borderRadius: '18px',
+            boxShadow: '0 8px 24px rgba(234, 179, 8, 0.15)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
           }}>
             <Shield size={28} color="#ffffff" />
           </div>
           <div>
-            <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, letterSpacing: '-0.03em', color: '#1e293b' }}>
+            <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, letterSpacing: '-0.03em', color: '#1d1d1f' }}>
               GrooveLab Master Portal
             </h1>
-            <p style={{ fontSize: '0.9rem', color: '#64748b', margin: '4px 0 0 0', fontWeight: 500 }}>
-              Globale Multi-Tenant Verwaltung & Schul-Provisionierung
+            <p style={{ fontSize: '0.9rem', color: '#8e8e93', margin: '4px 0 0 0', fontWeight: 600 }}>
+              Globale Multi-Tenant Verwaltung & Provisionierung
             </p>
           </div>
         </div>
@@ -335,20 +337,28 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
           <button 
             onClick={fetchSchoolsAndStats}
             style={{
-              padding: '12px',
+              width: '44px',
+              height: '44px',
               borderRadius: '14px',
               background: '#ffffff',
-              border: '1.5px solid #e2e8f0',
-              color: '#475569',
+              border: '1px solid rgba(0, 0, 0, 0.08)',
+              color: '#8e8e93',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              transition: 'all 0.2s',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+              transition: 'all 0.2s ease',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.01)'
             }}
-            
-            
+            className="hover-scale-mini"
+            onMouseOver={(e) => {
+              e.currentTarget.style.borderColor = 'rgba(0,0,0,0.15)';
+              e.currentTarget.style.color = '#1d1d1f';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)';
+              e.currentTarget.style.color = '#8e8e93';
+            }}
           >
             <RefreshCw size={18} />
           </button>
@@ -356,22 +366,21 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
           <button
             onClick={onLogout}
             style={{
-              padding: '12px 20px',
+              padding: '12px 24px',
               borderRadius: '14px',
-              background: '#ef4444',
+              background: '#ff3b30', // iOS Red
               border: 'none',
-              color: 'white',
-              fontWeight: 700,
+              color: '#ffffff',
+              fontWeight: 800,
               fontSize: '0.9rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 8px 20px rgba(239, 68, 68, 0.15)',
-              transition: 'all 0.2s'
+              boxShadow: '0 8px 24px rgba(255, 59, 48, 0.15)',
+              transition: 'all 0.2s ease'
             }}
-            
-            
+            className="hover-scale-mini"
           >
             <LogOut size={16} /> Abmelden
           </button>
@@ -387,38 +396,43 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
         gap: '20px'
       }}>
         {[
-          { title: 'Registrierte Schulen', value: stats.totalSchools, icon: <Layers size={22} />, color: '#eab308' },
-          { title: 'Verknüpfte Lehrer', value: stats.totalTeachers, icon: <Users size={22} />, color: '#3b82f6' },
-          { title: 'Aktive Schüler', value: stats.totalStudents, icon: <Award size={22} />, color: '#22c55e' },
-          { title: 'Sitzungen im Labor', value: stats.totalSessions, icon: <Clock size={22} />, color: '#a855f7' }
+          { title: 'Registrierte Schulen', value: stats.totalSchools, icon: <Layers size={20} />, color: '#eab308' },
+          { title: 'Verknüpfte Lehrer', value: stats.totalTeachers, icon: <Users size={20} />, color: '#3b82f6' },
+          { title: 'Aktive Schüler', value: stats.totalStudents, icon: <Award size={20} />, color: '#22c55e' },
+          { title: 'Sitzungen im Labor', value: stats.totalSessions, icon: <Clock size={20} />, color: '#a855f7' }
         ].map((kpi, idx) => (
           <div key={idx} style={{
-            background: 'rgba(255, 255, 255, 0.7)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            borderRadius: '20px',
-            padding: '24px',
-            border: '1px solid rgba(0, 0, 0, 0.05)',
-            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.02)',
+            background: '#ffffff',
+            borderRadius: '24px',
+            padding: '24px 28px',
+            border: '1px solid rgba(0, 0, 0, 0.04)',
+            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.015)',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between'
-          }}>
+            justifyContent: 'space-between',
+            transition: 'all 0.2s ease',
+            cursor: 'default'
+          }}
+          className="hover-scale-mini"
+          >
             <div>
-              <p style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', margin: 0, letterSpacing: '0.05em' }}>
+              <p style={{ color: '#8e8e93', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', margin: 0, letterSpacing: '0.05em' }}>
                 {kpi.title}
               </p>
-              <h3 style={{ fontSize: '2.25rem', fontWeight: 900, margin: '8px 0 0 0', color: '#1e293b', letterSpacing: '-0.03em' }}>
+              <h3 style={{ fontSize: '2.5rem', fontWeight: 800, margin: '6px 0 0 0', color: '#1d1d1f', letterSpacing: '-0.04em' }}>
                 {kpi.value}
               </h3>
             </div>
             <div style={{
-              background: `${kpi.color}10`,
+              background: `${kpi.color}0c`,
               color: kpi.color,
-              padding: '14px',
+              width: '48px',
+              height: '48px',
               borderRadius: '16px',
-              border: `1.5px solid ${kpi.color}20`,
-              boxShadow: `0 4px 12px ${kpi.color}08`
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: `1px solid ${kpi.color}15`,
             }}>
               {kpi.icon}
             </div>
@@ -436,23 +450,23 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
         alignItems: 'start'
       }}>
         
-        {/* Left Side: Schools Table Card */}
+        {/* Left Side: Schools flex card list */}
         <div style={{
-          background: 'rgba(255, 255, 255, 0.7)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          borderRadius: '24px',
+          background: '#ffffff',
+          borderRadius: '28px',
           padding: '32px',
-          border: '1px solid rgba(0, 0, 0, 0.05)',
-          boxShadow: '0 15px 35px rgba(0,0,0,0.03)',
-          minHeight: '400px'
+          border: '1px solid rgba(0, 0, 0, 0.04)',
+          boxShadow: '0 8px 30px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.015)',
+          minHeight: '400px',
+          display: 'flex',
+          flexDirection: 'column'
         }}>
-          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0 0 24px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#1e293b' }}>
+          <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0 0 24px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#1d1d1f', letterSpacing: '-0.02em' }}>
             <Layers size={22} color="#eab308" /> Schulen & Tenants
           </h2>
 
           {loading ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 0', gap: '16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, padding: '80px 0', gap: '16px' }}>
               <div className="loader" style={{
                 border: '4px solid rgba(0,0,0,0.05)',
                 borderLeftColor: '#eab308',
@@ -461,209 +475,209 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                 height: '36px',
                 animation: 'spin 1s linear infinite'
               }}></div>
-              <p style={{ color: '#64748b', fontSize: '0.95rem', fontWeight: 500 }}>Lade Schulregister...</p>
+              <p style={{ color: '#8e8e93', fontSize: '0.95rem', fontWeight: 600 }}>Lade Schulregister...</p>
             </div>
           ) : schools.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748b', fontWeight: 500 }}>
+            <div style={{ textAlign: 'center', padding: '80px 20px', color: '#8e8e93', fontWeight: 600, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               Keine Schulen im System registriert. Lege rechts deine erste Schule an!
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1.5px solid #f1f5f9' }}>
-                    <th style={{ padding: '12px 16px', color: '#64748b', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schule</th>
-                    <th style={{ padding: '12px 16px', color: '#64748b', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Primary Color</th>
-                    <th style={{ padding: '12px 16px', color: '#64748b', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</th>
-                    <th style={{ padding: '12px 16px', color: '#64748b', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Lehrer Einladen</th>
-                    <th style={{ padding: '12px 16px', color: '#64748b', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Aktionen</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {schools.map((school) => (
-                    <tr 
-                      key={school.id} 
-                      onClick={() => {
-                        setSelectedSchool(school);
-                        setEditName(school.name);
-                        setEditColor(school.primary_color || '#3b82f6');
-                        setEditLogo(school.logo_url || '');
-                        setEditStatus(school.status || 'active');
-                        setEditIsTrial(school.is_trial ?? true);
-                        setEditTrialEndsAt(school.trial_ends_at ? new Date(school.trial_ends_at).toISOString().split('T')[0] : '');
-                        setEditContractEndsAt(school.contract_ends_at ? new Date(school.contract_ends_at).toISOString().split('T')[0] : '');
-                        setEditMaxTeachers(school.max_teachers ?? 2);
-                        setEditMaxStudents(school.max_students ?? 6);
-                        setEditMaxSongs(school.max_songs ?? 5);
-                      }}
-                      style={{ 
-                        borderBottom: '1px solid #f1f5f9',
-                        transition: 'background 0.2s',
-                        cursor: 'pointer'
-                      }}
-                      onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
-                      onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
-                    >
-                      <td style={{ padding: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{
-                            width: '40px',
-                            height: '40px',
-                            borderRadius: '12px',
-                            background: school.primary_color || '#3b82f6',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 800,
-                            color: '#ffffff',
-                            fontSize: '1.1rem',
-                            boxShadow: '0 4px 10px rgba(0,0,0,0.05)'
-                          }}>
-                            {school.name.substring(0, 2).toUpperCase()}
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1e293b' }}>
-                              {school.name}
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontFamily: 'monospace', marginTop: '2px' }}>
-                              {school.id}
-                            </div>
-                          </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {schools.map((school) => {
+                const teachers = schoolStats[school.id]?.teachers || 0;
+                const students = schoolStats[school.id]?.students || 0;
+                const bands = schoolStats[school.id]?.bands || 0;
+
+                return (
+                  <div 
+                    key={school.id} 
+                    onClick={() => {
+                      setSelectedSchool(school);
+                      setEditName(school.name);
+                      setEditColor(school.primary_color || '#3b82f6');
+                      setEditLogo(school.logo_url || '');
+                      setEditStatus(school.status || 'active');
+                      setEditIsTrial(school.is_trial ?? true);
+                      setEditTrialEndsAt(school.trial_ends_at ? new Date(school.trial_ends_at).toISOString().split('T')[0] : '');
+                      setEditContractEndsAt(school.contract_ends_at ? new Date(school.contract_ends_at).toISOString().split('T')[0] : '');
+                      setEditMaxTeachers(school.max_teachers ?? 2);
+                      setEditMaxStudents(school.max_students ?? 6);
+                      setEditMaxSongs(school.max_songs ?? 5);
+                    }}
+                    style={{ 
+                      borderRadius: '18px',
+                      padding: '16px 20px',
+                      border: '1.5px solid #f1f5f9',
+                      background: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      cursor: 'pointer',
+                      transition: 'all 0.25s ease',
+                      gap: '16px',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.01)'
+                    }}
+                    className="hover-scale-mini"
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.borderColor = school.primary_color || '#3b82f6';
+                      e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.03)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.borderColor = '#f1f5f9';
+                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.01)';
+                    }}
+                  >
+                    {/* Brand Icon / Logo & Info */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        width: '46px',
+                        height: '46px',
+                        borderRadius: '14px',
+                        background: `linear-gradient(135deg, ${school.primary_color || '#3b82f6'} 0%, ${school.primary_color ? school.primary_color + 'dd' : '#1d4ed8'} 100%)`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 900,
+                        color: '#ffffff',
+                        fontSize: '1.1rem',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                        flexShrink: 0,
+                        overflow: 'hidden'
+                      }}>
+                        {school.logo_url ? (
+                          <img src={school.logo_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                        ) : (
+                          school.name.substring(0, 2).toUpperCase()
+                        )}
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#1d1d1f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {school.name}
                         </div>
-                      </td>
-                      <td style={{ padding: '16px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div style={{
-                              width: '16px',
-                              height: '16px',
-                              borderRadius: '50%',
-                              background: school.primary_color,
-                              border: '1.5px solid rgba(0,0,0,0.05)'
-                            }}></div>
-                            <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: '#475569', fontWeight: 600 }}>{school.primary_color}</span>
-                          </div>
-                      </td>
-                      <td style={{ padding: '16px' }} onClick={(e) => e.stopPropagation()}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); handleToggleSchoolPause(school.id, school.is_paused); }}
-                            style={{
-                              position: 'relative',
-                              width: '46px',
-                              height: '24px',
-                              borderRadius: '12px',
-                              background: school.is_paused ? '#cbd5e1' : '#22c55e',
-                              border: 'none',
-                              cursor: 'pointer',
-                              padding: '0',
-                              transition: 'background-color 0.2s ease',
-                              display: 'flex',
-                              alignItems: 'center',
-                              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.1)'
-                            }}
-                          >
-                            <div style={{
-                              width: '18px',
-                              height: '18px',
-                              borderRadius: '50%',
-                              background: '#ffffff',
-                              boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                              transition: 'transform 0.2s ease',
-                              transform: school.is_paused ? 'translateX(3px)' : 'translateX(25px)'
-                            }} />
-                          </button>
-                          <span style={{
-                            fontSize: '0.85rem',
-                            fontWeight: 700,
-                            color: school.is_paused ? '#64748b' : '#22c55e',
-                            minWidth: '55px'
-                          }}>
-                            {school.is_paused ? 'Pausiert' : 'Aktiv'}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                          <span style={{ fontSize: '0.75rem', color: '#8e8e93', fontFamily: 'monospace' }}>
+                            {school.id.substring(0, 8)}...
+                          </span>
+                          <span style={{ width: '3px', height: '3px', borderRadius: '50%', background: '#d1d1d6' }}></span>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#8e8e93' }}>
+                            {teachers} L • {students} S • {bands} B
                           </span>
                         </div>
-                      </td>
-                      <td style={{ padding: '16px' }} onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); copyInviteLink(school.id); }}
-                          style={{
-                            padding: '8px 14px',
-                            borderRadius: '10px',
-                            background: copiedId === school.id ? '#22c55e10' : '#ffffff',
-                            border: `1.5px solid ${copiedId === school.id ? '#22c55e40' : '#e2e8f0'}`,
-                            color: copiedId === school.id ? '#22c55e' : '#475569',
-                            fontSize: '0.8rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            boxShadow: '0 2px 5px rgba(0,0,0,0.01)',
-                            transition: 'all 0.25s'
-                          }}
-                        >
-                          {copiedId === school.id ? (
-                            <>
-                              <Check size={14} /> Kopiert!
-                            </>
-                          ) : (
-                            <>
-                              <Copy size={14} /> Einladungs-Link
-                            </>
-                          )}
-                        </button>
-                      </td>
-                      <td style={{ padding: '16px', textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
-                          <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteSchool(school.id, school.name);
-                              }}
-                              style={{
-                                padding: '8px',
-                                borderRadius: '8px',
-                                background: 'transparent',
-                                border: 'none',
-                                color: '#94a3b8',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
-                              }}
-                              onMouseOver={(e) => e.currentTarget.style.color = '#ef4444'}
-                              onMouseOut={(e) => e.currentTarget.style.color = '#94a3b8'}
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+
+                    {/* Actions & Toggles */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                      {/* iOS Style Toggle Pause */}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleSchoolPause(school.id, school.is_paused)}
+                        style={{
+                          position: 'relative',
+                          width: '42px',
+                          height: '24px',
+                          borderRadius: '12px',
+                          background: school.is_paused ? '#e5e5ea' : '#34c759', // iOS Gray vs iOS Green
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: '0',
+                          transition: 'background-color 0.2s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)'
+                        }}
+                        title={school.is_paused ? 'Aktivieren' : 'Pausieren'}
+                      >
+                        <div style={{
+                          width: '20px',
+                          height: '20px',
+                          borderRadius: '50%',
+                          background: '#ffffff',
+                          boxShadow: '0 2px 5px rgba(0,0,0,0.15)',
+                          transition: 'transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                          transform: school.is_paused ? 'translateX(2px)' : 'translateX(20px)'
+                        }} />
+                      </button>
+
+                      {/* Pill Invite Button */}
+                      <button
+                        onClick={() => copyInviteLink(school.id)}
+                        style={{
+                          padding: '8px 16px',
+                          borderRadius: '100px',
+                          background: copiedId === school.id ? '#34c75915' : '#f2f2f7',
+                          border: 'none',
+                          color: copiedId === school.id ? '#34c759' : '#0071e3', // iOS Green vs iOS Blue
+                          fontSize: '0.78rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          transition: 'all 0.2s ease',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                        }}
+                        className="hover-scale-mini"
+                      >
+                        {copiedId === school.id ? (
+                          <>
+                            <Check size={13} /> Kopiert
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={13} /> Einladung
+                          </>
+                        )}
+                      </button>
+
+                      {/* Trash Delete Button */}
+                      <button
+                        onClick={() => handleDeleteSchool(school.id, school.name)}
+                        style={{
+                          padding: '8px',
+                          borderRadius: '50%',
+                          background: '#f2f2f7',
+                          border: 'none',
+                          color: '#ff3b30',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.2s ease',
+                          width: '32px',
+                          height: '32px'
+                        }}
+                        className="hover-scale-mini"
+                        title="Schule löschen"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Right Side: Wrapper for both cards */}
+        {/* Right Side: Wrapper for Forms */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
           
-          {/* Right Side: Create School Form Card */}
+          {/* Create School Form Card */}
           <div style={{
-            background: 'rgba(255, 255, 255, 0.7)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            borderRadius: '24px',
+            background: '#ffffff',
+            borderRadius: '28px',
             padding: '32px',
-            border: '1px solid rgba(0, 0, 0, 0.05)',
-            boxShadow: '0 15px 35px rgba(0,0,0,0.03)'
+            border: '1px solid rgba(0, 0, 0, 0.04)',
+            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.015)'
           }}>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0 0 24px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#1e293b' }}>
+            <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0 0 24px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#1d1d1f', letterSpacing: '-0.02em' }}>
               <Plus size={22} color="#eab308" /> Schule anlegen
             </h2>
 
             <form onSubmit={handleCreateSchool} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', color: '#64748b', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Name der Schule *
                 </label>
                 <input
@@ -677,28 +691,29 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                     boxSizing: 'border-box',
                     padding: '14px 16px',
                     borderRadius: '12px',
-                    background: '#ffffff',
-                    border: '1.5px solid #e2e8f0',
-                    color: '#1e293b',
+                    background: '#f5f5f7',
+                    border: '1px solid transparent',
+                    color: '#1d1d1f',
                     fontSize: '0.95rem',
                     fontWeight: 600,
                     outline: 'none',
-                    transition: 'all 0.2s',
-                    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.01)'
+                    transition: 'all 0.2s ease'
                   }}
                   onFocus={(e) => {
+                    e.currentTarget.style.background = '#ffffff';
                     e.currentTarget.style.borderColor = '#eab308';
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(234, 179, 8, 0.15)';
+                    e.currentTarget.style.boxShadow = '0 0 0 4px rgba(234, 179, 8, 0.12)';
                   }}
                   onBlur={(e) => {
-                    e.currentTarget.style.borderColor = '#e2e8f0';
+                    e.currentTarget.style.background = '#f5f5f7';
+                    e.currentTarget.style.borderColor = 'transparent';
                     e.currentTarget.style.boxShadow = 'none';
                   }}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', color: '#64748b', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Primäre Branding-Farbe
                 </label>
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -707,10 +722,10 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                     value={newSchoolColor}
                     onChange={(e) => setNewSchoolColor(e.target.value)}
                     style={{
-                      border: '1.5px solid #e2e8f0',
+                      border: '1px solid rgba(0,0,0,0.08)',
                       width: '46px',
                       height: '46px',
-                      borderRadius: '10px',
+                      borderRadius: '12px',
                       cursor: 'pointer',
                       background: '#ffffff',
                       boxSizing: 'border-box',
@@ -725,22 +740,30 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                       flex: 1,
                       padding: '12px 16px',
                       borderRadius: '12px',
-                      background: '#ffffff',
-                      border: '1.5px solid #e2e8f0',
-                      color: '#1e293b',
+                      background: '#f5f5f7',
+                      border: '1px solid transparent',
+                      color: '#1d1d1f',
                       fontFamily: 'monospace',
                       fontWeight: 700,
                       outline: 'none',
-                      transition: 'all 0.2s'
+                      transition: 'all 0.2s ease'
                     }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = '#eab308'}
-                    onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+                    onFocus={(e) => {
+                      e.currentTarget.style.background = '#ffffff';
+                      e.currentTarget.style.borderColor = '#eab308';
+                      e.currentTarget.style.boxShadow = '0 0 0 4px rgba(234, 179, 8, 0.12)';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.background = '#f5f5f7';
+                      e.currentTarget.style.borderColor = 'transparent';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
                   />
                 </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', color: '#64748b', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Logo URL (Optional)
                 </label>
                 <input
@@ -753,16 +776,24 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                     boxSizing: 'border-box',
                     padding: '14px 16px',
                     borderRadius: '12px',
-                    background: '#ffffff',
-                    border: '1.5px solid #e2e8f0',
-                    color: '#1e293b',
+                    background: '#f5f5f7',
+                    border: '1px solid transparent',
+                    color: '#1d1d1f',
                     fontSize: '0.95rem',
                     fontWeight: 600,
                     outline: 'none',
                     transition: 'all 0.2s'
                   }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = '#eab308'}
-                  onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+                  onFocus={(e) => {
+                    e.currentTarget.style.background = '#ffffff';
+                    e.currentTarget.style.borderColor = '#eab308';
+                    e.currentTarget.style.boxShadow = '0 0 0 4px rgba(234, 179, 8, 0.12)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.background = '#f5f5f7';
+                    e.currentTarget.style.borderColor = 'transparent';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
                 />
               </div>
 
@@ -773,22 +804,21 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                   marginTop: '10px',
                   padding: '14px 20px',
                   borderRadius: '14px',
-                  background: 'linear-gradient(135deg, #eab308 0%, #d97706 100%)',
+                  background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
                   border: 'none',
-                  color: '#0f172a',
+                  color: '#ffffff',
                   fontWeight: 900,
                   fontSize: '0.95rem',
                   letterSpacing: '0.02em',
                   cursor: 'pointer',
-                  boxShadow: '0 8px 24px rgba(234, 179, 8, 0.25)',
+                  boxShadow: '0 8px 24px rgba(234, 179, 8, 0.2)',
                   transition: 'all 0.2s',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px'
                 }}
-                
-                
+                className="hover-scale-mini"
               >
                 {creating ? 'Wird angelegt...' : (
                   <>
@@ -798,19 +828,18 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
               </button>
             </form>
 
-            {/* User Guide Card */}
+            {/* Guide Card (iOS Style Tip) */}
             <div style={{
               marginTop: '32px',
               padding: '20px',
-              background: 'rgba(234, 179, 8, 0.04)',
-              border: '1px solid rgba(234, 179, 8, 0.15)',
-              borderRadius: '16px',
+              background: '#fdfaf2', // Soft warm yellow
+              border: '1px solid rgba(234, 179, 8, 0.12)',
+              borderRadius: '18px',
               fontSize: '0.85rem',
-              color: '#b45309',
-              lineHeight: '1.6',
-              boxShadow: '0 2px 8px rgba(234, 179, 8, 0.01)'
+              color: '#92400e',
+              lineHeight: '1.6'
             }}>
-              <strong style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: '#ca8a04', fontWeight: 800 }}>
+              <strong style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: '#b45309', fontWeight: 800 }}>
                 💡 Wie erstelle ich einen Lehrer?
               </strong>
               1. Trage den Schulnamen ein und klicke auf "Provisionieren".
@@ -823,23 +852,21 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
             </div>
           </div>
 
-          {/* Right Side: Master Admin Credentials Card */}
+          {/* Master Admin Credentials Card */}
           <div style={{
-            background: 'rgba(255, 255, 255, 0.7)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            borderRadius: '24px',
+            background: '#ffffff',
+            borderRadius: '28px',
             padding: '32px',
-            border: '1px solid rgba(0, 0, 0, 0.05)',
-            boxShadow: '0 15px 35px rgba(0,0,0,0.03)'
+            border: '1px solid rgba(0, 0, 0, 0.04)',
+            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.015)'
           }}>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0 0 24px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#1e293b' }}>
+            <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0 0 24px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#1d1d1f', letterSpacing: '-0.02em' }}>
               <Shield size={22} color="#eab308" /> Master-Admin Zugang
             </h2>
 
             <form onSubmit={handleUpdateAdminCredentials} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', color: '#64748b', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Benutzername
                 </label>
                 <input
@@ -853,22 +880,23 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                     boxSizing: 'border-box',
                     padding: '14px 16px',
                     borderRadius: '12px',
-                    background: '#ffffff',
-                    border: '1.5px solid #e2e8f0',
-                    color: '#1e293b',
+                    background: '#f5f5f7',
+                    border: '1px solid transparent',
+                    color: '#1d1d1f',
                     fontSize: '0.95rem',
                     fontWeight: 600,
                     outline: 'none',
-                    transition: 'all 0.2s',
-                    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.01)'
+                    transition: 'all 0.2s ease'
                   }}
                   onFocus={(e) => {
+                    e.currentTarget.style.background = '#ffffff';
                     e.currentTarget.style.borderColor = '#eab308';
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(234, 179, 8, 0.15)';
+                    e.currentTarget.style.boxShadow = '0 0 0 4px rgba(234, 179, 8, 0.12)';
                     setUsernameFocused(true);
                   }}
                   onBlur={(e) => {
-                    e.currentTarget.style.borderColor = '#e2e8f0';
+                    e.currentTarget.style.background = '#f5f5f7';
+                    e.currentTarget.style.borderColor = 'transparent';
                     e.currentTarget.style.boxShadow = 'none';
                     setUsernameFocused(false);
                   }}
@@ -876,7 +904,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', color: '#64748b', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Passwort
                 </label>
                 <input
@@ -890,22 +918,23 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                     boxSizing: 'border-box',
                     padding: '14px 16px',
                     borderRadius: '12px',
-                    background: '#ffffff',
-                    border: '1.5px solid #e2e8f0',
-                    color: '#1e293b',
+                    background: '#f5f5f7',
+                    border: '1px solid transparent',
+                    color: '#1d1d1f',
                     fontSize: '0.95rem',
                     fontWeight: 600,
                     outline: 'none',
-                    transition: 'all 0.2s',
-                    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.01)'
+                    transition: 'all 0.2s ease'
                   }}
                   onFocus={(e) => {
+                    e.currentTarget.style.background = '#ffffff';
                     e.currentTarget.style.borderColor = '#eab308';
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(234, 179, 8, 0.15)';
+                    e.currentTarget.style.boxShadow = '0 0 0 4px rgba(234, 179, 8, 0.12)';
                     setPasswordFocused(true);
                   }}
                   onBlur={(e) => {
-                    e.currentTarget.style.borderColor = '#e2e8f0';
+                    e.currentTarget.style.background = '#f5f5f7';
+                    e.currentTarget.style.borderColor = 'transparent';
                     e.currentTarget.style.boxShadow = 'none';
                     setPasswordFocused(false);
                   }}
@@ -918,22 +947,17 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                 style={{
                   width: '100%',
                   padding: '16px',
-                  borderRadius: '16px',
-                  background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                  borderRadius: '14px',
+                  background: '#1d1d1f', // iOS Solid Dark
                   color: '#ffffff',
                   border: 'none',
-                  fontSize: '1rem',
+                  fontSize: '0.95rem',
                   fontWeight: 800,
                   cursor: 'pointer',
-                  boxShadow: '0 8px 24px rgba(15, 23, 42, 0.15)',
-                  transition: 'all 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px'
+                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08)',
+                  transition: 'all 0.2s'
                 }}
-                
-                
+                className="hover-scale-mini"
               >
                 {updatingAdmin ? 'Wird gespeichert...' : 'Zugangsdaten speichern'}
               </button>
@@ -943,27 +967,36 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
               <div style={{
                 marginTop: '28px',
                 padding: '24px',
-                background: '#ffffff',
-                border: '1.5px solid #e2e8f0',
-                borderRadius: '18px',
+                background: '#f5f5f7',
+                borderRadius: '20px',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 gap: '16px',
-                boxShadow: '0 4px 15px rgba(0,0,0,0.02)'
+                border: '1px solid rgba(0,0,0,0.02)'
               }}>
-                <strong style={{ fontSize: '0.85rem', color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <strong style={{ fontSize: '0.8rem', color: '#8e8e93', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Master-Admin QR-Code
                 </strong>
-                <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${adminUser.qr_token}`}
-                  alt="Master Admin QR Badge"
-                  style={{ width: '160px', height: '160px', borderRadius: '12px', border: '1px solid #f1f5f9' }}
-                />
-                <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b', textAlign: 'center', lineHeight: '1.4', fontWeight: 600 }}>
+                <div style={{
+                  background: '#ffffff',
+                  padding: '12px',
+                  borderRadius: '16px',
+                  boxShadow: '0 4px 15px rgba(0,0,0,0.02)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <img 
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${adminUser.qr_token}`}
+                    alt="Master Admin QR Badge"
+                    style={{ width: '150px', height: '150px', display: 'block' }}
+                  />
+                </div>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: '#8e8e93', textAlign: 'center', lineHeight: '1.4', fontWeight: 600 }}>
                   Scanne diesen Code am Kiosk-Eingang für den sofortigen Zugang.
                 </p>
-                <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                <div style={{ fontSize: '0.72rem', color: '#c7c7cc', fontFamily: 'monospace', wordBreak: 'break-all' }}>
                   {adminUser.qr_token}
                 </div>
               </div>
@@ -973,30 +1006,31 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
 
       </div>
       
-      {/* School Edit Modal */}
+      {/* School Edit Modal (iOS Slide-in Sheet style) */}
       {selectedSchool && (
         <>
           <div 
             style={{
               position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-              background: 'rgba(15, 23, 42, 0.3)',
-              backdropFilter: 'blur(4px)',
-              WebkitBackdropFilter: 'blur(4px)',
+              background: 'rgba(0, 0, 0, 0.12)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
               zIndex: 9998,
-              transition: 'opacity 0.3s ease'
+              transition: 'all 0.3s ease'
             }}
             onClick={() => setSelectedSchool(null)}
           />
           <div 
             style={{
               position: 'fixed', top: 0, right: 0, bottom: 0,
-              width: '100%', maxWidth: '50vw', minWidth: '550px',
-              background: '#ffffff',
+              width: '100%', maxWidth: '45vw', minWidth: '550px',
+              background: '#f5f5f7', // iOS background
               zIndex: 9999,
-              boxShadow: '-10px 0 40px rgba(0,0,0,0.15)',
+              boxShadow: '-10px 0 40px rgba(0,0,0,0.06)',
               display: 'flex', flexDirection: 'column',
-              animation: 'slideIn 0.3s ease-out forwards',
-              overflow: 'hidden' // So the header bg doesn't spill
+              animation: 'slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+              borderRadius: '24px 0 0 24px',
+              overflow: 'hidden'
             }}
           >
             <style dangerouslySetInnerHTML={{__html: `
@@ -1010,56 +1044,65 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
             <div style={{
               position: 'relative',
               background: editColor || '#3b82f6',
-              padding: '40px 32px 60px',
+              padding: '48px 36px 64px',
               color: '#ffffff'
             }}>
               <button 
                 onClick={() => setSelectedSchool(null)}
                 style={{ 
-                  position: 'absolute', top: '16px', right: '16px', 
+                  position: 'absolute', top: '20px', right: '20px', 
                   background: 'rgba(255,255,255,0.2)', 
                   border: 'none', cursor: 'pointer', 
                   color: '#ffffff', width: '36px', height: '36px', 
                   borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'background 0.2s'
+                  transition: 'background 0.2s',
+                  fontSize: '1.25rem',
+                  fontWeight: 600
                 }}
                 onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
                 onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
               >
-                <span style={{ fontSize: '1.5rem', fontWeight: 600, lineHeight: 1 }}>×</span>
+                ×
               </button>
               
-              <h2 style={{ margin: '0 0 8px 0', fontSize: '2rem', fontWeight: 900, letterSpacing: '-0.02em', textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+              <h2 style={{ margin: '0 0 8px 0', fontSize: '2rem', fontWeight: 900, letterSpacing: '-0.03em', textShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
                 {selectedSchool.name}
               </h2>
-              <p style={{ margin: 0, fontSize: '0.9rem', opacity: 0.9, fontWeight: 500 }}>
+              <p style={{ margin: 0, fontSize: '0.9rem', opacity: 0.95, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 {editStatus === 'active' ? '🟢 Aktiv' : '🔴 Gesperrt (Bypass)'} {editIsTrial ? ' • ⏳ Probezeit' : ''}
               </p>
             </div>
 
             {/* Logo Avatar overlapping */}
-            <div style={{ padding: '0 32px', marginTop: '-40px', position: 'relative', zIndex: 10, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+            <div style={{ padding: '0 36px', marginTop: '-40px', position: 'relative', zIndex: 10 }}>
               <div style={{
                 width: '80px', height: '80px', 
-                background: '#ffffff', borderRadius: '20px', 
-                boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
+                background: '#ffffff', borderRadius: '22px', 
+                boxShadow: '0 8px 24px rgba(0,0,0,0.04)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                padding: '8px', border: '2px solid #f8fafc'
+                padding: '8px', border: '3px solid #f5f5f7',
+                overflow: 'hidden'
               }}>
                 {editLogo ? (
-                  <img src={editLogo} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                  <img src={editLogo} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                 ) : (
-                  <span style={{ fontSize: '2rem' }}>🏫</span>
+                  <span style={{ fontSize: '2.25rem' }}>🏫</span>
                 )}
               </div>
             </div>
 
-            {/* Scrollable Content */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
+            {/* Scrollable Content (Grouped Settings) */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '24px 36px 36px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
               
-              {/* Stats Row */}
+              {/* Stats Grid Container (Grouped) */}
               <div style={{
-                display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '32px'
+                background: '#ffffff',
+                borderRadius: '20px',
+                padding: '16px',
+                border: '1px solid rgba(0, 0, 0, 0.04)',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4, 1fr)',
+                gap: '8px'
               }}>
                 {[
                   { label: 'Lehrer', value: schoolStats[selectedSchool.id]?.teachers || 0 },
@@ -1067,144 +1110,188 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                   { label: 'Bands', value: schoolStats[selectedSchool.id]?.bands || 0 },
                   { label: 'Songs', value: schoolStats[selectedSchool.id]?.songs || 0 }
                 ].map((s, i) => (
-                  <div key={i} style={{
-                    background: '#f8fafc', padding: '16px 12px', borderRadius: '16px', border: '1px solid #e2e8f0', textAlign: 'center'
-                  }}>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.label}</div>
-                    <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#1e293b', marginTop: '4px' }}>{s.value}</div>
+                  <div key={i} style={{ textAlign: 'center', padding: '10px 4px' }}>
+                    <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.label}</div>
+                    <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#1d1d1f', marginTop: '4px', letterSpacing: '-0.02em' }}>{s.value}</div>
                   </div>
                 ))}
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                
-                {/* General Settings */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <h3 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Settings size={20} color={editColor || '#3b82f6'} /> Identität & Marke
-                  </h3>
+              {/* Group 1: General Info */}
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '20px',
+                padding: '24px',
+                border: '1px solid rgba(0, 0, 0, 0.04)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px'
+              }}>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', fontWeight: 800, color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.01em' }}>
+                  <Settings size={18} color={editColor || '#3b82f6'} /> Identität & Marke
+                </h3>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', color: '#8e8e93', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Name der Schule</label>
+                  <input 
+                    type="text" 
+                    value={editName} 
+                    onChange={(e) => setEditName(e.target.value)} 
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.12)', fontSize: '0.95rem', fontWeight: 600, color: '#1d1d1f', outline: 'none' }} 
+                  />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Name der Schule</label>
-                    <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1.5px solid #cbd5e1', boxSizing: 'border-box', fontSize: '1rem', fontWeight: 500, outline: 'none' }} />
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Hauptfarbe</label>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <input type="color" value={editColor} onChange={(e) => setEditColor(e.target.value)} style={{ width: '46px', height: '46px', padding: 0, border: 'none', borderRadius: '10px', cursor: 'pointer' }} />
-                        <input type="text" value={editColor} onChange={(e) => setEditColor(e.target.value)} style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }} />
-                      </div>
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Logo URL</label>
-                      <input type="text" value={editLogo} onChange={(e) => setEditLogo(e.target.value)} placeholder="https://..." style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1.5px solid #cbd5e1', boxSizing: 'border-box', fontSize: '0.9rem', outline: 'none' }} />
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#8e8e93', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Hauptfarbe</label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input type="color" value={editColor} onChange={(e) => setEditColor(e.target.value)} style={{ width: '42px', height: '42px', padding: 0, border: 'none', borderRadius: '10px', cursor: 'pointer' }} />
+                      <input type="text" value={editColor} onChange={(e) => setEditColor(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.12)', fontSize: '0.85rem', fontFamily: 'monospace', outline: 'none' }} />
                     </div>
                   </div>
-                </div>
-
-                <hr style={{ border: 'none', borderTop: '1px solid #e2e8f0', margin: '8px 0' }} />
-
-                {/* Status & Contract */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Shield size={20} color={editColor || '#3b82f6'} /> Zugang & Verträge
-                    </h3>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem', color: '#1e293b', background: '#f1f5f9', padding: '6px 12px', borderRadius: '20px' }}>
-                      <input type="checkbox" checked={editIsTrial} onChange={(e) => setEditIsTrial(e.target.checked)} style={{ width: '16px', height: '16px', accentColor: editColor || '#3b82f6' }} />
-                      Probezeit aktiv
-                    </label>
-                  </div>
-                  
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '8px' }}>Schul-Zugang (Login)</label>
-                    <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '6px', borderRadius: '14px' }}>
-                      <button 
-                        type="button"
-                        onClick={() => setEditStatus('active')}
-                        style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', background: editStatus === 'active' ? '#fff' : 'transparent', color: editStatus === 'active' ? '#16a34a' : '#64748b', boxShadow: editStatus === 'active' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none' }}
-                      >
-                        ✅ Aktiviert
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => setEditStatus('suspended')}
-                        style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', background: editStatus === 'suspended' ? '#fff' : 'transparent', color: editStatus === 'suspended' ? '#dc2626' : '#64748b', boxShadow: editStatus === 'suspended' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none' }}
-                      >
-                        🚫 Gesperrt
-                      </button>
-                    </div>
-                  </div>
-
-                  {editIsTrial ? (
-                    <div style={{ background: '#fffbeb', padding: '16px', borderRadius: '12px', border: '1px solid #fde68a' }}>
-                      <label style={{ display: 'block', fontSize: '0.85rem', color: '#b45309', fontWeight: 800, marginBottom: '6px' }}>⏳ Probezeit Enddatum</label>
-                      <input type="text" placeholder="TT.MM.JJJJ oder YYYY-MM-DD" value={editTrialEndsAt} onChange={(e) => setEditTrialEndsAt(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1.5px solid #fcd34d', boxSizing: 'border-box', outline: 'none', background: '#fff' }} />
-                      <p style={{ margin: '8px 0 0 0', fontSize: '0.8rem', color: '#92400e' }}>Nach diesem Datum werden Logins komplett verweigert.</p>
-                    </div>
-                  ) : (
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Vertragslaufzeit bis (Optional)</label>
-                      <input type="text" placeholder="TT.MM.JJJJ oder YYYY-MM-DD" value={editContractEndsAt} onChange={(e) => setEditContractEndsAt(e.target.value)} style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1.5px solid #cbd5e1', boxSizing: 'border-box', outline: 'none' }} />
-                    </div>
-                  )}
-                </div>
-
-                <hr style={{ border: 'none', borderTop: '1px solid #e2e8f0', margin: '8px 0' }} />
-
-                {/* Limits */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <h3 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Sliders size={20} color={editColor || '#3b82f6'} /> Kontingente (Limits)
-                  </h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Max Lehrer</label>
-                      <input type="number" min="0" value={editMaxTeachers} onChange={(e) => setEditMaxTeachers(parseInt(e.target.value) || 0)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1', boxSizing: 'border-box', outline: 'none' }} />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Max Schüler</label>
-                      <input type="number" min="0" value={editMaxStudents} onChange={(e) => setEditMaxStudents(parseInt(e.target.value) || 0)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1', boxSizing: 'border-box', outline: 'none' }} />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', color: '#475569', fontWeight: 700, marginBottom: '6px' }}>Max Songs</label>
-                      <input type="number" min="0" value={editMaxSongs} onChange={(e) => setEditMaxSongs(parseInt(e.target.value) || 0)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1', boxSizing: 'border-box', outline: 'none' }} />
-                    </div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#8e8e93', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Logo URL</label>
+                    <input type="text" value={editLogo} onChange={(e) => setEditLogo(e.target.value)} placeholder="https://..." style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.12)', fontSize: '0.9rem', outline: 'none' }} />
                   </div>
                 </div>
-
               </div>
+
+              {/* Group 2: Status & Contracts */}
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '20px',
+                padding: '24px',
+                border: '1px solid rgba(0, 0, 0, 0.04)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.01em' }}>
+                    <Shield size={18} color={editColor || '#3b82f6'} /> Zugang & Verträge
+                  </h3>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 800, fontSize: '0.85rem', color: '#48484a', background: '#f2f2f7', padding: '6px 12px', borderRadius: '100px' }}>
+                    <input type="checkbox" checked={editIsTrial} onChange={(e) => setEditIsTrial(e.target.checked)} style={{ width: '15px', height: '15px', accentColor: editColor || '#3b82f6' }} />
+                    Probezeit aktiv
+                  </label>
+                </div>
+                
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schul-Zugang (Login)</label>
+                  {/* Segmented Control */}
+                  <div style={{ display: 'flex', background: '#f2f2f7', padding: '4px', borderRadius: '10px' }}>
+                    <button 
+                      type="button"
+                      onClick={() => setEditStatus('active')}
+                      style={{ 
+                        flex: 1, 
+                        padding: '8px 12px', 
+                        borderRadius: '8px', 
+                        border: 'none', 
+                        fontSize: '0.85rem', 
+                        fontWeight: 800, 
+                        cursor: 'pointer', 
+                        transition: 'all 0.15s ease', 
+                        background: editStatus === 'active' ? '#ffffff' : 'transparent', 
+                        color: editStatus === 'active' ? '#34c759' : '#8e8e93', 
+                        boxShadow: editStatus === 'active' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none' 
+                      }}
+                    >
+                      Aktiviert
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setEditStatus('suspended')}
+                      style={{ 
+                        flex: 1, 
+                        padding: '8px 12px', 
+                        borderRadius: '8px', 
+                        border: 'none', 
+                        fontSize: '0.85rem', 
+                        fontWeight: 800, 
+                        cursor: 'pointer', 
+                        transition: 'all 0.15s ease', 
+                        background: editStatus === 'suspended' ? '#ffffff' : 'transparent', 
+                        color: editStatus === 'suspended' ? '#ff3b30' : '#8e8e93', 
+                        boxShadow: editStatus === 'suspended' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none' 
+                      }}
+                    >
+                      Gesperrt
+                    </button>
+                  </div>
+                </div>
+
+                {editIsTrial ? (
+                  <div style={{ background: '#fffbeb', padding: '16px', borderRadius: '12px', border: '1px solid rgba(234, 179, 8, 0.2)' }}>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#b45309', fontWeight: 800, marginBottom: '6px' }}>⏳ Probezeit Enddatum</label>
+                    <input type="text" placeholder="TT.MM.JJJJ oder YYYY-MM-DD" value={editTrialEndsAt} onChange={(e) => setEditTrialEndsAt(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #fcd34d', outline: 'none', background: '#fff', fontSize: '0.9rem', fontWeight: 600 }} />
+                    <p style={{ margin: '6px 0 0 0', fontSize: '0.75rem', color: '#b45309', fontWeight: 600 }}>Logins werden nach diesem Tag automatisch verweigert.</p>
+                  </div>
+                ) : (
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#8e8e93', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Vertragslaufzeit bis (Optional)</label>
+                    <input type="text" placeholder="TT.MM.JJJJ oder YYYY-MM-DD" value={editContractEndsAt} onChange={(e) => setEditContractEndsAt(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.12)', fontSize: '0.9rem', outline: 'none' }} />
+                  </div>
+                )}
+              </div>
+
+              {/* Group 3: Limits */}
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '20px',
+                padding: '24px',
+                border: '1px solid rgba(0, 0, 0, 0.04)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px'
+              }}>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', fontWeight: 800, color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.01em' }}>
+                  <Sliders size={18} color={editColor || '#3b82f6'} /> Kontingente (Limits)
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Max Lehrer</label>
+                    <input type="number" min="0" value={editMaxTeachers} onChange={(e) => setEditMaxTeachers(parseInt(e.target.value) || 0)} style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.12)', fontSize: '0.9rem', fontWeight: 600, outline: 'none' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Max Schüler</label>
+                    <input type="number" min="0" value={editMaxStudents} onChange={(e) => setEditMaxStudents(parseInt(e.target.value) || 0)} style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.12)', fontSize: '0.9rem', fontWeight: 600, outline: 'none' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Max Songs</label>
+                    <input type="number" min="0" value={editMaxSongs} onChange={(e) => setEditMaxSongs(parseInt(e.target.value) || 0)} style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.12)', fontSize: '0.9rem', fontWeight: 600, outline: 'none' }} />
+                  </div>
+                </div>
+              </div>
+
             </div>
 
             {/* Actions (Sticky Footer) */}
-            <div style={{ padding: '24px 32px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+            <div style={{ padding: '20px 36px', borderTop: '1px solid rgba(0,0,0,0.06)', background: '#ffffff', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
               <button
                 onClick={() => setSelectedSchool(null)}
                 style={{
-                  padding: '14px 24px', borderRadius: '12px', background: '#e2e8f0', color: '#475569', border: 'none', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer', transition: 'background 0.2s'
+                  padding: '12px 24px', borderRadius: '12px', background: '#e5e5ea', color: '#48484a', border: 'none', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer', transition: 'background 0.2s'
                 }}
-                onMouseOver={(e) => e.currentTarget.style.background = '#cbd5e1'}
-                onMouseOut={(e) => e.currentTarget.style.background = '#e2e8f0'}
+                onMouseOver={(e) => e.currentTarget.style.background = '#d1d1d6'}
+                onMouseOut={(e) => e.currentTarget.style.background = '#e5e5ea'}
               >
                 Abbrechen
               </button>
               <button
                 onClick={handleSaveSchoolDetails}
                 style={{
-                  padding: '14px 32px', borderRadius: '12px', background: editColor || '#3b82f6', color: '#ffffff', border: 'none', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer', boxShadow: `0 8px 16px ${editColor ? editColor+'40' : 'rgba(59, 130, 246, 0.3)'}`, transition: 'transform 0.1s'
+                  padding: '12px 32px', borderRadius: '12px', background: editColor || '#0071e3', color: '#ffffff', border: 'none', fontWeight: 900, fontSize: '0.95rem', cursor: 'pointer', boxShadow: `0 8px 20px ${editColor ? editColor+'30' : 'rgba(0,113,227,0.25)'}`, transition: 'transform 0.1s'
                 }}
                 onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.97)'}
                 onMouseUp={(e) => e.currentTarget.style.transform = 'none'}
                 onMouseLeave={(e) => e.currentTarget.style.transform = 'none'}
               >
-                Änderungen Speichern
+                Sichern
               </button>
             </div>
           </div>
         </>
       )}
 
-      
       {/* Global CSS injection for loading spinner */}
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes spin {

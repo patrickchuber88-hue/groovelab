@@ -36,6 +36,9 @@ body {
 .hover-scale:hover:not(:disabled) {
   transform: scale(1.05);
 }
+.hover-scale:active:not(:disabled) {
+  transform: scale(0.97);
+}
 
 /* Cinematic Artist Gateway */
 .founding-modal-overlay {
@@ -317,6 +320,9 @@ body {
 }
 .hover-scale-mini:hover {
   transform: scale(1.05) !important;
+}
+.hover-scale-mini:active {
+  transform: scale(0.97) !important;
 }
 
 /* Premium Cloud Link Buttons in Üben Board */
