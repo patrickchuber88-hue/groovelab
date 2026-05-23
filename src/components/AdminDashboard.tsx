@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, ChevronLeft, ChevronRight, GripVertical } from 'lucide-react';
 import { 
   ResponsiveContainer,
   BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell,
@@ -210,6 +210,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [newRoomStationCount, setNewRoomStationCount] = useState(5);
   const [draggedRoomId, setDraggedRoomId] = useState<string | null>(null);
   const [dragOverRoomId, setDragOverRoomId] = useState<string | null>(null);
+  const draggedRoomIdRef = React.useRef<string | null>(null);
   
   const [showAddStationForRoom, setShowAddStationForRoom] = useState<string | null>(null);
   const [newStationName, setNewStationName] = useState('');
@@ -1316,6 +1317,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
   const handleRoomDragStart = (e: React.DragEvent, roomId: string) => {
     setDraggedRoomId(roomId);
+    draggedRoomIdRef.current = roomId;
     e.dataTransfer.setData('text/plain', roomId);
     e.dataTransfer.effectAllowed = 'move';
   };
@@ -1326,7 +1328,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
   const handleRoomDragEnter = (e: React.DragEvent, roomId: string) => {
     e.preventDefault();
-    if (draggedRoomId && draggedRoomId !== roomId) {
+    const activeDraggedId = draggedRoomIdRef.current || draggedRoomId;
+    if (activeDraggedId && activeDraggedId !== roomId) {
       setDragOverRoomId(roomId);
     }
   };
@@ -1337,9 +1340,10 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
   const handleRoomDrop = async (e: React.DragEvent, targetRoomId: string) => {
     e.preventDefault();
-    const sourceId = e.dataTransfer.getData('text/plain') || draggedRoomId;
+    const sourceId = e.dataTransfer.getData('text/plain') || draggedRoomIdRef.current || draggedRoomId;
     if (!sourceId || sourceId === targetRoomId) {
       setDraggedRoomId(null);
+      draggedRoomIdRef.current = null;
       setDragOverRoomId(null);
       return;
     }
@@ -1349,6 +1353,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     const targetIndex = rooms.findIndex(r => r.id === targetRoomId);
     if (sourceIndex === -1 || targetIndex === -1) {
       setDraggedRoomId(null);
+      draggedRoomIdRef.current = null;
       setDragOverRoomId(null);
       return;
     }
@@ -1365,6 +1370,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
     setRooms(updatedRooms);
     setDraggedRoomId(null);
+    draggedRoomIdRef.current = null;
     setDragOverRoomId(null);
 
     // Persist reordered sort_order values to the database
@@ -1393,6 +1399,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
   const handleRoomDragEnd = () => {
     setDraggedRoomId(null);
+    draggedRoomIdRef.current = null;
     setDragOverRoomId(null);
   };
 
@@ -3238,20 +3245,17 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               <div 
                 key={room.id} 
                 className="glass-panel" 
-                draggable="true"
-                onDragStart={(e) => handleRoomDragStart(e, room.id)}
                 onDragOver={handleRoomDragOver}
                 onDragEnter={(e) => handleRoomDragEnter(e, room.id)}
                 onDragLeave={handleRoomDragLeave}
                 onDrop={(e) => handleRoomDrop(e, room.id)}
-                onDragEnd={handleRoomDragEnd}
                 style={{ 
                   padding: '24px', 
                   background: isDragOver ? 'rgba(99, 102, 241, 0.03)' : 'white', 
                   borderRadius: '24px', 
                   border: isDragOver ? `2px dashed ${brandColor}` : (isSelected ? '2px dashed #94a3b8' : '1px solid #f1f5f9'),
                   opacity: isSelected ? 0.5 : 1,
-                  cursor: draggedRoomId ? 'grabbing' : 'grab',
+                  cursor: 'default',
                   transition: 'all 0.2s ease',
                   boxShadow: isDragOver ? `0 12px 24px -10px ${brandColor}30` : 'none',
                   position: 'relative'
@@ -3259,6 +3263,30 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {/* Drag Handle */}
+                    <div 
+                      draggable="true"
+                      onDragStart={(e) => handleRoomDragStart(e, room.id)}
+                      onDragEnd={handleRoomDragEnd}
+                      style={{ 
+                        cursor: 'grab', 
+                        padding: '6px', 
+                        borderRadius: '10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#94a3b8',
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        transition: 'all 0.15s ease',
+                        marginRight: '4px'
+                      }}
+                      className="hover-scale-mini"
+                      title="Raum verschieben"
+                    >
+                      <GripVertical size={16} />
+                    </div>
+
                     <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: idx === 0 ? '#f59e0b15' : `${brandColor}10`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       {idx === 0 ? <Box size={20} color="#f59e0b" /> : <Box size={20} color={brandColor} />}
                     </div>
