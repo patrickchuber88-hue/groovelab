@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { 
   Shield, Plus, Copy, Check, Trash2, Users, Monitor, 
   MapPin, LogOut, RefreshCw, Layers, Award, Clock, Music,
-  Edit2, Settings, Sliders
+  Edit2, Settings, Sliders, Search
 } from 'lucide-react';
 
 interface School {
@@ -21,6 +21,8 @@ interface School {
   max_students?: number;
   max_songs?: number;
   limits_enabled?: boolean;
+  zip_code?: string | null;
+  city?: string | null;
 }
 
 interface MasterAdminDashboardProps {
@@ -37,6 +39,9 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
   const [newSchoolName, setNewSchoolName] = useState('');
   const [newSchoolColor, setNewSchoolColor] = useState('#3b82f6');
   const [newSchoolLogo, setNewSchoolLogo] = useState('');
+  const [newSchoolZip, setNewSchoolZip] = useState('');
+  const [newSchoolCity, setNewSchoolCity] = useState('');
+  const [schoolSearchQuery, setSchoolSearchQuery] = useState('');
   
   // Editing State
   const [editingSchoolId, setEditingSchoolId] = useState<string | null>(null);
@@ -75,6 +80,8 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
   const [editMaxSongs, setEditMaxSongs] = useState(5);
   const [editLimitsEnabled, setEditLimitsEnabled] = useState(false);
   const [editTrialOption, setEditTrialOption] = useState<'14' | '30' | 'custom'>('custom');
+  const [editZipCode, setEditZipCode] = useState('');
+  const [editCity, setEditCity] = useState('');
 
   useEffect(() => {
     fetchSchoolsAndStats();
@@ -140,7 +147,9 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
         max_teachers: editMaxTeachers,
         max_students: editMaxStudents,
         max_songs: editMaxSongs,
-        limits_enabled: editLimitsEnabled
+        limits_enabled: editLimitsEnabled,
+        zip_code: editZipCode.trim() || null,
+        city: editCity.trim() || null
       };
 
       const { error } = await supabase
@@ -242,9 +251,11 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
       const { data, error } = await supabase
         .from('schools')
         .insert({
-          name: newSchoolName,
+          name: newSchoolName.trim(),
           primary_color: newSchoolColor,
-          logo_url: newSchoolLogo || null
+          logo_url: newSchoolLogo || null,
+          zip_code: newSchoolZip.trim() || null,
+          city: newSchoolCity.trim() || null
         })
         .select()
         .single();
@@ -255,6 +266,8 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
       setNewSchoolName('');
       setNewSchoolColor('#3b82f6');
       setNewSchoolLogo('');
+      setNewSchoolZip('');
+      setNewSchoolCity('');
       fetchSchoolsAndStats();
     } catch (err: any) {
       console.error('Fehler beim Erstellen der Schule:', err.message);
@@ -307,6 +320,15 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
     setCopiedId(schoolId);
     setTimeout(() => setCopiedId(null), 2000);
   };
+
+  const filteredSchools = schools.filter(school => {
+    const q = schoolSearchQuery.trim().toLowerCase();
+    if (!q) return true;
+    const nameMatch = school.name?.toLowerCase().includes(q);
+    const cityMatch = school.city?.toLowerCase().includes(q);
+    const zipMatch = school.zip_code?.toLowerCase().includes(q);
+    return nameMatch || cityMatch || zipMatch;
+  });
 
   return (
     <div style={{
@@ -484,6 +506,39 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
             <Layers size={22} color="#eab308" /> Schulen & Tenants
           </h2>
 
+          {/* School Search Input */}
+          <div style={{ position: 'relative', marginBottom: '20px' }}>
+            <Search size={18} color="#8e8e93" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              type="text"
+              placeholder="Schulen nach Name, PLZ oder Ort durchsuchen..."
+              value={schoolSearchQuery}
+              onChange={(e) => setSchoolSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                padding: '12px 16px 12px 48px',
+                borderRadius: '14px',
+                border: '1.5px solid #e2e8f0',
+                background: '#f8fafc',
+                fontSize: '0.9rem',
+                fontWeight: 600,
+                outline: 'none',
+                transition: 'all 0.2s ease',
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.background = '#ffffff';
+                e.currentTarget.style.borderColor = '#eab308';
+                e.currentTarget.style.boxShadow = '0 0 0 4px rgba(234, 179, 8, 0.12)';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.background = '#f8fafc';
+                e.currentTarget.style.borderColor = '#e2e8f0';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            />
+          </div>
+
           {loading ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, padding: '80px 0', gap: '16px' }}>
               <div className="loader" style={{
@@ -500,11 +555,16 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
             <div style={{ textAlign: 'center', padding: '80px 20px', color: '#8e8e93', fontWeight: 600, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               Keine Schulen im System registriert. Lege rechts deine erste Schule an!
             </div>
+          ) : filteredSchools.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '80px 20px', color: '#8e8e93', fontWeight: 600, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            Keine Schulen gefunden, die deiner Suche entsprechen.
+            </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {schools.map((school) => {
+              {filteredSchools.map((school) => {
                 const teachers = schoolStats[school.id]?.teachers || 0;
                 const students = schoolStats[school.id]?.students || 0;
+                const songs = schoolStats[school.id]?.songs || 0;
                 const bands = schoolStats[school.id]?.bands || 0;
 
                 return (
@@ -524,6 +584,8 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                       setEditMaxSongs(school.max_songs ?? 5);
                       setEditLimitsEnabled(school.limits_enabled ?? false);
                       setEditTrialOption('custom');
+                      setEditZipCode(school.zip_code || '');
+                      setEditCity(school.city || '');
                     }}
                     style={{ 
                       borderRadius: '18px',
@@ -575,6 +637,12 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                         <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#1d1d1f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {school.name}
                         </div>
+                        {(school.zip_code || school.city) && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', color: '#64748b', marginTop: '2px', fontWeight: 600 }}>
+                            <MapPin size={12} color="#94a3b8" />
+                            <span>{school.zip_code || ''} {school.city || ''}</span>
+                          </div>
+                        )}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
                           <span style={{ fontSize: '0.75rem', color: '#8e8e93', fontFamily: 'monospace' }}>
                             {school.id.substring(0, 8)}...
@@ -584,6 +652,30 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                             {teachers} L • {students} S • {bands} B{school.limits_enabled && ' • ⚖️ Limits'}
                           </span>
                         </div>
+                        {school.limits_enabled && (
+                          <div style={{ display: 'flex', gap: '16px', marginTop: '10px', flexWrap: 'wrap' }}>
+                            {[
+                              { label: 'Lehrer', cur: teachers, max: school.max_teachers ?? 2, color: '#3b82f6' },
+                              { label: 'Schüler', cur: students, max: school.max_students ?? 6, color: '#22c55e' },
+                              { label: 'Songs', cur: songs, max: school.max_songs ?? 5, color: '#eab308' }
+                            ].map((item, i) => {
+                              const pct = Math.min(100, (item.cur / item.max) * 100);
+                              const isClose = pct >= 90;
+                              const barColor = isClose ? '#ef4444' : item.color;
+                              return (
+                                <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: '90px' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', fontWeight: 800, color: isClose ? '#ef4444' : '#8e8e93' }}>
+                                    <span>{item.label}</span>
+                                    <span>{item.cur}/{item.max}</span>
+                                  </div>
+                                  <div style={{ width: '100%', height: '5px', borderRadius: '3px', background: '#f1f5f9', overflow: 'hidden' }}>
+                                    <div style={{ width: `${pct}%`, height: '100%', background: barColor, borderRadius: '3px', transition: 'width 0.3s ease' }}></div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -731,6 +823,77 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                     e.currentTarget.style.boxShadow = 'none';
                   }}
                 />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    PLZ
+                  </label>
+                  <input
+                    type="text"
+                    value={newSchoolZip}
+                    onChange={(e) => setNewSchoolZip(e.target.value)}
+                    placeholder="z.B. 80331"
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      padding: '14px 16px',
+                      borderRadius: '12px',
+                      background: '#f5f5f7',
+                      border: '1px solid transparent',
+                      color: '#1d1d1f',
+                      fontSize: '0.95rem',
+                      fontWeight: 600,
+                      outline: 'none',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.background = '#ffffff';
+                      e.currentTarget.style.borderColor = '#eab308';
+                      e.currentTarget.style.boxShadow = '0 0 0 4px rgba(234, 179, 8, 0.12)';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.background = '#f5f5f7';
+                      e.currentTarget.style.borderColor = 'transparent';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Ort
+                  </label>
+                  <input
+                    type="text"
+                    value={newSchoolCity}
+                    onChange={(e) => setNewSchoolCity(e.target.value)}
+                    placeholder="z.B. München"
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      padding: '14px 16px',
+                      borderRadius: '12px',
+                      background: '#f5f5f7',
+                      border: '1px solid transparent',
+                      color: '#1d1d1f',
+                      fontSize: '0.95rem',
+                      fontWeight: 600,
+                      outline: 'none',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.background = '#ffffff';
+                      e.currentTarget.style.borderColor = '#eab308';
+                      e.currentTarget.style.boxShadow = '0 0 0 4px rgba(234, 179, 8, 0.12)';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.background = '#f5f5f7';
+                      e.currentTarget.style.borderColor = 'transparent';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  />
+                </div>
               </div>
 
               <div>
@@ -1160,6 +1323,28 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                     style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.12)', fontSize: '0.95rem', fontWeight: 600, color: '#1d1d1f', outline: 'none' }} 
                   />
                 </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#8e8e93', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>PLZ</label>
+                    <input 
+                      type="text" 
+                      value={editZipCode} 
+                      onChange={(e) => setEditZipCode(e.target.value)} 
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.12)', fontSize: '0.95rem', fontWeight: 600, color: '#1d1d1f', outline: 'none' }} 
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#8e8e93', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ort</label>
+                    <input 
+                      type="text" 
+                      value={editCity} 
+                      onChange={(e) => setEditCity(e.target.value)} 
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.12)', fontSize: '0.95rem', fontWeight: 600, color: '#1d1d1f', outline: 'none' }} 
+                    />
+                  </div>
+                </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.78rem', color: '#8e8e93', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Hauptfarbe</label>
