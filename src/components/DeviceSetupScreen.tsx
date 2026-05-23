@@ -364,13 +364,18 @@ export function DeviceSetupScreen() {
               const safeViewportWidth = Math.max(15, viewportWidth);
               const safeViewportHeight = Math.max(15, viewportHeight);
 
-              const croppedAspectRatio = activeRoom
-                ? (activeRoom.room_width * safeViewportWidth) / (activeRoom.room_height * safeViewportHeight)
-                : 1.5;
+              const croppedAspectRatio = 1.5;
 
               // Calculate resolved collision-free coordinates inside the 600px canvas space
               const canvasWidth = 600;
-              const canvasHeight = 600 / croppedAspectRatio;
+              const canvasHeight = 400;
+
+              // Uniform scaling to preserve room layout's aspect ratio and center it in the 600x400 card
+              const scaleX = canvasWidth / safeViewportWidth;
+              const scaleY = canvasHeight / safeViewportHeight;
+              const scale = Math.min(scaleX, scaleY);
+              const offsetX = (canvasWidth - safeViewportWidth * scale) / 2;
+              const offsetY = (canvasHeight - safeViewportHeight * scale) / 2;
 
               // Prepare raw elements
               const rawItems = currentRoomStations.map(s => {
@@ -379,11 +384,8 @@ export function DeviceSetupScreen() {
                 const posLeftOriginal = s.pos_x !== null ? s.pos_x : 50;
                 const posTopOriginal = s.pos_y !== null ? s.pos_y : 50;
 
-                const posLeftPct = safeViewportWidth > 0 ? ((posLeftOriginal - viewportMinX) / safeViewportWidth) * 100 : 50;
-                const posTopPct = safeViewportHeight > 0 ? ((posTopOriginal - viewportMinY) / safeViewportHeight) * 100 : 50;
-
-                const x = (posLeftPct / 100) * canvasWidth;
-                const y = (posTopPct / 100) * canvasHeight;
+                const x = offsetX + (posLeftOriginal - viewportMinX) * scale;
+                const y = offsetY + (posTopOriginal - viewportMinY) * scale;
 
                 const w = 100;
                 const h = 110;
