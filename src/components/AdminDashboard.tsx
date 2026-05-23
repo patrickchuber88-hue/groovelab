@@ -4355,6 +4355,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       activeSessions={activeSessions}
       students={students}
       school={admin?.schools}
+      admin={admin}
       kiosks={kiosks || []}
       onUpdate={() => fetchData()}
       onCleanupPlanning={handleCleanupPlanning}
@@ -5332,7 +5333,6 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   };
 
 
-
   const handleSaveRoomSize = async () => {
     if (!customizingRoom) return;
     const { error } = await supabase
@@ -6291,6 +6291,7 @@ function DeviceSetupScreen({
   activeSessions, 
   students, 
   school,
+  admin,
   kiosks,
   onUpdate,
   onCleanupPlanning,
@@ -6302,6 +6303,7 @@ function DeviceSetupScreen({
   activeSessions: any[], 
   students: any[], 
   school: any,
+  admin: any,
   kiosks: any[],
   onUpdate: () => void,
   onCleanupPlanning: () => void,
@@ -6310,6 +6312,27 @@ function DeviceSetupScreen({
   const [activeSubTab, setActiveSubTab] = useState<'academy' | 'device' | 'maintenance'>('academy');
   const [selectedRoomId, setSelectedRoomId] = useState(() => rooms[0]?.id || '');
   const [bookingStationId, setBookingStationId] = useState<string | null>(null);
+
+  // DPA states
+  const [dpaAgreement, setDpaAgreement] = useState<any>(null);
+  const [showDpaModal, setShowDpaModal] = useState(false);
+  const [dpaAccepted, setDpaAccepted] = useState(false);
+  const [isSigningDpa, setIsSigningDpa] = useState(false);
+
+  const fetchDpa = async () => {
+    const sId = school?.id || admin?.school_id;
+    if (!sId) return;
+    const { data } = await supabase
+      .from('dpa_agreements')
+      .select('*, users(*)')
+      .eq('school_id', sId)
+      .maybeSingle();
+    setDpaAgreement(data || null);
+  };
+
+  useEffect(() => {
+    fetchDpa();
+  }, [school?.id, admin?.school_id]);
 
   // Academy Setup state
   const [name, setName] = useState(school?.name || '');
@@ -6377,6 +6400,41 @@ function DeviceSetupScreen({
     setIsSaving(false);
     if (error) alert('Fehler: ' + error.message);
     else onUpdate();
+  };
+
+  const handleSignDpa = async () => {
+    if (!admin?.school_id) return;
+    setIsSigningDpa(true);
+    try {
+      let ip = 'unknown';
+      try {
+        const res = await fetch('https://api.ipify.org?format=json');
+        const data = await res.json();
+        ip = data.ip || 'unknown';
+      } catch (e) {
+        console.warn("Failed to fetch IP address, using fallback", e);
+      }
+
+      const { error: dpaErr } = await supabase
+        .from('dpa_agreements')
+        .insert({
+          school_id: admin.school_id,
+          user_id: admin.id,
+          dpa_version: 'v1.0-DSGVO',
+          ip_address: ip
+        });
+
+      if (dpaErr) throw dpaErr;
+
+      await fetchDpa();
+      setShowDpaModal(false);
+      alert("AV-Vertrag wurde erfolgreich rechtsverbindlich gezeichnet.");
+    } catch (err: any) {
+      console.error("DPA signing failed:", err);
+      alert("Fehler beim Unterzeichnen des AV-Vertrags: " + err.message);
+    } finally {
+      setIsSigningDpa(false);
+    }
   };
 
   const roomStations = stations.filter(s => s.room_id === selectedRoomId);
@@ -7164,6 +7222,67 @@ function DeviceSetupScreen({
             >
               {isSaving ? 'Speichere...' : 'Einstellungen speichern'}
             </button>
+
+            <div style={{ height: '1px', background: '#e2e8f0', margin: '8px 0' }} />
+
+            <div style={{ padding: '20px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: dpaAgreement ? '#dcfce7' : '#fee2e2', color: dpaAgreement ? '#16a34a' : '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Shield size={20} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Auftragsverarbeitungsvertrag (AV-Vertrag / DPA)</h3>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 0 0', maxWidth: '500px' }}>
+                      Nach Art. 28 DSGVO ist für die gesetzeskonforme Nutzung von GrooveLab der Abschluss eines AV-Vertrags erforderlich.
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  {dpaAgreement ? (
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#dcfce7', color: '#15803d', fontSize: '0.7rem', fontWeight: 800, padding: '4px 10px', borderRadius: '20px', textTransform: 'uppercase', marginBottom: '4px' }}>
+                        <Check size={12} /> Rechtsverbindlich unterzeichnet
+                      </span>
+                      <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                        Unterzeichnet von: <strong>{dpaAgreement.users ? `${dpaAgreement.users.first_name} ${dpaAgreement.users.last_name}` : 'Administrator'}</strong>
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                        Datum: <strong>{new Date(dpaAgreement.signed_at).toLocaleString('de-DE')}</strong>
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                        IP-Adresse: <strong>{dpaAgreement.ip_address}</strong> | Version: <strong>{dpaAgreement.dpa_version}</strong>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fee2e2', color: '#b91c1c', fontSize: '0.7rem', fontWeight: 800, padding: '4px 10px', borderRadius: '20px', textTransform: 'uppercase' }}>
+                        Ausstehend
+                      </span>
+                      <button
+                        onClick={() => setShowDpaModal(true)}
+                        style={{
+                          background: '#ef4444',
+                          color: 'white',
+                          border: 'none',
+                          padding: '8px 16px',
+                          borderRadius: '8px',
+                          fontWeight: 700,
+                          fontSize: '0.8rem',
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)',
+                          transition: 'all 0.2s'
+                        }}
+                        className="hover-scale"
+                      >
+                        AV-Vertrag zeichnen
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -7271,6 +7390,129 @@ function DeviceSetupScreen({
               >
                 Übe-Statistiken zurücksetzen
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDpaModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 6500, background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: '#ffffff', width: '100%', maxWidth: '650px', borderRadius: '32px', display: 'flex', flexDirection: 'column', maxHeight: '90vh', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', overflow: 'hidden' }}>
+            {/* Header */}
+            <div style={{ padding: '24px 32px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: `${brandColor}10`, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Shield size={20} />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: 0 }}>AV-Vertrag (DPA) unterzeichnen</h2>
+                  <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '2px 0 0 0' }}>Rechtsverbindliche Vereinbarung zur Auftragsdatenverarbeitung</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => { setShowDpaModal(false); setDpaAccepted(false); }} 
+                style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div style={{ padding: '32px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ 
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '16px',
+                padding: '20px',
+                maxHeight: '260px',
+                overflowY: 'auto',
+                fontSize: '12px',
+                lineHeight: '1.6',
+                color: '#334155',
+                textAlign: 'left'
+              }}>
+                <h4 style={{ margin: '0 0 10px 0', fontWeight: 800, fontSize: '13px' }}>AV-VERTRAG (VEREINBARUNG ZUR AUFTRAGSVERARBEITUNG NACH ART. 28 DSGVO)</h4>
+                <p><strong>Vertragspartner:</strong><br/>
+                Plattformbetreiber: GrooveLab App (nachfolgend „Auftragnehmer“)<br/>
+                Musikschule: {school?.name || admin?.schools?.name || 'deiner Schule'} (nachfolgend „Auftraggeber“)</p>
+                
+                <h5 style={{ margin: '12px 0 6px 0', fontWeight: 800 }}>§ 1 Gegenstand und Dauer der Verarbeitung</h5>
+                <p>Der Auftragnehmer stellt dem Auftraggeber die Software-Plattform „GrooveLab App“ als digitales Logbuch- und Raumverwaltungssystem zur Verfügung. Die Verarbeitung umfasst personenbezogene Daten der Schüler (standardmäßig anonymisierte Nachnamen) und Coaches (Check-ins, Lernfortschritte) des Auftraggebers.</p>
+                
+                <h5 style={{ margin: '12px 0 6px 0', fontWeight: 800 }}>§ 2 Technische und Organisatorische Maßnahmen (TOM)</h5>
+                <p>Der Auftragnehmer sichert angemessene technische und organisatorische Maßnahmen nach Art. 32 DSGVO zu, um die Datensicherheit und Vertraulichkeit zu gewährleisten (z.B. Row Level Security Mandantentrennung, verschlüsselte Verbindungen). Die Datenverarbeitung erfolgt in der EU (Supabase & Vercel).</p>
+                
+                <h5 style={{ margin: '12px 0 6px 0', fontWeight: 800 }}>§ 3 Pflichten des Auftragnehmers</h5>
+                <p>Die Verarbeitung der Daten erfolgt ausschließlich weisungsgebunden im Rahmen des vertraglich vereinbarten Verwendungszwecks. Der Auftragnehmer verpflichtet sein Personal auf Vertraulichkeit und unterstützt den Auftraggeber bei Betroffenenrechten und Audits nach bestem Wissen.</p>
+                
+                <h5 style={{ margin: '12px 0 6px 0', fontWeight: 800 }}>§ 4 Pflichten des Auftraggebers</h5>
+                <p>Der Auftraggeber ist die „verantwortliche Stelle` im Sinne der DSGVO und stellt sicher, dass für die Eingabe der Schüler- und Lehrerdaten eine gesetzliche Grundlage oder Einwilligung vorliegt.</p>
+              </div>
+
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'flex-start', 
+                gap: '12px',
+                background: '#fefcbf',
+                border: '1px solid #fef08a',
+                padding: '16px',
+                borderRadius: '16px'
+              }}>
+                <input 
+                  type="checkbox" 
+                  id="admin-dpa-accept-checkbox"
+                  checked={dpaAccepted}
+                  onChange={(e) => setDpaAccepted(e.target.checked)}
+                  style={{ marginTop: '3px', cursor: 'pointer', width: '18px', height: '18px' }}
+                />
+                <label htmlFor="admin-dpa-accept-checkbox" style={{ fontSize: '12px', color: '#854d0e', fontWeight: 700, cursor: 'pointer', textAlign: 'left', lineHeight: '1.4' }}>
+                  Ich bestätige die Vereinbarung zur Auftragsverarbeitung (AV-Vertrag / DPA) hiermit rechtsverbindlich für die oben genannte Musikschule „{school?.name || admin?.schools?.name || 'deiner Schule'}“ und erkläre, dass ich zur Schulleitung gehöre bzw. zeichnungsberechtigt bin.
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                <button 
+                  type="button" 
+                  disabled={!dpaAccepted || isSigningDpa} 
+                  onClick={handleSignDpa} 
+                  style={{
+                    flex: 1,
+                    background: brandColor,
+                    color: 'white',
+                    border: 'none',
+                    padding: '14px',
+                    borderRadius: '12px',
+                    fontWeight: 800,
+                    cursor: (dpaAccepted && !isSigningDpa) ? 'pointer' : 'not-allowed',
+                    opacity: (dpaAccepted && !isSigningDpa) ? 1 : 0.5,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: (dpaAccepted && !isSigningDpa) ? `0 8px 20px -6px ${brandColor}60` : 'none',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {isSigningDpa ? 'Verarbeite...' : 'Rechtsverbindlich unterzeichnen'}
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => { setShowDpaModal(false); setDpaAccepted(false); }} 
+                  style={{
+                    flex: 1,
+                    background: '#f1f5f9',
+                    color: '#64748b',
+                    border: 'none',
+                    padding: '14px',
+                    borderRadius: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Abbrechen
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -595,6 +595,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const finalizeLogin = async (user: any, stationId: string | null, isWithinAnyRoom: boolean, hidePresence = false) => {
     try {
       setLoading(true);
+      sessionStorage.setItem('groovelab_user_id', user.id);
       let finalStationId = null;
       let isHome = false;
 
@@ -747,12 +748,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         console.log(`[Login] Home mode detected. No new session created.`);
       }
 
-      sessionStorage.setItem('groovelab_user_id', user.id);
       setLoading(false);
       
       onLogin(user.id, isHome);
     } catch (err: any) {
       console.error('[Login] Finalize error:', err.message);
+      sessionStorage.removeItem('groovelab_user_id');
       setError(err.message);
       setLoading(false);
     }
@@ -839,7 +840,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       // 2. Geofence Check (Simpel & Stabil)
       let isWithinAnyRoom = true;
-      const isBypass = schoolData?.opening_hours?.geofence_bypass === true;
+      const isBypass = schoolData?.opening_hours?.geofence_bypass === true || !!effectiveStationId;
 
       if (!isBypass) {
         isWithinAnyRoom = false;
