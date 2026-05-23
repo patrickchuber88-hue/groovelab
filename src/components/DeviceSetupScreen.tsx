@@ -285,13 +285,32 @@ export function DeviceSetupScreen() {
         
         <div style={{ textAlign: 'left' }}>
           <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Raum auswählen</label>
-          <select 
-            value={rooms.find(r => r.id === selectedRoomId) ? selectedRoomId : (rooms[0]?.id || '')} 
-            onChange={(e) => setSelectedRoomId(e.target.value)}
-            style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '1rem', color: '#1e293b', fontWeight: 600 }}
-          >
-            {rooms.map(r => <option key={r.id} value={r.id}>{r.name || 'Unbenannter Raum'}</option>)}
-          </select>
+          <div style={{ display: 'inline-flex', gap: '6px', background: '#f1f5f9', padding: '5px', borderRadius: '14px', flexWrap: 'wrap' }}>
+            {rooms.map(room => {
+              const isSelected = room.id === selectedRoomId;
+              return (
+                <button
+                  key={room.id}
+                  onClick={() => setSelectedRoomId(room.id)}
+                  style={{
+                    border: 'none',
+                    background: isSelected ? 'white' : 'transparent',
+                    color: isSelected ? '#1e293b' : '#64748b',
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    fontSize: '0.875rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover-scale-mini"
+                >
+                  {room.name || 'Unbenannter Raum'}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div style={{ textAlign: 'left' }}>
