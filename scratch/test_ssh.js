@@ -13,12 +13,10 @@ conn.on('ready', () => {
   console.log('SSH connection established successfully.');
 
   const commands = [
-    // List databases
-    'docker exec supabase-db psql -U postgres -d postgres -c "\\l"',
-    // List users
-    'docker exec supabase-db psql -U postgres -d postgres -c "SELECT email, id FROM auth.users;" || echo "No auth schema/table"',
-    // List public tables
-    'docker exec supabase-db psql -U postgres -d postgres -c "\\dt public.*"'
+    // Update base_directory for Groovelab (id = 2) to /apps/groovelab
+    'docker exec coolify-db psql -U coolify -d coolify -c "UPDATE applications SET base_directory = \'/apps/groovelab\' WHERE id = 2;"',
+    // Verify the change
+    'docker exec coolify-db psql -U coolify -d coolify -c "SELECT id, name, base_directory FROM applications WHERE id = 2;"'
   ];
 
   const fullCommand = commands.join(' && echo "---NEXT---" && ');
