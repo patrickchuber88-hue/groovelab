@@ -2289,6 +2289,18 @@ function App() {
       setSession(sessionRes.data);
       if (sessionRes.error) console.error('[Dashboard] Error fetching session:', sessionRes.error);
 
+      // If this is a teacher or admin, make sure locationMode reflects their session state in the DB
+      const isTeacherOrAdmin = userData.role?.toLowerCase() === 'teacher' || userData.role?.toLowerCase() === 'admin';
+      if (isTeacherOrAdmin) {
+        if (sessionRes.data) {
+          setLocationMode('lab');
+          sessionStorage.setItem('groovelab_location_mode', 'lab');
+        } else {
+          setLocationMode('home');
+          sessionStorage.setItem('groovelab_location_mode', 'home');
+        }
+      }
+
       // Parse active sessions in parallel
       if (activeSessionsRes.data) {
         const count = activeSessionsRes.data.filter((s: any) => {
@@ -9441,7 +9453,7 @@ function App() {
 
               <div>
                 <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>5. Hosting & Datenbank-Infrastruktur</h4>
-                <p style={{ margin: 0 }}>Unsere Anwendung wird auf Servern externer Dienstleister gehostet, um einen sicheren und performanten Betrieb zu gewährleisten. Das Frontend wird über <strong>Vercel</strong> (Vercel Inc.) bereitgestellt, und die Datenbankinfrastruktur läuft über <strong>Supabase</strong> (Supabase Inc.). Mit beiden Dienstleistern wurden die gesetzlich vorgeschriebenen Verträge zur Auftragsverarbeitung (AV-Vertrag nach Art. 28 DSGVO) geschlossen, um den Schutz der Daten zu jeder Zeit zu gewährleisten.</p>
+                <p style={{ margin: 0 }}>Unsere Anwendung wird auf Servern in Deutschland gehostet, um einen sicheren, performanten und datenschutzkonformen Betrieb zu gewährleisten. Sowohl das Web-Frontend als auch die Datenbankinfrastruktur werden über die <strong>Hetzner Online GmbH</strong> (Hetzner.com) betrieben. Mit diesem Dienstleister wurde ein gesetzeskonformer Vertrag zur Auftragsverarbeitung (AV-Vertrag nach Art. 28 DSGVO) geschlossen, um den Schutz Ihrer Daten zu jeder Zeit im Einklang mit der DSGVO zu gewährleisten.</p>
               </div>
             </div>
           </div>

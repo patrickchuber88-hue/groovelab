@@ -5,6 +5,12 @@ import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
 import { renderInstrumentIcon } from '../utils/instruments';
 
+const cleanRoomName = (name: string | null | undefined): string => {
+  if (!name) return 'Unbenannter Raum';
+  return name.replace(/^#\d+\s*[-:]*\s*/, '').trim();
+};
+
+
 const TEACHER_INSTRUMENT_ICONS: Record<string, any> = { 
   Guitar: renderInstrumentIcon('Guitar'), 
   Bass: renderInstrumentIcon('Bass'), 
@@ -1793,7 +1799,12 @@ export function TeacherDashboard({
                                   }}
                                   className="hover-scale-mini"
                                 >
-                                  {idx === 0 ? `👑 #1 Hauptraum - ${room.name}` : `#${idx + 1} - ${room.name}`}
+                                  {(() => {
+                                    const cleanName = cleanRoomName(room.name);
+                                    return idx === 0
+                                      ? (cleanName.toLowerCase() === 'hauptraum' ? '👑 Hauptraum' : `👑 Hauptraum - ${cleanName}`)
+                                      : cleanName;
+                                  })()}
                                 </button>
                               );
                             })}
@@ -1937,7 +1948,12 @@ export function TeacherDashboard({
                                 }}
                                 className="hover-scale-mini"
                               >
-                                {idx === 0 ? `👑 #1 Hauptraum - ${room.name}` : `#${idx + 1} - ${room.name}`}
+                                 {(() => {
+                                   const cleanName = cleanRoomName(room.name);
+                                   return idx === 0
+                                     ? (cleanName.toLowerCase() === 'hauptraum' ? '👑 Hauptraum' : `👑 Hauptraum - ${cleanName}`)
+                                     : cleanName;
+                                 })()}
                               </button>
                             );
                           })}
@@ -2143,7 +2159,12 @@ export function TeacherDashboard({
                             transition: 'all 0.2s'
                           }}
                         >
-                          {idx === 0 ? `👑 #1 Hauptraum - ${room.name}` : `#${idx + 1} - ${room.name}`}
+                          {(() => {
+                            const cleanName = cleanRoomName(room.name);
+                            return idx === 0
+                              ? (cleanName.toLowerCase() === 'hauptraum' ? '👑 Hauptraum' : `👑 Hauptraum - ${cleanName}`)
+                              : cleanName;
+                          })()}
                         </button>
                       );
                     })}

@@ -2,6 +2,11 @@ import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Music, Tablet, X, ShieldCheck } from 'lucide-react';
 
+const cleanRoomName = (name: string | null | undefined): string => {
+  if (!name) return 'Unbenannter Raum';
+  return name.replace(/^#\d+\s*[-:]*\s*/, '').trim();
+};
+
 export function DeviceSetupScreen() {
   const [rooms, setRooms] = useState<any[]>([]);
   const [stations, setStations] = useState<any[]>([]);
@@ -306,7 +311,12 @@ export function DeviceSetupScreen() {
                   }}
                   className="hover-scale-mini"
                 >
-                  {idx === 0 ? `👑 #1 Hauptraum - ${room.name || 'Unbenannter Raum'}` : `#${idx + 1} - ${room.name || 'Unbenannter Raum'}`}
+                  {(() => {
+                    const cleanName = cleanRoomName(room.name);
+                    return idx === 0
+                      ? (cleanName.toLowerCase() === 'hauptraum' ? '👑 Hauptraum' : `👑 Hauptraum - ${cleanName}`)
+                      : cleanName;
+                  })()}
                 </button>
               );
             })}

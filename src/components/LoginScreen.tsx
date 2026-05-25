@@ -273,14 +273,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               }}>
                 <h4 style={{ margin: '0 0 10px 0', fontWeight: 800, fontSize: '13px' }}>AV-VERTRAG (VEREINBARUNG ZUR AUFTRAGSVERARBEITUNG NACH ART. 28 DSGVO)</h4>
                 <p><strong>Vertragspartner:</strong><br/>
-                Plattformbetreiber: GrooveLab App (nachfolgend „Auftragnehmer“)<br/>
+                Plattformbetreiber: GrooveLab App (Betreiber: Patrick Huber) (nachfolgend „Auftragnehmer“)<br/>
                 Musikschule: {onboardSchoolName || 'unbenannt'} (nachfolgend „Auftraggeber“)</p>
                 
                 <h5 style={{ margin: '12px 0 6px 0', fontWeight: 800 }}>§ 1 Gegenstand und Dauer der Verarbeitung</h5>
                 <p>Der Auftragnehmer stellt dem Auftraggeber die Software-Plattform „GrooveLab App“ als digitales Logbuch- und Raumverwaltungssystem zur Verfügung. Die Verarbeitung umfasst personenbezogene Daten der Schüler (standardmäßig anonymisierte Nachnamen) und Coaches (Check-ins, Lernfortschritte) des Auftraggebers.</p>
                 
                 <h5 style={{ margin: '12px 0 6px 0', fontWeight: 800 }}>§ 2 Technische und Organisatorische Maßnahmen (TOM)</h5>
-                <p>Der Auftragnehmer sichert angemessene technische und organisatorische Maßnahmen nach Art. 32 DSGVO zu, um die Datensicherheit und Vertraulichkeit zu gewährleisten (z.B. Row Level Security Mandantentrennung, verschlüsselte Verbindungen). Die Datenverarbeitung erfolgt in der EU (Supabase & Vercel).</p>
+                <p>Der Auftragnehmer sichert angemessene technische und organisatorische Maßnahmen nach Art. 32 DSGVO zu, um die Datensicherheit und Vertraulichkeit zu gewährleisten (z.B. Row Level Security Mandantentrennung, verschlüsselte Verbindungen). Die Datenverarbeitung und das Hosting erfolgen ausschließlich in Deutschland auf der Infrastruktur von Hetzner Online GmbH (Hetzner.com).</p>
                 
                 <h5 style={{ margin: '12px 0 6px 0', fontWeight: 800 }}>§ 3 Pflichten des Auftragnehmers</h5>
                 <p>Die Verarbeitung der Daten erfolgt ausschließlich weisungsgebunden im Rahmen des vertraglich vereinbarten Verwendungszwecks. Der Auftragnehmer verpflichtet sein Personal auf Vertraulichkeit und unterstützt den Auftraggeber bei Betroffenenrechten und Audits nach bestem Wissen.</p>
@@ -702,7 +702,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       }
 
       // Geofence check
-      if (!isWithinAnyRoom || (isTeacher && hidePresence)) {
+      // For teachers, we only force Home mode if they explicitly chose to hide presence. We bypass the physical geofence check.
+      const shouldForceHome = isTeacher ? hidePresence : (!isWithinAnyRoom);
+      if (shouldForceHome) {
         console.log(`[Login] Outside geofence or hiding presence. Forcing Home mode.`);
         isHome = true;
         finalStationId = null;
@@ -925,13 +927,20 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       if (isTeacher) {
         if (user.is_observer) {
           // Hospitanten are always sent to home mode without prompt
-          await finalizeLogin(user, effectiveStationId, isWithinAnyRoom, true);
+          await finalizeLogin(user, effectiveStationId, false, true);
           return;
         }
 
-        setPendingTeacherUser({ user, isWithinAnyRoom });
-        setShowTeacherChoiceModal(true);
-        setLoading(false);
+        if (isWithinAnyRoom) {
+          // Only show choice modal if within geofence (i.e. groovelab is "open" / accessible)
+          setPendingTeacherUser({ user, isWithinAnyRoom: true });
+          setShowTeacherChoiceModal(true);
+          setLoading(false);
+        } else {
+          // Directly set to Home mode (hidePresence = true, isWithinAnyRoom = false) without asking
+          console.log('[Login] Teacher outside geofence. Directing to Home mode without prompt.');
+          await finalizeLogin(user, effectiveStationId, false, true);
+        }
         return;
       }
 
@@ -1577,7 +1586,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
               <div>
                 <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>5. Hosting & Datenbank-Infrastruktur</h4>
-                <p style={{ margin: 0 }}>Unsere Anwendung wird auf Servern externer Dienstleister gehostet, um einen sicheren und performanten Betrieb zu gewährleisten. Das Frontend wird über <strong>Vercel</strong> (Vercel Inc.) bereitgestellt, und die Datenbankinfrastruktur läuft über <strong>Supabase</strong> (Supabase Inc.). Mit beiden Dienstleistern wurden die gesetzlich vorgeschriebenen Verträge zur Auftragsverarbeitung (AV-Vertrag nach Art. 28 DSGVO) geschlossen, um den Schutz der Daten zu jeder Zeit zu gewährleisten.</p>
+                <p style={{ margin: 0 }}>Unsere Anwendung wird auf Servern in Deutschland gehostet, um einen sicheren, performanten und datenschutzkonformen Betrieb zu gewährleisten. Sowohl das Web-Frontend als auch die Datenbankinfrastruktur werden über die <strong>Hetzner Online GmbH</strong> (Hetzner.com) betrieben. Mit diesem Dienstleister wurde ein gesetzeskonformer Vertrag zur Auftragsverarbeitung (AV-Vertrag nach Art. 28 DSGVO) geschlossen, um den Schutz Ihrer Daten zu jeder Zeit im Einklang mit der DSGVO zu gewährleisten.</p>
               </div>
             </div>
           </div>

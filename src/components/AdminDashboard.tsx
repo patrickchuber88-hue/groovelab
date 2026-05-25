@@ -9,6 +9,11 @@ import {
 } from 'recharts';
 import { renderInstrumentIcon } from '../utils/instruments';
 
+const cleanRoomName = (name: string | null | undefined): string => {
+  if (!name) return 'Unbenannter Raum';
+  return name.replace(/^#\d+\s*[-:]*\s*/, '').trim();
+};
+
 const DEFAULT_IMPRESSUM = `Angaben gemäß § 5 TMG
 Manuel Wagner
 Friedrichstr. 33
@@ -175,6 +180,105 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [kiosks, setKiosks] = useState<any[] | null>(null);
   const [activeTab, setActiveTab] = useState<string>(() => localStorage.getItem('groovelab_active_tab') || forceTab || 'live');
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
+  const [draggedStationId, setDraggedStationId] = useState<string | null>(null);
+  const [dragOverStationId, setDragOverStationId] = useState<string | null>(null);
+
+  const handleStationDragStart = (e: React.DragEvent, id: string) => {
+    setDraggedStationId(id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleStationDragOver = (e: React.DragEvent, id: string) => {
+    e.preventDefault();
+    if (draggedStationId !== id) {
+      setDragOverStationId(id);
+    }
+  };
+
+  const handleStationDrop = async (e: React.DragEvent, targetRoomId: string) => {
+    e.preventDefault();
+    if (!draggedStationId || !dragOverStationId) {
+      setDraggedStationId(null);
+      setDragOverStationId(null);
+      return;
+    }
+
+    // Get the current room's stations
+    const roomStations = stations.filter(s => s.room_id === targetRoomId);
+    
+    // Find indexes
+    const dragIdx = roomStations.findIndex(s => s.id === draggedStationId);
+    const hoverIdx = roomStations.findIndex(s => s.id === dragOverStationId);
+
+    if (dragIdx === -1 || hoverIdx === -1) {
+      setDraggedStationId(null);
+      setDragOverStationId(null);
+      return;
+    }
+
+    // Reorder array
+    const updatedRoomStations = [...roomStations];
+    const [draggedItem] = updatedRoomStations.splice(dragIdx, 1);
+    updatedRoomStations.splice(hoverIdx, 0, draggedItem);
+
+    // Optimistically update the state for stations
+    const remainingStations = stations.filter(s => s.room_id !== targetRoomId);
+    
+    // Assign new sort_order fields
+    const updatedAll = [
+      ...remainingStations,
+      ...updatedRoomStations.map((s, idx) => ({ ...s, sort_order: idx }))
+    ];
+    
+    // Sort updatedAll by sort_order ascending, then by name
+    updatedAll.sort((a, b) => {
+      if (a.room_id === b.room_id) {
+        if ((a.sort_order ?? 0) !== (b.sort_order ?? 0)) {
+          return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+        }
+        return (a.name || '').localeCompare(b.name || '');
+      }
+      return 0;
+    });
+
+    setStations(updatedAll);
+
+    // Also update setupStations if active tab is setup
+    setSetupStations(prev => {
+      const other = prev.filter(s => s.room_id !== targetRoomId);
+      const updatedSetup = [
+        ...other,
+        ...updatedRoomStations.map((s, idx) => ({ ...s, sort_order: idx }))
+      ];
+      updatedSetup.sort((a, b) => {
+        if (a.room_id === b.room_id) {
+          if ((a.sort_order ?? 0) !== (b.sort_order ?? 0)) {
+            return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+          }
+          return (a.name || '').localeCompare(b.name || '');
+        }
+        return 0;
+      });
+      return updatedSetup;
+    });
+
+    setDraggedStationId(null);
+    setDragOverStationId(null);
+
+    // Update in Supabase
+    try {
+      const promises = updatedRoomStations.map((s, idx) => {
+        return supabase
+          .from('stations')
+          .update({ sort_order: idx })
+          .eq('id', s.id);
+      });
+      await Promise.all(promises);
+    } catch (err) {
+      console.error('Failed to update stations sort order:', err);
+    }
+  };
+
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
       return window.innerWidth < 1200;
@@ -689,6 +793,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           .from('stations')
           .select('*, rooms!inner(school_id)')
           .eq('rooms.school_id', adminData.school_id)
+          .order('sort_order', { ascending: true })
           .order('name');
         if (stationsData) setStations(stationsData);
       } else if (activeTab === 'songs') {
@@ -759,7 +864,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       } else if (activeTab === 'setup') {
         const { data: rData } = await supabase.from('rooms').select('*').eq('school_id', adminData.school_id).order('sort_order', { ascending: true });
         setSetupRooms(rData || []);
-        const { data: sData } = await supabase.from('stations').select('*, rooms!inner(school_id)').eq('rooms.school_id', adminData.school_id).order('name');
+        const { data: sData } = await supabase.from('stations').select('*, rooms!inner(school_id)').eq('rooms.school_id', adminData.school_id).order('sort_order', { ascending: true }).order('name');
         setSetupStations(sData || []);
         
         // Fetch active sessions
@@ -3361,7 +3466,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                           textTransform: 'uppercase',
                           letterSpacing: '0.05em'
                         }}>
-                          {idx === 0 ? '👑 #1 Hauptraum' : `#${idx + 1}`}
+                          {idx === 0 ? '👑 Hauptraum' : 'Nebenraum'}
                         </span>
                       </div>
                     {editingRoomId === room.id ? (
@@ -3421,7 +3526,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                       </div>
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => { setEditingRoomId(room.id); setEditingRoomName(room.name); }}>
-                        <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>{room.name}</h3>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>{cleanRoomName(room.name)}</h3>
                         <Pencil size={14} color="#94a3b8" />
                       </div>
                     )}
@@ -3591,8 +3696,36 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 {stations.filter(s => s.room_id === room.id).map(station => {
                   const activeColor = station.color && station.color !== '#e5e7eb' && station.color !== '#e2e8f0' ? station.color : getStationColor(station.name);
                   return (
-                    <div key={station.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #f1f5f9', transition: 'all 0.2s', position: 'relative' }}>
+                    <div
+                      key={station.id}
+                      draggable
+                      onDragStart={(e) => handleStationDragStart(e, station.id)}
+                      onDragOver={(e) => handleStationDragOver(e, station.id)}
+                      onDragEnd={() => {
+                        setDraggedStationId(null);
+                        setDragOverStationId(null);
+                      }}
+                      onDrop={(e) => handleStationDrop(e, room.id)}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '14px',
+                        background: draggedStationId === station.id 
+                          ? '#f1f5f9' 
+                          : dragOverStationId === station.id 
+                          ? '#e2e8f0' 
+                          : '#f8fafc',
+                        borderRadius: '14px',
+                        border: dragOverStationId === station.id ? `2px dashed ${brandColor}` : '1px solid #f1f5f9',
+                        transition: 'all 0.2s',
+                        position: 'relative',
+                        cursor: 'grab',
+                        opacity: draggedStationId === station.id ? 0.5 : 1
+                      }}
+                    >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 700, color: '#475569' }}>
+                        <GripVertical size={16} style={{ color: '#94a3b8', cursor: 'grab' }} />
                         <Tablet size={16} color={activeColor} /> {station.name}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -6319,8 +6452,10 @@ function DeviceSetupScreen({
   const [dpaAccepted, setDpaAccepted] = useState(false);
   const [isSigningDpa, setIsSigningDpa] = useState(false);
 
+  const effectiveSchool = Array.isArray(school) ? school[0] : school;
+
   const fetchDpa = async () => {
-    const sId = school?.id || admin?.school_id;
+    const sId = effectiveSchool?.id || admin?.school_id;
     if (!sId) return;
     const { data } = await supabase
       .from('dpa_agreements')
@@ -6332,14 +6467,14 @@ function DeviceSetupScreen({
 
   useEffect(() => {
     fetchDpa();
-  }, [school?.id, admin?.school_id]);
+  }, [effectiveSchool?.id, admin?.school_id]);
 
   // Academy Setup state
-  const [name, setName] = useState(school?.name || '');
-  const [lat, setLat] = useState(school?.latitude?.toString() || '');
-  const [lng, setLng] = useState(school?.longitude?.toString() || '');
-  const [radius, setRadius] = useState(school?.geofence_radius_meters?.toString() || '100');
-  const [hours, setHours] = useState<any>(school?.opening_hours || {
+  const [name, setName] = useState(effectiveSchool?.name || '');
+  const [lat, setLat] = useState(effectiveSchool?.latitude?.toString() || '');
+  const [lng, setLng] = useState(effectiveSchool?.longitude?.toString() || '');
+  const [radius, setRadius] = useState(effectiveSchool?.geofence_radius_meters?.toString() || '100');
+  const [hours, setHours] = useState<any>(effectiveSchool?.opening_hours || {
     monday: { start: '08:00', end: '20:00', active: true },
     tuesday: { start: '08:00', end: '20:00', active: true },
     wednesday: { start: '08:00', end: '20:00', active: true },
@@ -6357,12 +6492,12 @@ function DeviceSetupScreen({
   }, [rooms, selectedRoomId]);
 
   useEffect(() => {
-    if (school) {
-      setName(school.name || '');
-      setLat(school.latitude?.toString() || '');
-      setLng(school.longitude?.toString() || '');
-      setRadius(school.geofence_radius_meters?.toString() || '100');
-      setHours(school.opening_hours || {
+    if (effectiveSchool) {
+      setName(effectiveSchool.name || '');
+      setLat(effectiveSchool.latitude?.toString() || '');
+      setLng(effectiveSchool.longitude?.toString() || '');
+      setRadius(effectiveSchool.geofence_radius_meters?.toString() || '100');
+      setHours(effectiveSchool.opening_hours || {
         monday: { start: '08:00', end: '20:00', active: true },
         tuesday: { start: '08:00', end: '20:00', active: true },
         wednesday: { start: '08:00', end: '20:00', active: true },
@@ -6372,7 +6507,7 @@ function DeviceSetupScreen({
         sunday: { start: '10:00', end: '16:00', active: false }
       });
     }
-  }, [school]);
+  }, [effectiveSchool]);
 
   const days = [
     { id: 'monday', label: 'Montag' },
@@ -6385,6 +6520,10 @@ function DeviceSetupScreen({
   ];
 
   const handleSaveAcademy = async () => {
+    if (!effectiveSchool?.id) {
+      alert('Fehler: Keine Schul-ID gefunden.');
+      return;
+    }
     setIsSaving(true);
     const { error } = await supabase
       .from('schools')
@@ -6395,7 +6534,7 @@ function DeviceSetupScreen({
         longitude: lng ? Number(lng) : null,
         geofence_radius_meters: radius ? Number(radius) : 100
       })
-      .eq('id', school.id);
+      .eq('id', effectiveSchool.id);
     
     setIsSaving(false);
     if (error) alert('Fehler: ' + error.message);
@@ -7433,14 +7572,14 @@ function DeviceSetupScreen({
               }}>
                 <h4 style={{ margin: '0 0 10px 0', fontWeight: 800, fontSize: '13px' }}>AV-VERTRAG (VEREINBARUNG ZUR AUFTRAGSVERARBEITUNG NACH ART. 28 DSGVO)</h4>
                 <p><strong>Vertragspartner:</strong><br/>
-                Plattformbetreiber: GrooveLab App (nachfolgend „Auftragnehmer“)<br/>
+                Plattformbetreiber: GrooveLab App (Betreiber: Patrick Huber) (nachfolgend „Auftragnehmer“)<br/>
                 Musikschule: {school?.name || admin?.schools?.name || 'deiner Schule'} (nachfolgend „Auftraggeber“)</p>
                 
                 <h5 style={{ margin: '12px 0 6px 0', fontWeight: 800 }}>§ 1 Gegenstand und Dauer der Verarbeitung</h5>
                 <p>Der Auftragnehmer stellt dem Auftraggeber die Software-Plattform „GrooveLab App“ als digitales Logbuch- und Raumverwaltungssystem zur Verfügung. Die Verarbeitung umfasst personenbezogene Daten der Schüler (standardmäßig anonymisierte Nachnamen) und Coaches (Check-ins, Lernfortschritte) des Auftraggebers.</p>
                 
                 <h5 style={{ margin: '12px 0 6px 0', fontWeight: 800 }}>§ 2 Technische und Organisatorische Maßnahmen (TOM)</h5>
-                <p>Der Auftragnehmer sichert angemessene technische und organisatorische Maßnahmen nach Art. 32 DSGVO zu, um die Datensicherheit und Vertraulichkeit zu gewährleisten (z.B. Row Level Security Mandantentrennung, verschlüsselte Verbindungen). Die Datenverarbeitung erfolgt in der EU (Supabase & Vercel).</p>
+                <p>Der Auftragnehmer sichert angemessene technische und organisatorische Maßnahmen nach Art. 32 DSGVO zu, um die Datensicherheit und Vertraulichkeit zu gewährleisten (z.B. Row Level Security Mandantentrennung, verschlüsselte Verbindungen). Die Datenverarbeitung und das Hosting erfolgen ausschließlich in Deutschland auf der Infrastruktur von Hetzner Online GmbH (Hetzner.com).</p>
                 
                 <h5 style={{ margin: '12px 0 6px 0', fontWeight: 800 }}>§ 3 Pflichten des Auftragnehmers</h5>
                 <p>Die Verarbeitung der Daten erfolgt ausschließlich weisungsgebunden im Rahmen des vertraglich vereinbarten Verwendungszwecks. Der Auftragnehmer verpflichtet sein Personal auf Vertraulichkeit und unterstützt den Auftraggeber bei Betroffenenrechten und Audits nach bestem Wissen.</p>
