@@ -13,13 +13,10 @@ conn.on('ready', () => {
   console.log('SSH connection established successfully.');
 
   const commands = [
-    // Update base_directory for Groovelab (id = 2) to /apps/groovelab
-    'docker exec coolify-db psql -U coolify -d coolify -c "UPDATE applications SET base_directory = \'/apps/groovelab\' WHERE id = 2;"',
-    // Verify the change
-    'docker exec coolify-db psql -U coolify -d coolify -c "SELECT id, name, base_directory FROM applications WHERE id = 2;"'
+    'curl -I -H "Host: vghe0pvamf85tn3pcu2o47db.178.105.10.2.sslip.io" http://localhost'
   ];
 
-  const fullCommand = commands.join(' && echo "---NEXT---" && ');
+  const fullCommand = commands.join(' && ');
 
   conn.exec(fullCommand, (err, stream) => {
     if (err) throw err;
