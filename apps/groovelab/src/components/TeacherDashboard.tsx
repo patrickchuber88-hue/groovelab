@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
+import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
 import { renderInstrumentIcon } from '../utils/instruments';
 
 const cleanRoomName = (name: string | null | undefined): string => {
@@ -477,27 +478,33 @@ interface TeacherDashboardProps {
   onLogout?: () => void;
   locationMode?: 'lab' | 'home';
   hideHeader?: boolean;
+  hideSidebar?: boolean;
   viewMode?: 'admin' | 'student';
+  initialTab?: 'briefing' | 'live' | 'bands' | 'students' | 'proposals';
   onTabChange?: (tab: string) => void;
   onOpenBandProfile?: (band: any) => void;
   onFoundBand?: (form: any, mySlot: any) => void;
   isSidebarCollapsed?: boolean;
   setIsSidebarCollapsed?: (collapsed: boolean) => void;
   onSidebarNotificationsChange?: (count: number) => void;
+  activePlatform?: 'campus' | 'groovelab';
 }
 
 export function TeacherDashboard({ 
   userId, 
   onLogout, 
   locationMode = 'lab', 
-  hideHeader = false, 
+  hideHeader = false,
+  hideSidebar = false,
   viewMode = 'admin', 
+  initialTab,
   onTabChange, 
   onOpenBandProfile, 
   onFoundBand,
   isSidebarCollapsed: propsIsSidebarCollapsed,
   setIsSidebarCollapsed: propsSetIsSidebarCollapsed,
-  onSidebarNotificationsChange
+  onSidebarNotificationsChange,
+  activePlatform = 'groovelab'
 }: TeacherDashboardProps) {
   const [teacher, setTeacher] = useState<any>(null);
   const [stations, setStations] = useState<any[]>([]);
@@ -512,9 +519,32 @@ export function TeacherDashboard({
   const [ticker, setTicker] = useState(0);
   const [selectedCoachProfile, setSelectedCoachProfile] = useState<any>(null);
   const [selectedStudentProfile, setSelectedStudentProfile] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState('live');
+  const [docStudent, setDocStudent] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'briefing' | 'live' | 'bands' | 'students' | 'proposals'>(initialTab || (hideHeader ? 'live' : 'briefing'));
   const [allBands, setAllBands] = useState<any[]>([]);
   const [allStudents, setAllStudents] = useState<any[]>([]);
+  const [studentSearch, setStudentSearch] = useState('');
+  const [studentLetter, setStudentLetter] = useState<string | null>(null);
+  const [showAddStudent, setShowAddStudent] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<any | null>(null);
+  const [newStudent, setNewStudent] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    birthDate: '',
+    photoUrl: '/avatar_ghost.jpg',
+    isExternalVocalist: false,
+    status: 'active',
+    is_trial: false,
+    trial_ends_at: '',
+    contract_ends_at: ''
+  });
+  const [showInviteStudent, setShowInviteStudent] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteFirstName, setInviteFirstName] = useState('');
+  const [inviteLastName, setInviteLastName] = useState('');
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [inviteSaving, setInviteSaving] = useState(false);
   const [helpRequests, setHelpRequests] = useState<any[]>([]);
   const [unreadShouts, setUnreadShouts] = useState<any[]>([]);
   const [bandSearch, setBandSearch] = useState('');
@@ -530,6 +560,9 @@ export function TeacherDashboard({
   const [rooms, setRooms] = useState<any[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string>('');
   const [zoomFactor, setZoomFactor] = useState<number>(1.0);
+  const [availabilities, setAvailabilities] = useState<any[]>([]);
+  const [activeDragScheduleId, setActiveDragScheduleId] = useState<string | null>(null);
+  const [dragOverSlotKey, setDragOverSlotKey] = useState<string | null>(null);
 
   // We no longer have local room ordering state/handlers because we use the centralized, database-driven sort_order.
 
@@ -554,6 +587,173 @@ export function TeacherDashboard({
       localStorage.setItem(`groovelab_room_zoom_${userId}_${selectedRoomId}`, value.toString());
     }
   };
+
+  const getTrafficLightColor = (draggedSchedId: string, targetSlot: any) => {
+    if (!briefingData?.timeline) return 'RED';
+    const sourceSlot = briefingData.timeline.find((s: any) => s.scheduleId === draggedSchedId);
+    if (!sourceSlot || !sourceSlot.student) return 'RED';
+
+    const studentInstrument = sourceSlot.instrument || 'Klavier';
+    const studentId = sourceSlot.student.id;
+
+    // 1. Room Matrix Check
+    const room = rooms.find(r => r.id === targetSlot.roomId);
+    if (room && room.allowed_instruments && room.allowed_instruments.length > 0) {
+      const allowed = room.allowed_instruments.map((i: string) => i.toLowerCase());
+      const studentInstLower = studentInstrument.toLowerCase();
+      if (!allowed.includes(studentInstLower)) {
+        return 'RED';
+      }
+    }
+
+    // 2. Collision Check: Is the target slot occupied?
+    const hasCollision = briefingData.timeline.some((s: any) => 
+      s.scheduleId !== draggedSchedId && 
+      s.timeSlot === targetSlot.timeSlot && 
+      s.status !== 'canceled_by_student' &&
+      s.status !== 'teacher_sick' &&
+      s.student !== null
+    );
+
+    if (hasCollision) {
+      return 'RED';
+    }
+
+    // 3. Availability Check
+    const rawDay = new Date().getDay();
+    const todayWeekday = rawDay === 0 ? 7 : rawDay;
+    const isAvailable = availabilities.some(a => 
+      a.user_id === studentId && 
+      a.day_of_week === todayWeekday && 
+      a.time_slot === targetSlot.timeSlot
+    );
+
+    return isAvailable ? 'GREEN' : 'YELLOW';
+  };
+
+  const handleDragStart = (e: React.DragEvent, scheduleId: string) => {
+    setActiveDragScheduleId(scheduleId);
+    e.dataTransfer.setData('text/plain', scheduleId);
+  };
+
+  const handleDragOver = (e: React.DragEvent, slotKey: string, color: string) => {
+    e.preventDefault();
+    if (color !== 'RED') {
+      setDragOverSlotKey(slotKey);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetSlot: any) => {
+    e.preventDefault();
+    const draggedSchedId = activeDragScheduleId;
+    setActiveDragScheduleId(null);
+    setDragOverSlotKey(null);
+
+    if (!draggedSchedId) return;
+
+    const color = getTrafficLightColor(draggedSchedId, targetSlot);
+    if (color === 'RED') {
+      alert('Tausch blockiert (Bypass-Schutz): Der Ziel-Slot ist belegt oder verletzt die Raum-Matrix.');
+      return;
+    }
+
+    const confirmMsg = color === 'YELLOW' 
+      ? 'Achtung (GELB): Der Slot liegt außerhalb der Verfügbarkeiten des Schülers. Tausch durchführen und Eltern-Freigabe anfordern?'
+      : 'Tausch durchführen (GRÜN)?';
+
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      const resp = await fetch('/api/schedule/swap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scheduleId: draggedSchedId,
+          targetTimeSlot: targetSlot.timeSlot,
+          targetDayOfWeek: new Date().getDay() === 0 ? 7 : new Date().getDay(),
+          targetRoomId: targetSlot.roomId
+        })
+      });
+
+      if (resp.ok) {
+        setTicker(t => t + 1);
+        return;
+      }
+
+      // Fallback: direct Supabase swap
+      const status = color === 'GREEN' ? 'approved' : 'pending_parent_approval';
+      const { error } = await supabase
+        .from('schedules')
+        .update({
+          time_slot: targetSlot.timeSlot,
+          status: status
+        })
+        .eq('id', draggedSchedId);
+
+      if (error) throw error;
+      setTicker(t => t + 1);
+    } catch (err) {
+      console.error(err);
+      alert('Tausch fehlgeschlagen.');
+    }
+  };
+
+  const handleReportIllness = async () => {
+    const pin = prompt('Bitte gebe deinen 4-stelligen Lehrer-PIN (z.B. GL-1234) zur Verifizierung ein:');
+    if (!pin) return;
+
+    try {
+      const resp = await fetch('/api/teacher/sick', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teacherId: userId, pin })
+      });
+
+      if (resp.ok) {
+        alert('Krankheitsmeldung erfolgreich registriert. Das Sekretariat und die betroffenen Schüler wurden benachrichtigt.');
+        setTicker(t => t + 1);
+        return;
+      }
+
+      // Fallback direct Supabase update
+      const { data: teacherProfile } = await supabase
+        .from('users')
+        .select('ausweis_nummer, school_id, first_name, last_name')
+        .eq('id', userId)
+        .single();
+
+      if (!teacherProfile || teacherProfile.ausweis_nummer !== pin) {
+        alert('Fehler: PIN falsch oder Verifizierung fehlgeschlagen.');
+        return;
+      }
+
+      const rawDay = new Date().getDay();
+      const todayWeekday = rawDay === 0 ? 7 : rawDay;
+
+      const { error: scheduleError } = await supabase
+        .from('schedules')
+        .update({ status: 'teacher_sick' })
+        .eq('teacher_id', userId)
+        .eq('day_of_week', todayWeekday);
+
+      if (scheduleError) throw scheduleError;
+
+      const alertMessage = `Lehrkraft ${teacherProfile.first_name} ${teacherProfile.last_name} (ID: ${userId}) hat sich krankgemeldet. Alle betroffenen Unterrichtseinheiten für heute entfallen.`;
+      await supabase.from('system_alerts').insert({
+        school_id: teacherProfile.school_id,
+        teacher_id: userId,
+        type: 'Teacher Illness Alert',
+        message: alertMessage,
+        resolved: false
+      });
+
+      alert('Krankheit erfolgreich gemeldet. Alle Stunden wurden abgesagt.');
+      setTicker(t => t + 1);
+    } catch (err) {
+      console.error(err);
+      alert('Fehler beim Melden der Krankheit.');
+    }
+  };
   
   const [lastSeenCounts, setLastSeenCounts] = useState(() => {
     try {
@@ -572,6 +772,145 @@ export function TeacherDashboard({
 
   const isSidebarCollapsed = propsIsSidebarCollapsed !== undefined ? propsIsSidebarCollapsed : localIsSidebarCollapsed;
   const setIsSidebarCollapsed = propsSetIsSidebarCollapsed !== undefined ? propsSetIsSidebarCollapsed : setLocalIsSidebarCollapsed;
+
+  const [briefingData, setBriefingData] = useState<any>(null);
+  const [briefingLoading, setBriefingLoading] = useState(true);
+
+  useEffect(() => {
+    const loadBriefing = async () => {
+      if (!userId) return;
+      try {
+        setBriefingLoading(true);
+        const resp = await fetch(`/api/briefing/teacher?userId=${userId}`);
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data && data.success) {
+            setBriefingData(data);
+            return;
+          }
+        }
+        throw new Error('API offline');
+      } catch (e) {
+        try {
+          const { data: teacherProfile } = await supabase
+            .from('users')
+            .select('school_id')
+            .eq('id', userId)
+            .single();
+
+          if (!teacherProfile) return;
+          const schoolId = teacherProfile.school_id;
+
+          const { data: schoolData } = await supabase
+            .from('schools')
+            .select('allow_messages_global')
+            .eq('id', schoolId)
+            .single();
+          const allowMessages = schoolData?.allow_messages_global ?? true;
+
+          const rawDay = new Date().getDay();
+          const todayWeekday = rawDay === 0 ? 7 : rawDay;
+
+          const { data: slots } = await supabase
+            .from('schedules')
+            .select(`
+              id,
+              time_slot,
+              status,
+              day_of_week,
+              rooms (id, name),
+              student:users!schedules_student_id_fkey (
+                id,
+                first_name,
+                last_name,
+                is_app_user,
+                instrument,
+                avatars (avatar_style, evolution_level, xp)
+              )
+            `)
+            .eq('teacher_id', userId)
+            .eq('day_of_week', todayWeekday);
+
+          const timeline = (slots || []).map((slot: any) => {
+            const student = slot.student;
+            const avatar = student?.avatars?.[0] || null;
+            const isAnalogStickerUser = !student?.is_app_user || avatar?.avatar_style === 'Standard_Silhouette';
+
+            return {
+              scheduleId: slot.id,
+              timeSlot: slot.time_slot,
+              status: slot.status,
+              roomId: slot.rooms?.id || null,
+              room: slot.rooms?.name || 'Hauptraum',
+              instrument: student?.instrument || 'Klavier',
+              student: student ? {
+                id: student.id,
+                name: `${student.first_name} ${student.last_name}`,
+                isAppUser: student.is_app_user ?? false,
+                isAnalogStickerUser
+              } : null
+            };
+          }).sort((a: any, b: any) => a.timeSlot.localeCompare(b.timeSlot));
+
+          const now = new Date();
+          const currentStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+          const nextSlot = timeline.find((s: any) => s.timeSlot >= currentStr) || timeline[0] || null;
+          let prepMirror = null;
+
+          if (nextSlot && nextSlot.student) {
+            const studentId = nextSlot.student.id;
+            const { data: studentAvatar } = await supabase
+              .from('avatars')
+              .select('evolution_level, xp, avatar_style')
+              .eq('user_id', studentId)
+              .maybeSingle();
+
+            const { data: recentProgress } = await supabase
+              .from('user_progress')
+              .select(`
+                current_level,
+                stage_ready_badge,
+                last_updated,
+                exercises (title, description)
+              `)
+              .eq('user_id', studentId)
+              .order('last_updated', { ascending: false })
+              .limit(3);
+
+            const verifiedSongs = (recentProgress || []).map((p: any) => ({
+              title: p.exercises?.title || 'Übungssong',
+              status: p.stage_ready_badge ? 'verifiziert' : 'in_progress',
+              level: p.current_level || 1,
+              note: allowMessages ? (p.exercises?.description || '') : '[SYSTEM: Nachrichten global stummgeschaltet]'
+            }));
+
+            prepMirror = {
+              studentId,
+              studentName: nextSlot.student.name,
+              timeSlot: nextSlot.timeSlot,
+              streakCount: studentAvatar?.avatar_style === 'Premium_Hero' ? 6 : 0,
+              evolutionLevel: studentAvatar?.evolution_level || 1,
+              verifiedSongs
+            };
+          }
+
+          setBriefingData({
+            success: true,
+            allowMessagesGlobal: allowMessages,
+            todayWeekday,
+            timeline,
+            prepMirror
+          });
+        } catch (err) {
+          console.error('Error loading briefing fallback:', err);
+        }
+      } finally {
+        setBriefingLoading(false);
+      }
+    };
+
+    loadBriefing();
+  }, [userId, ticker]);
 
   const unreadHelpCount = Math.max(0, helpRequests.length - lastSeenCounts.help);
   const unreadRehearsalCount = Math.max(0, rehearsalSuggestions.length - lastSeenCounts.rehearsal);
@@ -633,7 +972,7 @@ export function TeacherDashboard({
     fetchData();
     const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
-  }, [userId]);
+  }, [userId, activePlatform]);
 
   const fetchData = async () => {
     if (!userId) return;
@@ -669,6 +1008,9 @@ export function TeacherDashboard({
           .eq('school_id', tData.school_id)
           .order('sort_order', { ascending: true });
         setRooms(rData || []);
+
+        const { data: avData } = await supabase.from('user_availability').select('*');
+        setAvailabilities(avData || []);
         if (rData && rData.length > 0 && !selectedRoomId) {
           const savedRoomId = localStorage.getItem('groovelab_teacher_selected_room_id');
           if (savedRoomId && rData.some(r => r.id === savedRoomId)) {
@@ -738,7 +1080,13 @@ export function TeacherDashboard({
         setAllBands(bData || []);
 
         // 7. Students
-        const { data: studData } = await supabase.from('users').select('*').eq('school_id', tData.school_id).eq('role', 'student').order('first_name');
+        let studentQuery = supabase.from('users').select('*').eq('school_id', tData.school_id).eq('role', 'student');
+        if (activePlatform === 'campus') {
+          studentQuery = studentQuery.eq('is_campus_active', true);
+        } else {
+          studentQuery = studentQuery.eq('is_groovelab_active', true);
+        }
+        const { data: studData } = await studentQuery.order('first_name');
         setAllStudents(studData || []);
         // 8. Help
         if (viewMode !== 'student') {
@@ -1614,11 +1962,290 @@ export function TeacherDashboard({
     fetchData();
   };
 
+  const handleAddStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStudent.firstName) return;
+    
+    if (teacher?.schools?.limits_enabled) {
+      const maxStudents = teacher.schools.max_students ?? 6;
+      if (allStudents.length >= maxStudents) {
+        alert(`Limit erreicht! Deine Schule darf maximal ${maxStudents} Schüler registrieren. Kontaktiere deinen Master-Admin.`);
+        return;
+      }
+    }
+    
+    const qrToken = crypto.randomUUID();
+    const lName = newStudent.lastName;
+    const formattedLastName = lName.length > 1 ? lName.charAt(0) + '.' : lName;
+    
+    const { data, error } = await supabase.from('users').insert({
+      school_id: teacher.school_id, 
+      role: 'student', 
+      first_name: newStudent.firstName, 
+      last_name: formattedLastName,
+      email: newStudent.email || null,
+      birth_date: newStudent.birthDate ? newStudent.birthDate : null,
+      photo_url: newStudent.photoUrl || '/avatar_ghost.jpg',
+      qr_token: qrToken,
+      is_external_vocalist: newStudent.isExternalVocalist,
+      instrument: newStudent.isExternalVocalist ? 'Vocals' : 'Musiker',
+      status: newStudent.status || 'active',
+      is_trial: newStudent.is_trial || false,
+      trial_ends_at: newStudent.is_trial && newStudent.trial_ends_at ? newStudent.trial_ends_at : null,
+      contract_ends_at: newStudent.contract_ends_at ? newStudent.contract_ends_at : null,
+      is_campus_active: activePlatform === 'campus',
+      is_groovelab_active: activePlatform === 'groovelab'
+    }).select().single();
+    
+    if (error) {
+      alert('Fehler beim Hinzufügen: ' + error.message);
+    } else if (data) { 
+      setAllStudents(prev => [...prev, data]); 
+      setShowAddStudent(false); 
+      setNewStudent({ 
+        firstName: '', 
+        lastName: '', 
+        email: '',
+        birthDate: '', 
+        photoUrl: '/avatar_ghost.jpg', 
+        isExternalVocalist: false,
+        status: 'active',
+        is_trial: false,
+        trial_ends_at: '',
+        contract_ends_at: ''
+      }); 
+      fetchData();
+    }
+  };
+
+  const handleUpdateStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStudent) return;
+    const { error } = await supabase.from('users').update({
+      first_name: editingStudent.first_name,
+      last_name: editingStudent.last_name,
+      birth_date: editingStudent.birth_date || null,
+      status: editingStudent.status || 'active',
+      is_trial: editingStudent.is_trial || false,
+      trial_ends_at: editingStudent.is_trial && editingStudent.trial_ends_at ? editingStudent.trial_ends_at : null,
+      contract_ends_at: editingStudent.contract_ends_at || null,
+      is_external_vocalist: editingStudent.is_external_vocalist || false,
+      instrument: editingStudent.is_external_vocalist ? 'Vocals' : 'Musiker'
+    }).eq('id', editingStudent.id);
+    
+    if (error) {
+      alert('Fehler beim Aktualisieren: ' + error.message);
+    } else {
+      setAllStudents(prev => prev.map(s => s.id === editingStudent.id ? editingStudent : s));
+      setEditingStudent(null);
+      fetchData();
+    }
+  };
+
+  const handleDeleteStudent = async (id: string) => {
+    const studentToDelete = allStudents.find(s => s.id === id);
+    if (!studentToDelete) return;
+
+    const actionText = activePlatform === 'campus' 
+      ? 'Möchtest du diesen Schüler wirklich vom Campus entfernen?' 
+      : 'Möchtest du diesen Schüler wirklich von GrooveLab entfernen?';
+
+    if (window.confirm(actionText)) {
+      try {
+        const isCampus = activePlatform === 'campus';
+        const otherActive = isCampus ? studentToDelete.is_groovelab_active : studentToDelete.is_campus_active;
+
+        if (otherActive) {
+          const updatePayload = isCampus 
+            ? { is_campus_active: false } 
+            : { is_groovelab_active: false };
+          
+          const { error } = await supabase.from('users').update(updatePayload).eq('id', id);
+          if (error) throw error;
+        } else {
+          await supabase.from('user_song_skills').delete().eq('user_id', id);
+          await supabase.from('band_members').delete().eq('user_id', id);
+          await supabase.from('sessions').delete().eq('user_id', id);
+          await supabase.from('band_songs').update({ suggested_by: null }).eq('suggested_by', id);
+          await supabase.from('lab_planning').delete().eq('user_id', id);
+          await supabase.from('band_shoutbox').delete().eq('user_id', id);
+          await supabase.from('band_song_slots').delete().eq('user_id', id);
+          await supabase.from('help_requests').delete().eq('user_id', id);
+          
+          const { error } = await supabase.from('users').delete().eq('id', id);
+          if (error) throw error;
+        }
+        
+        setAllStudents(prev => prev.filter(s => s.id !== id));
+        fetchData();
+      } catch (err: any) {
+        alert('Fehler beim Entfernen: ' + err.message);
+      }
+    }
+  };
+
+  const handleInviteStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteFirstName.trim()) return;
+    setInviteSaving(true);
+    try {
+      if (teacher?.schools?.limits_enabled) {
+        const maxStudents = teacher.schools.max_students ?? 6;
+        if (allStudents.length >= maxStudents) {
+          alert(`Limit erreicht! Maximal ${maxStudents} Schüler.`);
+          return;
+        }
+      }
+      const qrToken = crypto.randomUUID();
+      const lName = inviteLastName.trim();
+      const formattedLast = lName.length > 1 ? lName.charAt(0) + '.' : lName;
+      const { data, error } = await supabase.from('users').insert({
+        school_id: teacher.school_id,
+        role: 'student',
+        first_name: inviteFirstName.trim(),
+        last_name: formattedLast,
+        email: inviteEmail.trim() || null,
+        photo_url: '/avatar_ghost.jpg',
+        qr_token: qrToken,
+        instrument: 'Musiker',
+        status: 'invited',
+        is_trial: true,
+        is_campus_active: activePlatform === 'campus',
+        is_groovelab_active: activePlatform === 'groovelab'
+      }).select().single();
+      if (error) {
+        alert('Fehler: ' + error.message);
+      } else if (data) {
+        setAllStudents(prev => [...prev, data]);
+        fetchData();
+        const link = `${window.location.origin}/?invite=${qrToken}`;
+        setInviteLink(link);
+      }
+    } finally {
+      setInviteSaving(false);
+    }
+  };
+
   if (!teacher) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b', fontWeight: 600 }}>Lade Zentrale...</div>;
 
   return (
-    <div style={{ padding: hideHeader ? '0' : '20px 40px', width: '100%', maxWidth: '1800px', margin: '0 auto', background: hideHeader ? 'transparent' : '#f8fafc', minHeight: '100vh' }}>
-      
+    <div style={{
+      display: 'flex',
+      minHeight: '100vh',
+      background: hideHeader ? 'transparent' : '#f8fafc',
+      color: '#1d1d1f',
+      fontFamily: '"Outfit", "Inter", -apple-system, sans-serif',
+      width: '100%',
+      boxSizing: 'border-box'
+    }}>
+      <style dangerouslySetInnerHTML={{__html: `
+        .google-card {
+          background: var(--glass-bg);
+          backdrop-filter: var(--glass-blur);
+          -webkit-backdrop-filter: var(--glass-blur);
+          border: 1px solid var(--glass-border);
+          border-radius: var(--radius-md);
+          padding: 24px;
+          box-shadow: var(--glass-shadow);
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+          position: relative;
+        }
+        .google-card:hover {
+          transform: translateY(-1px);
+          box-shadow: var(--glass-shadow-lg);
+        }
+        .google-btn-primary {
+          background: #d81e05; /* Swiss Red */
+          color: #ffffff;
+          border: none;
+          font-weight: 700;
+          font-size: 0.85rem;
+          padding: 10px 24px;
+          border-radius: var(--radius-pill);
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .google-btn-primary:hover {
+          background: #b71904;
+        }
+        .google-sidebar-item {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          width: 100%;
+          padding: 12px 16px;
+          border-radius: var(--radius-sm);
+          border: none;
+          font-size: 0.88rem;
+          font-family: 'Plus Jakarta Sans', sans-serif;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+          background: transparent;
+          color: var(--text-secondary);
+          text-align: left;
+          box-sizing: border-box;
+          margin-bottom: 4px;
+          position: relative;
+        }
+        .google-sidebar-item:hover {
+          background: rgba(0, 0, 0, 0.04);
+          color: var(--text-main);
+        }
+        .google-sidebar-item.active.briefing {
+          background: rgba(216, 30, 5, 0.08) !important;
+          color: #d81e05 !important;
+          font-weight: 700;
+        }
+        .google-sidebar-item.active.live {
+          background: rgba(19, 115, 51, 0.08) !important;
+          color: #137333 !important;
+          font-weight: 700;
+        }
+        .google-sidebar-item.active.bands {
+          background: rgba(176, 96, 0, 0.08) !important;
+          color: #b06000 !important;
+          font-weight: 700;
+        }
+        .google-sidebar-item.active.students {
+          background: rgba(107, 33, 168, 0.08) !important;
+          color: #6b21a8 !important;
+          font-weight: 700;
+        }
+        .sidebar-icon-circle {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          transition: all 0.2s ease;
+          background: rgba(0, 0, 0, 0.05);
+          color: var(--text-secondary);
+        }
+        .google-sidebar-item:hover .sidebar-icon-circle {
+          background: rgba(0, 0, 0, 0.08);
+          color: var(--text-main);
+        }
+        .google-sidebar-item.active.briefing .sidebar-icon-circle {
+          background: #d81e05;
+          color: #ffffff;
+        }
+        .google-sidebar-item.active.live .sidebar-icon-circle {
+          background: #34a853;
+          color: #ffffff;
+        }
+        .google-sidebar-item.active.bands .sidebar-icon-circle {
+          background: #fbbc05;
+          color: #ffffff;
+        }
+        .google-sidebar-item.active.students .sidebar-icon-circle {
+          background: #a855f7;
+          color: #ffffff;
+        }
+      `}} />
+
       {selectedCoachProfile && <TeacherDetailModal teacher={selectedCoachProfile} onClose={() => setSelectedCoachProfile(null)} />}
       {selectedStudentProfile && (
         <StudentDetailModal 
@@ -1630,75 +2257,610 @@ export function TeacherDashboard({
           }}
         />
       )}
-      
-      {!hideHeader && (
-        <header style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-              <h1 onClick={() => setActiveTab('live')} style={{ fontSize: '2.5rem', fontWeight: 900, color: activeTab === 'live' ? '#1e293b' : '#cbd5e1', cursor: 'pointer' }}>Live Lab</h1>
-              <h1 onClick={() => setActiveTab('bands')} style={{ fontSize: '2.5rem', fontWeight: 900, color: activeTab === 'bands' ? '#1e293b' : '#cbd5e1', cursor: 'pointer' }}>Bands</h1>
-            </div>
-            <p style={{ color: '#64748b', fontWeight: 600, fontSize: '0.9rem', marginTop: '8px' }}>MUSÄK - Groovelab Academy • Management Dashboard</p>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-             {activeTab === 'live' && (
-               <button
-                 onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                 style={{
-                   background: 'white',
-                   border: '1.5px solid #e2e8f0',
-                   padding: '8px 16px',
-                   borderRadius: '12px',
-                   fontSize: '0.85rem',
-                   fontWeight: 800,
-                   color: '#475569',
-                   cursor: 'pointer',
-                   display: 'flex',
-                   alignItems: 'center',
-                   gap: '8px',
-                   boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-                   transition: 'all 0.15s',
-                   marginRight: '8px'
-                 }}
-                 className="hover-scale"
-               >
-                 {isSidebarCollapsed ? (
-                   <>
-                     <ChevronLeft size={16} /> Sidebar einblenden
-                     {sidebarNotificationsCount > 0 && (
-                       <span style={{
-                         background: '#ef4444',
-                         color: 'white',
-                         fontSize: '0.7rem',
-                         fontWeight: 900,
-                         borderRadius: '10px',
-                         padding: '2px 6px',
-                         minWidth: '16px',
-                         height: '16px',
-                         display: 'flex',
-                         alignItems: 'center',
-                         justifyContent: 'center',
-                         boxShadow: '0 2px 8px rgba(239, 68, 68, 0.35)',
-                         animation: 'pulse 1.5s infinite',
-                         marginLeft: '4px'
-                       }}>
-                         {sidebarNotificationsCount}
-                       </span>
-                     )}
-                   </>
-                 ) : (
-                   <>
-                     Sidebar ausblenden <ChevronRight size={16} />
-                   </>
-                 )}
-               </button>
-             )}
-             <div style={{ background: '#f0fdf4', padding: '8px 16px', borderRadius: '100px', border: '1px solid #dcfce7', color: '#166534', fontSize: '0.85rem', fontWeight: 800 }}>{activeSessions.length} im Lab</div>
-             {viewMode === 'admin' && onLogout && <button onClick={onLogout} style={{ background: 'white', border: '1px solid #e2e8f0', padding: '10px 20px', borderRadius: '12px', fontWeight: 700, color: '#ef4444', cursor: 'pointer' }}>Zentrale schließen</button>}
-          </div>
-        </header>
+      {docStudent && (
+        <MeisterwerkDocumentationModal 
+          student={docStudent} 
+          onClose={() => setDocStudent(null)} 
+        />
       )}
-      {activeTab === 'live' ? (
+
+      {/* Invite Student Modal */}
+      {showInviteStudent && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px)',
+          zIndex: 1500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px'
+        }}>
+          <div style={{
+            background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '32px',
+            width: '100%', maxWidth: '480px', padding: '32px',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', gap: '24px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <h3 style={{ fontSize: '1.35rem', fontWeight: 950, color: '#1e293b', margin: '0 0 4px 0' }}>Schüler einladen</h3>
+                <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>Profil anlegen &amp; Einladungslink generieren</p>
+              </div>
+              <button onClick={() => { setShowInviteStudent(false); setInviteLink(null); }}
+                style={{ background: '#f1f5f9', border: 'none', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', flexShrink: 0 }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {!inviteLink ? (
+              <form onSubmit={handleInviteStudent} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname *</label>
+                    <input type="text" required value={inviteFirstName} onChange={e => setInviteFirstName(e.target.value)} placeholder="Max"
+                      style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Nachname</label>
+                    <input type="text" value={inviteLastName} onChange={e => setInviteLastName(e.target.value)} placeholder="Mustermann"
+                      style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>E-Mail (optional)</label>
+                  <input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="max@example.com"
+                    style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }} />
+                  <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>Wird für den mailto-Link benötigt</span>
+                </div>
+                <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
+                  <button type="button" onClick={() => { setShowInviteStudent(false); setInviteLink(null); }}
+                    style={{ flex: 1, padding: '14px', borderRadius: '16px', border: '1.5px solid #e2e8f0', background: 'white', fontWeight: 800, color: '#475569', cursor: 'pointer' }}>
+                    Abbrechen
+                  </button>
+                  <button type="submit" disabled={inviteSaving}
+                    style={{ flex: 2, padding: '14px', borderRadius: '16px', border: 'none', background: '#8b5cf6', color: 'white', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(139,92,246,0.2)', opacity: inviteSaving ? 0.7 : 1 }}>
+                    {inviteSaving ? 'Erstelle...' : '🔗 Link erstellen'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ width: '36px', height: '36px', background: '#22c55e', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <span style={{ color: 'white', fontSize: '1rem' }}>✓</span>
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 900, color: '#15803d' }}>Profil angelegt!</div>
+                      <div style={{ fontSize: '0.78rem', color: '#4ade80' }}>Teile den Link mit dem Schüler</div>
+                    </div>
+                  </div>
+                  <div style={{ background: 'white', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '12px 16px', wordBreak: 'break-all', fontSize: '0.75rem', color: '#475569', fontFamily: 'monospace' }}>
+                    {inviteLink}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <button onClick={() => { navigator.clipboard.writeText(inviteLink!).then(() => alert('✓ Link kopiert!')); }}
+                    style={{ padding: '14px', borderRadius: '16px', border: 'none', background: '#8b5cf6', color: 'white', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(139,92,246,0.2)' }}>
+                    <Copy size={16} /> Link kopieren
+                  </button>
+                  {inviteEmail && (
+                    <a href={`mailto:${inviteEmail}?subject=Deine%20Einladung&body=Hallo%20${encodeURIComponent(inviteFirstName)}%2C%0A%0AHier%20ist%20dein%20persönlicher%20Einladungslink%3A%0A${encodeURIComponent(inviteLink!)}`}
+                      style={{ padding: '14px', borderRadius: '16px', border: '1.5px solid #e2e8f0', background: 'white', color: '#475569', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', textDecoration: 'none', fontSize: '0.9rem' }}>
+                      <Mail size={16} /> Per E-Mail senden
+                    </a>
+                  )}
+                  <button onClick={() => { setShowInviteStudent(false); setInviteLink(null); setInviteFirstName(''); setInviteLastName(''); setInviteEmail(''); }}
+                    style={{ padding: '10px', borderRadius: '16px', border: 'none', background: 'transparent', color: '#94a3b8', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}>
+                    Schließen
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Sidebar - only render if hideHeader is false AND hideSidebar is false */}
+      {!hideHeader && !hideSidebar && (
+        <div style={{
+          width: '280px',
+          background: '#ffffff',
+          borderRight: '1px solid #e2e8f0',
+          padding: '36px 20px 24px 24px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '32px',
+          height: '100vh',
+          boxSizing: 'border-box',
+          overflowY: 'auto',
+          flexShrink: 0
+        }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 900, color: '#0b57d0', letterSpacing: '-0.02em' }}>
+              GrooveLab
+            </h1>
+            <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700 }}>
+              Teacher Portal
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
+            {[
+              { id: 'briefing', label: 'Briefing', icon: LayoutDashboard },
+              { id: 'live', label: 'Live Lab', icon: Music },
+              { id: 'bands', label: 'Bands', icon: Users },
+              { id: 'students', label: 'Schüler', icon: GraduationCap }
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isSelected = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`google-sidebar-item ${tab.id} ${isSelected ? 'active' : ''}`}
+                >
+                  <div className={`sidebar-icon-circle ${tab.id}`}>
+                    <Icon size={16} />
+                  </div>
+                  <span style={{ flex: 1 }}>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {viewMode === 'admin' && onLogout && (
+            <button
+              onClick={onLogout}
+              className="google-sidebar-item"
+              style={{ color: '#ef4444', marginTop: 'auto' }}
+            >
+              <div className="sidebar-icon-circle" style={{ color: '#ef4444' }}>
+                <LogOut size={16} />
+              </div>
+              <span>Abmelden</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Main Content Area */}
+      <div style={{
+        flex: 1,
+        padding: hideHeader ? '0' : '40px',
+        overflowY: 'auto',
+        height: '100vh',
+        boxSizing: 'border-box',
+        width: '100%'
+      }}>
+        {/* Header - only if hideHeader is false */}
+        {!hideHeader && (
+          <header style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>
+                {activeTab === 'briefing' ? '📊 Tägliches Briefing' : activeTab === 'live' ? '🎸 Live Lab' : activeTab === 'students' ? '🎓 Schülerverwaltung' : '👥 Bands'}
+              </h2>
+              <p style={{ color: '#64748b', fontWeight: 600, fontSize: '0.85rem', marginTop: '4px' }}>
+                {teacher ? `${teacher.first_name} ${teacher.last_name} • ${teacher.instrument || 'Coach'}` : 'Zentrale'}
+              </p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              {activeTab === 'live' && (
+                <button
+                  onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                  style={{
+                    background: 'white',
+                    border: '1.5px solid #e2e8f0',
+                    padding: '8px 16px',
+                    borderRadius: '12px',
+                    fontSize: '0.85rem',
+                    fontWeight: 800,
+                    color: '#475569',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                    transition: 'all 0.15s'
+                  }}
+                  className="hover-scale"
+                >
+                  {isSidebarCollapsed ? (
+                    <>
+                      <ChevronLeft size={16} /> Sidebar einblenden
+                    </>
+                  ) : (
+                    <>
+                      Sidebar ausblenden <ChevronRight size={16} />
+                    </>
+                  )}
+                </button>
+              )}
+              <div style={{ background: '#e6f4ea', padding: '8px 16px', borderRadius: '100px', border: '1px solid #34a853', color: '#137333', fontSize: '0.85rem', fontWeight: 800 }}>
+                {activeSessions.length} im Lab
+              </div>
+            </div>
+          </header>
+        )}
+
+        {/* Tab content switch */}
+        {activeTab === 'briefing' && !hideHeader ? (
+          <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start', flexWrap: 'wrap', width: '100%' }}>
+            <div style={{ flex: 3, minWidth: '400px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {briefingLoading ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Briefing wird geladen...</div>
+              ) : briefingData ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                
+                {/* Hero / Welcome */}
+                <div className="google-card" style={{
+                  background: 'linear-gradient(135deg, #e8f0fe 0%, #ffffff 100%)',
+                  borderColor: '#b3d1ff',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '32px'
+                }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: '#0b57d0' }}>
+                      Hallo, {teacher?.first_name || 'Coach'}!
+                    </h3>
+                    <p style={{ margin: '8px 0 0 0', color: '#475569', fontSize: '0.95rem', fontWeight: 600 }}>
+                      Hier ist deine Übersicht für den heutigen Tag.
+                    </p>
+                  </div>
+                  <div style={{ fontSize: '3rem' }}>☕</div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '-8px' }}>
+                  <button
+                    onClick={handleReportIllness}
+                    style={{
+                      background: '#fee2e2',
+                      color: '#b91c1c',
+                      border: '1.5px solid #fecaca',
+                      padding: '10px 20px',
+                      borderRadius: '100px',
+                      fontWeight: 800,
+                      fontSize: '0.82rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      transition: 'all 0.2s'
+                    }}
+                    className="hover-scale"
+                  >
+                    <span>🤒 Krankheit melden / Heute ausfallen lassen</span>
+                  </button>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+                  {/* Today's Schedule Card */}
+                  <div className="google-card">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                      <div style={{ background: '#e8f0fe', color: '#0b57d0', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Clock size={18} />
+                      </div>
+                      <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#1e293b' }}>Unterrichte Heute</h4>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {briefingData.timeline && briefingData.timeline.length > 0 ? (
+                        briefingData.timeline.map((slot: any, idx: number) => {
+                          const dragColor = activeDragScheduleId ? getTrafficLightColor(activeDragScheduleId, slot) : null;
+                          const isOver = dragOverSlotKey === slot.scheduleId;
+
+                          let slotBg = '#f8fafc';
+                          let slotBorder = '1px solid #e2e8f0';
+                          let labelColor = '#475569';
+                          let titleColor = '#0f172a';
+
+                          if (slot.status === 'canceled_by_student') {
+                            slotBg = '#fef2f2';
+                            slotBorder = '2px dashed #ef4444';
+                            labelColor = '#ef4444';
+                            titleColor = '#ef4444';
+                          } else if (slot.status === 'teacher_sick') {
+                            slotBg = '#fee2e2';
+                            slotBorder = '1px solid #fca5a5';
+                            labelColor = '#991b1b';
+                            titleColor = '#991b1b';
+                          } else if (slot.status === 'pending_parent_approval') {
+                            slotBg = '#fffbeb';
+                            slotBorder = '1.5px dashed #f59e0b';
+                            labelColor = '#d97706';
+                          }
+
+                          if (activeDragScheduleId && slot.scheduleId !== activeDragScheduleId) {
+                            if (dragColor === 'GREEN') {
+                              slotBg = isOver ? '#dcfce7' : '#f0fdf4';
+                              slotBorder = '2px dashed #22c55e';
+                            } else if (dragColor === 'YELLOW') {
+                              slotBg = isOver ? '#fef3c7' : '#fffbeb';
+                              slotBorder = '2px dashed #eab308';
+                            } else if (dragColor === 'RED') {
+                              slotBg = '#fef2f2';
+                              slotBorder = '2px dashed #ef4444';
+                            }
+                          }
+
+                          const isDraggable = slot.student && slot.status !== 'canceled_by_student' && slot.status !== 'teacher_sick';
+
+                          return (
+                            <div 
+                              key={idx} 
+                              draggable={isDraggable}
+                              onDragStart={(e) => isDraggable && handleDragStart(e, slot.scheduleId)}
+                              onDragOver={(e) => activeDragScheduleId && handleDragOver(e, slot.scheduleId, dragColor || 'RED')}
+                              onDrop={(e) => activeDragScheduleId && handleDrop(e, slot)}
+                              onClick={() => {
+                                if (slot.student) {
+                                  setDocStudent({
+                                    id: slot.student.id,
+                                    first_name: slot.student.name.split(' ')[0],
+                                    last_name: slot.student.name.split(' ').slice(1).join(' '),
+                                    photo_url: slot.student.photo_url || '/avatar_ghost.jpg'
+                                  });
+                                }
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '12px 16px',
+                                background: slotBg,
+                                borderRadius: '16px',
+                                border: slotBorder,
+                                cursor: slot.student ? 'pointer' : (isDraggable ? 'grab' : 'default'),
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              <div>
+                                <div style={{ fontWeight: 800, color: titleColor, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  {isDraggable && <span style={{ opacity: 0.3, cursor: 'grab', fontSize: '0.8rem' }}>☰</span>}
+                                  {slot.status === 'canceled_by_student' ? (
+                                    <span>FREISPRECH-SLOT (Abgesagt)</span>
+                                  ) : slot.status === 'teacher_sick' ? (
+                                    <span>Ausfall (Krankheit)</span>
+                                  ) : (
+                                    <span>{slot.student?.name || 'Freier Slot'}</span>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: labelColor, fontWeight: 600, marginTop: '2px' }}>
+                                  {slot.status === 'pending_parent_approval' ? (
+                                    <strong>Warte auf Eltern-OK • </strong>
+                                  ) : null}
+                                  {slot.instrument} • {slot.room}
+                                </div>
+                              </div>
+                              <div style={{
+                                background: slot.status === 'canceled_by_student' ? '#fee2e2' : '#e8f0fe',
+                                color: slot.status === 'canceled_by_student' ? '#ef4444' : '#0b57d0',
+                                padding: '4px 10px',
+                                borderRadius: '8px',
+                                fontSize: '0.75rem',
+                                fontWeight: 800
+                              }}>
+                                {slot.timeSlot}
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div style={{ textAlign: 'center', padding: '30px 0', color: '#64748b', fontSize: '0.9rem' }}>
+                          Keine geplanten Termine für heute.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Next Student Prep Mirror */}
+                  {briefingData.prepMirror && (
+                    <div className="google-card" style={{ borderLeft: '4px solid #10b981' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                        <div style={{ background: '#e6f4ea', color: '#137333', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Award size={18} />
+                        </div>
+                        <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#1e293b' }}>Nächster Schüler Prep-Mirror</h4>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div 
+                          style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
+                          onClick={() => {
+                            setDocStudent({
+                              id: briefingData.prepMirror.studentId,
+                              first_name: briefingData.prepMirror.studentName.split(' ')[0],
+                              last_name: briefingData.prepMirror.studentName.split(' ').slice(1).join(' '),
+                              photo_url: '/avatar_ghost.jpg'
+                            });
+                          }}
+                        >
+                          <div style={{
+                            width: '44px',
+                            height: '44px',
+                            borderRadius: '12px',
+                            background: '#34a853',
+                            color: 'white',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '1.25rem',
+                            fontWeight: 800
+                          }}>
+                            {briefingData.prepMirror.studentName.charAt(0)}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 900, color: '#0f172a' }}>{briefingData.prepMirror.studentName}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                              Slot: {briefingData.prepMirror.timeSlot} • Level {briefingData.prepMirror.evolutionLevel}
+                            </div>
+                          </div>
+                        </div>
+
+                        {briefingData.prepMirror.streakCount > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fffbeb', border: '1px solid #fef3c7', padding: '10px 14px', borderRadius: '12px', color: '#b45309', fontSize: '0.85rem', fontWeight: 700 }}>
+                            <Flame size={16} fill="#f59e0b" color="#f59e0b" />
+                            <span>Premium-User Flammen-Streak: {briefingData.prepMirror.streakCount} Tage!</span>
+                          </div>
+                        )}
+
+                        <div>
+                          <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: '8px' }}>
+                            Aktuelle Songs / Hausaufgaben
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {briefingData.prepMirror.verifiedSongs && briefingData.prepMirror.verifiedSongs.length > 0 ? (
+                              briefingData.prepMirror.verifiedSongs.map((song: any, idx: number) => (
+                                <div key={idx} style={{
+                                  background: '#f8fafc',
+                                  padding: '10px 12px',
+                                  borderRadius: '12px',
+                                  border: '1px solid #e2e8f0',
+                                  fontSize: '0.85rem'
+                                }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#1e293b' }}>
+                                    <span>{song.title}</span>
+                                    <span style={{
+                                      color: song.status === 'verifiziert' ? '#137333' : '#b45309',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 800
+                                    }}>
+                                      {song.status === 'verifiziert' ? '✓ Verifiziert' : 'Übt gerade'}
+                                    </span>
+                                  </div>
+                                  {song.note && (
+                                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px', fontStyle: 'italic' }}>
+                                      "{song.note}"
+                                    </div>
+                                  )}
+                                </div>
+                              ))
+                            ) : (
+                              <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Keine aktiven Songs dokumentiert.</div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            ) : (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#ef4444' }}>Fehler beim Laden des Briefings.</div>
+            )}
+            </div>
+
+            {/* Briefing Right Sidebar */}
+            <aside style={{ flex: 1, minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              <div style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Activity size={18} color="#0b57d0" /> Live-Status
+                </h3>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+                  <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
+                    <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>Im Lab</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 1000, color: '#0b57d0' }}>{activeSessions.length}</div>
+                  </div>
+                  <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
+                    <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>Bands</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 1000, color: '#0b57d0' }}>{allBands.length}</div>
+                  </div>
+                  <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
+                    <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>Challenges</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 1000, color: '#0b57d0' }}>{submissions.length}</div>
+                  </div>
+                  <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
+                    <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>Schüler</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 1000, color: '#0b57d0' }}>{allStudents.length}</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <button
+                    onClick={() => setActiveTab('live')}
+                    style={{
+                      background: '#0b57d0',
+                      color: 'white',
+                      border: 'none',
+                      padding: '12px',
+                      borderRadius: '16px',
+                      fontWeight: 800,
+                      fontSize: '0.82rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      width: '100%',
+                      boxShadow: '0 4px 12px rgba(11, 87, 208, 0.2)'
+                    }}
+                  >
+                    <Music size={16} /> Zum Live Lab
+                  </button>
+                  
+                  {viewMode === 'admin' && (
+                    <button
+                      onClick={async () => {
+                        if (window.confirm('Alle Schüler ausloggen?')) {
+                          const now = new Date().toISOString();
+                          await supabase
+                            .from('sessions')
+                            .update({ check_out_time: now })
+                            .is('check_out_time', null)
+                            .in('user_id', allStudents.map(s => s.id));
+                          fetchData();
+                        }
+                      }}
+                      style={{
+                        background: '#fee2e2',
+                        color: '#ef4444',
+                        border: '1px solid #fecaca',
+                        padding: '12px',
+                        borderRadius: '16px',
+                        fontWeight: 800,
+                        fontSize: '0.82rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        width: '100%'
+                      }}
+                    >
+                      <Trash2 size={16} /> Alle ausloggen
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Active Coaches Mini Panel */}
+              <div style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 900, color: '#1e293b' }}>
+                  Coaches im Dienst
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {coaches.map(c => (
+                    <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', overflow: 'hidden' }}>
+                        <AvatarImage src={c.users?.photo_url} user={c.users} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {c.users?.first_name} {c.users?.last_name}
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>
+                          {c.users?.instrument || 'Coach'}
+                        </div>
+                      </div>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }} />
+                    </div>
+                  ))}
+                  {coaches.length === 0 && (
+                    <div style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>Aktuell keine Coaches eingeloggt.</div>
+                  )}
+                </div>
+              </div>
+            </aside>
+          </div>
+        ) : activeTab === 'live' ? (
         <div className={`live-lab-grid ${isSidebarCollapsed ? 'collapsed' : ''}`}>
           {(() => {
             const activeRoom = rooms.find(r => r.id === selectedRoomId);
@@ -3322,19 +4484,642 @@ export function TeacherDashboard({
             </div>
           )}
         </div>
+      ) : activeTab === 'students' ? (
+        <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start', flexWrap: 'wrap', width: '100%' }}>
+          {/* Main Column */}
+          <div style={{ flex: 3, minWidth: '400px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            
+            {/* Search & Actions Bar */}
+            <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+                <Search size={20} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <input 
+                  placeholder="Schüler suchen..." 
+                  value={studentSearch} 
+                  onChange={e => setStudentSearch(e.target.value)} 
+                  style={{ width: '100%', padding: '16px 16px 16px 48px', borderRadius: '24px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', outline: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' }} 
+                />
+              </div>
+              <button
+                onClick={() => { setInviteLink(null); setInviteEmail(''); setInviteFirstName(''); setInviteLastName(''); setShowInviteStudent(true); }}
+                style={{
+                  background: 'white',
+                  color: '#8b5cf6',
+                  border: '2px solid #8b5cf6',
+                  padding: '14px 22px',
+                  borderRadius: '24px',
+                  fontWeight: 800,
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <Mail size={18} /> Einladen
+              </button>
+              <button
+                onClick={() => setShowAddStudent(true)}
+                style={{
+                  background: '#8b5cf6',
+                  color: 'white',
+                  border: 'none',
+                  padding: '16px 24px',
+                  borderRadius: '24px',
+                  fontWeight: 800,
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 8px 20px rgba(139, 92, 246, 0.2)',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <Plus size={18} /> Schüler anlegen
+              </button>
+            </div>
+
+            {/* A-Z Schnellsuche */}
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', background: 'white', padding: '12px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+              <button 
+                onClick={() => setStudentLetter(null)}
+                style={{
+                  background: studentLetter === null ? '#8b5cf6' : 'transparent',
+                  color: studentLetter === null ? 'white' : '#64748b',
+                  border: 'none',
+                  padding: '8px 16px',
+                  borderRadius: '12px',
+                  fontSize: '0.78rem',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                ALLE
+              </button>
+              {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(letter => {
+                const isActive = studentLetter === letter;
+                const hasStudents = allStudents.some(s => (s.first_name || '').toUpperCase().startsWith(letter));
+                return (
+                  <button
+                    key={letter}
+                    onClick={() => setStudentLetter(isActive ? null : letter)}
+                    style={{
+                      background: isActive ? '#8b5cf6' : 'transparent',
+                      color: isActive ? 'white' : hasStudents ? '#1e293b' : '#cbd5e1',
+                      border: 'none',
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '10px',
+                      fontSize: '0.78rem',
+                      fontWeight: isActive ? 950 : 700,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {letter}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Students Grid */}
+            {(() => {
+              const filtered = allStudents.filter(student => {
+                const matchesSearch = (student.first_name || '').toLowerCase().includes(studentSearch.toLowerCase()) || 
+                                      (student.last_name || '').toLowerCase().includes(studentSearch.toLowerCase());
+                const matchesLetter = studentLetter ? (student.first_name || '').toUpperCase().startsWith(studentLetter) : true;
+                return matchesSearch && matchesLetter;
+              });
+
+              if (filtered.length === 0) {
+                return (
+                  <div className="google-card" style={{ padding: '60px 40px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                    <div style={{ fontSize: '3rem' }}>🔍</div>
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Keine Schüler gefunden</h3>
+                    <p style={{ color: '#64748b', fontSize: '0.85rem', maxWidth: '360px', margin: 0 }}>
+                      Passe deine Suche oder den A-Z Schnellfilter an, oder erstelle einen neuen Schüler.
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+                  {filtered.map(student => {
+                    const isSessionActive = activeSessions.some(sess => sess.user_id === student.id);
+                    return (
+                      <div 
+                        key={student.id} 
+                        className="google-card"
+                        style={{ 
+                          padding: '24px', 
+                          borderRadius: '24px', 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          gap: '16px',
+                          border: isSessionActive ? '2px solid #22c55e' : '1px solid #e2e8f0',
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => setSelectedStudentProfile(student)}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                          <div style={{ width: '48px', height: '48px', borderRadius: '16px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 10px rgba(0,0,0,0.05)', flexShrink: 0 }}>
+                            <AvatarImage src={student.photo_url} user={student} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 900, fontSize: '1rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {student.first_name} {student.last_name}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                              <span style={{ 
+                                background: student.status === 'active' ? '#e6f4ea' : '#f1f3f4', 
+                                color: student.status === 'active' ? '#137333' : '#5f6368', 
+                                padding: '2px 8px', 
+                                borderRadius: '6px', 
+                                fontSize: '0.62rem', 
+                                fontWeight: 900,
+                                textTransform: 'uppercase'
+                              }}>
+                                {student.status === 'active' ? 'Aktiv' : 'Inaktiv'}
+                              </span>
+                              {student.is_trial && (
+                                <span style={{ background: '#fef7e0', color: '#b06000', padding: '2px 8px', borderRadius: '6px', fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase' }}>
+                                  Test
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '16px', border: '1px solid #f1f5f9', fontSize: '0.75rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: '#64748b', fontWeight: 600 }}>Instrument:</span>
+                            <span style={{ fontWeight: 800 }}>{student.instrument || 'Musiker'}</span>
+                          </div>
+                          {student.contract_ends_at && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: '#64748b', fontWeight: 600 }}>Vertrag bis:</span>
+                              <span style={{ fontWeight: 800 }}>{new Date(student.contract_ends_at).toLocaleDateString('de-DE')}</span>
+                            </div>
+                          )}
+                          {student.is_trial && student.trial_ends_at && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: '#64748b', fontWeight: 600 }}>Testphase bis:</span>
+                              <span style={{ fontWeight: 800 }}>{new Date(student.trial_ends_at).toLocaleDateString('de-DE')}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }} onClick={e => e.stopPropagation()}>
+                          <button
+                            onClick={() => setEditingStudent({
+                              id: student.id,
+                              first_name: student.first_name,
+                              last_name: student.last_name,
+                              birth_date: student.birth_date || '',
+                              status: student.status || 'active',
+                              is_trial: student.is_trial || false,
+                              trial_ends_at: student.trial_ends_at || '',
+                              contract_ends_at: student.contract_ends_at || '',
+                              is_external_vocalist: student.is_external_vocalist || false
+                            })}
+                            style={{
+                              flex: 1,
+                              background: '#f1f5f9',
+                              border: 'none',
+                              padding: '8px 12px',
+                              borderRadius: '12px',
+                              fontSize: '0.78rem',
+                              fontWeight: 800,
+                              color: '#475569',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px'
+                            }}
+                          >
+                            <Edit3 size={14} /> Bearbeiten
+                          </button>
+                          <button
+                            onClick={() => handleDeleteStudent(student.id)}
+                            style={{
+                              background: '#fee2e2',
+                              border: 'none',
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#ef4444',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Schüler Sidebar */}
+          <aside style={{ flex: 1, minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+              <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', fontWeight: 900, color: '#1e293b' }}>
+                Schüler-Statistik
+              </h3>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>Gesamt registriert</span>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 950, color: '#8b5cf6' }}>{allStudents.length}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>In Testphase (Trial)</span>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 950, color: '#d97706' }}>{allStudents.filter(s => s.is_trial).length}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>Inaktive Schüler</span>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 950, color: '#64748b' }}>{allStudents.filter(s => s.status === 'inactive').length}</span>
+                </div>
+              </div>
+
+              {teacher?.schools?.limits_enabled ? (
+                <div style={{ background: '#f3e8ff', border: '1px solid #e9d5ff', padding: '16px', borderRadius: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', fontWeight: 800, color: '#6b21a8', marginBottom: '8px' }}>
+                    <span>Schulauslastung</span>
+                    <span>{allStudents.length} / {teacher.schools.max_students ?? 6}</span>
+                  </div>
+                  <div style={{ width: '100%', height: '8px', background: 'rgba(139, 92, 246, 0.15)', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ 
+                      width: `${Math.min(100, (allStudents.length / (teacher.schools.max_students ?? 6)) * 100)}%`, 
+                      height: '100%', 
+                      background: '#8b5cf6', 
+                      borderRadius: '4px',
+                      transition: 'width 0.3s ease'
+                    }} />
+                  </div>
+                  <p style={{ margin: '8px 0 0 0', fontSize: '0.68rem', color: '#7c3aed', fontWeight: 600, lineHeight: 1.4 }}>
+                    Sobald das Limit erreicht ist, können keine weiteren Schüler angelegt werden.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ background: '#e6f4ea', border: '1px solid #a7f3d0', padding: '16px', borderRadius: '16px', fontSize: '0.75rem', color: '#137333', fontWeight: 700 }}>
+                  ✓ Unbegrenztes Schülerlimit aktiv!
+                </div>
+              )}
+            </div>
+
+            <div style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+              <h3 style={{ margin: '0 0 12px 0', fontSize: '1rem', fontWeight: 900, color: '#1e293b' }}>
+                Onboarding-Tipps
+              </h3>
+              <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '0.78rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '8px', fontWeight: 600, lineHeight: 1.4 }}>
+                <li>Der QR-Code wird automatisch generiert und dient als Login-Token.</li>
+                <li>Schüler können sich selbst ins Live Lab einchecken, indem sie ihren QR-Code an die iPad-Station halten.</li>
+                <li>Mitglieder der Testphase werden besonders markiert.</li>
+              </ul>
+            </div>
+          </aside>
+        </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <input placeholder="Suche..." value={bandSearch} onChange={e => setBandSearch(e.target.value)} style={{ width: '100%', padding: '16px', borderRadius: '24px', border: '2px solid #f1f5f9' }} />
-           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '24px' }}>
-             {allBands.filter(b => b.name.toLowerCase().includes(bandSearch.toLowerCase())).map(band => (
-               <div key={band.id} onClick={() => onOpenBandProfile?.(band)} className="glass-panel" style={{ padding: '24px', borderRadius: '24px', cursor: 'pointer' }}>
-                 <h3 style={{ margin: 0 }}>{band.name}</h3>
-                 <p style={{ color: '#64748b', fontSize: '0.8rem' }}>{(() => { const ids = (band.band_members || []).map((m: any) => m.user_id || m.student_id || m.external_name).filter(Boolean); return new Set(ids).size; })()} Mitglieder</p>
-               </div>
-             ))}
-           </div>
+        <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start', flexWrap: 'wrap', width: '100%' }}>
+          {/* Main Column */}
+          <div style={{ flex: 3, minWidth: '400px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <input 
+              placeholder="Band suchen..." 
+              value={bandSearch} 
+              onChange={e => setBandSearch(e.target.value)} 
+              style={{ width: '100%', padding: '16px 20px', borderRadius: '24px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', outline: 'none' }} 
+            />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+              {allBands.filter(b => b.name.toLowerCase().includes(bandSearch.toLowerCase())).map(band => (
+                <div 
+                  key={band.id} 
+                  onClick={() => onOpenBandProfile?.(band)} 
+                  className="google-card" 
+                  style={{ padding: '24px', borderRadius: '24px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '12px' }}
+                >
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 950, color: '#1e293b' }}>{band.name}</h3>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>Mitglieder</span>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0b57d0' }}>
+                      {(() => { const ids = (band.band_members || []).map((m: any) => m.user_id || m.student_id || m.external_name).filter(Boolean); return new Set(ids).size; })()}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Bands Right Sidebar */}
+          <aside style={{ flex: 1, minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+              <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', fontWeight: 900, color: '#1e293b' }}>
+                Band-Übersicht
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>Gesamt Bands</span>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 950, color: '#0b57d0' }}>{allBands.length}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>Offene Song-Vorschläge</span>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 950, color: '#b06000' }}>{openProposals.length}</span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+              <h3 style={{ margin: '0 0 12px 0', fontSize: '1rem', fontWeight: 900, color: '#1e293b' }}>
+                Coaching Leitfaden
+              </h3>
+              <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '0.78rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '8px', fontWeight: 600, lineHeight: 1.4 }}>
+                <li>🎸 <b>Fokus auf Rhythmus</b>: Lass die Bands langsam starten und das Timing festigen.</li>
+                <li>🎤 <b>Gesang lauter</b>: Stelle sicher, dass Sänger klar verständlich über der Band liegen.</li>
+                <li>🎹 <b>Klangauswahl</b>: Keys sollten Frequenzlücken füllen, nicht die Gitarren überdecken.</li>
+                <li>📝 <b>Abstimmungen</b>: Überprüfe regelmäßig die ausstehenden Songs im Repertoire Planer.</li>
+              </ul>
+            </div>
+          </aside>
         </div>
       )}
+
+      {/* Add Student Modal */}
+      {showAddStudent && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(255, 255, 255, 0.8)',
+          backdropFilter: 'blur(12px)',
+          zIndex: 1500,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px'
+        }}>
+          <div style={{
+            background: 'white',
+            border: '1.5px solid #e2e8f0',
+            borderRadius: '32px',
+            width: '100%',
+            maxWidth: '500px',
+            padding: '32px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.05)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '1.35rem', fontWeight: 950, color: '#1e293b', margin: 0 }}>Neuen Schüler anlegen</h3>
+              <button 
+                onClick={() => setShowAddStudent(false)}
+                style={{ background: '#f1f5f9', border: 'none', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddStudent} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname *</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={newStudent.firstName} 
+                    onChange={e => setNewStudent({...newStudent, firstName: e.target.value})} 
+                    style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Nachname *</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={newStudent.lastName} 
+                    onChange={e => setNewStudent({...newStudent, lastName: e.target.value})} 
+                    style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>E-Mail (optional)</label>
+                <input 
+                  type="email"
+                  value={newStudent.email} 
+                  onChange={e => setNewStudent({...newStudent, email: e.target.value})} 
+                  placeholder="schueler@example.com"
+                  style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input 
+                  type="checkbox" 
+                  id="isExternalVocalist"
+                  checked={newStudent.isExternalVocalist} 
+                  onChange={e => setNewStudent({...newStudent, isExternalVocalist: e.target.checked})} 
+                />
+                <label htmlFor="isExternalVocalist" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b', cursor: 'pointer' }}>Externer Sänger (Vocals)</label>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input 
+                  type="checkbox" 
+                  id="isTrial"
+                  checked={newStudent.is_trial} 
+                  onChange={e => setNewStudent({...newStudent, is_trial: e.target.checked})} 
+                />
+                <label htmlFor="isTrial" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b', cursor: 'pointer' }}>In Testphase (Trial)</label>
+              </div>
+
+              {newStudent.is_trial && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Testphase Ende</label>
+                  <input 
+                    type="date" 
+                    value={newStudent.trial_ends_at} 
+                    onChange={e => setNewStudent({...newStudent, trial_ends_at: e.target.value})} 
+                    style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }}
+                  />
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vertragsende (optional)</label>
+                <input 
+                  type="date" 
+                  value={newStudent.contract_ends_at} 
+                  onChange={e => setNewStudent({...newStudent, contract_ends_at: e.target.value})} 
+                  style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+                <button 
+                  type="button" 
+                  onClick={() => setShowAddStudent(false)}
+                  style={{ flex: 1, padding: '14px', borderRadius: '16px', border: '1.5px solid #e2e8f0', background: 'white', fontWeight: 800, color: '#475569', cursor: 'pointer' }}
+                >
+                  Abbrechen
+                </button>
+                <button 
+                  type="submit" 
+                  style={{ flex: 1, padding: '14px', borderRadius: '16px', border: 'none', background: '#8b5cf6', color: 'white', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.2)' }}
+                >
+                  Speichern
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Student Modal */}
+      {editingStudent && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(255, 255, 255, 0.8)',
+          backdropFilter: 'blur(12px)',
+          zIndex: 1500,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px'
+        }}>
+          <div style={{
+            background: 'white',
+            border: '1.5px solid #e2e8f0',
+            borderRadius: '32px',
+            width: '100%',
+            maxWidth: '500px',
+            padding: '32px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.05)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '1.35rem', fontWeight: 950, color: '#1e293b', margin: 0 }}>Schüler bearbeiten</h3>
+              <button 
+                onClick={() => setEditingStudent(null)}
+                style={{ background: '#f1f5f9', border: 'none', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateStudent} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname</label>
+                <input 
+                  type="text" 
+                  required
+                  value={editingStudent.first_name} 
+                  onChange={e => setEditingStudent({...editingStudent, first_name: e.target.value})} 
+                  style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Nachname</label>
+                <input 
+                  type="text" 
+                  required
+                  value={editingStudent.last_name} 
+                  onChange={e => setEditingStudent({...editingStudent, last_name: e.target.value})} 
+                  style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Status</label>
+                <select 
+                  value={editingStudent.status}
+                  onChange={e => setEditingStudent({...editingStudent, status: e.target.value})}
+                  style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem', background: 'white' }}
+                >
+                  <option value="active">Aktiv</option>
+                  <option value="inactive">Inaktiv</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input 
+                  type="checkbox" 
+                  id="editIsExternalVocalist"
+                  checked={editingStudent.is_external_vocalist} 
+                  onChange={e => setEditingStudent({...editingStudent, is_external_vocalist: e.target.checked})} 
+                />
+                <label htmlFor="editIsExternalVocalist" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b', cursor: 'pointer' }}>Externer Sänger (Vocals)</label>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input 
+                  type="checkbox" 
+                  id="editIsTrial"
+                  checked={editingStudent.is_trial} 
+                  onChange={e => setEditingStudent({...editingStudent, is_trial: e.target.checked})} 
+                />
+                <label htmlFor="editIsTrial" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b', cursor: 'pointer' }}>In Testphase (Trial)</label>
+              </div>
+
+              {editingStudent.is_trial && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Testphase Ende</label>
+                  <input 
+                    type="date" 
+                    value={editingStudent.trial_ends_at ? editingStudent.trial_ends_at.substring(0, 10) : ''} 
+                    onChange={e => setEditingStudent({...editingStudent, trial_ends_at: e.target.value})} 
+                    style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }}
+                  />
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vertragsende (optional)</label>
+                <input 
+                  type="date" 
+                  value={editingStudent.contract_ends_at ? editingStudent.contract_ends_at.substring(0, 10) : ''} 
+                  onChange={e => setEditingStudent({...editingStudent, contract_ends_at: e.target.value})} 
+                  style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+                <button 
+                  type="button" 
+                  onClick={() => setEditingStudent(null)}
+                  style={{ flex: 1, padding: '14px', borderRadius: '16px', border: '1.5px solid #e2e8f0', background: 'white', fontWeight: 800, color: '#475569', cursor: 'pointer' }}
+                >
+                  Abbrechen
+                </button>
+                <button 
+                  type="submit" 
+                  style={{ flex: 1, padding: '14px', borderRadius: '16px', border: 'none', background: '#8b5cf6', color: 'white', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.2)' }}
+                >
+                  Speichern
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      </div>
       {/* Full Submissions View Overlay */}
       {showAllSubmissions && (
         <div style={{

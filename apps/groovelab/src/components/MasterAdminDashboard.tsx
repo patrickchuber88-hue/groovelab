@@ -6,6 +6,8 @@ import {
   Edit2, Settings, Sliders, Search
 } from 'lucide-react';
 
+import { BillingDashboard } from './BillingDashboard';
+
 interface School {
   id: string;
   name: string;
@@ -23,6 +25,12 @@ interface School {
   limits_enabled?: boolean;
   zip_code?: string | null;
   city?: string | null;
+  has_groovelab_subscription?: boolean;
+  has_campus_subscription?: boolean;
+  subscription_bypass?: boolean;
+  groovelab_kiosk_token?: string | null;
+  campus_login_token?: string | null;
+  secretary_onboarding_token?: string | null;
 }
 
 interface MasterAdminDashboardProps {
@@ -42,6 +50,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
   const [newSchoolZip, setNewSchoolZip] = useState('');
   const [newSchoolCity, setNewSchoolCity] = useState('');
   const [schoolSearchQuery, setSchoolSearchQuery] = useState('');
+  const [activePortalTab, setActivePortalTab] = useState<'schools' | 'billing'>('schools');
   
   // Editing State
   const [editingSchoolId, setEditingSchoolId] = useState<string | null>(null);
@@ -82,6 +91,9 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
   const [editTrialOption, setEditTrialOption] = useState<'14' | '30' | 'custom'>('custom');
   const [editZipCode, setEditZipCode] = useState('');
   const [editCity, setEditCity] = useState('');
+  const [editHasGroovelab, setEditHasGroovelab] = useState(false);
+  const [editHasCampus, setEditHasCampus] = useState(false);
+  const [editSubscriptionBypass, setEditSubscriptionBypass] = useState(false);
 
   useEffect(() => {
     fetchSchoolsAndStats();
@@ -149,7 +161,10 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
         max_songs: editMaxSongs,
         limits_enabled: editLimitsEnabled,
         zip_code: editZipCode.trim() || null,
-        city: editCity.trim() || null
+        city: editCity.trim() || null,
+        has_groovelab_subscription: editHasGroovelab,
+        has_campus_subscription: editHasCampus,
+        subscription_bypass: editSubscriptionBypass
       };
 
       const { error } = await supabase
@@ -314,8 +329,8 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
   };
 
 
-  const copyInviteLink = (schoolId: string) => {
-    const inviteUrl = `${window.location.origin}?invite_school_id=${schoolId}&role=teacher`;
+  const copyInviteLink = (schoolId: string, token?: string | null) => {
+    const inviteUrl = `${window.location.origin}?invite_school_id=${schoolId}&role=secretary&token=${token || ''}`;
     navigator.clipboard.writeText(inviteUrl);
     setCopiedId(schoolId);
     setTimeout(() => setCopiedId(null), 2000);
@@ -374,6 +389,44 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
           </div>
         </div>
 
+        {/* Tab Switcher */}
+        <div style={{ display: 'flex', gap: '8px', background: '#f5f5f7', padding: '4px', borderRadius: '14px' }}>
+          <button
+            onClick={() => setActivePortalTab('schools')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '10px',
+              border: 'none',
+              background: activePortalTab === 'schools' ? '#ffffff' : 'transparent',
+              color: activePortalTab === 'schools' ? '#1d1d1f' : '#8e8e93',
+              fontSize: '0.82rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: activePortalTab === 'schools' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+              transition: 'all 0.2s'
+            }}
+          >
+            🏫 Schulen
+          </button>
+          <button
+            onClick={() => setActivePortalTab('billing')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '10px',
+              border: 'none',
+              background: activePortalTab === 'billing' ? '#ffffff' : 'transparent',
+              color: activePortalTab === 'billing' ? '#1d1d1f' : '#8e8e93',
+              fontSize: '0.82rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: activePortalTab === 'billing' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+              transition: 'all 0.2s'
+            }}
+          >
+            💳 Abrechnung
+          </button>
+        </div>
+
         <div style={{ display: 'flex', gap: '12px' }}>
           <button 
             onClick={fetchSchoolsAndStats}
@@ -428,8 +481,12 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
         </div>
       </div>
 
-      {/* KPI Stats Grid */}
-      <div style={{
+      {activePortalTab === 'billing' ? (
+        <BillingDashboard />
+      ) : (
+        <>
+          {/* KPI Stats Grid */}
+          <div style={{
         maxWidth: '1200px',
         margin: '0 auto 40px auto',
         display: 'grid',
@@ -586,6 +643,9 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                       setEditTrialOption('custom');
                       setEditZipCode(school.zip_code || '');
                       setEditCity(school.city || '');
+                      setEditHasGroovelab(school.has_groovelab_subscription ?? false);
+                      setEditHasCampus(school.has_campus_subscription ?? false);
+                      setEditSubscriptionBypass(school.subscription_bypass ?? false);
                     }}
                     style={{ 
                       borderRadius: '18px',
@@ -652,6 +712,28 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                             {teachers} L • {students} S • {bands} B{school.limits_enabled && ' • ⚖️ Limits'}
                           </span>
                         </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
+                          {school.has_campus_subscription && (
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#0071e3', background: '#0071e310', padding: '2px 8px', borderRadius: '100px' }}>
+                              🎓 Campus
+                            </span>
+                          )}
+                          {school.has_groovelab_subscription && (
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#ff9500', background: '#ff950010', padding: '2px 8px', borderRadius: '100px' }}>
+                              🎸 GrooveLab
+                            </span>
+                          )}
+                          {school.subscription_bypass && (
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#ff3b30', background: '#ff3b3010', padding: '2px 8px', borderRadius: '100px', border: '1px dashed #ff3b3030' }}>
+                              ⚙️ Bypass
+                            </span>
+                          )}
+                          {!school.has_campus_subscription && !school.has_groovelab_subscription && (
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#8e8e93', background: '#8e8e9310', padding: '2px 8px', borderRadius: '100px' }}>
+                              Kein Abo
+                            </span>
+                          )}
+                        </div>
                         {school.limits_enabled && (
                           <div style={{ display: 'flex', gap: '16px', marginTop: '10px', flexWrap: 'wrap' }}>
                             {[
@@ -714,7 +796,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
 
                       {/* Pill Invite Button */}
                       <button
-                        onClick={() => copyInviteLink(school.id)}
+                        onClick={() => copyInviteLink(school.id, school.secretary_onboarding_token)}
                         style={{
                           padding: '8px 16px',
                           borderRadius: '100px',
@@ -1187,468 +1269,1058 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
             )}
           </div>
         </div>
-
       </div>
-      
-      {/* School Edit Modal (iOS Slide-in Sheet style) */}
+    </>
+  )}
+      {/* School Edit Modal (Full-Screen Workspace - Light Mode) */}
       {selectedSchool && (
-        <>
-          <div 
-            style={{
-              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-              background: 'rgba(0, 0, 0, 0.12)',
-              backdropFilter: 'blur(8px)',
-              WebkitBackdropFilter: 'blur(8px)',
-              zIndex: 9998,
-              transition: 'all 0.3s ease'
-            }}
-            onClick={() => setSelectedSchool(null)}
-          />
-          <div 
-            style={{
-              position: 'fixed', top: 0, right: 0, bottom: 0,
-              width: '100%', maxWidth: '45vw', minWidth: '550px',
-              background: '#f5f5f7', // iOS background
-              zIndex: 9999,
-              boxShadow: '-10px 0 40px rgba(0,0,0,0.06)',
-              display: 'flex', flexDirection: 'column',
-              animation: 'slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-              borderRadius: '24px 0 0 24px',
-              overflow: 'hidden'
-            }}
-          >
-            <style dangerouslySetInnerHTML={{__html: `
-              @keyframes slideIn {
-                from { transform: translateX(100%); }
-                to { transform: translateX(0); }
-              }
-            `}} />
-            
-            {/* Hero Header */}
-            <div style={{
-              position: 'relative',
-              background: editColor || '#3b82f6',
-              padding: '48px 36px 64px',
-              color: '#ffffff'
-            }}>
-              <button 
-                onClick={() => setSelectedSchool(null)}
-                style={{ 
-                  position: 'absolute', top: '20px', right: '20px', 
-                  background: 'rgba(255,255,255,0.2)', 
-                  border: 'none', cursor: 'pointer', 
-                  color: '#ffffff', width: '36px', height: '36px', 
-                  borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'background 0.2s',
-                  fontSize: '1.25rem',
-                  fontWeight: 600
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
-                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
-              >
-                ×
-              </button>
-              
-              <h2 style={{ margin: '0 0 8px 0', fontSize: '2rem', fontWeight: 900, letterSpacing: '-0.03em', textShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-                {selectedSchool.name}
-              </h2>
-              <p style={{ margin: 0, fontSize: '0.9rem', opacity: 0.95, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                {editStatus === 'active' ? '🟢 Aktiv' : '🔴 Gesperrt (Bypass)'} {editIsTrial ? ' • ⏳ Probezeit' : ''}
-              </p>
-            </div>
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            background: '#f8fafc',
+            color: '#0f172a',
+            zIndex: 9999,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            fontFamily: '"Outfit", "Inter", -apple-system, sans-serif',
+            animation: 'fadeIn 0.25s ease-out forwards'
+          }}
+        >
+          <style dangerouslySetInnerHTML={{__html: `
+            @keyframes fadeIn {
+              from { opacity: 0; transform: scale(1.02); }
+              to { opacity: 1; transform: scale(1); }
+            }
+          `}} />
+          
+          {/* Subtle colored background glows */}
+          <div style={{
+            position: 'absolute',
+            top: '-20%',
+            left: '20%',
+            width: '600px',
+            height: '600px',
+            background: `radial-gradient(circle, ${editColor}08 0%, transparent 70%)`,
+            pointerEvents: 'none',
+            zIndex: 1
+          }} />
 
-            {/* Logo Avatar overlapping */}
-            <div style={{ padding: '0 36px', marginTop: '-40px', position: 'relative', zIndex: 10 }}>
+          {/* Premium Glass Header - Light Mode */}
+          <div style={{
+            position: 'relative',
+            zIndex: 10,
+            background: 'rgba(255, 255, 255, 0.8)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            borderBottom: '1px solid #e2e8f0',
+            padding: '20px 40px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
               <div style={{
-                width: '80px', height: '80px', 
-                background: '#ffffff', borderRadius: '22px', 
-                boxShadow: '0 8px 24px rgba(0,0,0,0.04)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                padding: '8px', border: '3px solid #f5f5f7',
+                width: '48px',
+                height: '48px',
+                borderRadius: '16px',
+                background: `linear-gradient(135deg, ${editColor || '#3b82f6'} 0%, ${editColor ? editColor + 'cc' : '#1d4ed8'} 100%)`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 900,
+                color: '#ffffff',
+                fontSize: '1.25rem',
+                boxShadow: `0 8px 24px ${editColor ? editColor + '20' : 'rgba(59, 130, 246, 0.15)'}`,
                 overflow: 'hidden'
               }}>
                 {editLogo ? (
-                  <img src={editLogo} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                  <img src={editLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
-                  <span style={{ fontSize: '2.25rem' }}>🏫</span>
+                  editName.substring(0, 2).toUpperCase()
                 )}
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.02em', color: '#0f172a' }}>
+                    {editName || selectedSchool.name}
+                  </h2>
+                  <span style={{
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    padding: '4px 10px',
+                    borderRadius: '100px',
+                    background: editStatus === 'active' ? '#d1fae5' : '#fee2e2',
+                    color: editStatus === 'active' ? '#065f46' : '#991b1b',
+                    border: `1px solid ${editStatus === 'active' ? '#a7f3d0' : '#fecaca'}`
+                  }}>
+                    {editStatus === 'active' ? 'Aktiv' : 'Gesperrt'}
+                  </span>
+                  {editIsTrial && (
+                    <span style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      padding: '4px 10px',
+                      borderRadius: '100px',
+                      background: '#fef3c7',
+                      color: '#92400e',
+                      border: '1px solid #fde68a'
+                    }}>
+                      Probezeit
+                    </span>
+                  )}
+                </div>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 500 }}>
+                  Tenant ID: <span style={{ fontFamily: 'monospace', color: '#334155' }}>{selectedSchool.id}</span>
+                </p>
               </div>
             </div>
 
-            {/* Scrollable Content (Grouped Settings) */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '24px 36px 36px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              
-              {/* Stats Grid Container (Grouped) */}
-              <div style={{
-                background: '#ffffff',
-                borderRadius: '20px',
-                padding: '16px',
-                border: '1px solid rgba(0, 0, 0, 0.04)',
-                display: 'grid',
-                gridTemplateColumns: 'repeat(4, 1fr)',
-                gap: '8px'
-              }}>
-                {[
-                  { label: 'Lehrer', value: schoolStats[selectedSchool.id]?.teachers || 0 },
-                  { label: 'Schüler', value: schoolStats[selectedSchool.id]?.students || 0 },
-                  { label: 'Bands', value: schoolStats[selectedSchool.id]?.bands || 0 },
-                  { label: 'Songs', value: schoolStats[selectedSchool.id]?.songs || 0 }
-                ].map((s, i) => (
-                  <div key={i} style={{ textAlign: 'center', padding: '10px 4px' }}>
-                    <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.label}</div>
-                    <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#1d1d1f', marginTop: '4px', letterSpacing: '-0.02em' }}>{s.value}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Group 1: General Info */}
-              <div style={{
-                background: '#ffffff',
-                borderRadius: '20px',
-                padding: '24px',
-                border: '1px solid rgba(0, 0, 0, 0.04)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '16px'
-              }}>
-                <h3 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', fontWeight: 800, color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.01em' }}>
-                  <Settings size={18} color={editColor || '#3b82f6'} /> Identität & Marke
-                </h3>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', color: '#8e8e93', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Name der Schule</label>
-                  <input 
-                    type="text" 
-                    value={editName} 
-                    onChange={(e) => setEditName(e.target.value)} 
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.12)', fontSize: '0.95rem', fontWeight: 600, color: '#1d1d1f', outline: 'none' }} 
-                  />
-                </div>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#8e8e93', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>PLZ</label>
-                    <input 
-                      type="text" 
-                      value={editZipCode} 
-                      onChange={(e) => setEditZipCode(e.target.value)} 
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.12)', fontSize: '0.95rem', fontWeight: 600, color: '#1d1d1f', outline: 'none' }} 
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#8e8e93', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ort</label>
-                    <input 
-                      type="text" 
-                      value={editCity} 
-                      onChange={(e) => setEditCity(e.target.value)} 
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.12)', fontSize: '0.95rem', fontWeight: 600, color: '#1d1d1f', outline: 'none' }} 
-                    />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#8e8e93', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Hauptfarbe</label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <input type="color" value={editColor} onChange={(e) => setEditColor(e.target.value)} style={{ width: '42px', height: '42px', padding: 0, border: 'none', borderRadius: '10px', cursor: 'pointer' }} />
-                      <input type="text" value={editColor} onChange={(e) => setEditColor(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.12)', fontSize: '0.85rem', fontFamily: 'monospace', outline: 'none' }} />
-                    </div>
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#8e8e93', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Logo URL</label>
-                    <input type="text" value={editLogo} onChange={(e) => setEditLogo(e.target.value)} placeholder="https://..." style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.12)', fontSize: '0.9rem', outline: 'none' }} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Group 2: Status & Contracts */}
-              <div style={{
-                background: '#ffffff',
-                borderRadius: '20px',
-                padding: '24px',
-                border: '1px solid rgba(0, 0, 0, 0.04)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '16px'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.01em' }}>
-                    <Shield size={18} color={editColor || '#3b82f6'} /> Zugang & Verträge
-                  </h3>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 800, fontSize: '0.85rem', color: '#48484a', background: '#f2f2f7', padding: '6px 12px', borderRadius: '100px' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={editIsTrial} 
-                      onChange={(e) => {
-                        const checked = e.target.checked;
-                        setEditIsTrial(checked);
-                        if (checked && !editTrialEndsAt) {
-                          setEditTrialOption('14');
-                          setEditTrialEndsAt(getFutureDate(14));
-                        }
-                      }} 
-                      style={{ width: '15px', height: '15px', accentColor: editColor || '#3b82f6' }} 
-                    />
-                    Probezeit aktiv
-                  </label>
-                </div>
-                
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schul-Zugang (Login)</label>
-                  {/* Segmented Control */}
-                  <div style={{ display: 'flex', background: '#f2f2f7', padding: '4px', borderRadius: '10px' }}>
-                    <button 
-                      type="button"
-                      onClick={() => setEditStatus('active')}
-                      style={{ 
-                        flex: 1, 
-                        padding: '8px 12px', 
-                        borderRadius: '8px', 
-                        border: 'none', 
-                        fontSize: '0.85rem', 
-                        fontWeight: 800, 
-                        cursor: 'pointer', 
-                        transition: 'all 0.15s ease', 
-                        background: editStatus === 'active' ? '#ffffff' : 'transparent', 
-                        color: editStatus === 'active' ? '#34c759' : '#8e8e93', 
-                        boxShadow: editStatus === 'active' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none' 
-                      }}
-                    >
-                      Aktiviert
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => setEditStatus('suspended')}
-                      style={{ 
-                        flex: 1, 
-                        padding: '8px 12px', 
-                        borderRadius: '8px', 
-                        border: 'none', 
-                        fontSize: '0.85rem', 
-                        fontWeight: 800, 
-                        cursor: 'pointer', 
-                        transition: 'all 0.15s ease', 
-                        background: editStatus === 'suspended' ? '#ffffff' : 'transparent', 
-                        color: editStatus === 'suspended' ? '#ff3b30' : '#8e8e93', 
-                        boxShadow: editStatus === 'suspended' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none' 
-                      }}
-                    >
-                      Gesperrt
-                    </button>
-                  </div>
-                </div>
-
-                <div style={{ marginTop: '4px' }}>
-                  <label style={{ display: 'block', fontSize: '0.78rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Individueller QR-Login Link
-                  </label>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input
-                      readOnly
-                      value={`${window.location.origin}/?school_id=${selectedSchool.id}`}
-                      style={{
-                        flex: 1,
-                        padding: '10px 12px',
-                        borderRadius: '10px',
-                        border: '1px solid rgba(0,0,0,0.12)',
-                        background: '#f5f5f7',
-                        fontSize: '0.8rem',
-                        fontFamily: 'monospace',
-                        color: '#48484a',
-                        outline: 'none'
-                      }}
-                      onClick={(e) => (e.target as HTMLInputElement).select()}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(`${window.location.origin}/?school_id=${selectedSchool.id}`);
-                        alert('QR-Login Link für diese Schule in die Zwischenablage kopiert!');
-                      }}
-                      style={{
-                        background: editColor || '#0071e3',
-                        color: '#ffffff',
-                        border: 'none',
-                        borderRadius: '10px',
-                        padding: '10px 16px',
-                        fontSize: '0.8rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        transition: 'opacity 0.2s'
-                      }}
-                      onMouseOver={(e) => e.currentTarget.style.opacity = '0.85'}
-                      onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
-                    >
-                      Kopieren
-                    </button>
-                  </div>
-                  <p style={{ margin: '6px 0 0 0', fontSize: '0.72rem', color: '#8e8e93', lineHeight: '1.4' }}>
-                    Dieser Link öffnet den QR-Code-Scanner direkt gebrandet für diese Schule (z. B. auf Schüler-Endgeräten zu Hause).
-                  </p>
-                </div>
-
-                {editIsTrial ? (
-                  <div style={{ background: '#fffbeb', padding: '16px', borderRadius: '12px', border: '1px solid rgba(234, 179, 8, 0.2)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.78rem', color: '#b45309', fontWeight: 800, marginBottom: '8px' }}>⏳ Probezeit Dauer</label>
-                      <div style={{ display: 'flex', background: '#fef3c7', padding: '3px', borderRadius: '8px' }}>
-                        {[
-                          { label: '14 Tage', value: '14' },
-                          { label: '30 Tage', value: '30' },
-                          { label: 'Benutzerdefiniert', value: 'custom' }
-                        ].map((opt) => (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            onClick={() => {
-                              setEditTrialOption(opt.value as any);
-                              if (opt.value === '14') {
-                                setEditTrialEndsAt(getFutureDate(14));
-                              } else if (opt.value === '30') {
-                                setEditTrialEndsAt(getFutureDate(30));
-                              }
-                            }}
-                            style={{
-                              flex: 1,
-                              padding: '6px 8px',
-                              borderRadius: '6px',
-                              border: 'none',
-                              fontSize: '0.8rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              transition: 'all 0.15s ease',
-                              background: editTrialOption === opt.value ? '#ffffff' : 'transparent',
-                              color: editTrialOption === opt.value ? '#b45309' : '#d97706',
-                              boxShadow: editTrialOption === opt.value ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
-                            }}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.78rem', color: '#b45309', fontWeight: 800, marginBottom: '6px' }}>
-                        {editTrialOption === 'custom' ? 'Probezeit Enddatum' : 'Berechnetes Enddatum'}
-                      </label>
-                      {editTrialOption === 'custom' ? (
-                        <input
-                          type="text"
-                          placeholder="TT.MM.JJJJ oder YYYY-MM-DD"
-                          value={editTrialEndsAt}
-                          onChange={(e) => setEditTrialEndsAt(e.target.value)}
-                          style={{
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            padding: '10px 12px',
-                            borderRadius: '8px',
-                            border: '1.5px solid #fcd34d',
-                            outline: 'none',
-                            background: '#fff',
-                            fontSize: '0.9rem',
-                            fontWeight: 600,
-                            color: '#1d1d1f'
-                          }}
-                        />
-                      ) : (
-                        <div style={{
-                          padding: '10px 12px',
-                          borderRadius: '8px',
-                          background: 'rgba(255, 255, 255, 0.5)',
-                          border: '1.5px solid rgba(252, 211, 77, 0.5)',
-                          fontSize: '0.9rem',
-                          fontWeight: 700,
-                          color: '#b45309'
-                        }}>
-                          {formatDateDisplay(editTrialEndsAt) || 'Kein Datum berechnet'}
-                        </div>
-                      )}
-                      <p style={{ margin: '6px 0 0 0', fontSize: '0.72rem', color: '#b45309', fontWeight: 600 }}>
-                        Logins werden nach diesem Tag automatisch verweigert.
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#8e8e93', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Vertragslaufzeit bis (Optional)</label>
-                    <input type="text" placeholder="TT.MM.JJJJ oder YYYY-MM-DD" value={editContractEndsAt} onChange={(e) => setEditContractEndsAt(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.12)', fontSize: '0.9rem', outline: 'none' }} />
-                  </div>
-                )}
-              </div>
-
-              {/* Group 3: Limits */}
-              <div style={{
-                background: '#ffffff',
-                borderRadius: '20px',
-                padding: '24px',
-                border: '1px solid rgba(0, 0, 0, 0.04)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '16px',
-                opacity: editLimitsEnabled ? 1 : 0.8,
-                transition: 'opacity 0.25s ease'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.01em' }}>
-                    <Sliders size={18} color={editColor || '#3b82f6'} /> Kontingente (Limits)
-                  </h3>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 800, fontSize: '0.85rem', color: '#48484a', background: '#f2f2f7', padding: '6px 12px', borderRadius: '100px' }}>
-                    <input type="checkbox" checked={editLimitsEnabled} onChange={(e) => setEditLimitsEnabled(e.target.checked)} style={{ width: '15px', height: '15px', accentColor: editColor || '#3b82f6' }} />
-                    Limits aktivieren
-                  </label>
-                </div>
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: 'repeat(3, 1fr)', 
-                  gap: '12px',
-                  opacity: editLimitsEnabled ? 1 : 0.45,
-                  pointerEvents: editLimitsEnabled ? 'auto' : 'none',
-                  transition: 'all 0.25s ease'
-                }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Max Lehrer</label>
-                    <input type="number" min="0" disabled={!editLimitsEnabled} value={editMaxTeachers} onChange={(e) => setEditMaxTeachers(parseInt(e.target.value) || 0)} style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.12)', fontSize: '0.9rem', fontWeight: 600, outline: 'none', background: editLimitsEnabled ? '#ffffff' : '#f5f5f7' }} />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Max Schüler</label>
-                    <input type="number" min="0" disabled={!editLimitsEnabled} value={editMaxStudents} onChange={(e) => setEditMaxStudents(parseInt(e.target.value) || 0)} style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.12)', fontSize: '0.9rem', fontWeight: 600, outline: 'none', background: editLimitsEnabled ? '#ffffff' : '#f5f5f7' }} />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Max Songs</label>
-                    <input type="number" min="0" disabled={!editLimitsEnabled} value={editMaxSongs} onChange={(e) => setEditMaxSongs(parseInt(e.target.value) || 0)} style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.12)', fontSize: '0.9rem', fontWeight: 600, outline: 'none', background: editLimitsEnabled ? '#ffffff' : '#f5f5f7' }} />
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Actions (Sticky Footer) */}
-            <div style={{ padding: '20px 36px', borderTop: '1px solid rgba(0,0,0,0.06)', background: '#ffffff', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: '12px' }}>
               <button
                 onClick={() => setSelectedSchool(null)}
                 style={{
-                  padding: '12px 24px', borderRadius: '12px', background: '#e5e5ea', color: '#48484a', border: 'none', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer', transition: 'background 0.2s'
+                  padding: '12px 24px',
+                  borderRadius: '12px',
+                  background: '#f1f5f9',
+                  color: '#475569',
+                  border: '1px solid #e2e8f0',
+                  fontWeight: 700,
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
                 }}
-                onMouseOver={(e) => e.currentTarget.style.background = '#d1d1d6'}
-                onMouseOut={(e) => e.currentTarget.style.background = '#e5e5ea'}
+                onMouseOver={(e) => e.currentTarget.style.background = '#e2e8f0'}
+                onMouseOut={(e) => e.currentTarget.style.background = '#f1f5f9'}
               >
                 Abbrechen
               </button>
               <button
                 onClick={handleSaveSchoolDetails}
                 style={{
-                  padding: '12px 32px', borderRadius: '12px', background: editColor || '#0071e3', color: '#ffffff', border: 'none', fontWeight: 900, fontSize: '0.95rem', cursor: 'pointer', boxShadow: `0 8px 20px ${editColor ? editColor+'30' : 'rgba(0,113,227,0.25)'}`, transition: 'transform 0.1s'
+                  padding: '12px 32px',
+                  borderRadius: '12px',
+                  background: editColor || '#eab308',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontWeight: 800,
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                  boxShadow: `0 8px 24px ${editColor ? editColor + '30' : 'rgba(234, 179, 8, 0.25)'}`,
+                  transition: 'all 0.2s'
                 }}
-                onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.97)'}
-                onMouseUp={(e) => e.currentTarget.style.transform = 'none'}
-                onMouseLeave={(e) => e.currentTarget.style.transform = 'none'}
+                onMouseOver={(e) => e.currentTarget.style.filter = 'brightness(1.1)'}
+                onMouseOut={(e) => e.currentTarget.style.filter = 'none'}
               >
-                Sichern
+                Änderungen speichern
               </button>
             </div>
           </div>
-        </>
-      )}
+
+          {/* Workspace Layout */}
+          <div style={{
+            flex: 1,
+            display: 'grid',
+            gridTemplateColumns: '380px 1fr',
+            overflow: 'hidden',
+            position: 'relative',
+            zIndex: 2
+          }}>
+            
+            {/* Sidebar Control Panel - Light Mode */}
+            <div style={{
+              background: '#f1f5f9',
+              borderRight: '1px solid #e2e8f0',
+              padding: '40px 32px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '32px',
+              overflowY: 'auto'
+            }}>
+              {/* Logo Brand Preview */}
+              <div style={{
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '24px',
+                padding: '24px',
+                textAlign: 'center',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '16px',
+                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
+              }}>
+                <div style={{
+                  width: '100px',
+                  height: '100px',
+                  borderRadius: '24px',
+                  background: '#f8fafc',
+                  border: `3px solid ${editColor || '#3b82f6'}`,
+                  boxShadow: `0 8px 30px ${editColor ? editColor + '15' : 'rgba(0,0,0,0.05)'}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '2.5rem',
+                  overflow: 'hidden'
+                }}>
+                  {editLogo ? (
+                    <img src={editLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    '🏫'
+                  )}
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>Branding Vorschau</h4>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>Wird in Apps & Portalen verwendet</p>
+                </div>
+              </div>
+
+              {/* Statistics Overview */}
+              <div style={{
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '24px',
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
+              }}>
+                <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Statistiken (Aktuell)
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  {[
+                    { label: 'Lehrer', value: schoolStats[selectedSchool.id]?.teachers || 0, color: '#3b82f6' },
+                    { label: 'Schüler', value: schoolStats[selectedSchool.id]?.students || 0, color: '#22c55e' },
+                    { label: 'Bands', value: schoolStats[selectedSchool.id]?.bands || 0, color: '#a855f7' },
+                    { label: 'Songs', value: schoolStats[selectedSchool.id]?.songs || 0, color: '#eab308' }
+                  ].map((stat, i) => (
+                    <div key={i} style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '14px',
+                      padding: '12px 16px'
+                    }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', display: 'block' }}>{stat.label}</span>
+                      <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', marginTop: '4px', display: 'block' }}>{stat.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* School Status Settings */}
+              <div style={{
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '24px',
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
+              }}>
+                <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  System-Status
+                </h4>
+                
+                <div style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <button 
+                    type="button"
+                    onClick={() => setEditStatus('active')}
+                    style={{ 
+                      flex: 1, 
+                      padding: '10px', 
+                      borderRadius: '8px', 
+                      border: 'none', 
+                      fontSize: '0.85rem', 
+                      fontWeight: 800, 
+                      cursor: 'pointer', 
+                      transition: 'all 0.2s', 
+                      background: editStatus === 'active' ? '#ffffff' : 'transparent', 
+                      color: editStatus === 'active' ? '#10b981' : '#64748b',
+                      boxShadow: editStatus === 'active' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                    }}
+                  >
+                    Aktiviert
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setEditStatus('suspended')}
+                    style={{ 
+                      flex: 1, 
+                      padding: '10px', 
+                      borderRadius: '8px', 
+                      border: 'none', 
+                      fontSize: '0.85rem', 
+                      fontWeight: 800, 
+                      cursor: 'pointer', 
+                      transition: 'all 0.2s', 
+                      background: editStatus === 'suspended' ? '#ffffff' : 'transparent', 
+                      color: editStatus === 'suspended' ? '#ef4444' : '#64748b',
+                      boxShadow: editStatus === 'suspended' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                    }}
+                  >
+                    Gesperrt
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>Probezeit Modus</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextTrial = !editIsTrial;
+                      setEditIsTrial(nextTrial);
+                      if (nextTrial && !editTrialEndsAt) {
+                        setEditTrialOption('14');
+                        setEditTrialEndsAt(getFutureDate(14));
+                      }
+                    }}
+                    style={{
+                      position: 'relative',
+                      width: '42px',
+                      height: '24px',
+                      borderRadius: '12px',
+                      background: editIsTrial ? '#eab308' : '#cbd5e1',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '0',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <div style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      background: '#ffffff',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                      transition: 'transform 0.2s',
+                      transform: editIsTrial ? 'translateX(22px)' : 'translateX(2px)'
+                    }} />
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Main Form Fields Grid Area */}
+            <div style={{
+              padding: '40px 48px',
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '32px',
+              background: '#f8fafc'
+            }}>
+              
+              {/* Form Grid */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
+                gap: '28px',
+                alignItems: 'start'
+              }}>
+
+                {/* Box 1: Stammdaten & Brand */}
+                <div style={{
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '24px',
+                  padding: '32px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '20px',
+                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)'
+                }}>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Settings size={20} color={editColor || '#3b82f6'} /> Identität & Marke
+                  </h3>
+                  
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Schulname
+                    </label>
+                    <input 
+                      type="text" 
+                      value={editName} 
+                      onChange={(e) => setEditName(e.target.value)} 
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        padding: '14px 16px',
+                        borderRadius: '12px',
+                        border: '1.5px solid #cbd5e1',
+                        background: '#ffffff',
+                        fontSize: '0.95rem',
+                        fontWeight: 600,
+                        color: '#0f172a',
+                        outline: 'none',
+                        transition: 'all 0.2s'
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = editColor || '#3b82f6';
+                        e.currentTarget.style.boxShadow = `0 0 0 4px ${editColor}15`;
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = '#cbd5e1';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        PLZ
+                      </label>
+                      <input 
+                        type="text" 
+                        value={editZipCode} 
+                        onChange={(e) => setEditZipCode(e.target.value)} 
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '14px 16px',
+                          borderRadius: '12px',
+                          border: '1.5px solid #cbd5e1',
+                          background: '#ffffff',
+                          fontSize: '0.95rem',
+                          fontWeight: 600,
+                          color: '#0f172a',
+                          outline: 'none',
+                          transition: 'all 0.2s'
+                        }}
+                        onFocus={(e) => {
+                          e.currentTarget.style.borderColor = editColor || '#3b82f6';
+                          e.currentTarget.style.boxShadow = `0 0 0 4px ${editColor}15`;
+                        }}
+                        onBlur={(e) => {
+                          e.currentTarget.style.borderColor = '#cbd5e1';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        Ort
+                      </label>
+                      <input 
+                        type="text" 
+                        value={editCity} 
+                        onChange={(e) => setEditCity(e.target.value)} 
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '14px 16px',
+                          borderRadius: '12px',
+                          border: '1.5px solid #cbd5e1',
+                          background: '#ffffff',
+                          fontSize: '0.95rem',
+                          fontWeight: 600,
+                          color: '#0f172a',
+                          outline: 'none',
+                          transition: 'all 0.2s'
+                        }}
+                        onFocus={(e) => {
+                          e.currentTarget.style.borderColor = editColor || '#3b82f6';
+                          e.currentTarget.style.boxShadow = `0 0 0 4px ${editColor}15`;
+                        }}
+                        onBlur={(e) => {
+                          e.currentTarget.style.borderColor = '#cbd5e1';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Branding Farbe
+                    </label>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                      <input 
+                        type="color" 
+                        value={editColor} 
+                        onChange={(e) => setEditColor(e.target.value)} 
+                        style={{ width: '48px', height: '48px', padding: '2px', border: '1px solid #cbd5e1', borderRadius: '12px', cursor: 'pointer', background: 'transparent' }} 
+                      />
+                      <input 
+                        type="text" 
+                        value={editColor} 
+                        onChange={(e) => setEditColor(e.target.value)} 
+                        style={{
+                          flex: 1,
+                          padding: '14px 16px',
+                          borderRadius: '12px',
+                          border: '1.5px solid #cbd5e1',
+                          background: '#ffffff',
+                          fontSize: '0.9rem',
+                          fontFamily: 'monospace',
+                          color: '#0f172a',
+                          fontWeight: 700,
+                          outline: 'none',
+                          transition: 'all 0.2s'
+                        }}
+                        onFocus={(e) => {
+                          e.currentTarget.style.borderColor = editColor || '#3b82f6';
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Logo URL
+                    </label>
+                    <input 
+                      type="text" 
+                      value={editLogo} 
+                      onChange={(e) => setEditLogo(e.target.value)} 
+                      placeholder="https://..." 
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        padding: '14px 16px',
+                        borderRadius: '12px',
+                        border: '1.5px solid #cbd5e1',
+                        background: '#ffffff',
+                        fontSize: '0.95rem',
+                        color: '#0f172a',
+                        outline: 'none',
+                        transition: 'all 0.2s'
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = editColor || '#3b82f6';
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Box 2: Abonnements & Lizenzen */}
+                <div style={{
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '24px',
+                  padding: '32px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '20px',
+                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)'
+                }}>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Layers size={20} color="#eab308" /> Abonnements & Lizenzen
+                  </h3>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    {/* Campus Abo */}
+                    <label style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '16px 20px',
+                      borderRadius: '16px',
+                      background: editHasCampus ? '#f0f9ff' : '#ffffff',
+                      border: `1.5px solid ${editHasCampus ? '#bae6fd' : '#e2e8f0'}`,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        <span style={{ fontSize: '0.95rem', fontWeight: 700, color: editHasCampus ? '#0369a1' : '#0f172a' }}>🎓 Campus-Abonnement</span>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Zugang zur Campus-Plattform (Lehrer, Schüler, Klassen)</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={editHasCampus}
+                        onChange={(e) => setEditHasCampus(e.target.checked)}
+                        style={{ width: '20px', height: '20px', accentColor: '#0071e3', cursor: 'pointer' }}
+                      />
+                    </label>
+
+                    {/* GrooveLab Abo */}
+                    <label style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '16px 20px',
+                      borderRadius: '16px',
+                      background: editHasGroovelab ? '#fff7ed' : '#ffffff',
+                      border: `1.5px solid ${editHasGroovelab ? '#ffedd5' : '#e2e8f0'}`,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        <span style={{ fontSize: '0.95rem', fontWeight: 700, color: editHasGroovelab ? '#c2410c' : '#0f172a' }}>🎸 GrooveLab-Abonnement</span>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Zugang zur Kiosk-Hardware & Proberaumsteuerung</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={editHasGroovelab}
+                        onChange={(e) => setEditHasGroovelab(e.target.checked)}
+                        style={{ width: '20px', height: '20px', accentColor: '#ff9500', cursor: 'pointer' }}
+                      />
+                    </label>
+
+                    {/* Bypass Switch */}
+                    <label style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '16px 20px',
+                      borderRadius: '16px',
+                      background: editSubscriptionBypass ? '#fef2f2' : '#ffffff',
+                      border: `1.5px solid ${editSubscriptionBypass ? '#fecaca' : '#e2e8f0'}`,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        <span style={{ fontSize: '0.95rem', fontWeight: 700, color: editSubscriptionBypass ? '#dc2626' : '#ef4444' }}>⚙️ Abo-Bypass aktivieren</span>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Schaltet alle Features bedingungslos für Testläufe frei</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={editSubscriptionBypass}
+                        onChange={(e) => setEditSubscriptionBypass(e.target.checked)}
+                        style={{ width: '20px', height: '20px', accentColor: '#ef4444', cursor: 'pointer' }}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {/* Box 3: Zugang & Fristen */}
+                <div style={{
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '24px',
+                  padding: '32px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '20px',
+                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)'
+                }}>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Shield size={20} color="#10b981" /> Zugang & Fristen
+                  </h3>
+
+                  {editIsTrial ? (
+                    <div style={{
+                      background: '#fffdf5',
+                      padding: '24px',
+                      borderRadius: '16px',
+                      border: '1px solid #fef3c7',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '16px'
+                    }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', color: '#b45309', fontWeight: 800, marginBottom: '8px' }}>
+                          ⏳ Probezeit Laufzeit
+                        </label>
+                        <div style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                          {[
+                            { label: '14 Tage', value: '14' },
+                            { label: '30 Tage', value: '30' },
+                            { label: 'Manuell', value: 'custom' }
+                          ].map((opt) => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => {
+                                setEditTrialOption(opt.value as any);
+                                if (opt.value === '14') {
+                                  setEditTrialEndsAt(getFutureDate(14));
+                                } else if (opt.value === '30') {
+                                  setEditTrialEndsAt(getFutureDate(30));
+                                }
+                              }}
+                              style={{
+                                flex: 1,
+                                padding: '8px 10px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                fontSize: '0.8rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                background: editTrialOption === opt.value ? '#ffffff' : 'transparent',
+                                color: editTrialOption === opt.value ? '#d97706' : '#64748b',
+                                boxShadow: editTrialOption === opt.value ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                              }}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', color: '#b45309', fontWeight: 800, marginBottom: '8px' }}>
+                          Enddatum Probezeit
+                        </label>
+                        {editTrialOption === 'custom' ? (
+                          <input
+                            type="text"
+                            placeholder="TT.MM.JJJJ oder YYYY-MM-DD"
+                            value={editTrialEndsAt}
+                            onChange={(e) => setEditTrialEndsAt(e.target.value)}
+                            style={{
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              padding: '12px 14px',
+                              borderRadius: '10px',
+                              border: '1.5px solid #fcd34d',
+                              outline: 'none',
+                              background: '#ffffff',
+                              fontSize: '0.9rem',
+                              fontWeight: 600,
+                              color: '#0f172a'
+                            }}
+                          />
+                        ) : (
+                          <div style={{
+                            padding: '12px 14px',
+                            borderRadius: '10px',
+                            background: '#fdfbf7',
+                            border: '1px solid #fef3c7',
+                            fontSize: '0.9rem',
+                            fontWeight: 700,
+                            color: '#b45309'
+                          }}>
+                            {formatDateDisplay(editTrialEndsAt) || 'Kein Datum berechnet'}
+                          </div>
+                        )}
+                        <p style={{ margin: '6px 0 0 0', fontSize: '0.72rem', color: '#b45309', opacity: 0.8 }}>
+                          Der Systemzugang erlischt nach diesem Tag automatisch.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        Vertragslaufzeit bis (Optional)
+                      </label>
+                      <input 
+                        type="text" 
+                        placeholder="TT.MM.JJJJ oder YYYY-MM-DD" 
+                        value={editContractEndsAt} 
+                        onChange={(e) => setEditContractEndsAt(e.target.value)} 
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '14px 16px',
+                          borderRadius: '12px',
+                          border: '1.5px solid #cbd5e1',
+                          background: '#ffffff',
+                          fontSize: '0.95rem',
+                          color: '#0f172a',
+                          outline: 'none'
+                        }} 
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Box 4: Limits & Kontingente */}
+                <div style={{
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '24px',
+                  padding: '32px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '20px',
+                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <Sliders size={20} color="#a855f7" /> Kontingente (Limits)
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setEditLimitsEnabled(!editLimitsEnabled)}
+                      style={{
+                        position: 'relative',
+                        width: '42px',
+                        height: '24px',
+                        borderRadius: '12px',
+                        background: editLimitsEnabled ? '#a855f7' : '#cbd5e1',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '0',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <div style={{
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        background: '#ffffff',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                        transition: 'transform 0.2s',
+                        transform: editLimitsEnabled ? 'translateX(22px)' : 'translateX(2px)'
+                      }} />
+                    </button>
+                  </div>
+
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: '16px',
+                    opacity: editLimitsEnabled ? 1 : 0.4,
+                    pointerEvents: editLimitsEnabled ? 'auto' : 'none',
+                    transition: 'all 0.25s ease'
+                  }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Max Lehrer</label>
+                      <input 
+                        type="number" 
+                        min="0" 
+                        disabled={!editLimitsEnabled} 
+                        value={editMaxTeachers} 
+                        onChange={(e) => setEditMaxTeachers(parseInt(e.target.value) || 0)} 
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '12px 14px',
+                          borderRadius: '10px',
+                          border: '1.5px solid #cbd5e1',
+                          fontSize: '0.95rem',
+                          fontWeight: 600,
+                          outline: 'none',
+                          color: '#0f172a',
+                          background: '#ffffff'
+                        }} 
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Max Schüler</label>
+                      <input 
+                        type="number" 
+                        min="0" 
+                        disabled={!editLimitsEnabled} 
+                        value={editMaxStudents} 
+                        onChange={(e) => setEditMaxStudents(parseInt(e.target.value) || 0)} 
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '12px 14px',
+                          borderRadius: '10px',
+                          border: '1.5px solid #cbd5e1',
+                          fontSize: '0.95rem',
+                          fontWeight: 600,
+                          outline: 'none',
+                          color: '#0f172a',
+                          background: '#ffffff'
+                        }} 
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Max Songs</label>
+                      <input 
+                        type="number" 
+                        min="0" 
+                        disabled={!editLimitsEnabled} 
+                        value={editMaxSongs} 
+                        onChange={(e) => setEditMaxSongs(parseInt(e.target.value) || 0)} 
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '12px 14px',
+                          borderRadius: '10px',
+                          border: '1.5px solid #cbd5e1',
+                          fontSize: '0.95rem',
+                          fontWeight: 600,
+                          outline: 'none',
+                          color: '#0f172a',
+                          background: '#ffffff'
+                        }} 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* QR Code & Share Links */}
+              <div style={{
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '24px',
+                padding: '32px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '20px',
+                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)'
+              }}>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  🔗 Schule einbinden & Direkt-Login
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '24px' }}>
+                   {/* Link 1: Secretary Invitation Link */}
+                   <div>
+                     <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                       1. Einladungslink für Schule/Sekretariat
+                     </label>
+                     <div style={{ display: 'flex', gap: '10px' }}>
+                       <input
+                         readOnly
+                         value={`${window.location.origin}?invite_school_id=${selectedSchool.id}&role=secretary`}
+                         style={{
+                           flex: 1,
+                           padding: '12px 14px',
+                           borderRadius: '10px',
+                           border: '1px solid #cbd5e1',
+                           background: '#f8fafc',
+                           fontSize: '0.8rem',
+                           fontFamily: 'monospace',
+                           color: '#334155',
+                           outline: 'none'
+                         }}
+                         onClick={(e) => (e.target as HTMLInputElement).select()}
+                       />
+                       <button
+                         type="button"
+                         onClick={() => {
+                           navigator.clipboard.writeText(`${window.location.origin}?invite_school_id=${selectedSchool.id}&role=secretary`);
+                           alert('Einladungslink kopiert!');
+                         }}
+                         style={{
+                           background: '#f1f5f9',
+                           color: '#334155',
+                           border: '1px solid #cbd5e1',
+                           borderRadius: '10px',
+                           padding: '12px 16px',
+                           fontSize: '0.82rem',
+                           fontWeight: 800,
+                           cursor: 'pointer',
+                           transition: 'all 0.2s'
+                         }}
+                         onMouseOver={(e) => e.currentTarget.style.background = '#e2e8f0'}
+                         onMouseOut={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                       >
+                         Kopieren
+                       </button>
+                     </div>
+                     <p style={{ margin: '6px 0 0 0', fontSize: '0.75rem', color: '#64748b', lineHeight: '1.4' }}>
+                       Ermöglicht der Schule, das erste Administrator-Konto für das Sekretariat selbstständig zu registrieren.
+                     </p>
+                   </div>
+
+                   {/* Link 2: Campus QR Link (No Kiosk) */}
+                   <div>
+                     <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                       2. Campus Link zum QR-Scanner (ohne Kiosk)
+                     </label>
+                     <div style={{ display: 'flex', gap: '10px' }}>
+                       <input
+                         readOnly
+                         value={`${window.location.origin}/?school_id=${selectedSchool.id}`}
+                         style={{
+                           flex: 1,
+                           padding: '12px 14px',
+                           borderRadius: '10px',
+                           border: '1px solid #cbd5e1',
+                           background: '#f8fafc',
+                           fontSize: '0.8rem',
+                           fontFamily: 'monospace',
+                           color: '#334155',
+                           outline: 'none'
+                         }}
+                         onClick={(e) => (e.target as HTMLInputElement).select()}
+                       />
+                       <button
+                         type="button"
+                         onClick={() => {
+                           navigator.clipboard.writeText(`${window.location.origin}/?school_id=${selectedSchool.id}`);
+                           alert('Campus QR-Scanner Link kopiert!');
+                         }}
+                         style={{
+                           background: '#f1f5f9',
+                           color: '#334155',
+                           border: '1px solid #cbd5e1',
+                           borderRadius: '10px',
+                           padding: '12px 16px',
+                           fontSize: '0.82rem',
+                           fontWeight: 800,
+                           cursor: 'pointer',
+                           transition: 'all 0.2s'
+                         }}
+                         onMouseOver={(e) => e.currentTarget.style.background = '#e2e8f0'}
+                         onMouseOut={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                       >
+                         Kopieren
+                       </button>
+                     </div>
+                     <p style={{ margin: '6px 0 0 0', fontSize: '0.75rem', color: '#64748b', lineHeight: '1.4' }}>
+                       Öffnet den Login-Scanner im Standard-Modus für Schüler und Lehrer (z.B. auf privaten Geräten).
+                     </p>
+                   </div>
+
+                   {/* Link 3: Groovelab Kiosk Link */}
+                   <div>
+                     <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                       3. GrooveLab Link zum QR-Scanner (mit Kiosk)
+                     </label>
+                     <div style={{ display: 'flex', gap: '10px' }}>
+                       <input
+                         readOnly
+                         value={`${window.location.origin}/?kiosk_token=${selectedSchool.groovelab_kiosk_token || ''}`}
+                         style={{
+                           flex: 1,
+                           padding: '12px 14px',
+                           borderRadius: '10px',
+                           border: '1px solid #cbd5e1',
+                           background: '#f8fafc',
+                           fontSize: '0.8rem',
+                           fontFamily: 'monospace',
+                           color: '#334155',
+                           outline: 'none'
+                         }}
+                         onClick={(e) => (e.target as HTMLInputElement).select()}
+                       />
+                       <button
+                         type="button"
+                         onClick={() => {
+                           navigator.clipboard.writeText(`${window.location.origin}/?kiosk_token=${selectedSchool.groovelab_kiosk_token || ''}`);
+                           alert('Kiosk QR-Scanner Link kopiert!');
+                         }}
+                         style={{
+                           background: '#f1f5f9',
+                           color: '#334155',
+                           border: '1px solid #cbd5e1',
+                           borderRadius: '10px',
+                           padding: '12px 16px',
+                           fontSize: '0.82rem',
+                           fontWeight: 800,
+                           cursor: 'pointer',
+                           transition: 'all 0.2s'
+                         }}
+                         onMouseOver={(e) => e.currentTarget.style.background = '#e2e8f0'}
+                         onMouseOut={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                       >
+                         Kopieren
+                       </button>
+                     </div>
+                     <p style={{ margin: '6px 0 0 0', fontSize: '0.75rem', color: '#64748b', lineHeight: '1.4' }}>
+                       Öffnet den Login-Scanner im Kiosk-Modus für fest installierte Proberaum-Terminals.
+                     </p>
+                   </div>
+                 </div>
+               </div>
+
+              </div>
+            </div>
+          </div>
+        )}
 
       {/* Global CSS injection for loading spinner */}
       <style dangerouslySetInnerHTML={{__html: `

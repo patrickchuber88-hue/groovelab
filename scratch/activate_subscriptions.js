@@ -9,26 +9,25 @@ const config = {
   readyTimeout: 10000
 };
 
+const sqlQuery = "UPDATE public.schools SET has_groovelab_subscription = true, has_campus_subscription = true; SELECT id, name, has_groovelab_subscription, has_campus_subscription FROM public.schools;";
+
 conn.on('ready', () => {
   console.log('SSH connection established successfully.');
 
-  const commands = [
-    // Check if user_role type exists
-    'docker exec supabase-db psql -U postgres -d postgres -c "SELECT n.nspname as schema, t.typname as type FROM pg_type t LEFT JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace WHERE (t.typtype = \'e\' OR t.typbasetype <> 0) AND n.nspname = \'public\';"'
-  ];
-
-  const fullCommand = commands.join(' && ');
-
-  conn.exec(fullCommand, (err, stream) => {
+  conn.exec('docker exec -i supabase-db psql -U postgres -d postgres', (err, stream) => {
     if (err) throw err;
+    
     stream.on('close', (code, signal) => {
-      console.log(`Finished with code ${code}.`);
+      console.log(`Query finished with code ${code}.`);
       conn.end();
     }).on('data', (data) => {
       console.log('STDOUT:\n' + data);
     }).stderr.on('data', (data) => {
       console.log('STDERR:\n' + data);
     });
+
+    stream.write(sqlQuery);
+    stream.end();
   });
 }).on('error', (err) => {
   console.error('SSH Connection Error:', err);

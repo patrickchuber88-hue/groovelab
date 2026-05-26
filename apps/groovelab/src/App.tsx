@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School } from 'lucide-react';
+import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy } from 'lucide-react';
 import { 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer,
   BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell
@@ -15,6 +15,8 @@ import { DeviceSetupScreen } from './components/DeviceSetupScreen';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
 import { MasterAdminDashboard } from './components/MasterAdminDashboard';
+import { SecretaryDashboard } from './components/SecretaryDashboard';
+import { StudentAvatarDashboard } from './components/StudentAvatarDashboard';
 import { TeacherDetailModal } from './components/TeacherDetailModal';
 import { StudentDetailModal } from './components/StudentDetailModal';
 import { normalizeInstrument, renderInstrumentIcon } from './utils/instruments';
@@ -1529,6 +1531,9 @@ function App() {
   const [activeStudentTab, setActiveStudentTab] = useState<string>(() => {
     return localStorage.getItem('groovelab_active_tab') || 'profile';
   });
+  const [activePlatform, setActivePlatform] = useState<'campus' | 'groovelab'>(() => {
+    return (localStorage.getItem('groovelab_active_platform') as 'campus' | 'groovelab') || 'groovelab';
+  });
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       return window.innerWidth < 1200;
@@ -2051,8 +2056,32 @@ function App() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('groovelab_active_tab', activeStudentTab);
-  }, [activeStudentTab]);
+    if (activePlatform === 'campus') {
+      localStorage.setItem('campus_active_tab', activeStudentTab);
+    } else {
+      localStorage.setItem('groovelab_active_tab', activeStudentTab);
+    }
+  }, [activeStudentTab, activePlatform]);
+
+  // Track whether this is the first platform-switch render (not initial mount)
+  const platformInitialized = React.useRef(false);
+  useEffect(() => {
+    localStorage.setItem('groovelab_active_platform', activePlatform);
+    // On initial mount, tabs are already restored from localStorage in useState initializer.
+    // Only restore saved tab when the user actively switches platforms.
+    if (!platformInitialized.current) {
+      platformInitialized.current = true;
+      return;
+    }
+    const isStudent = user?.role?.toLowerCase() === 'student';
+    if (activePlatform === 'campus') {
+      const savedTab = localStorage.getItem('campus_active_tab') || (isStudent ? 'profile' : 'live');
+      setActiveStudentTab(savedTab);
+    } else {
+      const savedTab = localStorage.getItem('groovelab_active_tab') || 'live';
+      setActiveStudentTab(savedTab);
+    }
+  }, [activePlatform]);
   const { width, height } = useWindowSize();
 
   const [liveSessionMins, setLiveSessionMins] = useState(0);
@@ -2212,8 +2241,39 @@ function App() {
         return;
       }
 
-      // If we are in initial load and home-mode, check if external vocalist, and adjust tab if needed
-      if (isInitial && isStudent && locationMode === 'home') {
+      if (isInitial) {
+        const savedPlatform = localStorage.getItem('groovelab_active_platform') as 'campus' | 'groovelab' | null;
+        if (savedPlatform) {
+          const hasRights = savedPlatform === 'campus' ? userData.is_campus_active : userData.is_groovelab_active;
+          if (hasRights) {
+            setActivePlatform(savedPlatform);
+            if (isStudent && savedPlatform === 'campus') {
+              setActiveStudentTab('profile');
+            }
+          } else {
+            const fallback = userData.is_campus_active ? 'campus' : 'groovelab';
+            setActivePlatform(fallback);
+            if (isStudent && fallback === 'campus') {
+              setActiveStudentTab('profile');
+            }
+          }
+        } else {
+          if (userData.is_campus_active) {
+            setActivePlatform('campus');
+            if (isStudent) {
+              setActiveStudentTab('profile');
+            }
+          } else if (userData.is_groovelab_active) {
+            setActivePlatform('groovelab');
+          }
+        }
+      }
+
+      // If we are in initial load and home-mode, check if external vocalist, and adjust tab if needed (only for GrooveLab)
+      const currentPlatform = isInitial 
+        ? (localStorage.getItem('groovelab_active_platform') || (userData.is_campus_active ? 'campus' : 'groovelab')) 
+        : activePlatform;
+      if (isInitial && isStudent && locationMode === 'home' && currentPlatform !== 'campus') {
         const startTab = userData.is_external_vocalist ? 'repertoire' : 'practice';
         setActiveStudentTab(startTab);
         localStorage.setItem('groovelab_active_tab', startTab);
@@ -4693,6 +4753,19 @@ function App() {
     return <MasterAdminDashboard onLogout={handleLogout} />;
   }
 
+  // 2.5b SECRETARY DASHBOARD BYPASS
+  if (user.role?.toLowerCase() === 'secretary' || user.role?.toLowerCase() === 'admin') {
+    return (
+      <ErrorBoundary>
+        <SecretaryDashboard 
+          schoolId={user.school_id} 
+          userId={user.id} 
+          onLogout={handleLogout} 
+        />
+      </ErrorBoundary>
+    );
+  }
+
   // 2.6 DEACTIVATED / PAUSED SCHOOL CHECK
   if (isSchoolPaused) {
     return (
@@ -5100,101 +5173,130 @@ function App() {
 
         <nav className="sidebar-menu" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {user.role?.toLowerCase() === 'student' ? (
-            <>
-              <button onClick={() => setActiveStudentTab('live')} className={`sidebar-item ${activeStudentTab === 'live' ? 'active' : ''}`} style={{ position: 'relative' }}>
-                <Monitor size={20} /> Live Lab
-                <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 6px #ef4444', marginLeft: 'auto', flexShrink: 0 }} className="animate-pulse"></div>
-              </button>
-
-              {/* Only for instrumentalists */}
-              {!user.is_external_vocalist && (
-                <>
-                  <button onClick={() => setActiveStudentTab('practice')} className={`sidebar-item ${activeStudentTab === 'practice' ? 'active' : ''}`}>
-                    <Play size={20} fill={activeStudentTab === 'practice' ? 'white' : 'none'} /> Üben
-                  </button>
-                  <button onClick={() => setActiveStudentTab('library')} className={`sidebar-item ${activeStudentTab === 'library' ? 'active' : ''}`}>
-                    <Library size={20} /> Bibliothek
-                  </button>
-                </>
-              )}
-
-              <button onClick={() => setActiveStudentTab('repertoire')} className={`sidebar-item ${activeStudentTab === 'repertoire' ? 'active' : ''}`}>
-                <Award size={20} /> Repertoire
-              </button>
-
-              {!user.is_external_vocalist && (
-                <button onClick={() => setActiveStudentTab('matching')} className={`sidebar-item ${activeStudentTab === 'matching' ? 'active' : ''}`}>
-                  <Users size={20} /> Band-Matching
+            activePlatform === 'campus' ? (
+              <>
+                <button onClick={() => setActiveStudentTab('briefing')} className={`sidebar-item ${['briefing', 'profile'].includes(activeStudentTab) ? 'active' : ''}`}>
+                  <GraduationCap size={20} /> Briefing
                 </button>
-              )}
+                <button onClick={() => setActiveStudentTab('songs')} className={`sidebar-item ${activeStudentTab === 'songs' ? 'active' : ''}`}>
+                  <Music size={20} /> Songs
+                </button>
+                <button onClick={() => setActiveStudentTab('practice_board')} className={`sidebar-item ${activeStudentTab === 'practice_board' ? 'active' : ''}`}>
+                  <Play size={20} /> Übe-Board
+                </button>
+                <button onClick={() => setActiveStudentTab('campus_cup')} className={`sidebar-item ${activeStudentTab === 'campus_cup' ? 'active' : ''}`}>
+                  <Trophy size={20} /> Campus-Cup
+                </button>
+                <button onClick={() => setActiveStudentTab('hero')} className={`sidebar-item ${activeStudentTab === 'hero' ? 'active' : ''}`}>
+                  <Star size={20} /> Mein Held
+                </button>
+                <button onClick={() => setActiveStudentTab('team')} className={`sidebar-item ${activeStudentTab === 'team' ? 'active' : ''}`}>
+                  <Users size={20} /> Mein Team
+                </button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => setActiveStudentTab('live')} className={`sidebar-item ${activeStudentTab === 'live' ? 'active' : ''}`} style={{ position: 'relative' }}>
+                  <Monitor size={20} /> Live Lab
+                  <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 6px #ef4444', marginLeft: 'auto', flexShrink: 0 }} className="animate-pulse"></div>
+                </button>
 
-              <button onClick={() => setActiveStudentTab('bands')} className={`sidebar-item ${activeStudentTab === 'bands' ? 'active' : ''}`}>
-                <Box size={20} /> Bands
-              </button>
-
-              <button onClick={() => setActiveStudentTab('messages')} className={`sidebar-item ${activeStudentTab === 'messages' ? 'active' : ''}`} style={{ position: 'relative' }}>
-                <Megaphone size={20} /> Nachrichten
-                {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length > 0 && (
-                  <div style={{ 
-                    background: '#ef4444', 
-                    color: 'white', 
-                    borderRadius: '50%', 
-                    minWidth: '18px', 
-                    height: '18px', 
-                    padding: '0 5px',
-                    fontSize: '0.65rem', 
-                    fontWeight: 900, 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    marginLeft: 'auto',
-                    boxShadow: '0 2px 5px rgba(239, 68, 68, 0.4)'
-                  }}>{studentMessages.filter(m => !m.read_by?.includes(user?.id)).length}</div>
+                {/* Only for instrumentalists */}
+                {!user.is_external_vocalist && (
+                  <>
+                    <button onClick={() => setActiveStudentTab('practice')} className={`sidebar-item ${activeStudentTab === 'practice' ? 'active' : ''}`}>
+                      <Play size={20} fill={activeStudentTab === 'practice' ? 'white' : 'none'} /> Üben
+                    </button>
+                    <button onClick={() => setActiveStudentTab('library')} className={`sidebar-item ${activeStudentTab === 'library' ? 'active' : ''}`}>
+                      <Library size={20} /> Bibliothek
+                    </button>
+                  </>
                 )}
-              </button>
 
-              <button onClick={() => setActiveStudentTab('profile')} className={`sidebar-item ${activeStudentTab === 'profile' ? 'active' : ''}`}>
-                <Shield size={20} /> Profil
-              </button>
+                <button onClick={() => setActiveStudentTab('repertoire')} className={`sidebar-item ${activeStudentTab === 'repertoire' ? 'active' : ''}`}>
+                  <Award size={20} /> Repertoire
+                </button>
 
-              <button onClick={() => setActiveStudentTab('team')} className={`sidebar-item ${activeStudentTab === 'team' ? 'active' : ''}`}>
-                <Users size={20} /> Team
-              </button>
-            </>
+                {!user.is_external_vocalist && (
+                  <button onClick={() => setActiveStudentTab('matching')} className={`sidebar-item ${activeStudentTab === 'matching' ? 'active' : ''}`}>
+                    <Users size={20} /> Band-Matching
+                  </button>
+                )}
+
+                <button onClick={() => setActiveStudentTab('bands')} className={`sidebar-item ${activeStudentTab === 'bands' ? 'active' : ''}`}>
+                  <Box size={20} /> Bands
+                </button>
+
+                <button onClick={() => setActiveStudentTab('messages')} className={`sidebar-item ${activeStudentTab === 'messages' ? 'active' : ''}`} style={{ position: 'relative' }}>
+                  <Megaphone size={20} /> Nachrichten
+                  {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length > 0 && (
+                    <div style={{ 
+                      background: '#ef4444', 
+                      color: 'white', 
+                      borderRadius: '50%', 
+                      minWidth: '18px', 
+                      height: '18px', 
+                      padding: '0 5px',
+                      fontSize: '0.65rem', 
+                      fontWeight: 900, 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      marginLeft: 'auto',
+                      boxShadow: '0 2px 5px rgba(239, 68, 68, 0.4)'
+                    }}>{studentMessages.filter(m => !m.read_by?.includes(user?.id)).length}</div>
+                  )}
+                </button>
+              </>
+            )
           ) : (
-            <>
-              <button onClick={() => setActiveStudentTab('live')} className={`sidebar-item ${activeStudentTab === 'live' ? 'active' : ''}`} style={{ position: 'relative' }}>
-                <Monitor size={20} /> Live Lab
-                <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 6px #ef4444', marginLeft: 'auto', flexShrink: 0 }} className="animate-pulse"></div>
-              </button>
-              <button onClick={() => setActiveStudentTab('messages')} className={`sidebar-item ${activeStudentTab === 'messages' ? 'active' : ''}`}>
-                <Mail size={20} /> Nachrichten
-              </button>
-              <button onClick={() => setActiveStudentTab('students')} className={`sidebar-item ${activeStudentTab === 'students' ? 'active' : ''}`}>
-                <Users size={20} /> Schüler
-              </button>
-              <button onClick={() => setActiveStudentTab('team')} className={`sidebar-item ${activeStudentTab === 'team' ? 'active' : ''}`}>
-                <Shield size={20} /> Team
-              </button>
-              <button onClick={() => setActiveStudentTab('rooms')} className={`sidebar-item ${activeStudentTab === 'rooms' ? 'active' : ''}`}>
-                <Box size={20} /> Räume
-              </button>
-              <button onClick={() => setActiveStudentTab('songs')} className={`sidebar-item ${activeStudentTab === 'songs' ? 'active' : ''}`}>
-                <Library size={20} /> Songs
-              </button>
-              <button onClick={() => setActiveStudentTab('bands')} className={`sidebar-item ${activeStudentTab === 'bands' ? 'active' : ''}`}>
-                <Box size={20} /> Bands
-              </button>
-              <button onClick={() => setActiveStudentTab('stats')} className={`sidebar-item ${activeStudentTab === 'stats' ? 'active' : ''}`}>
-                <Music size={20} /> Statistik
-              </button>
-              <button onClick={() => setActiveStudentTab('gallery')} className={`sidebar-item ${activeStudentTab === 'gallery' ? 'active' : ''}`}>
-                <QrCode size={20} /> ID Galerie
-              </button>
-              <button onClick={() => setActiveStudentTab('setup')} className={`sidebar-item ${activeStudentTab === 'setup' ? 'active' : ''}`}>
-                <Shield size={20} /> Setup
-              </button>
-            </>
+            activePlatform === 'campus' ? (
+              <>
+                <button onClick={() => setActiveStudentTab('live')} className={`sidebar-item ${activeStudentTab === 'live' ? 'active' : ''}`} style={{ position: 'relative' }}>
+                  <Monitor size={20} /> Stundenpläne & Briefing
+                </button>
+                <button onClick={() => setActiveStudentTab('students')} className={`sidebar-item ${activeStudentTab === 'students' ? 'active' : ''}`}>
+                  <Users size={20} /> Schüler verwalten
+                </button>
+                <button onClick={() => setActiveStudentTab('team')} className={`sidebar-item ${activeStudentTab === 'team' ? 'active' : ''}`}>
+                  <Shield size={20} /> Kollegium (Team)
+                </button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => setActiveStudentTab('live')} className={`sidebar-item ${activeStudentTab === 'live' ? 'active' : ''}`} style={{ position: 'relative' }}>
+                  <Monitor size={20} /> Live Lab
+                  <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 6px #ef4444', marginLeft: 'auto', flexShrink: 0 }} className="animate-pulse"></div>
+                </button>
+                <button onClick={() => setActiveStudentTab('messages')} className={`sidebar-item ${activeStudentTab === 'messages' ? 'active' : ''}`}>
+                  <Mail size={20} /> Nachrichten
+                </button>
+                <button onClick={() => setActiveStudentTab('students')} className={`sidebar-item ${activeStudentTab === 'students' ? 'active' : ''}`}>
+                  <Users size={20} /> Schüler
+                </button>
+                <button onClick={() => setActiveStudentTab('team')} className={`sidebar-item ${activeStudentTab === 'team' ? 'active' : ''}`}>
+                  <Shield size={20} /> Team
+                </button>
+                <button onClick={() => setActiveStudentTab('rooms')} className={`sidebar-item ${activeStudentTab === 'rooms' ? 'active' : ''}`}>
+                  <Box size={20} /> Räume
+                </button>
+                <button onClick={() => setActiveStudentTab('songs')} className={`sidebar-item ${activeStudentTab === 'songs' ? 'active' : ''}`}>
+                  <Library size={20} /> Songs
+                </button>
+                <button onClick={() => setActiveStudentTab('bands')} className={`sidebar-item ${activeStudentTab === 'bands' ? 'active' : ''}`}>
+                  <Box size={20} /> Bands
+                </button>
+                <button onClick={() => setActiveStudentTab('stats')} className={`sidebar-item ${activeStudentTab === 'stats' ? 'active' : ''}`}>
+                  <Music size={20} /> Statistik
+                </button>
+                <button onClick={() => setActiveStudentTab('gallery')} className={`sidebar-item ${activeStudentTab === 'gallery' ? 'active' : ''}`}>
+                  <QrCode size={20} /> ID Galerie
+                </button>
+                <button onClick={() => setActiveStudentTab('setup')} className={`sidebar-item ${activeStudentTab === 'setup' ? 'active' : ''}`}>
+                  <Shield size={20} /> Setup
+                </button>
+              </>
+            )
           )}
         </nav>
 
@@ -5261,7 +5363,83 @@ function App() {
       </aside>
 
       <div className={`main-wrapper ${activeStudentTab === 'live' ? 'live-tab-active' : ''}`} style={{ paddingTop: '0' }}>
-        <header className="header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 32px', height: '80px', background: 'transparent' }}>
+        <header className="header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', height: '80px', background: 'transparent' }}>
+          {/* App Switcher Tabs */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'flex-end', 
+            gap: '6px', 
+            height: '100%',
+            paddingTop: '20px',
+            boxSizing: 'border-box'
+          }}>
+            {/* Campus Tab */}
+            {school?.has_campus_subscription && user?.is_campus_active && (
+              <div 
+                onClick={() => setActivePlatform('campus')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '12px 20px 10px',
+                  borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0',
+                  background: activePlatform === 'campus' ? '#34a853' : 'rgba(52, 168, 83, 0.06)',
+                  color: activePlatform === 'campus' ? '#ffffff' : '#34a853',
+                  border: activePlatform === 'campus' ? '1px solid #34a853' : '1px solid rgba(52, 168, 83, 0.18)',
+                  borderBottom: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  cursor: 'pointer',
+                  zIndex: activePlatform === 'campus' ? 2 : 1,
+                  transform: activePlatform === 'campus' ? 'translateY(1px)' : 'translateY(0)',
+                  boxShadow: activePlatform === 'campus' ? '0 -4px 12px rgba(52, 168, 83, 0.2)' : 'none',
+                  transition: 'all 0.25s ease',
+                  height: '42px',
+                  boxSizing: 'border-box',
+                  fontFamily: "'Plus Jakarta Sans', sans-serif"
+                }}
+              >
+                <GraduationCap size={14} color={activePlatform === 'campus' ? '#ffffff' : '#34a853'} />
+                <span>Campus</span>
+              </div>
+            )}
+
+            {/* GrooveLab Tab */}
+            {school?.has_groovelab_subscription && user?.is_groovelab_active && (
+              <div 
+                onClick={() => setActivePlatform('groovelab')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '12px 20px 10px',
+                  borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0',
+                  background: activePlatform === 'groovelab' ? '#fbbc05' : 'rgba(251, 188, 5, 0.06)',
+                  color: activePlatform === 'groovelab' ? '#09090b' : '#b45309',
+                  border: activePlatform === 'groovelab' ? '1px solid #fbbc05' : '1px solid rgba(251, 188, 5, 0.18)',
+                  borderBottom: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  cursor: 'pointer',
+                  zIndex: activePlatform === 'groovelab' ? 2 : 1,
+                  transform: activePlatform === 'groovelab' ? 'translateY(1px)' : 'translateY(0)',
+                  boxShadow: activePlatform === 'groovelab' ? '0 -4px 12px rgba(251, 188, 5, 0.2)' : 'none',
+                  transition: 'all 0.25s ease',
+                  height: '42px',
+                  boxSizing: 'border-box',
+                  fontFamily: "'Plus Jakarta Sans', sans-serif"
+                }}
+              >
+                <Music size={14} color={activePlatform === 'groovelab' ? '#09090b' : '#b45309'} />
+                <span>GrooveLab</span>
+              </div>
+            )}
+          </div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
             {/* Common Status Pills */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -5472,6 +5650,7 @@ function App() {
                 </div>
               ) : (
                 <TeacherDashboard 
+                  key={activePlatform}
                   userId={user.id} 
                   hideHeader={true} 
                   viewMode="student" 
@@ -5479,6 +5658,7 @@ function App() {
                   isSidebarCollapsed={isSidebarCollapsed}
                   setIsSidebarCollapsed={setIsSidebarCollapsed}
                   onSidebarNotificationsChange={setSidebarNotificationsCount}
+                  activePlatform={activePlatform}
                   onFoundBand={(form, mySlot) => {
                     console.log('[DEBUG-Groovelab] setSuggestingSkill (manual click) in TeacherDashboard onFoundBand');
                     setSuggestingSkill({
@@ -5498,10 +5678,22 @@ function App() {
           </ErrorBoundary>
         )}
 
-        {/* Profile Tab */}
-        {activeStudentTab === 'profile' && (
+        {/* Student Campus Dashboard Tabs */}
+        {user.role === 'student' && activePlatform === 'campus' && ['briefing', 'songs', 'practice_board', 'campus_cup', 'hero', 'profile'].includes(activeStudentTab) && (
           <ErrorBoundary>
-            <div className="animation-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1200px', margin: '0 auto' }}>
+            <StudentAvatarDashboard 
+              studentId={user.id} 
+              parentActiveTab={activeStudentTab}
+              onTabChange={(tab) => setActiveStudentTab(tab)}
+            />
+          </ErrorBoundary>
+        )}
+
+        {/* Profile Tab */}
+        {activeStudentTab === 'profile' && !(user.role === 'student' && activePlatform === 'campus') && (
+          <ErrorBoundary>
+            <>
+                <div className="animation-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1200px', margin: '0 auto' }}>
               {/* Top: Massive Hero Card */}
               <div className="glass-panel" style={{ background: 'white', borderRadius: '32px', display: 'flex', overflow: 'hidden', minHeight: '340px' }}>
                 <div style={{ flex: '0 0 40%', background: '#f8fafc', position: 'relative', overflow: 'hidden' }}>
@@ -6516,16 +6708,20 @@ function App() {
                 </>
               )}
             </div>
+              </>
+            )}
           </ErrorBoundary>
         )}
 
         {/* Admin/Teacher Section Tabs (Unified) */}
         {((user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'teacher')) && ['live', 'students', 'team', 'rooms', 'songs', 'stats', 'gallery', 'setup', 'bands'].includes(activeStudentTab) && (
-          <ErrorBoundary key={activeStudentTab}>
+          <ErrorBoundary key={`${activePlatform}-${activeStudentTab}`}>
             <AdminDashboard 
+              key={activePlatform}
               userId={user.id} 
               onLogout={handleLogout} 
               forceTab={activeStudentTab}
+              activePlatform={activePlatform}
               onTabChange={(tabId: any) => setActiveStudentTab(tabId)}
               onOpenBandProfile={(band: any) => {
                 setSelectedBandForProfile(band);

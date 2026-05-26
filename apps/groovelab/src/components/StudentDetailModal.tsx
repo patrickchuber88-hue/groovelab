@@ -14,9 +14,11 @@ interface StudentDetailModalProps {
   student: any;
   onClose: () => void;
   onOpenBandProfile?: (band: any) => void;
+  activePlatform?: 'secretary' | 'campus' | 'groovelab';
+  onSwitchPlatform?: (newPlatform: 'campus' | 'groovelab') => void;
 }
 
-export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student, onClose, onOpenBandProfile }) => {
+export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student, onClose, onOpenBandProfile, activePlatform, onSwitchPlatform }) => {
   const [skills, setSkills] = useState<any[]>([]);
   const [bands, setBands] = useState<any[]>([]);
   const [vocalsSongIds, setVocalsSongIds] = useState<Set<string>>(new Set());
@@ -24,6 +26,61 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   const [showFullPhoto, setShowFullPhoto] = useState(false);
   const [sessionsList, setSessionsList] = useState<any[]>([]);
   const [planningList, setPlanningList] = useState<any[]>([]);
+  const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? false);
+  const [isGroovelabActive, setIsGroovelabActive] = useState<boolean>(student.is_groovelab_active ?? false);
+  const [isPremiumActive, setIsPremiumActive] = useState<boolean>(false);
+
+  const handleToggleCampus = async (newVal: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ is_campus_active: newVal })
+        .eq('id', student.id);
+      if (error) throw error;
+      setIsCampusActive(newVal);
+      student.is_campus_active = newVal;
+    } catch (err: any) {
+      alert('Fehler beim Aktualisieren des Campus-Zugangs: ' + err.message);
+    }
+  };
+
+  const handleToggleGroovelab = async (newVal: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ is_groovelab_active: newVal })
+        .eq('id', student.id);
+      if (error) throw error;
+      setIsGroovelabActive(newVal);
+      student.is_groovelab_active = newVal;
+    } catch (err: any) {
+      alert('Fehler beim Aktualisieren des GrooveLab-Zugangs: ' + err.message);
+    }
+  };
+
+  const handleTogglePremium = async (newVal: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('premium_status')
+        .upsert({ 
+          student_id: student.id, 
+          is_premium_active: newVal,
+          updated_at: new Date().toISOString()
+        });
+      if (error) throw error;
+      
+      // Also update users.is_premium_user
+      await supabase
+        .from('users')
+        .update({ is_premium_user: newVal })
+        .eq('id', student.id);
+
+      setIsPremiumActive(newVal);
+      student.is_premium_user = newVal;
+    } catch (err: any) {
+      alert('Fehler beim Aktualisieren des Premium-Status: ' + err.message);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -93,6 +150,14 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         .select('*')
         .eq('user_id', student.id);
       setPlanningList(planData || []);
+
+      // Fetch premium status
+      const { data: premiumInfo } = await supabase
+        .from('premium_status')
+        .select('is_premium_active')
+        .eq('student_id', student.id)
+        .maybeSingle();
+      setIsPremiumActive(premiumInfo?.is_premium_active ?? false);
 
       setLoading(false);
     };
@@ -235,6 +300,57 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           <X size={20} />
         </button>
 
+        {/* Detail-Kartei Cross-Tab Links */}
+        {onSwitchPlatform && (
+          <div style={{ marginBottom: '20px', display: 'flex' }}>
+            {activePlatform === 'groovelab' ? (
+              <button
+                onClick={() => onSwitchPlatform('campus')}
+                style={{
+                  background: '#22c55e',
+                  color: 'white',
+                  border: 'none',
+                  padding: '12px 24px',
+                  borderRadius: '16px',
+                  fontWeight: 900,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 14px rgba(34, 197, 94, 0.3)',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+                className="hover-scale"
+              >
+                <span>[ 🟩 Zu Campus-Akte wechseln ]</span>
+              </button>
+            ) : activePlatform === 'campus' ? (
+              <button
+                onClick={() => onSwitchPlatform('groovelab')}
+                style={{
+                  background: '#fbbc05',
+                  color: '#09090b',
+                  border: 'none',
+                  padding: '12px 24px',
+                  borderRadius: '16px',
+                  fontWeight: 900,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 14px rgba(251, 188, 5, 0.3)',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+                className="hover-scale"
+              >
+                <span>[ 🎸 Zu GrooveLab-Akte wechseln ]</span>
+              </button>
+            ) : null}
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: '28px', marginBottom: '32px', alignItems: 'center', width: '100%', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: '28px', alignItems: 'flex-start', flex: '1 1 350px' }}>
             <div 
@@ -287,9 +403,43 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                   );
                 })}
               </div>
-              <div style={{ marginTop: '8px' }}>
-                <div style={{ display: 'inline-block', background: '#f1f5f9', padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', height: 'fit-content' }}>
+              <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'inline-block', background: '#f1f5f9', padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', height: 'fit-content', width: 'fit-content' }}>
                   {student.instrument || 'Multi-Talent'}
+                </div>
+                
+                {/* Platform activation manually controlled */}
+                <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '16px', border: '1.5px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🔑 Plattform-Aktivierung</span>
+                  <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={isCampusActive} 
+                        onChange={(e) => handleToggleCampus(e.target.checked)} 
+                        style={{ accentColor: '#34a853', width: '15px', height: '15px' }}
+                      />
+                      Campus 🎓
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={isGroovelabActive} 
+                        onChange={(e) => handleToggleGroovelab(e.target.checked)} 
+                        style={{ accentColor: '#fbbc05', width: '15px', height: '15px' }}
+                      />
+                      GrooveLab 🎸
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={isPremiumActive} 
+                        onChange={(e) => handleTogglePremium(e.target.checked)} 
+                        style={{ accentColor: '#eab308', width: '15px', height: '15px' }}
+                      />
+                      Premium ⭐
+                    </label>
+                  </div>
                 </div>
               </div>
 

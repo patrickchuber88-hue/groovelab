@@ -164,9 +164,10 @@ interface AdminDashboardProps {
   forceTab?: string;
   onTabChange?: (tab: string) => void;
   onOpenBandProfile?: (band: any) => void;
+  activePlatform?: 'campus' | 'groovelab';
 }
 
-export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpenBandProfile }: AdminDashboardProps) {
+export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpenBandProfile, activePlatform = 'groovelab' }: AdminDashboardProps) {
   const [admin, setAdmin] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
@@ -178,7 +179,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [setupRooms, setSetupRooms] = useState<any[]>([]);
   const [setupStations, setSetupStations] = useState<any[]>([]);
   const [kiosks, setKiosks] = useState<any[] | null>(null);
-  const [activeTab, setActiveTab] = useState<string>(() => localStorage.getItem('groovelab_active_tab') || forceTab || 'live');
+  const tabStorageKey = activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab';
+  const [activeTab, setActiveTab] = useState<string>(() => localStorage.getItem(activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab') || forceTab || 'live');
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
   const [draggedStationId, setDraggedStationId] = useState<string | null>(null);
   const [dragOverStationId, setDragOverStationId] = useState<string | null>(null);
@@ -691,7 +693,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   useEffect(() => {
     if (forceTab) {
       setActiveTab(forceTab);
-      localStorage.setItem('groovelab_active_tab', forceTab);
+      localStorage.setItem(tabStorageKey, forceTab);
     }
   }, [forceTab]);
 
@@ -720,12 +722,10 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           .order('check_in_time', { ascending: false });
         setActiveSessions(sData || []);
       } else if (activeTab === 'students') {
-        const { data: studentsData } = await supabase
-          .from('users')
-          .select('*')
-          .eq('school_id', adminData.school_id)
-          .eq('role', 'student')
-          .order('first_name');
+        let sq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
+        if (activePlatform === 'campus') sq = sq.eq('is_campus_active', true);
+        else sq = sq.eq('is_groovelab_active', true);
+        const { data: studentsData } = await sq.order('first_name');
         if (studentsData) {
           setStudents(studentsData);
           const studentIds = studentsData.map(s => s.id);
@@ -830,12 +830,10 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           }
         }
         // Also fetch students for the search function in band edit
-        const { data: studentsData } = await supabase
-          .from('users')
-          .select('*')
-          .eq('school_id', adminData.school_id)
-          .eq('role', 'student')
-          .order('first_name');
+        let bsq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
+        if (activePlatform === 'campus') bsq = bsq.eq('is_campus_active', true);
+        else bsq = bsq.eq('is_groovelab_active', true);
+        const { data: studentsData } = await bsq.order('first_name');
         if (studentsData) setStudents(studentsData);
         
         // Also fetch teachers for coach selection
@@ -877,12 +875,10 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         setActiveSessions(activeSessionsData || []);
         
         // Fetch students roster for manual check-in
-        const { data: studentsData } = await supabase
-          .from('users')
-          .select('*')
-          .eq('school_id', adminData.school_id)
-          .eq('role', 'student')
-          .order('first_name');
+        let ssq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
+        if (activePlatform === 'campus') ssq = ssq.eq('is_campus_active', true);
+        else ssq = ssq.eq('is_groovelab_active', true);
+        const { data: studentsData } = await ssq.order('first_name');
         if (studentsData) setStudents(studentsData);
       }
     }
@@ -1128,7 +1124,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       photo_url: newStudent.photoUrl || '/avatar_ghost.jpg',
       qr_token: qrToken,
       is_external_vocalist: newStudent.isExternalVocalist,
-      instrument: newStudent.isExternalVocalist ? 'Vocals' : 'Musiker'
+      instrument: newStudent.isExternalVocalist ? 'Vocals' : 'Musiker',
+      is_campus_active: activePlatform === 'campus',
+      is_groovelab_active: activePlatform === 'groovelab'
     }).select().single();
     
     if (error) alert('Fehler: ' + error.message);
@@ -1160,24 +1158,42 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   };
 
   const handleDeleteStudent = async (id: string) => {
-    if (window.confirm('Möchtest du diesen Schüler wirklich löschen? Alle Fortschritte gehen verloren.')) {
+    const studentToDelete = students.find(s => s.id === id);
+    if (!studentToDelete) return;
+
+    const actionText = activePlatform === 'campus'
+      ? 'Möchtest du diesen Schüler wirklich vom Campus entfernen?'
+      : 'Möchtest du diesen Schüler wirklich von GrooveLab entfernen?';
+
+    if (window.confirm(actionText)) {
       try {
-        // Cleanup related data to avoid FK constraint errors and orphaned entries
-        await supabase.from('user_song_skills').delete().eq('user_id', id);
-        await supabase.from('band_members').delete().eq('user_id', id);
-        await supabase.from('sessions').delete().eq('user_id', id);
-        await supabase.from('band_songs').update({ suggested_by: null }).eq('suggested_by', id);
-        await supabase.from('lab_planning').delete().eq('user_id', id);
-        await supabase.from('band_shoutbox').delete().eq('user_id', id);
-        await supabase.from('band_song_slots').delete().eq('user_id', id);
-        await supabase.from('help_requests').delete().eq('user_id', id);
-        
-        const { error } = await supabase.from('users').delete().eq('id', id);
-        if (error) throw error;
+        const isCampus = activePlatform === 'campus';
+        const otherActive = isCampus ? studentToDelete.is_groovelab_active : studentToDelete.is_campus_active;
+
+        if (otherActive) {
+          // Soft delete: only remove from this platform, keep the user for the other
+          const updatePayload = isCampus
+            ? { is_campus_active: false }
+            : { is_groovelab_active: false };
+          const { error } = await supabase.from('users').update(updatePayload).eq('id', id);
+          if (error) throw error;
+        } else {
+          // Hard delete: student is only on this platform, remove completely
+          await supabase.from('user_song_skills').delete().eq('user_id', id);
+          await supabase.from('band_members').delete().eq('user_id', id);
+          await supabase.from('sessions').delete().eq('user_id', id);
+          await supabase.from('band_songs').update({ suggested_by: null }).eq('suggested_by', id);
+          await supabase.from('lab_planning').delete().eq('user_id', id);
+          await supabase.from('band_shoutbox').delete().eq('user_id', id);
+          await supabase.from('band_song_slots').delete().eq('user_id', id);
+          await supabase.from('help_requests').delete().eq('user_id', id);
+          const { error } = await supabase.from('users').delete().eq('id', id);
+          if (error) throw error;
+        }
         
         setStudents(students.filter(s => s.id !== id));
       } catch (err: any) {
-        alert('Fehler beim Löschen: ' + err.message);
+        alert('Fehler beim Entfernen: ' + err.message);
       }
     }
   };
@@ -2082,9 +2098,11 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const renderLiveTab = () => (
     <div style={{ marginTop: '0', flex: 1, display: 'flex', flexDirection: 'column' }}>
       <TeacherDashboard 
+        key={`${activePlatform}-${activeTab}`}
         userId={userId} 
-        hideHeader={true} 
+        hideHeader={activePlatform === 'campus' ? false : true} 
         viewMode="admin" 
+        initialTab={activePlatform === 'campus' ? 'briefing' : 'live'}
         onTabChange={(id) => onTabChange?.(id)}
         isSidebarCollapsed={isSidebarCollapsed}
         setIsSidebarCollapsed={setIsSidebarCollapsed}

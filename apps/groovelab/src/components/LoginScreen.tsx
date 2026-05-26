@@ -42,6 +42,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [error, setError] = useState<string | null>(null);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showImpressum, setShowImpressum] = useState(false);
+  const [firstNameFocused, setFirstNameFocused] = useState(false);
+  const [lastNameFocused, setLastNameFocused] = useState(false);
 
   // Onboarding States
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -528,6 +530,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   // Onboarding parameters for invited school coaches
   const urlParams = new URLSearchParams(window.location.search);
   const inviteSchoolId = urlParams.get('invite_school_id');
+  const inviteRole = urlParams.get('role') || 'teacher';
   const schoolIdParam = urlParams.get('school_id');
   
   const [schoolName, setSchoolName] = useState<string>('');
@@ -966,63 +969,90 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
   // Intercept and render coach self-onboarding if invite parameters are in URL
   if (inviteSchoolId) {
+    const isSecretary = inviteRole === 'secretary' || inviteRole === 'admin';
+
     if (registeredUser) {
       return (
         <div style={{
-          position: 'fixed', inset: 0, backgroundColor: '#0f172a',
+          position: 'fixed', inset: 0, 
+          backgroundColor: isSecretary ? '#f8fafc' : '#0f172a',
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          padding: '20px', fontFamily: '"Outfit", "Inter", sans-serif', zIndex: 9999, color: '#f8fafc'
+          padding: '20px', fontFamily: '"Outfit", "Inter", sans-serif', zIndex: 9999, 
+          color: isSecretary ? '#1e293b' : '#f8fafc'
         }}>
           <div style={{
-            width: '100%', maxWidth: '440px', background: 'rgba(255, 255, 255, 0.03)',
-            backdropFilter: 'blur(16px)', borderRadius: '32px', padding: '32px',
-            border: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', flexDirection: 'column',
-            alignItems: 'center', boxShadow: '0 40px 100px rgba(0, 0, 0, 0.4)', boxSizing: 'border-box'
+            width: '100%', maxWidth: '440px', 
+            background: isSecretary ? '#ffffff' : 'rgba(255, 255, 255, 0.03)',
+            borderRadius: '24px', padding: '36px',
+            border: isSecretary ? '1px solid #e2e8f0' : '1px solid rgba(255, 255, 255, 0.08)', 
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', 
+            boxShadow: isSecretary ? '0 20px 50px rgba(15, 23, 42, 0.04)' : '0 40px 100px rgba(0, 0, 0, 0.4)', 
+            boxSizing: 'border-box'
           }}>
             <div style={{
-              width: '60px', height: '60px', borderRadius: '50%', background: '#22c55e20',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px'
+              width: '64px', height: '64px', borderRadius: '50%', 
+              background: isSecretary ? '#e6f4ea' : '#22c55e20',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px'
             }}>
-              <Check size={32} color="#22c55e" />
+              <Check size={36} color={isSecretary ? '#137333' : '#22c55e'} strokeWidth={3} />
             </div>
-            <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#22c55e', margin: '0 0 10px 0', textAlign: 'center' }}>
+            <h1 style={{ fontSize: '24px', fontWeight: 800, color: isSecretary ? '#137333' : '#22c55e', margin: '0 0 10px 0', textAlign: 'center', letterSpacing: '-0.02em' }}>
               Registrierung erfolgreich!
             </h1>
-            <p style={{ color: '#94a3b8', fontSize: '13px', textAlign: 'center', lineHeight: '1.5', margin: '0 0 24px 0' }}>
-              Dein GrooveLab Coach-Ausweis wurde erstellt. Mache einen <strong>Screenshot</strong> oder drucke diesen QR-Code aus, um dich ab sofort einzuloggen.
+            <p style={{ color: isSecretary ? '#5f6368' : '#94a3b8', fontSize: '13px', textAlign: 'center', lineHeight: '1.5', margin: '0 0 24px 0', fontWeight: 600 }}>
+              {isSecretary 
+                ? 'Dein Campus Administrator-Ausweis wurde erstellt. Mache einen Screenshot oder drucke diesen QR-Code aus, um dich ab sofort einzuloggen.'
+                : 'Dein GrooveLab Coach-Ausweis wurde erstellt. Mache einen Screenshot oder drucke diesen QR-Code aus, um dich ab sofort einzuloggen.'}
             </p>
             
+            {/* ID Card Wrapper */}
             <div style={{
-              background: 'white', padding: '16px', borderRadius: '24px',
-              boxShadow: '0 10px 30px rgba(0,0,0,0.2)', marginBottom: '24px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
+              width: '100%',
+              background: isSecretary ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)',
+              borderRadius: '20px',
+              border: isSecretary ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.06)',
+              padding: '24px',
+              boxSizing: 'border-box',
+              marginBottom: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center'
             }}>
-              <img 
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${registeredUser.qr_token}`} 
-                alt="GrooveLab QR Code" 
-                style={{ width: '200px', height: '200px' }}
-              />
-            </div>
+              <div style={{
+                background: 'white', padding: '12px', borderRadius: '16px',
+                boxShadow: isSecretary ? '0 8px 24px rgba(0, 0, 0, 0.03)' : '0 10px 30px rgba(0,0,0,0.2)', 
+                border: isSecretary ? '1px solid #e2e8f0' : 'none',
+                marginBottom: '16px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${registeredUser.qr_token}`} 
+                  alt="QR Code" 
+                  style={{ width: '180px', height: '180px', display: 'block' }}
+                />
+              </div>
 
-            <div style={{
-              width: '100%', padding: '16px', background: 'rgba(255, 255, 255, 0.02)',
-              borderRadius: '16px', border: '1px solid rgba(255,255,255,0.06)',
-              marginBottom: '24px', boxSizing: 'border-box'
-            }}>
-              <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>Name</div>
-              <div style={{ fontSize: '1rem', fontWeight: 700, color: 'white' }}>{registeredUser.first_name} {registeredUser.last_name}</div>
-              
-              <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '12px', marginBottom: '4px' }}>Schule</div>
-              <div style={{ fontSize: '1rem', fontWeight: 700, color: '#eab308' }}>{schoolName || 'GrooveLab Academy'}</div>
+              <div style={{ width: '100%', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.75rem', color: isSecretary ? '#5f6368' : '#94a3b8', marginBottom: '2px', fontWeight: 600 }}>Name</div>
+                <div style={{ fontSize: '1.05rem', fontWeight: 700, color: isSecretary ? '#1d1d1f' : 'white', marginBottom: '12px' }}>
+                  {registeredUser.first_name} {registeredUser.last_name}
+                </div>
+                
+                <div style={{ fontSize: '0.75rem', color: isSecretary ? '#5f6368' : '#94a3b8', marginBottom: '2px', fontWeight: 600 }}>Schule</div>
+                <div style={{ fontSize: '1.05rem', fontWeight: 700, color: isSecretary ? '#0b57d0' : '#eab308' }}>
+                  {schoolName || 'GrooveLab Academy'}
+                </div>
+              </div>
             </div>
 
             <button
               onClick={() => onLogin(registeredUser.id, true)}
               style={{
-                width: '100%', padding: '14px 20px', borderRadius: '16px',
-                background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
-                border: 'none', color: '#0f172a', fontWeight: 800, fontSize: '0.95rem',
-                cursor: 'pointer', boxShadow: '0 8px 24px rgba(234, 179, 8, 0.25)',
+                width: '100%', padding: '14px 20px', borderRadius: '100px',
+                background: isSecretary ? '#0b57d0' : 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                border: 'none', color: isSecretary ? '#ffffff' : '#0f172a', fontWeight: 800, fontSize: '0.95rem',
+                cursor: 'pointer', boxShadow: isSecretary ? '0 4px 12px rgba(11, 87, 208, 0.2)' : '0 8px 24px rgba(234, 179, 8, 0.25)',
                 transition: 'all 0.2s', outline: 'none'
               }}
             >
@@ -1035,32 +1065,48 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
     return (
       <div style={{
-        position: 'fixed', inset: 0, backgroundColor: '#0f172a',
+        position: 'fixed', inset: 0, 
+        backgroundColor: isSecretary ? '#f8fafc' : '#0f172a',
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        padding: '20px', fontFamily: '"Outfit", "Inter", sans-serif', zIndex: 9999, color: '#f8fafc'
+        padding: '20px', fontFamily: '"Outfit", "Inter", sans-serif', zIndex: 9999, 
+        color: isSecretary ? '#1e293b' : '#f8fafc'
       }}>
         <div style={{
-          width: '100%', maxWidth: '440px', background: 'rgba(255, 255, 255, 0.03)',
-          backdropFilter: 'blur(16px)', borderRadius: '32px', padding: '32px',
-          border: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', flexDirection: 'column',
-          boxShadow: '0 40px 100px rgba(0, 0, 0, 0.4)', boxSizing: 'border-box'
+          width: '100%', maxWidth: '440px', 
+          background: isSecretary ? '#ffffff' : 'rgba(255, 255, 255, 0.03)',
+          borderRadius: '24px', padding: '36px',
+          border: isSecretary ? '1px solid #e2e8f0' : '1px solid rgba(255, 255, 255, 0.08)', 
+          display: 'flex', flexDirection: 'column',
+          boxShadow: isSecretary ? '0 20px 50px rgba(15, 23, 42, 0.04)' : '0 40px 100px rgba(0, 0, 0, 0.4)', 
+          boxSizing: 'border-box'
         }}>
           
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
             <div style={{
-              background: '#eab308', padding: '8px', borderRadius: '12px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
+              background: isSecretary ? '#e8f0fe' : '#eab308', 
+              padding: '10px', borderRadius: '12px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: isSecretary ? '0 4px 12px rgba(11, 87, 208, 0.08)' : 'none'
             }}>
-              <Music size={24} color="#0f172a" />
+              {isSecretary ? (
+                <School size={24} color="#0b57d0" strokeWidth={2.5} />
+              ) : (
+                <Music size={24} color="#0f172a" />
+              )}
             </div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 800 }}>GrooveLab Einladung</div>
+            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: isSecretary ? '#0b57d0' : '#ffffff' }}>
+              {isSecretary ? 'Campus Admin Einladung' : 'GrooveLab Einladung'}
+            </div>
           </div>
 
-          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
-            Registriere dich als Coach
+          <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0 0 8px 0', letterSpacing: '-0.02em', color: isSecretary ? '#1d1d1f' : '#ffffff' }}>
+            {isSecretary ? 'Registriere dich als Administrator' : 'Registriere dich als Coach'}
           </h2>
-          <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: '0 0 24px 0', lineHeight: '1.5' }}>
-            Du wurdest eingeladen, als Coach für die Schule <strong style={{ color: '#eab308' }}>{loadingSchool ? 'wird geladen...' : (schoolName || 'GrooveLab Academy')}</strong> beizutreten.
+          <p style={{ color: isSecretary ? '#5f6368' : '#94a3b8', fontSize: '0.85rem', margin: '0 0 24px 0', lineHeight: '1.5', fontWeight: 600 }}>
+            {isSecretary 
+              ? `Du wurdest eingeladen, als Administrator/Sekretariat für die Schule `
+              : `Du wurdest eingeladen, als Coach für die Schule `}
+            <strong style={{ color: isSecretary ? '#0b57d0' : '#eab308' }}>{loadingSchool ? 'wird geladen...' : (schoolName || 'GrooveLab Academy')}</strong> beizutreten.
           </p>
 
           <form onSubmit={async (e) => {
@@ -1069,8 +1115,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             try {
               setSigningUp(true);
               
-              // Check limits if enabled for the school
-              if (schoolData?.limits_enabled) {
+              // Check limits if enabled for the school (only for teachers/admins, secretary might have different or no limits)
+              if (schoolData?.limits_enabled && !isSecretary) {
                 const { count, error: countErr } = await supabase
                   .from('users')
                   .select('*', { count: 'exact', head: true })
@@ -1095,9 +1141,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 .insert({
                   id: newUserId,
                   school_id: inviteSchoolId,
-                  role: 'teacher',
-                  first_name: firstName,
-                  last_name: lastName,
+                  role: inviteRole, // Sets the role to 'secretary' dynamically!
+                  first_name: firstName.trim(),
+                  last_name: lastName.trim(),
                   qr_token: newQrToken
                 })
                 .select()
@@ -1106,41 +1152,57 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               if (error) throw error;
               setRegisteredUser(data);
             } catch (err: any) {
-              console.error("Error signing up coach:", err);
+              console.error("Error signing up user:", err);
               alert("Fehler bei der Registrierung: " + err.message);
             } finally {
               setSigningUp(false);
             }
-          }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          }} style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
             
             <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600, marginBottom: '6px' }}>Vorname *</label>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: isSecretary ? '#475569' : '#94a3b8', fontWeight: 700, marginBottom: '6px' }}>Vorname *</label>
               <input
                 type="text"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 placeholder="Max"
                 required
+                onFocus={() => setFirstNameFocused(true)}
+                onBlur={() => setFirstNameFocused(false)}
                 style={{
-                  width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: '10px',
-                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-                  color: 'white', fontSize: '0.9rem', outline: 'none'
+                  width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '8px',
+                  background: isSecretary ? '#f8fafc' : 'rgba(255,255,255,0.05)', 
+                  border: isSecretary 
+                    ? `1px solid ${firstNameFocused ? '#0b57d0' : '#dadce0'}` 
+                    : `1px solid ${firstNameFocused ? '#eab308' : 'rgba(255,255,255,0.08)'}`,
+                  boxShadow: firstNameFocused && isSecretary ? '0 0 0 3px rgba(11, 87, 208, 0.12)' : 'none',
+                  color: isSecretary ? '#1d1d1f' : 'white', fontSize: '0.95rem', outline: 'none',
+                  fontWeight: 600,
+                  transition: 'all 0.15s ease'
                 }}
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600, marginBottom: '6px' }}>Nachname *</label>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: isSecretary ? '#475569' : '#94a3b8', fontWeight: 700, marginBottom: '6px' }}>Nachname *</label>
               <input
                 type="text"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 placeholder="Mustermann"
                 required
+                onFocus={() => setLastNameFocused(true)}
+                onBlur={() => setLastNameFocused(false)}
                 style={{
-                  width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: '10px',
-                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-                  color: 'white', fontSize: '0.9rem', outline: 'none'
+                  width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '8px',
+                  background: isSecretary ? '#f8fafc' : 'rgba(255,255,255,0.05)', 
+                  border: isSecretary 
+                    ? `1px solid ${lastNameFocused ? '#0b57d0' : '#dadce0'}` 
+                    : `1px solid ${lastNameFocused ? '#eab308' : 'rgba(255,255,255,0.08)'}`,
+                  boxShadow: lastNameFocused && isSecretary ? '0 0 0 3px rgba(11, 87, 208, 0.12)' : 'none',
+                  color: isSecretary ? '#1d1d1f' : 'white', fontSize: '0.95rem', outline: 'none',
+                  fontWeight: 600,
+                  transition: 'all 0.15s ease'
                 }}
               />
             </div>
@@ -1149,10 +1211,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               type="submit"
               disabled={signingUp}
               style={{
-                marginTop: '8px', padding: '14px', borderRadius: '12px',
-                background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
-                border: 'none', color: '#0f172a', fontWeight: 800, fontSize: '0.9rem',
-                cursor: 'pointer', boxShadow: '0 8px 20px rgba(234, 179, 8, 0.2)',
+                marginTop: '8px', padding: '14px 20px', borderRadius: '100px',
+                background: isSecretary ? '#0b57d0' : 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                border: 'none', color: isSecretary ? '#ffffff' : '#0f172a', fontWeight: 800, fontSize: '0.95rem',
+                cursor: 'pointer', boxShadow: isSecretary ? '0 4px 12px rgba(11, 87, 208, 0.2)' : '0 8px 20px rgba(234, 179, 8, 0.2)',
                 transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}
             >
