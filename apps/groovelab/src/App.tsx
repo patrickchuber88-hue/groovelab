@@ -2073,14 +2073,9 @@ function App() {
       platformInitialized.current = true;
       return;
     }
-    const isStudent = user?.role?.toLowerCase() === 'student';
-    if (activePlatform === 'campus') {
-      const savedTab = localStorage.getItem('campus_active_tab') || (isStudent ? 'profile' : 'live');
-      setActiveStudentTab(savedTab);
-    } else {
-      const savedTab = localStorage.getItem('groovelab_active_tab') || 'live';
-      setActiveStudentTab(savedTab);
-    }
+    const firstMenuTab = activePlatform === 'campus' ? 'briefing' : 'live';
+    setActiveStudentTab(firstMenuTab);
+    localStorage.setItem(activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab', firstMenuTab);
   }, [activePlatform]);
   const { width, height } = useWindowSize();
 
@@ -5151,52 +5146,77 @@ function App() {
       {/* Sidebar Navigation (iPad/Desktop) */}
       <aside className="sidebar-nav" style={{ display: windowWidth > 1024 ? 'flex' : 'none' }}>
         <div className="sidebar-logo" style={{ padding: '8px 0px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ 
-            width: '42px', 
-            height: '42px', 
-            background: '#fefce8', 
-            borderRadius: '12px', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            boxShadow: '0 4px 12px rgba(234, 179, 8, 0.1)'
-          }}>
-            <Music size={24} color="#eab308" strokeWidth={3} />
-          </div>
-          <div style={{ 
-            fontSize: '1.5rem', 
-            fontWeight: 900, 
-            color: '#eab308',
-            letterSpacing: '-0.02em'
-          }}>GrooveLab</div>
+          {activePlatform === 'campus' ? (
+            <>
+              <div style={{ 
+                width: '42px', 
+                height: '42px', 
+                background: 'rgba(52, 168, 83, 0.08)', 
+                borderRadius: '12px', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(52, 168, 83, 0.1)'
+              }}>
+                <GraduationCap size={24} color="#34a853" strokeWidth={3} />
+              </div>
+              <div style={{ 
+                fontSize: '1.5rem', 
+                fontWeight: 900, 
+                color: '#34a853',
+                letterSpacing: '-0.02em'
+              }}>Campus</div>
+            </>
+          ) : (
+            <>
+              <div style={{ 
+                width: '42px', 
+                height: '42px', 
+                background: '#fefce8', 
+                borderRadius: '12px', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(234, 179, 8, 0.1)'
+              }}>
+                <Music size={24} color="#eab308" strokeWidth={3} />
+              </div>
+              <div style={{ 
+                fontSize: '1.5rem', 
+                fontWeight: 900, 
+                color: '#eab308',
+                letterSpacing: '-0.02em'
+              }}>GrooveLab</div>
+            </>
+          )}
         </div>
 
         <nav className="sidebar-menu" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {user.role?.toLowerCase() === 'student' ? (
             activePlatform === 'campus' ? (
               <>
-                <button onClick={() => setActiveStudentTab('briefing')} className={`sidebar-item ${['briefing', 'profile'].includes(activeStudentTab) ? 'active' : ''}`}>
+                <button onClick={() => setActiveStudentTab('briefing')} className={`sidebar-item ${['briefing', 'profile'].includes(activeStudentTab) ? `active ${activePlatform}` : ''}`}>
                   <GraduationCap size={20} /> Briefing
                 </button>
-                <button onClick={() => setActiveStudentTab('songs')} className={`sidebar-item ${activeStudentTab === 'songs' ? 'active' : ''}`}>
+                <button onClick={() => setActiveStudentTab('songs')} className={`sidebar-item ${activeStudentTab === 'songs' ? `active ${activePlatform}` : ''}`}>
                   <Music size={20} /> Songs
                 </button>
-                <button onClick={() => setActiveStudentTab('practice_board')} className={`sidebar-item ${activeStudentTab === 'practice_board' ? 'active' : ''}`}>
+                <button onClick={() => setActiveStudentTab('practice_board')} className={`sidebar-item ${activeStudentTab === 'practice_board' ? `active ${activePlatform}` : ''}`}>
                   <Play size={20} /> Übe-Board
                 </button>
-                <button onClick={() => setActiveStudentTab('campus_cup')} className={`sidebar-item ${activeStudentTab === 'campus_cup' ? 'active' : ''}`}>
+                <button onClick={() => setActiveStudentTab('campus_cup')} className={`sidebar-item ${activeStudentTab === 'campus_cup' ? `active ${activePlatform}` : ''}`}>
                   <Trophy size={20} /> Campus-Cup
                 </button>
-                <button onClick={() => setActiveStudentTab('hero')} className={`sidebar-item ${activeStudentTab === 'hero' ? 'active' : ''}`}>
+                <button onClick={() => setActiveStudentTab('hero')} className={`sidebar-item ${activeStudentTab === 'hero' ? `active ${activePlatform}` : ''}`}>
                   <Star size={20} /> Mein Held
                 </button>
-                <button onClick={() => setActiveStudentTab('team')} className={`sidebar-item ${activeStudentTab === 'team' ? 'active' : ''}`}>
+                <button onClick={() => setActiveStudentTab('team')} className={`sidebar-item ${activeStudentTab === 'team' ? `active ${activePlatform}` : ''}`}>
                   <Users size={20} /> Mein Team
                 </button>
               </>
             ) : (
               <>
-                <button onClick={() => setActiveStudentTab('live')} className={`sidebar-item ${activeStudentTab === 'live' ? 'active' : ''}`} style={{ position: 'relative' }}>
+                <button onClick={() => setActiveStudentTab('live')} className={`sidebar-item ${activeStudentTab === 'live' ? `active ${activePlatform}` : ''}`} style={{ position: 'relative' }}>
                   <Monitor size={20} /> Live Lab
                   <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 6px #ef4444', marginLeft: 'auto', flexShrink: 0 }} className="animate-pulse"></div>
                 </button>
@@ -5204,30 +5224,30 @@ function App() {
                 {/* Only for instrumentalists */}
                 {!user.is_external_vocalist && (
                   <>
-                    <button onClick={() => setActiveStudentTab('practice')} className={`sidebar-item ${activeStudentTab === 'practice' ? 'active' : ''}`}>
+                    <button onClick={() => setActiveStudentTab('practice')} className={`sidebar-item ${activeStudentTab === 'practice' ? `active ${activePlatform}` : ''}`}>
                       <Play size={20} fill={activeStudentTab === 'practice' ? 'white' : 'none'} /> Üben
                     </button>
-                    <button onClick={() => setActiveStudentTab('library')} className={`sidebar-item ${activeStudentTab === 'library' ? 'active' : ''}`}>
+                    <button onClick={() => setActiveStudentTab('library')} className={`sidebar-item ${activeStudentTab === 'library' ? `active ${activePlatform}` : ''}`}>
                       <Library size={20} /> Bibliothek
                     </button>
                   </>
                 )}
 
-                <button onClick={() => setActiveStudentTab('repertoire')} className={`sidebar-item ${activeStudentTab === 'repertoire' ? 'active' : ''}`}>
+                <button onClick={() => setActiveStudentTab('repertoire')} className={`sidebar-item ${activeStudentTab === 'repertoire' ? `active ${activePlatform}` : ''}`}>
                   <Award size={20} /> Repertoire
                 </button>
 
                 {!user.is_external_vocalist && (
-                  <button onClick={() => setActiveStudentTab('matching')} className={`sidebar-item ${activeStudentTab === 'matching' ? 'active' : ''}`}>
+                  <button onClick={() => setActiveStudentTab('matching')} className={`sidebar-item ${activeStudentTab === 'matching' ? `active ${activePlatform}` : ''}`}>
                     <Users size={20} /> Band-Matching
                   </button>
                 )}
 
-                <button onClick={() => setActiveStudentTab('bands')} className={`sidebar-item ${activeStudentTab === 'bands' ? 'active' : ''}`}>
+                <button onClick={() => setActiveStudentTab('bands')} className={`sidebar-item ${activeStudentTab === 'bands' ? `active ${activePlatform}` : ''}`}>
                   <Box size={20} /> Bands
                 </button>
 
-                <button onClick={() => setActiveStudentTab('messages')} className={`sidebar-item ${activeStudentTab === 'messages' ? 'active' : ''}`} style={{ position: 'relative' }}>
+                <button onClick={() => setActiveStudentTab('messages')} className={`sidebar-item ${activeStudentTab === 'messages' ? `active ${activePlatform}` : ''}`} style={{ position: 'relative' }}>
                   <Megaphone size={20} /> Nachrichten
                   {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length > 0 && (
                     <div style={{ 
@@ -5252,47 +5272,47 @@ function App() {
           ) : (
             activePlatform === 'campus' ? (
               <>
-                <button onClick={() => setActiveStudentTab('live')} className={`sidebar-item ${activeStudentTab === 'live' ? 'active' : ''}`} style={{ position: 'relative' }}>
+                <button onClick={() => setActiveStudentTab('live')} className={`sidebar-item ${activeStudentTab === 'live' ? `active ${activePlatform}` : ''}`} style={{ position: 'relative' }}>
                   <Monitor size={20} /> Stundenpläne & Briefing
                 </button>
-                <button onClick={() => setActiveStudentTab('students')} className={`sidebar-item ${activeStudentTab === 'students' ? 'active' : ''}`}>
+                <button onClick={() => setActiveStudentTab('students')} className={`sidebar-item ${activeStudentTab === 'students' ? `active ${activePlatform}` : ''}`}>
                   <Users size={20} /> Schüler verwalten
                 </button>
-                <button onClick={() => setActiveStudentTab('team')} className={`sidebar-item ${activeStudentTab === 'team' ? 'active' : ''}`}>
+                <button onClick={() => setActiveStudentTab('team')} className={`sidebar-item ${activeStudentTab === 'team' ? `active ${activePlatform}` : ''}`}>
                   <Shield size={20} /> Kollegium (Team)
                 </button>
               </>
             ) : (
               <>
-                <button onClick={() => setActiveStudentTab('live')} className={`sidebar-item ${activeStudentTab === 'live' ? 'active' : ''}`} style={{ position: 'relative' }}>
+                <button onClick={() => setActiveStudentTab('live')} className={`sidebar-item ${activeStudentTab === 'live' ? `active ${activePlatform}` : ''}`} style={{ position: 'relative' }}>
                   <Monitor size={20} /> Live Lab
                   <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 6px #ef4444', marginLeft: 'auto', flexShrink: 0 }} className="animate-pulse"></div>
                 </button>
-                <button onClick={() => setActiveStudentTab('messages')} className={`sidebar-item ${activeStudentTab === 'messages' ? 'active' : ''}`}>
+                <button onClick={() => setActiveStudentTab('messages')} className={`sidebar-item ${activeStudentTab === 'messages' ? `active ${activePlatform}` : ''}`}>
                   <Mail size={20} /> Nachrichten
                 </button>
-                <button onClick={() => setActiveStudentTab('students')} className={`sidebar-item ${activeStudentTab === 'students' ? 'active' : ''}`}>
+                <button onClick={() => setActiveStudentTab('students')} className={`sidebar-item ${activeStudentTab === 'students' ? `active ${activePlatform}` : ''}`}>
                   <Users size={20} /> Schüler
                 </button>
-                <button onClick={() => setActiveStudentTab('team')} className={`sidebar-item ${activeStudentTab === 'team' ? 'active' : ''}`}>
+                <button onClick={() => setActiveStudentTab('team')} className={`sidebar-item ${activeStudentTab === 'team' ? `active ${activePlatform}` : ''}`}>
                   <Shield size={20} /> Team
                 </button>
-                <button onClick={() => setActiveStudentTab('rooms')} className={`sidebar-item ${activeStudentTab === 'rooms' ? 'active' : ''}`}>
+                <button onClick={() => setActiveStudentTab('rooms')} className={`sidebar-item ${activeStudentTab === 'rooms' ? `active ${activePlatform}` : ''}`}>
                   <Box size={20} /> Räume
                 </button>
-                <button onClick={() => setActiveStudentTab('songs')} className={`sidebar-item ${activeStudentTab === 'songs' ? 'active' : ''}`}>
+                <button onClick={() => setActiveStudentTab('songs')} className={`sidebar-item ${activeStudentTab === 'songs' ? `active ${activePlatform}` : ''}`}>
                   <Library size={20} /> Songs
                 </button>
-                <button onClick={() => setActiveStudentTab('bands')} className={`sidebar-item ${activeStudentTab === 'bands' ? 'active' : ''}`}>
+                <button onClick={() => setActiveStudentTab('bands')} className={`sidebar-item ${activeStudentTab === 'bands' ? `active ${activePlatform}` : ''}`}>
                   <Box size={20} /> Bands
                 </button>
-                <button onClick={() => setActiveStudentTab('stats')} className={`sidebar-item ${activeStudentTab === 'stats' ? 'active' : ''}`}>
+                <button onClick={() => setActiveStudentTab('stats')} className={`sidebar-item ${activeStudentTab === 'stats' ? `active ${activePlatform}` : ''}`}>
                   <Music size={20} /> Statistik
                 </button>
-                <button onClick={() => setActiveStudentTab('gallery')} className={`sidebar-item ${activeStudentTab === 'gallery' ? 'active' : ''}`}>
+                <button onClick={() => setActiveStudentTab('gallery')} className={`sidebar-item ${activeStudentTab === 'gallery' ? `active ${activePlatform}` : ''}`}>
                   <QrCode size={20} /> ID Galerie
                 </button>
-                <button onClick={() => setActiveStudentTab('setup')} className={`sidebar-item ${activeStudentTab === 'setup' ? 'active' : ''}`}>
+                <button onClick={() => setActiveStudentTab('setup')} className={`sidebar-item ${activeStudentTab === 'setup' ? `active ${activePlatform}` : ''}`}>
                   <Shield size={20} /> Setup
                 </button>
               </>
@@ -5300,29 +5320,41 @@ function App() {
           )}
         </nav>
 
-        <div style={{ marginTop: 'auto', borderTop: '1px solid #f1f5f9', paddingTop: '16px', paddingBottom: '16px' }}>
-          <div style={{ padding: '0 8px', marginBottom: '12px' }}>
-             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ position: 'relative' }}>
-                  <div style={{ width: '44px', height: '44px', borderRadius: '12px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                    <StudioAvatar src={user.photo_url} user={user} />
-                  </div>
-                  {session && <div style={{ position: 'absolute', bottom: -2, right: -2, width: '10px', height: '10px', background: '#ef4444', borderRadius: '50%', border: '2px solid white' }}></div>}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b' }}>{user.first_name}</div>
-                  <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                    {(user.role === 'teacher' || user.role === 'admin') ? 'GrooveLab Lehrer' : 'GrooveLab Schüler'}
-                  </div>
-                </div>
-             </div>
-          </div>
+        <div style={{ marginTop: 'auto', borderTop: '1px solid #f1f5f9', paddingTop: '16px', paddingBottom: '16px', paddingLeft: '8px', paddingRight: '8px' }}>
           <button 
             onClick={() => setActiveStudentTab('profile')} 
-            className={`sidebar-item ${activeStudentTab === 'profile' ? 'active' : ''}`}
-            style={{ marginBottom: '4px' }}
+            className={`sidebar-item ${activeStudentTab === 'profile' ? `active ${activePlatform}` : ''}`}
+            style={{ 
+              width: '100%',
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '12px', 
+              padding: '8px 12px', 
+              borderRadius: '16px', 
+              border: 'none', 
+              background: 'transparent',
+              cursor: 'pointer',
+              marginBottom: '8px',
+              textAlign: 'left',
+              transition: 'all 0.2s ease',
+              boxSizing: 'border-box'
+            }}
           >
-            <User size={18} /> Mein Profil
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '12px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                <StudioAvatar src={user.photo_url} user={user} />
+              </div>
+              {session && <div style={{ position: 'absolute', bottom: -2, right: -2, width: '10px', height: '10px', background: '#ef4444', borderRadius: '50%', border: '2px solid white' }}></div>}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.first_name}</div>
+              <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {activePlatform === 'campus'
+                  ? (user.role === 'admin' ? 'Campus Admin' : user.role === 'teacher' ? 'Campus Lehrkraft' : user.role === 'secretary' ? 'Campus Sekretariat' : 'Campus Schüler')
+                  : (user.role === 'admin' ? 'GrooveLab Admin' : user.role === 'teacher' ? 'GrooveLab Lehrer' : user.role === 'secretary' ? 'GrooveLab Sekretariat' : 'GrooveLab Schüler')}
+              </div>
+            </div>
+            <ChevronRight size={16} color="#94a3b8" style={{ marginLeft: 'auto', flexShrink: 0 }} />
           </button>
           <button 
             onClick={() => handleLogout()}
@@ -5363,12 +5395,12 @@ function App() {
       </aside>
 
       <div className={`main-wrapper ${activeStudentTab === 'live' ? 'live-tab-active' : ''}`} style={{ paddingTop: '0' }}>
-        <header className="header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', height: '80px', background: 'transparent' }}>
+        <header className="header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: windowWidth <= 1024 ? '0 16px' : '0 32px', height: '80px', background: 'transparent' }}>
           {/* App Switcher Tabs */}
           <div style={{ 
             display: 'flex', 
             alignItems: 'flex-end', 
-            gap: '6px', 
+            gap: windowWidth <= 1024 ? '4px' : '6px', 
             height: '100%',
             paddingTop: '20px',
             boxSizing: 'border-box'
@@ -5381,27 +5413,27 @@ function App() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  padding: '12px 20px 10px',
-                  borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0',
-                  background: activePlatform === 'campus' ? '#34a853' : 'rgba(52, 168, 83, 0.06)',
+                  padding: windowWidth <= 1024 ? '10px 14px 8px' : '12px 22px 10px',
+                  borderRadius: '12px 12px 0 0',
+                  background: activePlatform === 'campus' ? '#34a853' : 'rgba(52, 168, 83, 0.05)',
                   color: activePlatform === 'campus' ? '#ffffff' : '#34a853',
                   border: activePlatform === 'campus' ? '1px solid #34a853' : '1px solid rgba(52, 168, 83, 0.18)',
                   borderBottom: 'none',
-                  fontWeight: 700,
+                  fontWeight: 750,
                   fontSize: '0.82rem',
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
                   cursor: 'pointer',
                   zIndex: activePlatform === 'campus' ? 2 : 1,
                   transform: activePlatform === 'campus' ? 'translateY(1px)' : 'translateY(0)',
-                  boxShadow: activePlatform === 'campus' ? '0 -4px 12px rgba(52, 168, 83, 0.2)' : 'none',
-                  transition: 'all 0.25s ease',
-                  height: '42px',
+                  boxShadow: activePlatform === 'campus' ? '0 -4px 16px rgba(52, 168, 83, 0.18)' : 'none',
+                  transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                  height: '44px',
                   boxSizing: 'border-box',
                   fontFamily: "'Plus Jakarta Sans', sans-serif"
                 }}
               >
-                <GraduationCap size={14} color={activePlatform === 'campus' ? '#ffffff' : '#34a853'} />
+                <GraduationCap size={15} color={activePlatform === 'campus' ? '#ffffff' : '#34a853'} />
                 <span>Campus</span>
               </div>
             )}
@@ -5414,81 +5446,196 @@ function App() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  padding: '12px 20px 10px',
-                  borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0',
-                  background: activePlatform === 'groovelab' ? '#fbbc05' : 'rgba(251, 188, 5, 0.06)',
+                  padding: windowWidth <= 1024 ? '10px 14px 8px' : '12px 22px 10px',
+                  borderRadius: '12px 12px 0 0',
+                  background: activePlatform === 'groovelab' ? '#fbbc05' : 'rgba(251, 188, 5, 0.05)',
                   color: activePlatform === 'groovelab' ? '#09090b' : '#b45309',
                   border: activePlatform === 'groovelab' ? '1px solid #fbbc05' : '1px solid rgba(251, 188, 5, 0.18)',
                   borderBottom: 'none',
-                  fontWeight: 700,
+                  fontWeight: 750,
                   fontSize: '0.82rem',
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
                   cursor: 'pointer',
                   zIndex: activePlatform === 'groovelab' ? 2 : 1,
                   transform: activePlatform === 'groovelab' ? 'translateY(1px)' : 'translateY(0)',
-                  boxShadow: activePlatform === 'groovelab' ? '0 -4px 12px rgba(251, 188, 5, 0.2)' : 'none',
-                  transition: 'all 0.25s ease',
-                  height: '42px',
+                  boxShadow: activePlatform === 'groovelab' ? '0 -4px 16px rgba(251, 188, 5, 0.18)' : 'none',
+                  transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                  height: '44px',
                   boxSizing: 'border-box',
                   fontFamily: "'Plus Jakarta Sans', sans-serif"
                 }}
               >
-                <Music size={14} color={activePlatform === 'groovelab' ? '#09090b' : '#b45309'} />
+                <Music size={15} color={activePlatform === 'groovelab' ? '#09090b' : '#b45309'} />
                 <span>GrooveLab</span>
               </div>
             )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-            {/* Common Status Pills */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {/* Trial Pill */}
-              {(user?.role === 'teacher' || user?.role === 'admin') && school?.is_trial && trialDaysLeft !== null && (
-                <div style={{ 
-                  display: 'flex', alignItems: 'center', gap: '8px', 
-                  background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)', 
-                  padding: '8px 16px', borderRadius: '12px', 
-                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)',
-                  color: 'white'
-                }}>
-                  <AlertCircle size={14} color="white" />
-                  <span style={{ color: 'white', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    {trialDaysLeft > 0 
-                      ? `Probezeit: ${trialDaysLeft} ${trialDaysLeft === 1 ? 'Tag' : 'Tage'}`
-                      : 'Probezeit abgelaufen'}
-                  </span>
-                </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: windowWidth <= 1024 ? '12px' : '24px' }}>
+            {/* Status Pills */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: windowWidth <= 768 ? '4px' : '8px' }}>
+              {activePlatform === 'campus' ? (
+                <>
+                  {/* Trial Pill */}
+                  {(user?.role === 'teacher' || user?.role === 'admin') && school?.is_trial && trialDaysLeft !== null && (
+                    <div style={{ 
+                      display: 'flex', alignItems: 'center', gap: '8px', 
+                      background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)', 
+                      padding: windowWidth <= 768 ? '8px 12px' : '8px 16px', borderRadius: '12px', 
+                      boxShadow: '0 4px 12px rgba(245, 158, 11, 0.1)',
+                      color: 'white'
+                    }}>
+                      <AlertCircle size={14} color="white" />
+                      <span style={{ color: 'white', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        {trialDaysLeft > 0 
+                          ? `Probezeit: ${trialDaysLeft} ${trialDaysLeft === 1 ? 'Tag' : 'Tage'}`
+                          : 'Probezeit abgelaufen'}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* School Pill */}
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '8px', 
+                    background: user?.role === 'student' ? 'rgba(59, 130, 246, 0.04)' : 'rgba(239, 68, 68, 0.06)', 
+                    padding: windowWidth <= 768 ? '8px 12px' : '8px 16px', 
+                    borderRadius: '12px', 
+                    border: user?.role === 'student' ? '1px solid rgba(59, 130, 246, 0.12)' : '1px solid rgba(239, 68, 68, 0.18)',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                  }}>
+                    <School size={14} color="#ef4444" />
+                    <span style={{ fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      {user?.role === 'student' ? (
+                        <>
+                          <span style={{ color: '#ef4444' }}>
+                            {school?.name || 'Meine Musikschule'}
+                          </span>
+                          <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
+                          <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <User size={14} color="#3b82f6" />
+                            <span>
+                              {teachers.find(t => t.id === user.teacher_id) 
+                                ? `${teachers.find(t => t.id === user.teacher_id).first_name} ${teachers.find(t => t.id === user.teacher_id).last_name}` 
+                                : (teachers.length > 0 
+                                  ? `${teachers[0].first_name} ${teachers[0].last_name}` 
+                                  : 'Patrick Huber')}
+                            </span>
+                          </span>
+                        </>
+                      ) : (
+                        <span style={{ color: '#ef4444' }}>
+                          {school?.name === 'Testlauf' 
+                            ? `Lehrer: ${user.first_name} ${user.last_name}`
+                            : (school?.name || 'Meine Musikschule')}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+
+                  {/* Role Pill (Hidden on Mobile) */}
+                  {windowWidth > 768 && (() => {
+                    let rolePillBg = 'rgba(52, 168, 83, 0.06)';
+                    let rolePillBorder = 'rgba(52, 168, 83, 0.18)';
+                    let rolePillTextColor = '#34a853';
+
+                    if (user?.role === 'student') {
+                      rolePillBg = 'rgba(52, 168, 83, 0.06)';
+                      rolePillBorder = 'rgba(52, 168, 83, 0.18)';
+                      rolePillTextColor = '#34a853';
+                    } else if (user?.role === 'teacher' || user?.role === 'admin') {
+                      rolePillBg = 'rgba(59, 130, 246, 0.06)';
+                      rolePillBorder = 'rgba(59, 130, 246, 0.18)';
+                      rolePillTextColor = '#3b82f6';
+                    } else if (user?.role === 'secretary') {
+                      rolePillBg = 'rgba(139, 92, 246, 0.06)';
+                      rolePillBorder = 'rgba(139, 92, 246, 0.18)';
+                      rolePillTextColor = '#8b5cf6';
+                    }
+                    
+                    return (
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '8px', 
+                        background: rolePillBg, 
+                        padding: '8px 16px', 
+                        borderRadius: '12px', 
+                        border: `1px solid ${rolePillBorder}`,
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                      }}>
+                        {user?.role?.toLowerCase() === 'admin' ? (
+                          <Shield size={14} color={rolePillTextColor} />
+                        ) : user?.role?.toLowerCase() === 'secretary' ? (
+                          <Shield size={14} color={rolePillTextColor} />
+                        ) : (
+                          <User size={14} color={rolePillTextColor} />
+                        )}
+                        <span style={{ color: rolePillTextColor, fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          {user?.role?.toLowerCase() === 'admin' 
+                            ? 'Campus Admin' 
+                            : user?.role?.toLowerCase() === 'teacher' 
+                              ? 'Lehrkraft' 
+                              : user?.role?.toLowerCase() === 'secretary'
+                                ? 'Sekretariat'
+                                : 'Schüler'}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </>
+              ) : (
+                <>
+                  {/* Trial Pill */}
+                  {(user?.role === 'teacher' || user?.role === 'admin') && school?.is_trial && trialDaysLeft !== null && (
+                    <div style={{ 
+                      display: 'flex', alignItems: 'center', gap: '8px', 
+                      background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)', 
+                      padding: windowWidth <= 768 ? '8px 12px' : '8px 16px', borderRadius: '12px', 
+                      boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)',
+                      color: 'white'
+                    }}>
+                      <AlertCircle size={14} color="white" />
+                      <span style={{ color: 'white', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        {trialDaysLeft > 0 
+                          ? `Probezeit: ${trialDaysLeft} ${trialDaysLeft === 1 ? 'Tag' : 'Tage'}`
+                          : 'Probezeit abgelaufen'}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Location Pill */}
+                  <div style={{ 
+                    display: 'flex', alignItems: 'center', gap: '8px', 
+                    background: getRoleColor(user?.role, locationMode === 'lab' ? (session?.stations?.name || 'Labor iPad') : undefined), 
+                    padding: windowWidth <= 768 ? '8px 12px' : '8px 16px', borderRadius: '12px', 
+                    boxShadow: `0 4px 12px ${getRoleColor(user?.role, locationMode === 'lab' ? (session?.stations?.name || 'Labor iPad') : undefined)}30`
+                  }}>
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'white' }}></div>
+                    <span style={{ color: 'white', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      {(user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'teacher') 
+                        ? (locationMode === 'lab' ? 'Labor iPad' : 'Home') 
+                        : (locationMode === 'lab' ? `Labor (${session?.stations?.name || 'iPad'})` : 'Home')}
+                    </span>
+                  </div>
+
+                  {/* Lab Count Pill */}
+                  <div style={{ 
+                    display: 'flex', alignItems: 'center', gap: '8px', 
+                    background: '#22c55e', padding: windowWidth <= 768 ? '8px 12px' : '8px 16px', borderRadius: '12px', 
+                    boxShadow: '0 4px 12px rgba(34, 197, 94, 0.2)'
+                  }}>
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'white' }}></div>
+                    <span style={{ color: 'white', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{activeStudentsCount} im Lab</span>
+                  </div>
+                </>
               )}
-
-               {/* Location Pill */}
-               <div style={{ 
-                display: 'flex', alignItems: 'center', gap: '8px', 
-                background: getRoleColor(user?.role, locationMode === 'lab' ? (session?.stations?.name || 'Labor iPad') : undefined), 
-                padding: '8px 16px', borderRadius: '12px', 
-                boxShadow: `0 4px 12px ${getRoleColor(user?.role, locationMode === 'lab' ? (session?.stations?.name || 'Labor iPad') : undefined)}30`
-              }}>
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'white' }}></div>
-                <span style={{ color: 'white', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  {(user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'teacher') 
-                    ? (locationMode === 'lab' ? 'Labor iPad' : 'Home') 
-                    : (locationMode === 'lab' ? `Labor (${session?.stations?.name || 'iPad'})` : 'Home')}
-                </span>
-              </div>
-
-              {/* Lab Count Pill */}
-              <div style={{ 
-                display: 'flex', alignItems: 'center', gap: '8px', 
-                background: '#22c55e', padding: '8px 16px', borderRadius: '12px', 
-                boxShadow: '0 4px 12px rgba(34, 197, 94, 0.2)'
-              }}>
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'white' }}></div>
-                <span style={{ color: 'white', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{activeStudentsCount} im Lab</span>
-              </div>
             </div>
 
-            {/* Ausweis Button (Only Student) */}
-            {user.role === 'student' && (
+            {/* Ausweis Button (Only Student, Desktop only) */}
+            {user.role?.toLowerCase() === 'student' && windowWidth > 1024 && (
               <button onClick={() => setShowQR(true)} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'white', padding: '10px 20px', borderRadius: '16px', border: '1px solid #f1f5f9', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', cursor: 'pointer' }}>
                 <span style={{ color: '#eab308', fontWeight: 800, fontSize: '0.85rem' }}>Ausweis</span>
                 <QrCode size={18} color="#eab308" />
@@ -5496,14 +5643,18 @@ function App() {
             )}
 
             {/* User Info */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', paddingLeft: '16px', borderLeft: '1px solid #f1f5f9' }}>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '1rem' }}>Hallo {user.first_name}</div>
-                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                  {(user.role === 'teacher' || user.role === 'admin') ? 'GrooveLab Lehrer' : 'GrooveLab Schüler'}
+            <div style={{ display: 'flex', alignItems: 'center', gap: windowWidth <= 1024 ? '8px' : '16px', paddingLeft: windowWidth <= 1024 ? '8px' : '16px', borderLeft: '1px solid #f1f5f9' }}>
+              {windowWidth > 1024 && (
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '1rem' }}>Hallo {user.first_name}</div>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                    {activePlatform === 'campus'
+                      ? (user.role === 'admin' ? 'Campus Admin' : user.role === 'teacher' ? 'Campus Lehrkraft' : user.role === 'secretary' ? 'Campus Sekretariat' : 'Campus Schüler')
+                      : (user.role === 'admin' ? 'GrooveLab Admin' : user.role === 'teacher' ? 'GrooveLab Lehrer' : user.role === 'secretary' ? 'GrooveLab Sekretariat' : 'GrooveLab Schüler')}
+                  </div>
                 </div>
-              </div>
-              <div style={{ width: '52px', height: '52px', borderRadius: '16px', border: '3px solid white', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+              )}
+              <div style={{ width: windowWidth <= 768 ? '40px' : '52px', height: windowWidth <= 768 ? '40px' : '52px', borderRadius: '16px', border: '3px solid white', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', overflow: 'hidden', flexShrink: 0 }}>
                 <img src={user.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
               </div>
               {/* Elegant Logout Button next to avatar */}
@@ -5515,182 +5666,93 @@ function App() {
                   gap: '6px', 
                   background: '#fff1f2', 
                   border: '1px solid #ffe4e6', 
-                  padding: '8px 14px', 
+                  padding: windowWidth <= 768 ? '8px' : '8px 14px', 
                   borderRadius: '12px', 
                   color: '#f43f5e', 
                   fontWeight: 800, 
                   fontSize: '0.8rem', 
                   cursor: 'pointer',
                   transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  boxShadow: '0 4px 12px rgba(244, 63, 94, 0.08)'
+                  boxShadow: '0 4px 12px rgba(244, 63, 94, 0.08)',
+                  flexShrink: 0
                 }}
                 className="hover-scale"
                 title="Abmelden"
               >
                 <LogOut size={14} color="#f43f5e" />
-                <span>Abmelden</span>
+                {windowWidth > 768 && <span>Abmelden</span>}
               </button>
             </div>
           </div>
         </header>
 
+        {/* Thin colored accent line matching active platform — consistent across all boards */}
+        <div style={{
+          height: '3px',
+          width: '100%',
+          background: activePlatform === 'campus'
+            ? '#34a853'
+            : activePlatform === 'groovelab'
+              ? '#fbbc05'
+              : '#0b57d0',
+          flexShrink: 0,
+          marginBottom: '24px'
+        }} />
+
 
       <main className="main-content" style={{ overflow: activeStudentTab === 'live' ? 'hidden' : 'auto', flex: 1, display: 'flex', flexDirection: 'column', height: activeStudentTab === 'live' ? '100%' : 'auto' }}>
         {/* Live Lab Tab for Students */}
-        {user.role === 'student' && activeStudentTab === 'live' && (
+        {user.role?.toLowerCase() === 'student' && activeStudentTab === 'live' && (
           <ErrorBoundary>
             <div className="animation-slide-up" style={{ width: '100%', padding: '0px 16px 16px 16px', display: 'flex', flexDirection: 'column', flex: 1, height: '100%' }}>
-              {locationMode === 'home' && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', marginTop: '16px' }}>
-                  <h1 style={{ fontSize: '2rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.04em', margin: 0 }}>Live Lab</h1>
-                </div>
-              )}
-              
-              {locationMode === 'home' ? (
-                <div style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.4) 100%)',
-                  backdropFilter: 'blur(20px)',
-                  border: '1px solid rgba(255, 255, 255, 0.7)',
-                  borderRadius: '32px',
-                  padding: '56px 32px',
-                  textAlign: 'center',
-                  maxWidth: '640px',
-                  margin: '40px auto 0 auto',
-                  boxShadow: '0 20px 50px rgba(15, 23, 42, 0.05)',
-                  boxSizing: 'border-box'
-                }}>
-                  <div style={{
-                    width: '80px',
-                    height: '80px',
-                    borderRadius: '28px',
-                    background: 'rgba(234, 179, 8, 0.1)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginBottom: '24px',
-                    boxShadow: '0 8px 24px rgba(234, 179, 8, 0.15)',
-                    animation: 'pulse 2s infinite'
-                  }}>
-                    <Lock size={40} color="#eab308" />
-                  </div>
-                  <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', margin: '0 0 12px 0', letterSpacing: '-0.03em', fontFamily: '"Outfit", sans-serif' }}>
-                    Live Lab (Home-Modus)
-                  </h2>
-                  <p style={{ color: '#475569', fontSize: '15px', lineHeight: '1.6', margin: '0 0 32px 0', maxWidth: '480px', fontWeight: 600, fontFamily: '"Inter", sans-serif' }}>
-                    Dein Standort wurde via GPS überprüft: Du bist aktuell außerhalb des GrooveLabs eingeloggt. Das Live-Mischpult, die Raum-Buchungen und das Einbuchen in Live-Proben stehen dir nur vor Ort im GrooveLab zur Verfügung.
-                  </p>
-                  
-                  <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px',
-                    width: '100%',
-                    maxWidth: '320px'
-                  }}>
-                    {!user.is_external_vocalist && (
-                      <button 
-                        onClick={() => {
-                          setActiveStudentTab('practice');
-                          localStorage.setItem('groovelab_active_tab', 'practice');
-                        }}
-                        style={{
-                          background: '#eab308',
-                          color: '#0f172a',
-                          border: 'none',
-                          padding: '14px 24px',
-                          borderRadius: '16px',
-                          fontWeight: 900,
-                          fontSize: '14px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '8px',
-                          boxShadow: '0 8px 20px rgba(234, 179, 8, 0.25)',
-                          transition: 'transform 0.2s',
-                          fontFamily: '"Outfit", sans-serif'
-                        }}
-                        className="hover-scale"
-                      >
-                        <Play size={16} fill="#0f172a" />
-                        Übebereich öffnen
-                      </button>
-                    )}
-                    <button 
-                      onClick={() => {
-                        setActiveStudentTab('repertoire');
-                        localStorage.setItem('groovelab_active_tab', 'repertoire');
-                      }}
-                      style={{
-                        background: '#ffffff',
-                        color: '#475569',
-                        border: '1.5px solid #e2e8f0',
-                        padding: '14px 24px',
-                        borderRadius: '16px',
-                        fontWeight: 800,
-                        fontSize: '14px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        transition: 'all 0.15s',
-                        fontFamily: '"Outfit", sans-serif'
-                      }}
-                      className="hover-scale"
-                    >
-                      <Award size={16} />
-                      Mein Repertoire ansehen
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <TeacherDashboard 
-                  key={activePlatform}
-                  userId={user.id} 
-                  hideHeader={true} 
-                  viewMode="student" 
-                  onTabChange={setActiveStudentTab}
-                  isSidebarCollapsed={isSidebarCollapsed}
-                  setIsSidebarCollapsed={setIsSidebarCollapsed}
-                  onSidebarNotificationsChange={setSidebarNotificationsCount}
-                  activePlatform={activePlatform}
-                  onFoundBand={(form, mySlot) => {
-                    console.log('[DEBUG-Groovelab] setSuggestingSkill (manual click) in TeacherDashboard onFoundBand');
-                    setSuggestingSkill({
-                      ...mySlot,
-                      isLeader: true,
-                      leaderName: 'Du',
-                      song_id: form.song?.id || form.song_id,
-                      songs: { id: form.song?.id || form.song_id, title: form.song?.title },
-                      formation_group: form.groupKey || form.id,
-                      members: form.members
-                    });
-                    setFoundingName(generateRandomBandName());
-                  }}
-                />
-              )}
+              <TeacherDashboard 
+                key={activePlatform}
+                userId={user.id} 
+                hideHeader={true} 
+                viewMode="student" 
+                onTabChange={setActiveStudentTab}
+                isSidebarCollapsed={isSidebarCollapsed}
+                setIsSidebarCollapsed={setIsSidebarCollapsed}
+                onSidebarNotificationsChange={setSidebarNotificationsCount}
+                activePlatform={activePlatform}
+                onSwitchPlatform={(newPlatform) => {
+                  setActivePlatform(newPlatform);
+                  setActiveStudentTab(newPlatform === 'campus' ? 'briefing' : 'live');
+                }}
+                onFoundBand={(form, mySlot) => {
+                  console.log('[DEBUG-Groovelab] setSuggestingSkill (manual click) in TeacherDashboard onFoundBand');
+                  setSuggestingSkill({
+                    ...mySlot,
+                    isLeader: true,
+                    leaderName: 'Du',
+                    song_id: form.song?.id || form.song_id,
+                    songs: { id: form.song?.id || form.song_id, title: form.song?.title },
+                    formation_group: form.groupKey || form.id,
+                    members: form.members
+                  });
+                  setFoundingName(generateRandomBandName());
+                }}
+              />
             </div>
           </ErrorBoundary>
         )}
 
         {/* Student Campus Dashboard Tabs */}
-        {user.role === 'student' && activePlatform === 'campus' && ['briefing', 'songs', 'practice_board', 'campus_cup', 'hero', 'profile'].includes(activeStudentTab) && (
+        {user.role?.toLowerCase() === 'student' && activePlatform === 'campus' && ['briefing', 'songs', 'practice_board', 'campus_cup', 'hero', 'profile', 'all_appointments'].includes(activeStudentTab) && (
           <ErrorBoundary>
             <StudentAvatarDashboard 
               studentId={user.id} 
               parentActiveTab={activeStudentTab}
               onTabChange={(tab) => setActiveStudentTab(tab)}
+              onProfileUpdate={(updatedFields) => {
+                setUser((prev: any) => prev ? { ...prev, ...updatedFields } : null);
+              }}
             />
           </ErrorBoundary>
         )}
 
         {/* Profile Tab */}
-        {activeStudentTab === 'profile' && !(user.role === 'student' && activePlatform === 'campus') && (
+        {activeStudentTab === 'profile' && !(user.role?.toLowerCase() === 'student' && activePlatform === 'campus') && (
           <ErrorBoundary>
             <>
                 <div className="animation-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1200px', margin: '0 auto' }}>
@@ -5744,7 +5806,7 @@ function App() {
                   </div>
 
                   <h1 style={{ fontSize: '3.5rem', fontWeight: 900, color: '#1e293b', margin: '0 0 16px 0', letterSpacing: '-0.03em' }}>
-                    {user.first_name} {user.last_name?.[0]}.
+                    {user.role === 'student' ? user.first_name : `${user.first_name} ${user.last_name?.[0]}.`}
                   </h1>
 
                   {/* Instrument Icons */}
@@ -6708,10 +6770,9 @@ function App() {
                 </>
               )}
             </div>
-              </>
-            )}
-          </ErrorBoundary>
-        )}
+          </>
+        </ErrorBoundary>
+      )}
 
         {/* Admin/Teacher Section Tabs (Unified) */}
         {((user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'teacher')) && ['live', 'students', 'team', 'rooms', 'songs', 'stats', 'gallery', 'setup', 'bands'].includes(activeStudentTab) && (
@@ -7549,7 +7610,7 @@ function App() {
                             </div>
                             <div>
                               <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1e293b' }}>
-                                {user.first_name} {user.last_name || ''}
+                                {user.role === 'student' ? user.first_name : `${user.first_name} ${user.last_name || ''}`}
                               </div>
                               <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>
                                 {dateFormatted}
@@ -9775,242 +9836,325 @@ function App() {
       )}
       {/* Mobile Bottom Navigation */}
       {/* Mobile Bottom Navigation */}
-      <nav className="mobile-nav" style={{ display: windowWidth <= 1024 ? 'flex' : 'none' }}>
-        {user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'teacher' ? (
-          <>
-            {/* Live Lab (special highlighted button) */}
-            <button 
-              onClick={() => setActiveStudentTab('live')} 
-              style={{ 
-                background: activeStudentTab === 'live' ? '#fef3c7' : '#ffffff', 
-                border: activeStudentTab === 'live' ? 'none' : '1px solid #e2e8f0', 
-                display: 'flex', 
-                flexDirection: 'column', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                gap: '2px', 
-                color: activeStudentTab === 'live' ? '#b45309' : '#64748b', 
-                cursor: 'pointer',
-                padding: '6px 10px',
-                borderRadius: '16px',
-                boxShadow: activeStudentTab === 'live' ? '0 4px 12px rgba(234, 179, 8, 0.25)' : '0 2px 6px rgba(0, 0, 0, 0.02)',
-                position: 'relative',
-                flex: '0 0 auto',
-                minWidth: '72px',
-                height: '52px',
-                transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-              }}
-              className="hover-scale"
-            >
-              <span style={{ 
-                position: 'absolute', 
-                top: '4px', 
-                right: '4px', 
-                width: '8px', 
-                height: '8px', 
-                borderRadius: '50%', 
-                background: '#ef4444', 
-                boxShadow: '0 0 8px #ef4444' 
-              }} className="animate-pulse"></span>
-              <Monitor size={20} color={activeStudentTab === 'live' ? '#b45309' : '#64748b'} />
-              <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.01em' }}>Live Lab</span>
-            </button>
+      {/* Mobile Bottom Navigation */}
+      {/* Mobile Bottom Navigation */}
+      {(() => {
+        const getMobileButtonStyle = (tabName: string, activeClass: string = '') => {
+          let isActive = false;
+          if (tabName === 'briefing') {
+            isActive = ['briefing', 'profile'].includes(activeStudentTab) && activePlatform === 'campus';
+          } else {
+            isActive = activeStudentTab === tabName;
+          }
 
-            {/* Nachrichten */}
-            <button onClick={() => setActiveStudentTab('messages')} className={activeStudentTab === 'messages' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'messages' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
-              <div style={{ position: 'relative', display: 'inline-flex' }}>
-                <Mail size={20} />
-                {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length > 0 && (
+          let activeBg = 'rgba(251, 188, 5, 0.12)';
+          let activeTextColor = '#b45309';
+
+          if (activeClass === 'campus') {
+            activeBg = 'rgba(52, 168, 83, 0.08)';
+            activeTextColor = '#137333';
+          }
+
+          const isCompact = windowWidth <= 600;
+
+          return {
+            display: 'flex',
+            flexDirection: 'row' as const,
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: isCompact ? '0' : '8px',
+            padding: isCompact ? '10px' : '10px 18px',
+            borderRadius: '9999px',
+            border: 'none',
+            background: isActive ? activeBg : 'transparent',
+            color: isActive ? activeTextColor : '#64748b',
+            cursor: 'pointer',
+            fontSize: '0.88rem',
+            fontWeight: 700,
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+            transition: 'all 0.2s ease',
+            whiteSpace: 'nowrap' as const,
+            flexShrink: 0,
+            boxShadow: 'none',
+            width: isCompact ? '42px' : 'auto',
+            height: isCompact ? '42px' : 'auto',
+            boxSizing: 'border-box' as const
+          };
+        };
+
+        const isCompact = windowWidth <= 600;
+
+        return (
+          <nav 
+            className="mobile-nav" 
+            style={{ 
+              display: windowWidth <= 1024 ? 'flex' : 'none',
+              justifyContent: isCompact ? 'space-around' : 'flex-start',
+              gap: isCompact ? '4px' : '12px',
+              padding: isCompact ? '8px 12px 24px 12px' : '12px 16px 28px 16px'
+            }}
+          >
+            {user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'teacher' ? (
+              <>
+                {/* Live Lab */}
+                <button 
+                  onClick={() => setActiveStudentTab('live')} 
+                  style={{ ...getMobileButtonStyle('live'), position: 'relative' }}
+                  className="hover-scale"
+                  title="Live Lab"
+                >
+                  <Monitor size={20} />
+                  {!isCompact && <span>Live Lab</span>}
                   <span style={{ 
-                    position: 'absolute', 
-                    top: '-4px', 
-                    right: '-8px', 
+                    width: '8px', 
+                    height: '8px', 
+                    borderRadius: '50%', 
                     background: '#ef4444', 
-                    color: 'white', 
-                    fontSize: '0.55rem', 
-                    fontWeight: 900, 
-                    padding: '1px 4px', 
-                    borderRadius: '10px',
-                    minWidth: '14px',
-                    height: '14px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 2px 4px rgba(239, 68, 68, 0.3)'
-                  }}>
-                    {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length}
-                  </span>
+                    boxShadow: '0 0 8px #ef4444',
+                    display: 'inline-block',
+                    marginLeft: isCompact ? '0' : '4px',
+                    position: isCompact ? 'absolute' : 'relative',
+                    top: isCompact ? '4px' : 'auto',
+                    right: isCompact ? '4px' : 'auto'
+                  }} className="animate-pulse"></span>
+                </button>
+
+                {/* Nachrichten */}
+                <button onClick={() => setActiveStudentTab('messages')} style={getMobileButtonStyle('messages')} title="Nachrichten">
+                  <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                    <Mail size={20} />
+                    {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length > 0 && (
+                      <span style={{ 
+                        marginLeft: isCompact ? '0' : '6px',
+                        background: '#ef4444', 
+                        color: 'white', 
+                        fontSize: '0.55rem', 
+                        fontWeight: 900, 
+                        padding: '1px 6px', 
+                        borderRadius: '10px',
+                        boxShadow: '0 2px 4px rgba(239, 68, 68, 0.3)',
+                        position: isCompact ? 'absolute' : 'relative',
+                        top: isCompact ? '-8px' : 'auto',
+                        right: isCompact ? '-12px' : 'auto'
+                      }}>
+                        {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length}
+                      </span>
+                    )}
+                  </div>
+                  {!isCompact && <span style={{ marginLeft: '4px' }}>Nachrichten</span>}
+                </button>
+
+                {/* Schüler */}
+                <button onClick={() => setActiveStudentTab('students')} style={getMobileButtonStyle('students')} title="Schüler">
+                  <Users size={20} />
+                  {!isCompact && <span>Schüler</span>}
+                </button>
+
+                {/* Team */}
+                <button onClick={() => setActiveStudentTab('team')} style={getMobileButtonStyle('team')} title="Team">
+                  <Shield size={20} />
+                  {!isCompact && <span>Team</span>}
+                </button>
+
+                {/* Räume */}
+                <button onClick={() => setActiveStudentTab('rooms')} style={getMobileButtonStyle('rooms')} title="Räume">
+                  <Box size={20} />
+                  {!isCompact && <span>Räume</span>}
+                </button>
+
+                {/* Songs */}
+                <button onClick={() => setActiveStudentTab('songs')} style={getMobileButtonStyle('songs')} title="Songs">
+                  <Library size={20} />
+                  {!isCompact && <span>Songs</span>}
+                </button>
+
+                {/* Bands */}
+                <button onClick={() => setActiveStudentTab('bands')} style={getMobileButtonStyle('bands')} title="Bands">
+                  <Box size={20} />
+                  {!isCompact && <span>Bands</span>}
+                </button>
+
+                {/* Statistik */}
+                <button onClick={() => setActiveStudentTab('stats')} style={getMobileButtonStyle('stats')} title="Statistik">
+                  <Music size={20} />
+                  {!isCompact && <span>Statistik</span>}
+                </button>
+
+                {/* ID Galerie */}
+                <button onClick={() => setActiveStudentTab('gallery')} style={getMobileButtonStyle('gallery')} title="ID Galerie">
+                  <QrCode size={20} />
+                  {!isCompact && <span>ID Galerie</span>}
+                </button>
+
+                {/* Setup */}
+                <button onClick={() => setActiveStudentTab('setup')} style={getMobileButtonStyle('setup')} title="Setup">
+                  <Settings size={20} />
+                  {!isCompact && <span>Setup</span>}
+                </button>
+              </>
+            ) : (
+              <>
+                {/* Student Bottom Navigation */}
+                {activePlatform === 'campus' ? (
+                  <>
+                    {/* Briefing */}
+                    <button 
+                      onClick={() => setActiveStudentTab('briefing')} 
+                      style={getMobileButtonStyle('briefing', 'campus')}
+                      title="Briefing"
+                    >
+                      <GraduationCap size={20} />
+                      {!isCompact && <span>Briefing</span>}
+                    </button>
+
+                    {/* Songs */}
+                    <button 
+                      onClick={() => setActiveStudentTab('songs')} 
+                      style={getMobileButtonStyle('songs', 'campus')}
+                      title="Songs"
+                    >
+                      <Music size={20} />
+                      {!isCompact && <span>Songs</span>}
+                    </button>
+
+                    {/* Übe-Board */}
+                    <button 
+                      onClick={() => setActiveStudentTab('practice_board')} 
+                      style={getMobileButtonStyle('practice_board', 'campus')}
+                      title="Übe-Board"
+                    >
+                      <Play size={20} />
+                      {!isCompact && <span>Übe-Board</span>}
+                    </button>
+
+                    {/* Campus-Cup */}
+                    <button 
+                      onClick={() => setActiveStudentTab('campus_cup')} 
+                      style={getMobileButtonStyle('campus_cup', 'campus')}
+                      title="Campus-Cup"
+                    >
+                      <Trophy size={20} />
+                      {!isCompact && <span>Campus-Cup</span>}
+                    </button>
+
+                    {/* Mein Held */}
+                    <button 
+                      onClick={() => setActiveStudentTab('hero')} 
+                      style={getMobileButtonStyle('hero', 'campus')}
+                      title="Mein Held"
+                    >
+                      <Star size={20} />
+                      {!isCompact && <span>Mein Held</span>}
+                    </button>
+
+                    {/* Mein Team */}
+                    <button 
+                      onClick={() => setActiveStudentTab('team')} 
+                      style={getMobileButtonStyle('team', 'campus')}
+                      title="Mein Team"
+                    >
+                      <Users size={20} />
+                      {!isCompact && <span>Mein Team</span>}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {/* Live Lab */}
+                    <button 
+                      onClick={() => setActiveStudentTab('live')} 
+                      style={{ ...getMobileButtonStyle('live'), position: 'relative' }}
+                      className="hover-scale"
+                      title="Live Lab"
+                    >
+                      <Monitor size={20} />
+                      {!isCompact && <span>Live Lab</span>}
+                      <span style={{ 
+                        width: '8px', 
+                        height: '8px', 
+                        borderRadius: '50%', 
+                        background: '#ef4444', 
+                        boxShadow: '0 0 8px #ef4444',
+                        display: 'inline-block',
+                        marginLeft: isCompact ? '0' : '4px',
+                        position: isCompact ? 'absolute' : 'relative',
+                        top: isCompact ? '4px' : 'auto',
+                        right: isCompact ? '4px' : 'auto'
+                      }} className="animate-pulse"></span>
+                    </button>
+
+                    {/* Üben (Instrumentalisten) */}
+                    {!user.is_external_vocalist && (
+                      <button onClick={() => setActiveStudentTab('practice')} style={getMobileButtonStyle('practice')} title="Üben">
+                        <Play size={20} />
+                        {!isCompact && <span>Üben</span>}
+                      </button>
+                    )}
+
+                    {/* Bibliothek (Instrumentalisten) */}
+                    {!user.is_external_vocalist && (
+                      <button onClick={() => setActiveStudentTab('library')} style={getMobileButtonStyle('library')} title="Bibliothek">
+                        <Library size={20} />
+                        {!isCompact && <span>Bibliothek</span>}
+                      </button>
+                    )}
+
+                    {/* Repertoire */}
+                    <button onClick={() => setActiveStudentTab('repertoire')} style={getMobileButtonStyle('repertoire')} title="Repertoire">
+                      <Award size={20} />
+                      {!isCompact && <span>Repertoire</span>}
+                    </button>
+
+                    {/* Band-Matching (Instrumentalisten) */}
+                    {!user.is_external_vocalist && (
+                      <button onClick={() => setActiveStudentTab('matching')} style={getMobileButtonStyle('matching')} title="Band-Matching">
+                        <Users size={20} />
+                        {!isCompact && <span>Band-Matching</span>}
+                      </button>
+                    )}
+
+                    {/* Bands */}
+                    <button onClick={() => setActiveStudentTab('bands')} style={getMobileButtonStyle('bands')} title="Bands">
+                      <Box size={20} />
+                      {!isCompact && <span>Bands</span>}
+                    </button>
+
+                    {/* Nachrichten */}
+                    <button onClick={() => setActiveStudentTab('messages')} style={getMobileButtonStyle('messages')} title="Nachrichten">
+                      <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                        <Megaphone size={20} />
+                        {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length > 0 && (
+                          <span style={{ 
+                            marginLeft: isCompact ? '0' : '6px',
+                            background: '#ef4444', 
+                            color: 'white', 
+                            fontSize: '0.55rem', 
+                            fontWeight: 900, 
+                            padding: '1px 6px', 
+                            borderRadius: '10px',
+                            boxShadow: '0 2px 4px rgba(239, 68, 68, 0.3)',
+                            position: isCompact ? 'absolute' : 'relative',
+                            top: isCompact ? '-8px' : 'auto',
+                            right: isCompact ? '-12px' : 'auto'
+                          }}>
+                            {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length}
+                          </span>
+                        )}
+                      </div>
+                      {!isCompact && <span style={{ marginLeft: '4px' }}>Nachrichten</span>}
+                    </button>
+
+                    {/* Profil */}
+                    <button onClick={() => setActiveStudentTab('profile')} style={getMobileButtonStyle('profile')} title="Profil">
+                      <Shield size={20} />
+                      {!isCompact && <span>Profil</span>}
+                    </button>
+                  </>
                 )}
-              </div>
-              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Nachrichten</span>
-            </button>
-
-            {/* Schüler */}
-            <button onClick={() => setActiveStudentTab('students')} className={activeStudentTab === 'students' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'students' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
-              <Users size={20} />
-              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Schüler</span>
-            </button>
-
-            {/* Team */}
-            <button onClick={() => setActiveStudentTab('team')} className={activeStudentTab === 'team' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'team' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
-              <Shield size={20} />
-              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Team</span>
-            </button>
-
-            {/* Räume */}
-            <button onClick={() => setActiveStudentTab('rooms')} className={activeStudentTab === 'rooms' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'rooms' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
-              <Box size={20} />
-              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Räume</span>
-            </button>
-
-            {/* Songs */}
-            <button onClick={() => setActiveStudentTab('songs')} className={activeStudentTab === 'songs' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'songs' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
-              <Library size={20} />
-              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Songs</span>
-            </button>
-
-            {/* Bands */}
-            <button onClick={() => setActiveStudentTab('bands')} className={activeStudentTab === 'bands' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'bands' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
-              <Box size={20} />
-              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Bands</span>
-            </button>
-
-            {/* Statistik */}
-            <button onClick={() => setActiveStudentTab('stats')} className={activeStudentTab === 'stats' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'stats' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
-              <Music size={20} />
-              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Statistik</span>
-            </button>
-
-            {/* ID Galerie */}
-            <button onClick={() => setActiveStudentTab('gallery')} className={activeStudentTab === 'gallery' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'gallery' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
-              <QrCode size={20} />
-              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>ID Galerie</span>
-            </button>
-
-            {/* Setup */}
-            <button onClick={() => setActiveStudentTab('setup')} className={activeStudentTab === 'setup' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'setup' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
-              <Settings size={20} />
-              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Setup</span>
-            </button>
-          </>
-        ) : (
-          <>
-            {/* Student Bottom Navigation (Original) */}
-            <button 
-              onClick={() => setActiveStudentTab('live')} 
-              style={{ 
-                background: activeStudentTab === 'live' ? '#fef3c7' : '#ffffff', 
-                border: activeStudentTab === 'live' ? 'none' : '1px solid #e2e8f0', 
-                display: 'flex', 
-                flexDirection: 'column', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                gap: '2px', 
-                color: activeStudentTab === 'live' ? '#b45309' : '#64748b', 
-                cursor: 'pointer',
-                padding: '6px 10px',
-                borderRadius: '16px',
-                boxShadow: activeStudentTab === 'live' ? '0 4px 12px rgba(234, 179, 8, 0.25)' : '0 2px 6px rgba(0, 0, 0, 0.02)',
-                position: 'relative',
-                flex: '0 0 auto',
-                minWidth: '72px',
-                height: '52px',
-                transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-              }}
-              className="hover-scale"
-            >
-              <span style={{ 
-                position: 'absolute', 
-                top: '4px', 
-                right: '4px', 
-                width: '8px', 
-                height: '8px', 
-                borderRadius: '50%', 
-                background: '#ef4444', 
-                boxShadow: '0 0 8px #ef4444' 
-              }} className="animate-pulse"></span>
-              <Monitor size={20} color={activeStudentTab === 'live' ? '#b45309' : '#64748b'} />
-              <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.01em' }}>Live Lab</span>
-            </button>
-
-            <button onClick={() => setActiveStudentTab('practice')} className={activeStudentTab === 'practice' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'practice' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
-              <Play size={20} />
-              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Üben</span>
-            </button>
-
-            <button onClick={() => setActiveStudentTab('library')} className={activeStudentTab === 'library' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'library' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
-              <Library size={20} />
-              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Bibliothek</span>
-            </button>
-
-            <button onClick={() => setActiveStudentTab('repertoire')} className={activeStudentTab === 'repertoire' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'repertoire' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
-              <Award size={20} />
-              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Repertoire</span>
-            </button>
-
-            <button onClick={() => setActiveStudentTab('matching')} className={activeStudentTab === 'matching' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'matching' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
-              <Users size={20} />
-              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Band-Matching</span>
-            </button>
-
-            <button onClick={() => setActiveStudentTab('bands')} className={activeStudentTab === 'bands' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'bands' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
-              <Box size={20} />
-              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Bands</span>
-            </button>
-            <button 
-              onClick={() => setActiveStudentTab('messages')} 
-              className={activeStudentTab === 'messages' ? 'active' : ''} 
-              style={{ 
-                background: 'transparent', 
-                border: 'none', 
-                display: 'flex', 
-                flexDirection: 'column', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
-                gap: '4px', 
-                color: activeStudentTab === 'messages' ? brandColor : '#94a3b8', 
-                cursor: 'pointer'
-              }}
-            >
-              <div style={{ position: 'relative', display: 'inline-flex' }}>
-                <Megaphone size={20} />
-                {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length > 0 && (
-                  <span style={{ 
-                    position: 'absolute', 
-                    top: '-4px', 
-                    right: '-8px', 
-                    background: '#ef4444', 
-                    color: 'white', 
-                    fontSize: '0.55rem', 
-                    fontWeight: 900, 
-                    padding: '1px 4px', 
-                    borderRadius: '10px',
-                    minWidth: '14px',
-                    height: '14px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 2px 4px rgba(239, 68, 68, 0.3)'
-                  }}>
-                    {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length}
-                  </span>
-                )}
-              </div>
-              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Nachrichten</span>
-            </button>
-
-            <button onClick={() => setActiveStudentTab('profile')} className={activeStudentTab === 'profile' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'profile' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
-              <Shield size={20} />
-              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Profil</span>
-            </button>
-
-            <button onClick={() => setActiveStudentTab('team')} className={activeStudentTab === 'team' ? 'active' : ''} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', color: activeStudentTab === 'team' ? brandColor : '#94a3b8', cursor: 'pointer' }}>
-              <Music size={20} />
-              <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>Team</span>
-            </button>
-          </>
-        )}
-      </nav>
+              </>
+            )}
+          </nav>
+        );
+      })()}
       {/* Announcement Notification Modal */}
       {activeAnnouncement && (() => {
         let parsed;
@@ -10113,6 +10257,11 @@ function App() {
             setBandProfileView('public');
             setShowBandProfile(true);
             setSelectedStudentProfile(null);
+          }}
+          activePlatform={activePlatform}
+          onSwitchPlatform={(newPlatform) => {
+            setActivePlatform(newPlatform);
+            setActiveStudentTab(newPlatform === 'campus' ? 'briefing' : 'live');
           }}
         />
       )}
