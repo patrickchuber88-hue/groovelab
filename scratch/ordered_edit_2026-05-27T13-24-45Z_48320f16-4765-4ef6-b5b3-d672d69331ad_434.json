@@ -1,0 +1,18 @@
+{
+  "conv_id": "48320f16-4765-4ef6-b5b3-d672d69331ad",
+  "step_index": 434,
+  "created_at": "2026-05-27T13:24:45Z",
+  "type": "replace_file_content",
+  "args": {
+    "AllowMultiple": "false",
+    "Description": "\"Insert lesson countdown & completion state helper calculations\"",
+    "EndLine": "412",
+    "Instruction": "\"Add helper functions to compute days until the next lesson and active completion states for the daily checklist.\"",
+    "ReplacementContent": "\"  const getDaysUntilNextLesson = () => {\\n    if (!upcomingLessons || upcomingLessons.length === 0) return null;\\n    const nextL = upcomingLessons[0];\\n    let targetDate: Date;\\n    if (nextL.date instanceof Date) {\\n      targetDate = nextL.date;\\n    } else if (nextL.dateStr) {\\n      const parts = nextL.dateStr.split('.');\\n      if (parts.length === 3) {\\n        targetDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));\\n      } else {\\n        targetDate = new Date();\\n      }\\n    } else {\\n      return null;\\n    }\\n    \\n    const today = new Date();\\n    today.setHours(0, 0, 0, 0);\\n    targetDate.setHours(0, 0, 0, 0);\\n    const diffTime = targetDate.getTime() - today.getTime();\\n    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));\\n    return diffDays;\\n  };\\n\\n  const daysUntilLesson = getDaysUntilNextLesson();\\n  const allCompleted = dailyChecklist.every(t => t.completed);\\n  const studentName = student?.nickname || student?.first_name || 'Champion';\\n\\n  // Filtered Song items\\n  const filteredSongs = progressItems.filter(item => {\\n    const matchesSearch = item.topic_name.toLowerCase().includes(songSearch.toLowerCase());\"",
+    "StartLine": "410",
+    "TargetContent": "\"  // Filtered Song items\\n  const filteredSongs = progressItems.filter(item => {\\n    const matchesSearch = item.topic_name.toLowerCase().includes(songSearch.toLowerCase());\"",
+    "TargetFile": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+    "toolAction": "\"Inject briefing helper calculations\"",
+    "toolSummary": "\"File edit\""
+  }
+}

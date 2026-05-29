@@ -1,0 +1,1 @@
+"      {/* Thin accent line matching the CAMPUS tab label color (#34a853) */}\n      <div style={{ height: '9px', background: '#34a853', width: '100%' }} />"

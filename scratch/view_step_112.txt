@@ -1,0 +1,24 @@
+Created At: 2026-05-28T06:11:25Z
+Completed At: 2026-05-28T06:11:25Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1124
+Total Bytes: 51115
+Showing lines 660 to 675
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+660:                     )}
+661:                   </div>
+662:                 </section>
+663:               </div>
+664: 
+665:               <aside style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+666:                 {/* Module & Einstellungen - iOS Switched Settings Card */}
+667:                 <section style={{ 
+668:                   background: '#ffffff', 
+669:                   borderRadius: '24px', 
+670:                   padding: '24px', 
+671:                   border: '1px solid rgba(0, 0, 0, 0.04)',
+672:                 boxShadow: '0 4px 16px rgba(0, 0, 0, 0.01)'
+673:               }}>
+674:                 <h4 style={{ fontSize: '0.92rem', fontWeight: 700, color: '#1d1d1f', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+675:                   <Sliders size={16} style={{ color: '#86868b' }} /> Module & Einstellungen
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

@@ -1,0 +1,12 @@
+{
+  "AllowMultiple": "false",
+  "Description": "\"Remove the redundant closing brace at the end of StudentAvatarDashboard.tsx.\"",
+  "EndLine": "1056",
+  "Instruction": "\"Remove duplicate closing brace at the end of the file.\"",
+  "ReplacementContent": "\"    </div>\\n  );\\n}\"",
+  "StartLine": "1051",
+  "TargetContent": "\"    </div>\\n  );\\n}\\n}\"",
+  "TargetFile": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "toolAction": "\"Removing extra closing brace at end of dashboard file\"",
+  "toolSummary": "\"Fix closing braces in StudentAvatarDashboard\""
+}

@@ -1,0 +1,14 @@
+{
+  "conv_id": "881bec39-cbe6-4441-b3f5-94f5ef9ae10c",
+  "step_index": 486,
+  "created_at": "2026-05-26T20:43:20Z",
+  "type": "multi_replace_file_content",
+  "args": {
+    "Description": "\"Add progress state and fetch function, add Music/Library imports, extend tab switcher, and add songs tab UI rendering logic.\"",
+    "Instruction": "\"Integrate Songs & Material board UI and asymmetric premium dashboard view into StudentAvatarDashboard.tsx.\"",
+    "ReplacementChunks": "[{\"AllowMultiple\":false,\"EndLine\":7,\"ReplacementContent\":\"  Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, \\n  ChevronRight, Coffee, Clock, Flame, BookOpen, Share2, Play, \\n  Pause, RotateCcw, Volume2, Moon, QrCode, X, EyeOff, Zap, Music, Library\",\"StartLine\":4,\"TargetContent\":\"  Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, \\n  ChevronRight, Coffee, Clock, Flame, BookOpen, Share2, Play, \\n  Pause, RotateCcw, Volume2, Moon, QrCode, X, EyeOff, Zap\"},{\"AllowMultiple\":false,\"EndLine\":68,\"ReplacementContent\":\"  const [activeTab, setActiveTab] = useState<'briefing' | 'hero' | 'songs'>('briefing');\",\"StartLine\":67,\"TargetContent\":\"  const [activeTab, setActiveTab] = useState<'briefing' | 'hero'>('briefing');\"},{\"AllowMultiple\":false,\"EndLine\":89,\"ReplacementContent\":\"  useEffect(() => {\\n    fetchStudentAndAvatar();\\n  }, [studentId]);\\n\\n  // progress matrix state\\n  const [progressItems, setProgressItems] = useState<any[]>([]);\\n  const [isPremiumActive, setIsPremiumActive] = useState(false);\\n  const [progressLoading, setProgressLoading] = useState(false);\\n\\n  const fetchStudentProgress = async () => {\\n    setProgressLoading(true);\\n    try {\\n      // Try to call backend API\\n      const resp = await fetch(`/api/student/get-progress?studentId=${studentId}`, {\\n        headers: {\\n          'Authorization': `Bearer ${sessionStorage.getItem('sb-access-token') || ''}`\\n        }\\n      });\\n      if (resp.ok) {\\n        const data = await resp.json();\\n        setIsPremiumActive(data.isPremiumActive ?? false);\\n        setProgressItems(data.progress || []);\\n        setProgressLoading(false);\\n        return;\\n      }\\n\\n      // Direct Supabase query fallback\\n      const { data: premiumInfo } = await supabase\\n        .from('premium_status')\\n        .select('is_premium_active')\\n        .eq('student_id', studentId)\\n        .maybeSingle();\\n\\n      const premium = premiumInfo?.is_premium_active ?? false;\\n      setIsPremiumActive(premium);\\n\\n      const { data: matrixItems } = await \n<truncated 21655 bytes>",
+    "TargetFile": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+    "toolAction": "\"Modifying StudentAvatarDashboard.tsx to add Songs & Material tab and premium display logic\"",
+    "toolSummary": "\"Modify StudentAvatarDashboard.tsx\""
+  }
+}

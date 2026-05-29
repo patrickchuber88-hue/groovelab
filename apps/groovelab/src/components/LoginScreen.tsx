@@ -37,6 +37,11 @@ const isWithinOpeningHours = (openingHours: any) => {
   }
 };
 
+const cleanRoomName = (name: string | null | undefined): string => {
+  if (!name) return 'Unbenannter Raum';
+  return name.replace(/^#\d+\s*[-:]*\s*/, '').trim();
+};
+
 export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +49,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [showImpressum, setShowImpressum] = useState(false);
   const [firstNameFocused, setFirstNameFocused] = useState(false);
   const [lastNameFocused, setLastNameFocused] = useState(false);
+
+  // Manual PIN Login and Kiosk Activator States
+  const [pinInput, setPinInput] = useState('');
+  const [kioskRooms, setKioskRooms] = useState<any[]>([]);
+  const [kioskStations, setKioskStations] = useState<any[]>([]);
+  const [kioskSelectedRoomId, setKioskSelectedRoomId] = useState<string>('');
+  const [activeSessionStationIds, setActiveSessionStationIds] = useState<string[]>([]);
+  const [loadingKioskData, setLoadingKioskData] = useState(false);
 
   // Onboarding States
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -59,6 +72,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [onboardDpaAccepted, setOnboardDpaAccepted] = useState(false);
   const [onboardCreatedUser, setOnboardCreatedUser] = useState<any>(null);
   const [onboardIPAddress, setOnboardIPAddress] = useState('unknown');
+  const [expandedSection, setExpandedSection] = useState<'none' | 'pin' | 'kiosk'>('none');
 
   const fetchIpAddress = async () => {
     try {
@@ -602,18 +616,34 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       let finalStationId = null;
       let isHome = false;
 
-      const schoolData = Array.isArray(user.schools) ? user.schools[0] : user.schools;
+      const userSchool = Array.isArray(user.schools) ? user.schools[0] : user.schools;
       const isMaster = user.is_master_admin === true;
       const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
       
       if (!isMaster) {
-        if (schoolData?.is_paused || schoolData?.status === 'suspended') {
+        // Enforce school matching check for students using component-level schoolData state
+        if (user.role === 'student') {
+          if (!schoolData?.id) {
+            alert("Login verweigert. Für den Schüler-Login wird ein zugehöriger Schul-Link benötigt.");
+            await supabase.auth.signOut();
+            setLoading(false);
+            return;
+          }
+          if (user.school_id !== schoolData.id) {
+            alert("Login verweigert. Dieser Login-Link gehört nicht zu deiner Schule.");
+            await supabase.auth.signOut();
+            setLoading(false);
+            return;
+          }
+        }
+
+        if (userSchool?.is_paused || userSchool?.status === 'suspended') {
           alert("Login ist aktuell nicht möglich (Status gesperrt oder pausiert).");
           await supabase.auth.signOut();
           setLoading(false);
           return;
-        } else if (schoolData?.is_trial && schoolData?.trial_ends_at) {
-          const trialEnd = new Date(schoolData.trial_ends_at).getTime();
+        } else if (userSchool?.is_trial && userSchool?.trial_ends_at) {
+          const trialEnd = new Date(userSchool.trial_ends_at).getTime();
           const nowMs = new Date().getTime();
           if (nowMs > trialEnd) {
             alert("Login ist aktuell nicht möglich (Probezeit abgelaufen).");
@@ -621,8 +651,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             setLoading(false);
             return;
           }
-        } else if (!schoolData?.is_trial && schoolData?.contract_ends_at) {
-          const contractEnd = new Date(schoolData.contract_ends_at).getTime();
+        } else if (!userSchool?.is_trial && userSchool?.contract_ends_at) {
+          const contractEnd = new Date(userSchool.contract_ends_at).getTime();
           const nowMs = new Date().getTime();
           if (nowMs > contractEnd) {
             alert("Login ist aktuell nicht möglich (Vertrag abgelaufen).");
@@ -644,7 +674,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             setLoading(false);
             return;
           }
-        } else if (!user.is_trial && user.contract_ends_at) {
+        } else if (user.role !== 'student' && !user.is_trial && user.contract_ends_at) {
           const contractEnd = new Date(user.contract_ends_at).getTime();
           const nowMs = new Date().getTime();
           if (nowMs > contractEnd) {
@@ -791,10 +821,198 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     prefetch();
   }, [effectiveStationId]);
 
-  const handleScan = async (qrToken: string) => {
+  // Fetch rooms and stations for the Kiosk activator when schoolData is resolved
+  useEffect(() => {
+    if (!schoolData?.id) return;
+    async function fetchKioskData() {
+      try {
+        setLoadingKioskData(true);
+        const [roomsRes, stationsRes, sessionsRes] = await Promise.all([
+          supabase.from('rooms').select('*').eq('school_id', schoolData.id).order('sort_order', { ascending: true }),
+          supabase.from('stations').select('*').order('name'),
+          supabase.from('sessions').select('station_id').is('check_out_time', null)
+        ]);
+        
+        const rData = roomsRes.data || [];
+        setKioskRooms(rData);
+        if (rData.length > 0) {
+          setKioskSelectedRoomId(rData[0].id);
+        }
+        
+        const roomIds = rData.map((r: any) => r.id);
+        setKioskStations((stationsRes.data || []).filter((s: any) => roomIds.includes(s.room_id)));
+        setActiveSessionStationIds((sessionsRes.data || []).map((s: any) => s.station_id));
+      } catch (err) {
+        console.error("Error fetching kiosk activator data:", err);
+      } finally {
+        setLoadingKioskData(false);
+      }
+    }
+    fetchKioskData();
+  }, [schoolData]);
+
+  const handlePinLogin = async (pin: string) => {
+    if (!pin.trim() || loading) return;
+    setLoading(true);
+    setError(null);
+    try {
+      console.log('[Login] Attempting manual PIN login for:', pin);
+      let query = supabase
+        .from('users')
+        .select('*, schools(*)');
+      
+      const cleanPin = pin.trim();
+      if (cleanPin.includes('-') && cleanPin.length > 20) {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanPin);
+        if (isUuid) {
+          query = query.eq('qr_token', cleanPin);
+        } else {
+          query = query.eq('teacher_qr_token', cleanPin);
+        }
+      } else {
+        query = query.eq('ausweis_nummer', cleanPin);
+      }
+
+      if (schoolData?.id) {
+        query = query.eq('school_id', schoolData.id);
+      }
+
+      const { data: user, error: userErr } = await query.maybeSingle();
+
+      if (userErr || !user) {
+        if (schoolData?.id) {
+          let checkQuery = supabase.from('users').select('*, schools(*)');
+          if (cleanPin.includes('-') && cleanPin.length > 20) {
+            const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanPin);
+            if (isUuid) {
+              checkQuery = checkQuery.eq('qr_token', cleanPin);
+            } else {
+              checkQuery = checkQuery.eq('teacher_qr_token', cleanPin);
+            }
+          } else {
+            checkQuery = checkQuery.eq('ausweis_nummer', cleanPin);
+          }
+          const { data: checkUser } = await checkQuery.maybeSingle();
+          if (checkUser && checkUser.role === 'student' && checkUser.school_id !== schoolData.id) {
+            throw new Error('Login verweigert. Dieser Login-Link gehört nicht zu deiner Schule.');
+          }
+        }
+        throw new Error('Ungültiger Ausweis-PIN oder QR-Token.');
+      }
+
+      if (user.is_master_admin) {
+        finalizeLogin(user, null, true);
+        return;
+      }
+
+      const userSchool = Array.isArray(user.schools) ? user.schools[0] : user.schools;
+      if (!user.school_id && userSchool?.id) {
+        user.school_id = userSchool.id;
+      }
+
+      if (user.role === 'student') {
+        if (!schoolData?.id) {
+          throw new Error('Für den Schüler-Login wird ein zugehöriger Schul-Link benötigt.');
+        }
+        if (user.school_id !== schoolData.id) {
+          throw new Error('Login verweigert. Dieser Login-Link gehört nicht zu deiner Schule.');
+        }
+      }
+
+      let isWithinAnyRoom = true;
+      const isBypass = userSchool?.opening_hours?.geofence_bypass === true || !!effectiveStationId;
+
+      if (!isBypass) {
+        isWithinAnyRoom = false;
+        let currentPos = userPos;
+        if (!currentPos && navigator.geolocation) {
+          try {
+            currentPos = await new Promise<{lat: number, lng: number}>((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(
+                (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                (err) => reject(err),
+                { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 }
+              );
+            });
+            setUserPos(currentPos);
+          } catch (e) {
+            console.warn('[Login] Geolocation fetch failed during PIN login:', e);
+          }
+        }
+
+        if (currentPos) {
+          const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', user.school_id).order('sort_order', { ascending: true });
+          if (rooms) {
+            for (const room of rooms) {
+              const points = Array.isArray(room.geofence_points) ? room.geofence_points : [];
+              const allCoords = [...points];
+              if (room.latitude && room.longitude) allCoords.push({ lat: room.latitude, lng: room.longitude });
+              
+              for (const pt of allCoords) {
+                if (pt && pt.lat && pt.lng) {
+                  const dist = getDistanceFromLatLonInM(currentPos.lat, currentPos.lng, Number(pt.lat), Number(pt.lng));
+                  if (dist < 100) { 
+                    isWithinAnyRoom = true;
+                    break;
+                  }
+                }
+              }
+              if (isWithinAnyRoom) break;
+            }
+          }
+
+          if (!isWithinAnyRoom && userSchool?.latitude && userSchool?.longitude) {
+            const distToSchool = getDistanceFromLatLonInM(currentPos.lat, currentPos.lng, Number(userSchool.latitude), Number(userSchool.longitude));
+            const radius = userSchool.geofence_radius_meters || 150;
+            if (distToSchool < radius) {
+              isWithinAnyRoom = true;
+            }
+          }
+        }
+      }
+
+      const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
+      if (isTeacher) {
+        if (user.is_observer) {
+          await finalizeLogin(user, effectiveStationId, false, true);
+          return;
+        }
+
+        if (isWithinAnyRoom) {
+          setPendingTeacherUser({ user, isWithinAnyRoom: true });
+          setShowTeacherChoiceModal(true);
+          setLoading(false);
+        } else {
+          await finalizeLogin(user, effectiveStationId, false, true);
+        }
+        return;
+      }
+
+      await finalizeLogin(user, effectiveStationId, isWithinAnyRoom);
+    } catch (err: any) {
+      console.error('[Login] PIN login error:', err.message);
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  const handleScan = async (scannedValue: string) => {
     if (loading) return;
     setLoading(true);
     setError(null);
+
+    let qrToken = scannedValue;
+    try {
+      if (scannedValue.includes('?')) {
+        const urlParams = new URLSearchParams(scannedValue.split('?')[1]);
+        const parsedToken = urlParams.get('qr_token');
+        if (parsedToken) {
+          qrToken = parsedToken;
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to parse scanned URL", e);
+    }
 
     // 0. Force kill camera immediately upon scan
     try {
@@ -820,11 +1038,16 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       // 1. User finden
       sessionStorage.setItem('groovelab_qr_token', qrToken);
-      const { data: user, error: userErr } = await supabase
-        .from('users')
-        .select('*, schools(*)')
-        .eq('qr_token', qrToken)
-        .single();
+      let query = supabase.from('users').select('*, schools(*)');
+      
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(qrToken);
+      if (isUuid) {
+        query = query.eq('qr_token', qrToken);
+      } else {
+        query = query.eq('teacher_qr_token', qrToken);
+      }
+      
+      const { data: user, error: userErr } = await query.maybeSingle();
       sessionStorage.removeItem('groovelab_qr_token');
 
       if (userErr || !user) throw new Error('Nutzer nicht gefunden.');
@@ -836,11 +1059,20 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         return;
       }
 
-      const schoolData = Array.isArray(user.schools) ? user.schools[0] : user.schools;
+      const userSchool = Array.isArray(user.schools) ? user.schools[0] : user.schools;
       
       // Ensure school_id is available for room lookups even if not directly on the user object
-      if (!user.school_id && schoolData?.id) {
-        user.school_id = schoolData.id;
+      if (!user.school_id && userSchool?.id) {
+        user.school_id = userSchool.id;
+      }
+
+      if (user.role === 'student') {
+        if (!schoolData?.id) {
+          throw new Error('Für den Schüler-Login wird ein zugehöriger Schul-Link benötigt.');
+        }
+        if (user.school_id !== schoolData.id) {
+          throw new Error('Login verweigert. Dieser Login-Link gehört nicht zu deiner Schule.');
+        }
       }
 
       // 2. Geofence Check (Simpel & Stabil)
@@ -1104,7 +1336,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           </h2>
           <p style={{ color: isSecretary ? '#5f6368' : '#94a3b8', fontSize: '0.85rem', margin: '0 0 24px 0', lineHeight: '1.5', fontWeight: 600 }}>
             {isSecretary 
-              ? `Du wurdest eingeladen, als Administrator/Sekretariat für die Schule `
+              ? `Du wurdest eingeladen, als Administrator/Verwaltung für die Schule `
               : `Du wurdest eingeladen, als Coach für die Schule `}
             <strong style={{ color: isSecretary ? '#0b57d0' : '#eab308' }}>{loadingSchool ? 'wird geladen...' : (schoolName || 'GrooveLab Academy')}</strong> beizutreten.
           </p>
@@ -1235,29 +1467,29 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     <div style={{ 
       position: 'fixed',
       inset: 0,
-      backgroundColor: '#ffffff', 
+      backgroundColor: '#f8fafc', 
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      justifyContent: 'center',
-      padding: '20px',
+      padding: '40px 20px',
       fontFamily: 'Inter, system-ui, sans-serif',
-      zIndex: 9999
+      zIndex: 9999,
+      overflowY: 'auto'
     }}>
       
       <div className="loading-pulse" style={{
-        width: '80px',
-        height: '80px',
-        background: '#f8fafc',
+        width: '70px',
+        height: '70px',
+        background: '#ffffff',
         borderRadius: '24px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: '24px',
+        marginBottom: '16px',
         boxShadow: '0 10px 30px rgba(0, 0, 0, 0.05)',
         border: '1px solid #e2e8f0'
       }}>
-        <Music size={40} color="#eab308" />
+        <Music size={36} color={schoolData?.primary_color || "#eab308"} />
       </div>
 
       <h1 
@@ -1272,39 +1504,46 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           });
         }}
         style={{ 
-          fontSize: '32px', 
+          fontSize: '30px', 
           fontWeight: 1000, 
           color: '#0f172a', 
-          marginBottom: '8px', 
+          marginBottom: '4px', 
           margin: 0, 
           letterSpacing: '-0.02em',
           cursor: 'default',
-          userSelect: 'none'
+          userSelect: 'none',
+          textAlign: 'center'
         }}
       >
-        GrooveLab
+        Campus-Login
       </h1>
-      <p style={{ color: '#64748b', textAlign: 'center', fontSize: '14px', marginBottom: '48px', maxWidth: '300px', lineHeight: '1.5', fontWeight: 600 }}>
-        Halte deinen Ausweis vor die Kamera,<br/>um dich einzuloggen.
+      <p style={{ color: '#64748b', textAlign: 'center', fontSize: '13px', marginBottom: '32px', maxWidth: '300px', lineHeight: '1.4', fontWeight: 600 }}>
+        {schoolName ? `für ${schoolName}` : `Halte deinen Ausweis vor die Kamera, um dich einzuloggen.`}
       </p>
 
+      {/* Main Standard QR-Scanner Card */}
+      {expandedSection === 'none' && (
       <div style={{
         width: '100%',
         maxWidth: '400px',
         background: '#ffffff',
-        borderRadius: '56px',
-        padding: '32px',
-        boxShadow: '0 40px 100px rgba(15, 23, 42, 0.08)',
+        borderRadius: '40px',
+        padding: '24px',
+        boxShadow: '0 25px 60px rgba(15, 23, 42, 0.05)',
         border: '1px solid #f1f5f9',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         position: 'relative'
       }}>
+        <div style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', width: '100%', justifyContent: 'center' }}>
+          <Tablet size={14} /> Standard Login über Campus QR-Ausweis
+        </div>
+
         <div style={{
           width: '100%',
           aspectRatio: '1/1',
-          borderRadius: '40px',
+          borderRadius: '28px',
           overflow: 'hidden',
           background: '#000',
           position: 'relative',
@@ -1341,13 +1580,186 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         </div>
 
         {error && (
-          <div style={{ marginTop: '24px', background: '#fef2f2', border: '1px solid #fee2e2', color: '#ef4444', padding: '16px', borderRadius: '20px', fontSize: '13px', fontWeight: 800, textAlign: 'center', width: '100%' }}>
+          <div style={{ marginTop: '16px', background: '#fef2f2', border: '1px solid #fee2e2', color: '#ef4444', padding: '14px', borderRadius: '16px', fontSize: '13px', fontWeight: 800, textAlign: 'center', width: '100%' }}>
             {error}
           </div>
         )}
-
-
       </div>
+      )}
+
+      {/* Links to expand PIN / Kiosk */}
+      {expandedSection === 'none' && (
+        <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+          <button 
+            onClick={() => setExpandedSection('pin')}
+            style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer', transition: 'color 0.2s' }}
+          >
+            Passwort Anmeldung
+          </button>
+          {schoolData && kioskRooms.length > 0 && (
+            <button 
+              onClick={() => setExpandedSection('kiosk')}
+              style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer', transition: 'color 0.2s' }}
+            >
+              Im GrooveLab anmelden
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Manueller PIN Zugang */}
+      {expandedSection === 'pin' && (
+      <div style={{
+        width: '100%',
+        maxWidth: '400px',
+        background: '#ffffff',
+        borderRadius: '32px',
+        padding: '24px',
+        boxShadow: '0 10px 30px rgba(15, 23, 42, 0.03)',
+        border: '1px solid #f1f5f9',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px',
+        marginTop: '20px'
+      }}>
+        <div style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <User size={14} /> Manueller Zugang über PIN / QR-Token
+        </div>
+        <form onSubmit={(e) => { e.preventDefault(); handlePinLogin(pinInput); }} style={{ display: 'flex', gap: '10px' }}>
+          <input
+            type="text"
+            value={pinInput}
+            onChange={(e) => setPinInput(e.target.value)}
+            placeholder="Support-PIN oder QR-Token..."
+            style={{
+              flex: 1,
+              padding: '12px 16px',
+              borderRadius: '14px',
+              border: '1.5px solid #cbd5e1',
+              fontSize: '14px',
+              fontWeight: 700,
+              outline: 'none',
+              transition: 'all 0.2s',
+              background: '#f8fafc',
+              color: '#0f172a'
+            }}
+          />
+          <button
+            type="submit"
+            disabled={loading || !pinInput.trim()}
+            style={{
+              padding: '12px 20px',
+              borderRadius: '14px',
+              border: 'none',
+              background: schoolData?.primary_color || '#eab308',
+              color: '#0f172a',
+              fontWeight: 800,
+              fontSize: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              opacity: !pinInput.trim() ? 0.6 : 1
+            }}
+          >
+            Login
+          </button>
+        </form>
+        <button onClick={() => setExpandedSection('none')} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', marginTop: '12px', cursor: 'pointer', alignSelf: 'center' }}>
+          Zurück
+        </button>
+      </div>
+      )}
+
+      {/* Kiosk Activator for internal school rooms */}
+      {expandedSection === 'kiosk' && schoolData && kioskRooms.length > 0 && (
+        <div style={{
+          width: '100%',
+          maxWidth: '400px',
+          background: '#ffffff',
+          borderRadius: '32px',
+          padding: '24px',
+          boxShadow: '0 10px 30px rgba(15, 23, 42, 0.03)',
+          border: '1px solid #f1f5f9',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+          marginTop: '20px'
+        }}>
+          <div style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Tablet size={14} /> GrooveLab Kiosk aktivieren (iPad Stationen)
+          </div>
+          
+          {/* Room Selector */}
+          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+            {kioskRooms.map((room) => (
+              <button
+                key={room.id}
+                onClick={() => setKioskSelectedRoomId(room.id)}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: '12px',
+                  border: '1px solid',
+                  borderColor: kioskSelectedRoomId === room.id ? (schoolData?.primary_color || '#eab308') : '#e2e8f0',
+                  background: kioskSelectedRoomId === room.id ? (schoolData?.primary_color || '#eab308') : 'transparent',
+                  color: '#0f172a',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {cleanRoomName(room.name)}
+              </button>
+            ))}
+          </div>
+
+          {/* iPad Stations Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            {kioskStations.filter(s => s.room_id === kioskSelectedRoomId).map((station) => {
+              const isOccupied = activeSessionStationIds.includes(station.id);
+              return (
+                <button
+                  key={station.id}
+                  onClick={async () => {
+                    if (isOccupied) {
+                      const confirm = window.confirm(`Dieses iPad ist besetzt. Möchtest du die alte Sitzung beenden und dieses iPad übernehmen?`);
+                      if (!confirm) return;
+                      // End previous session
+                      await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('station_id', station.id).is('check_out_time', null);
+                    }
+                    sessionStorage.removeItem('groovelab_user_id');
+                    localStorage.setItem('groovelab_station_id', station.id);
+                    localStorage.setItem('groovelab_school_id', schoolData.id);
+                    window.location.reload();
+                  }}
+                  style={{
+                    padding: '12px',
+                    borderRadius: '16px',
+                    border: '1.5px solid',
+                    borderColor: isOccupied ? '#fca5a5' : '#bbf7d0',
+                    background: isOccupied ? '#fef2f2' : '#f0fdf4',
+                    color: '#1e293b',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px'
+                  }}
+                >
+                  <span style={{ fontSize: '13px', fontWeight: 800 }}>{station.name}</span>
+                  <span style={{ fontSize: '10px', color: isOccupied ? '#ef4444' : '#16a34a', fontWeight: 700 }}>
+                    {isOccupied ? 'Besetzt (Übernehmen)' : 'Frei'}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <button onClick={() => setExpandedSection('none')} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', marginTop: '12px', cursor: 'pointer', alignSelf: 'center' }}>
+            Zurück
+          </button>
+        </div>
+      )}
 
       {/* Geofence Diagnostic Panel (Localhost only) */}
       {isLocalhost && geoDebug && (

@@ -1,0 +1,7 @@
+{
+  "AbsolutePath": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "EndLine": "135",
+  "StartLine": "110",
+  "toolAction": "\"Viewing refs of student dashboard component\"",
+  "toolSummary": "\"View refs 110-135\""
+}

@@ -1,0 +1,80 @@
+Created At: 2026-05-28T06:14:32Z
+Completed At: 2026-05-28T06:14:32Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1186
+Total Bytes: 55333
+Showing lines 801 to 1186
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+801: 
+802:                   {/* Top card header with silver chip */}
+803:                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', zIndex: 1 }}>
+804:                     <div style={{ 
+805:                       width: '38px', 
+806:                       height: '26px', 
+807:                       background: 'linear-gradient(135deg, #e5e5ea 0%, #aeaeaf 100%)', 
+808:                       borderRadius: '5px',
+809:                       boxShadow: '0 2px 6px rgba(0,0,0,0.3)'
+810:                     }} />
+811:                     <span style={{ fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255, 255, 255, 0.6)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+812:                       Campus Pass
+813:                     </span>
+814:                   </div>
+815:                   
+816:                   {/* QR Code Container centered */}
+817:                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', margin: '8px 0', width: '100%', zIndex: 1 }}>
+818:                     <div style={{ background: '#ffffff', padding: '12px', borderRadius: '16px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+819:                       <QRCode value={student.qr_token || student.id || ''} size={130} />
+820:                     </div>
+821:                     <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.6)', fontWeight: 650, let
+<truncated 19301 bytes>
+lignItems: 'center',
+1138:                       justifyContent: 'space-between',
+1139:                       borderBottom: '0.5px solid rgba(0, 0, 0, 0.04)'
+1140:                     }}>
+1141:                       <span style={{ color: '#86868b' }}>{pres.dayStr}.</span>
+1142:                       <span>{pres.rangeStr}</span>
+1143:                     </div>
+1144:                   ))}
+1145:                   {weekSessions.length === 0 && (
+1146:                     <div style={{ fontSize: '0.85rem', color: '#86868b', background: '#ffffff', padding: '20px', textAlign: 'center' }}>
+1147:                       Keine reservierten Zeiten diese Woche.
+1148:                     </div>
+1149:                   )}
+1150:                 </div>
+1151:               </section>
+1152:             </aside>
+1153:           </div>
+1154:         )}
+1155:       </div>
+1156:       {showFullPhoto && (
+1157:         <div 
+1158:           onClick={() => setShowFullPhoto(false)}
+1159:           style={{ 
+1160:             position: 'fixed', 
+1161:             inset: 0, 
+1162:             zIndex: 4000, 
+1163:             background: 'rgba(0,0,0,0.85)', 
+1164:             backdropFilter: 'blur(20px)', 
+1165:             display: 'flex', 
+1166:             alignItems: 'center', 
+1167:             justifyContent: 'center', 
+1168:             cursor: 'zoom-out'
+1169:           }}
+1170:         >
+1171:           <img 
+1172:             src={student.photo_url || '/avatar_ghost.jpg'} 
+1173:             style={{ 
+1174:               maxWidth: '90%', 
+1175:               maxHeight: '90%', 
+1176:               borderRadius: '24px', 
+1177:               boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+1178:               border: '4px solid white'
+1179:             }} 
+1180:           />
+1181:         </div>
+1182:       )}
+1183:     </div>
+1184:   );
+1185: };
+1186: 
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

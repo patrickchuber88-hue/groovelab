@@ -1,0 +1,1 @@
+"    // Local update stats state\n    setStats((prev: any) => prev ? {"

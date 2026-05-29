@@ -98,12 +98,12 @@ export async function verifyTeacherPinHandler(req: Request, res: Response): Prom
       return;
     }
 
-    // 1. Find teacher by qr_token
+    // 1. Find teacher by qr_token or teacher_qr_token
     const { data: teacher, error: fetchError } = await supabase
       .from('users')
       .select('id, first_name, last_name, registration_pin, role')
-      .eq('qr_token', qrToken)
-      .single();
+      .or(`qr_token.eq."${qrToken}",teacher_qr_token.eq."${qrToken}"`)
+      .maybeSingle();
 
     if (fetchError || !teacher) {
       res.status(404).json({ error: 'Teacher profile not found with this token.' });

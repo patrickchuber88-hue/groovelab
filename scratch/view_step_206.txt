@@ -1,0 +1,19 @@
+Created At: 2026-05-28T06:15:51Z
+Completed At: 2026-05-28T06:15:51Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1282
+Total Bytes: 59899
+Showing lines 772 to 782
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+772:                           boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+773:                         }} />
+774:                       </button>
+775:                     </div>
+776:                   </div>
+777:                                     {/* Premium Digital Campus ID Card Badge - APPLE WALLET STYLE (Vertical Edition) */}
+778:                   <div className="hover-scale" style={{ 
+779:                     background: 'linear-gradient(135deg, #064e3b 0%, #022c22 100%)', 
+780:                     borderRadius: '24px', 
+781:                     padding: '24px', 
+782:                     color: 'white',
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

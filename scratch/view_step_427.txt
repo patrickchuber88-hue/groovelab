@@ -1,0 +1,71 @@
+Created At: 2026-05-28T06:25:25Z
+Completed At: 2026-05-28T06:25:25Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1285
+Total Bytes: 59656
+Showing lines 1050 to 1150
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+1050:                               display: 'flex',
+1051:                               alignItems: 'center',
+1052:                               gap: '6px'
+1053:                             }}
+1054:                           >
+1055:                             <span>{renderInstrumentIcon(inst.name, undefined, 14)}</span>
+1056:                             <span>100% Meister</span>
+1057:                           </div>
+1058:                         ))}
+1059:                       </div>
+1060:                     </div>
+1061:                   ))}
+1062:                   {repertoire.length === 0 && !loading && (
+1063:                     <div style={{ fontSize: '0.85rem', color: '#86868b', background: '#ffffff', padding: '24px', borderRadius: '24px', border: '1px solid rgba(0, 0, 0, 0.04)', textAlign: 'center' }}>
+1064:                       Noch kein Repertoire.
+1065:                     </div>
+1066:                   )}
+1067:                 </div>
+1068:               </section>
+1069:             </div>
+1070: 
+1071:             <aside style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+1072:               {/* Module & Einstellungen - iOS Switched Settings Card (also displayed in GrooveLab view) */}
+1073:               <section style={{ 
+1074:                 background: '#ffffff', 
+1075:                 borderRadius: '24px', 
+1076:                 padding: '24px', 
+1077:                 border: '1px solid rgba(0, 0, 0, 0.04)',
+1078:                 boxShadow: '0 4px 16px rgba(0, 0, 0, 0.01)
+<truncated 2327 bytes>
+, background: 'rgba(0, 0, 0, 0.06)' }} />
+1119: 
+1120:                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+1121:                     <div style={{ display: 'flex', flexDirection: 'column' }}>
+1122:                       <span style={{ fontSize: '0.86rem', fontWeight: 600, color: '#1d1d1f' }}>GrooveLab-Modul aktivieren</span>
+1123:                       <span style={{ fontSize: '0.72rem', color: '#86868b' }}>Songbooks, Bands & üben</span>
+1124:                     </div>
+1125:                     <button 
+1126:                       onClick={() => handleToggleGroovelab(!isGroovelabActive)}
+1127:                       style={{
+1128:                         width: '46px',
+1129:                         height: '26px',
+1130:                         borderRadius: '99px',
+1131:                         background: isGroovelabActive ? '#007aff' : '#e5e5ea',
+1132:                         border: 'none',
+1133:                         cursor: 'pointer',
+1134:                         position: 'relative',
+1135:                         transition: 'background 0.25s ease',
+1136:                         padding: 0
+1137:                       }}
+1138:                     >
+1139:                       <div style={{
+1140:                         width: '22px',
+1141:                         height: '22px',
+1142:                         borderRadius: '50%',
+1143:                         background: '#ffffff',
+1144:                         position: 'absolute',
+1145:                         top: '2px',
+1146:                         left: isGroovelabActive ? '22px' : '2px',
+1147:                         transition: 'left 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
+1148:                         boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+1149:                       }} />
+1150:                     </button>
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

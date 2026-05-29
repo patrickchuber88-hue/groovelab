@@ -1,0 +1,18 @@
+{
+  "conv_id": "52f561b0-93f7-429d-8bfe-17475885b358",
+  "step_index": 50,
+  "created_at": "2026-05-27T13:57:16Z",
+  "type": "replace_file_content",
+  "args": {
+    "AllowMultiple": "false",
+    "Description": "\"Auto-upgrade student to is_app_user = true when loading their campus student dashboard if they were previously analog, unblocking them and letting them choose their hero.\"",
+    "EndLine": "548",
+    "Instruction": "\"Auto-upgrade student to is_app_user = true when they load their campus dashboard to prevent them from being blocked on the web application.\"",
+    "ReplacementContent": "\"      // 1. Fetch student user profile with premium state\\n      const { data: user, error: userErr } = await supabase\\n        .from('users')\\n        .select('id, is_app_user, first_name, school_id, is_premium_user')\\n        .eq('id', studentId)\\n        .single();\\n\\n      if (userErr) throw userErr;\\n      if (!user) return;\\n\\n      if (!user.is_app_user) {\\n        await supabase\\n          .from('users')\\n          .update({ is_app_user: true })\\n          .eq('id', studentId);\\n        user.is_app_user = true;\\n      }\\n\\n      setIsAppUser(user.is_app_user ?? false);\\n      setIsPremiumUser(user.is_premium_user ?? false);\"",
+    "StartLine": "536",
+    "TargetContent": "\"      // 1. Fetch student user profile with premium state\\n      const { data: user, error: userErr } = await supabase\\n        .from('users')\\n        .select('id, is_app_user, first_name, school_id, is_premium_user')\\n        .eq('id', studentId)\\n        .single();\\n\\n      if (userErr) throw userErr;\\n      if (!user) return;\\n\\n      setIsAppUser(user.is_app_user ?? false);\\n      setIsPremiumUser(user.is_premium_user ?? false);\"",
+    "TargetFile": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+    "toolAction": "\"Updating StudentAvatarDashboard.tsx with auto-upgrade logic\"",
+    "toolSummary": "\"Update StudentAvatarDashboard.tsx\""
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "conv_id": "cc184b89-5c63-4fec-afe7-632ff283fbaf",
+  "step_index": 261,
+  "created_at": "2026-05-27T08:33:54Z",
+  "type": "replace_file_content",
+  "args": {
+    "AllowMultiple": "false",
+    "Description": "\"Define type for prev parameter in setStats state modifier\"",
+    "EndLine": "265",
+    "Instruction": "\"Add type annotation to prev parameter in setStats callback\"",
+    "ReplacementContent": "\"    // Local update stats state\\n    setStats((prev: any) => prev ? {\"",
+    "StartLine": "261",
+    "TargetContent": "\"    // Local update stats state\\n    setStats(prev => prev ? {\"",
+    "TargetFile": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+    "toolAction": "\"Fixing setStats parameter type warning\"",
+    "toolSummary": "\"Fix setStats type\""
+  }
+}

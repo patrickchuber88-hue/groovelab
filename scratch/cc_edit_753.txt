@@ -1,0 +1,12 @@
+{
+  "AllowMultiple": "false",
+  "Description": "\"Update scrollToRef in StudentAvatarDashboard.tsx to synchronize parent sidebar state with bottom nav tabs click.\"",
+  "EndLine": "304",
+  "Instruction": "\"Modify scrollToRef to support onTabChange call.\"",
+  "ReplacementContent": "\"  const scrollToRef = (ref: React.RefObject<HTMLDivElement>, tabName: 'briefing' | 'songs' | 'practice_board' | 'campus_cup') => {\\n    setActiveTab(tabName);\\n    onTabChange?.(tabName);\\n    if (ref.current) {\\n      ref.current.scrollIntoView({ behavior: 'smooth', block: 'center' });\\n    }\\n  };\"",
+  "StartLine": "299",
+  "TargetContent": "\"  const scrollToRef = (ref: React.RefObject<HTMLDivElement>, tabName: 'briefing' | 'songs' | 'practice_board' | 'campus_cup') => {\\n    setActiveTab(tabName);\\n    if (ref.current) {\\n      ref.current.scrollIntoView({ behavior: 'smooth', block: 'center' });\\n    }\\n  };\"",
+  "TargetFile": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "toolAction": "\"Updating scrollToRef callback\"",
+  "toolSummary": "\"Sync bottom tab clicks\""
+}

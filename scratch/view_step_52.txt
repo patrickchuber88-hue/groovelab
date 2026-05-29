@@ -1,0 +1,64 @@
+Created At: 2026-05-28T05:53:11Z
+Completed At: 2026-05-28T05:53:11Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1196
+Total Bytes: 54962
+Showing lines 490 to 545
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+490:                   {(skills.filter(s => {
+491:                     const isVocal = (s.instrument || '').toLowerCase().includes('vocal') || (s.instrument || '').toLowerCase().includes('gesang');
+492:                     return s.is_stage_ready && !isVocal;
+493:                   }).length + vocalsSongIds.size) * 100} XP
+494:                 </span>
+495:               </div>
+496: 
+497:               {/* iOS System Pill Button for Activation Status */}
+498:               <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+499:                 {isCampusActive && (
+500:                   <div 
+501:                     onClick={() => {
+502:                       setLocalTab('campus');
+503:                       if (onSwitchPlatform) {
+504:                         onSwitchPlatform('campus');
+505:                       }
+506:                     }}
+507:                     style={{ 
+508:                       background: 'rgba(52, 168, 83, 0.08)', 
+509:                       padding: '4px 12px', 
+510:                       borderRadius: '99px', 
+511:                       fontSize: '0.72rem', 
+512:                       fontWeight: 600, 
+513:                       color: '#137333', 
+514:                       letterSpacing: '0.02em',
+515:                       border: '0.5px solid rgba(52, 168, 83, 0.12)',
+516:                       cursor: 'pointer'
+517:                     }}
+518:                   >
+519:                     🎓 Campus
+520:                   </div>
+521:                 )}
+522:                 {isGroovelabActive && (
+523:                   <div 
+524:                     onClick={() => {
+525:                       setLocalTab('groovelab');
+526:                       if (onSwitchPlatform) {
+527:                         onSwitchPlatform('groovelab');
+528:                       }
+529:                     }}
+530:                     style={{ 
+531:                       background: 'rgba(0, 122, 255, 0.08)', 
+532:                       padding: '4px 12px', 
+533:                       borderRadius: '99px', 
+534:                       fontSize: '0.72rem', 
+535:                       fontWeight: 600, 
+536:                       color: '#007aff', 
+537:                       letterSpacing: '0.02em',
+538:                       border: '0.5px solid rgba(0, 122, 255, 0.12)',
+539:                       cursor: 'pointer'
+540:                     }}
+541:                   >
+542:                     🎸 GrooveLab
+543:                   </div>
+544:                 )}
+545:               </div>
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

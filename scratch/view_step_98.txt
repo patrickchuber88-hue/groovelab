@@ -1,0 +1,73 @@
+Created At: 2026-05-28T06:11:01Z
+Completed At: 2026-05-28T06:11:01Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1184
+Total Bytes: 54452
+Showing lines 430 to 640
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+430:                 <Music size={15} />
+431:                 <span>GrooveLab</span>
+432:               </button>
+433:             </div>
+434:           </div>
+435:         )}
+436: 
+437:         {/* Profile Card Header - Spacious & Clean iOS Widget Look */}
+438:         <div style={{ display: 'flex', gap: '32px', marginBottom: '40px', alignItems: 'center', width: '100%', flexWrap: 'wrap' }}>
+439:           <div style={{ display: 'flex', gap: '32px', alignItems: 'center', flex: '1 1 450px' }}>
+440:             <div 
+441:               onClick={() => setShowFullPhoto(true)}
+442:               style={{ 
+443:                 width: '110px', 
+444:                 height: '110px', 
+445:                 borderRadius: '24px', 
+446:                 overflow: 'hidden', 
+447:                 boxShadow: '0 8px 24px rgba(0, 0, 0, 0.04)', 
+448:                 border: '1px solid rgba(0, 0, 0, 0.04)',
+449:                 flexShrink: 0, 
+450:                 cursor: 'pointer', 
+451:                 transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+452:               }}
+453:               className="hover-scale"
+454:             >
+455:               <img src={student.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+456:             </div>
+457:             
+458:             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+459:               <h2 style={{ 
+460:                 fontSize: '2.1rem', 
+461:                 fontWeight: 800, 
+462:              
+<truncated 8228 bytes>
+ 
+611:                         background: '#ffffff', 
+612:                         padding: '20px 24px', 
+613:                         display: 'flex',
+614:                         alignItems: 'center',
+615:                         justifyContent: 'space-between',
+616:                         borderBottom: '0.5px solid rgba(0, 0, 0, 0.04)'
+617:                       }}>
+618:                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+619:                           <span style={{ fontSize: '0.92rem', fontWeight: 650, color: '#1d1d1f' }}>
+620:                             {getWeekdayName(sched.day_of_week)} • {sched.time_slot} Uhr
+621:                           </span>
+622:                           <span style={{ fontSize: '0.78rem', color: '#86868b', fontWeight: 500 }}>
+623:                             🏫 {sched.rooms?.name || 'Raum'} &bull; Lehrkraft: {sched.teacher ? `${sched.teacher.first_name} ${sched.teacher.last_name}` : 'Lehrkraft'}
+624:                           </span>
+625:                         </div>
+626:                         
+627:                         <span style={{ 
+628:                           fontSize: '0.68rem', 
+629:                           fontWeight: 600, 
+630:                           padding: '4px 10px', 
+631:                           borderRadius: '99px', 
+632:                           background: 'rgba(52, 168, 83, 0.08)', 
+633:                           color: '#137333'
+634:                         }}>
+635:                           Aktiv
+636:                         </span>
+637:                       </div>
+638:                     ))}
+639:                     {campusSchedules.length === 0 && (
+640:                       <div style={{ fontSize: '0.85rem', color: '#86868b', background: '#ffffff', padding: '24px', textAlign: 'center', fontWeight: 500 }}>
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

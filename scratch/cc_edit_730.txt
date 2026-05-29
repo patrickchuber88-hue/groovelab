@@ -1,0 +1,7 @@
+{
+  "AbsolutePath": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "EndLine": "899",
+  "StartLine": "830",
+  "toolAction": "\"Viewing lines for tracking style errors\"",
+  "toolSummary": "\"View lines 830-899\""
+}

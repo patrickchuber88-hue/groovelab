@@ -1,0 +1,17 @@
+{
+  "conv_id": "48320f16-4765-4ef6-b5b3-d672d69331ad",
+  "step_index": 332,
+  "created_at": "2026-05-27T13:16:50Z",
+  "type": "replace_file_content",
+  "args": {
+    "AllowMultiple": "false",
+    "Description": "\"Set up wider responsive grid layout container with a left column and right sidebar in StudentAvatarDashboard.tsx.\"",
+    "EndLine": "427",
+    "ReplacementContent": "\"      {/* DISTINCT BOARD RENDERING WITH A GORGEOUS RIGHT SIDEBAR */}\\n      <div style={{ maxWidth: '1440px', margin: '30px auto 0 auto', padding: '0 24px' }}>\\n        <style dangerouslySetInnerHTML={{ __html: `\\n          @media (min-width: 1024px) {\\n            .campus-layout-container {\\n              display: grid !important;\\n              grid-template-columns: 1fr 360px !important;\\n              gap: 30px !important;\\n              align-items: flex-start !important;\\n            }\\n          }\\n          .campus-layout-container {\\n            display: flex;\\n            flex-direction: column;\\n            gap: 30px;\\n          }\\n        `}} />\\n        <div className=\\\"campus-layout-container\\\">\\n          {/* Left Col: Active Tab Content */}\\n          <div style={{ display: 'flex', flexDirection: 'column', gap: '30px', flex: 1, minWidth: 0 }}>\"",
+    "StartLine": "426",
+    "TargetContent": "\"      {/* DISTINCT BOARD RENDERING */}\\n      <div style={{ maxWidth: '1200px', margin: '30px auto 0 auto', padding: '0 20px' }}>\"",
+    "TargetFile": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+    "toolAction": "\"Replacing board layout container wrapper with grid in StudentAvatarDashboard.tsx\"",
+    "toolSummary": "\"Update layout wrapper\""
+  }
+}

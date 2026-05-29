@@ -1,0 +1,12 @@
+{
+  "AllowMultiple": "false",
+  "Description": "\"Define type for prev parameter in setNextLesson state modifier\"",
+  "EndLine": "188",
+  "Instruction": "\"Add type annotation to prev parameter in setNextLesson callback\"",
+  "ReplacementContent": "\"      // Local fallback mock\\n      setNextLesson((prev: any) => prev ? { ...prev, status: 'canceled_by_student' } : null);\"",
+  "StartLine": "185",
+  "TargetContent": "\"      // Local fallback mock\\n      setNextLesson(prev => prev ? { ...prev, status: 'canceled_by_student' } : null);\"",
+  "TargetFile": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "toolAction": "\"Fixing setNextLesson parameter type warning\"",
+  "toolSummary": "\"Fix setNextLesson type\""
+}

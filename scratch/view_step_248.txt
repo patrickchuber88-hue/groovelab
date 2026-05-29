@@ -1,0 +1,59 @@
+Created At: 2026-05-28T06:17:02Z
+Completed At: 2026-05-28T06:17:02Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1285
+Total Bytes: 59614
+Showing lines 955 to 1045
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+955:                       padding: '20px', 
+956:                       borderRadius: '24px', 
+957:                       border: '1px solid rgba(0, 0, 0, 0.04)',
+958:                       boxShadow: '0 4px 16px rgba(0, 0, 0, 0.01)'
+959:                     }}>
+960:                       <div style={{ display: 'flex', justifycontent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+961:                         <div>
+962:                           <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.02em' }}>{s.artist}</div>
+963:                           <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#1d1d1f', marginTop: '2px' }}>{s.title}</div>
+964:                         </div>
+965:                         <div style={{ 
+966:                           padding: '4px 10px', 
+967:                           borderRadius: '99px', 
+968:                           fontSize: '0.68rem', 
+969:                           fontWeight: 700, 
+970:                           background: s.level === 'starter' ? 'rgba(255, 149, 0, 0.08)' : 'rgba(0, 122, 255, 0.08)', 
+971:                           color: s.level === 'starter' ? '#ff9500' : '#007aff' 
+972:                         }}>
+973:                           {s.level === 'starter' ? 'STARTER' : 'PRO'}
+974:                         </div>
+975:                       </div>
+976:                       <div style={{ display: 'flex', flexwrap: 'wrap', gap: '8px' }}>
+977:             
+<truncated 2537 bytes>
+   border: '1px solid rgba(0, 0, 0, 0.04)',
+1020:                       boxShadow: '0 4px 16px rgba(0, 0, 0, 0.01)'
+1021:                     }}>
+1022:                       <div style={{ display: 'flex', justifycontent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+1023:                         <div>
+1024:                           <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.02em' }}>{s.artist}</div>
+1025:                           <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#1d1d1f', marginTop: '2px' }}>{s.title}</div>
+1026:                         </div>
+1027:                         <div style={{ 
+1028:                           padding: '4px 10px', 
+1029:                           borderRadius: '99px', 
+1030:                           fontSize: '0.68rem', 
+1031:                           fontWeight: 700, 
+1032:                           background: 'rgba(52, 168, 83, 0.08)', 
+1033:                           color: '#34a853' 
+1034:                         }}>
+1035:                           {s.level === 'starter' ? 'STARTER' : 'PRO'}
+1036:                         </div>
+1037:                       </div>
+1038:                       <div style={{ display: 'flex', flexwrap: 'wrap', gap: '8px' }}>
+1039:                         {s.instruments.filter((i: any) => i.is_stage_ready).map((inst: any, idx: number) => (
+1040:                           <div 
+1041:                             key={idx} 
+1042:                             title={`${inst.name}${inst.part_number > 1 || (s.instruments.filter((i:any) => i.name === inst.name).length > 1) ? ` ${inst.part_number}` : ''}`}
+1043:                             style={{ 
+1044:                               fontSize: '0.8rem', 
+1045:                               fontWeight: 600, 
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

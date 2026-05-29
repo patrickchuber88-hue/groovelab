@@ -1,0 +1,28 @@
+Created At: 2026-05-28T06:10:38Z
+Completed At: 2026-05-28T06:10:38Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1184
+Total Bytes: 54452
+Showing lines 576 to 595
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+576:                   </div>
+577:                 </div>
+578: 
+579:                 <div>
+580:                   <div style={{ fontSize: '0.5rem', fontWeight: 700, color: 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Musikschule</div>
+581:                   <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#ffffff', marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '170px' }}>
+582:                     {student.schools?.name || 'Campus Musikschule'}
+583:                   </div>
+584:                 </div>
+585:               </div>
+586: 
+587:               {/* Right side QR code */}
+588:               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', zIndex: 1 }}>
+589:                 <div style={{ background: '#ffffff', padding: '8px', borderRadius: '12px', boxShadow: '0 6px 15px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+590:                   <QRCode value={student.qr_token || student.id || ''} size={76} />
+591:                 </div>
+592:                 <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.5)', fontWeight: 700, letterSpacing: '0.08em' }}>CHECK-IN</span>
+593:               </div>
+594:             </div>
+595:           )}
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

@@ -1,0 +1,53 @@
+Created At: 2026-05-28T07:09:17Z
+Completed At: 2026-05-28T07:09:17Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/TeacherDashboard.tsx`
+Total Lines: 5472
+Total Bytes: 273520
+Showing lines 2645 to 2800
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+2645:                       <span>🤒 Krankheit melden / Heute ausfallen lassen</span>
+2646:                     </button>
+2647:                   </div>
+2648: 
+2649:                   {/* SCHEDULE & PREP-MIRROR ROW */}
+2650:                   <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '24px', alignItems: 'start' }}>
+2651:                     
+2652:                     {/* TAGESPLAN (timeline schedule) */}
+2653:                     <div className="google-card" style={{ padding: '24px', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 4px 20px rgba(15, 23, 42, 0.02)', background: 'white' }}>
+2654:                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+2655:                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#1f2937' }}>
+2656:                           <Clock size={20} color="#0b57d0" />
+2657:                           <strong style={{ fontSize: '1.1rem', fontWeight: 800, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Tagesplan (Unterrichte Heute)</strong>
+2658:                         </div>
+2659:                         <span style={{
+2660:                           fontSize: '0.72rem',
+2661:                           fontWeight: 800,
+2662:                           padding: '4px 12px',
+2663:                           borderRadius: '100px',
+2664:                           background: '#e8f0fe',
+2665:                           color: '#0b57d
+<truncated 7646 bytes>
+or, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', fontSize: '0.95rem' }}>
+2779:                                         {isDraggable && <span style={{ opacity: 0.3, cursor: 'grab', fontSize: '0.8rem' }}>☰</span>}
+2780:                                         {slot.status === 'canceled_by_student' ? (
+2781:                                           <span>FREISPRECH-SLOT (Abgesagt)</span>
+2782:                                         ) : slot.status === 'teacher_sick' ? (
+2783:                                           <span>Ausfall (Krankheit)</span>
+2784:                                         ) : slot.status === 'pending_reschedule' ? (
+2785:                                           <span style={{ color: '#d97706', display: 'flex', alignItems: 'center', gap: '4px' }}>
+2786:                                             🔄 Schüler möchte verschieben
+2787:                                           </span>
+2788:                                         ) : (
+2789:                                           <span>{slot.student?.name || 'Freier Slot'}</span>
+2790:                                         )}
+2791:                                       </div>
+2792:                                       <div style={{ fontSize: '0.78rem', color: labelColor, fontWeight: 600, marginTop: '3px' }}>
+2793:                                         {slot.status === 'pending_parent_approval' ? (
+2794:                                           <strong>Warte auf Eltern-OK • </strong>
+2795:                                         ) : null}
+2796:                                         {slot.instrument} • {slot.room}
+2797:                                       </div>
+2798:                                     </div>
+2799:                                     
+2800:                                     {/* Slot Time Badge */}
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

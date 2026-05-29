@@ -1,0 +1,31 @@
+Created At: 2026-05-28T06:10:34Z
+Completed At: 2026-05-28T06:10:34Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1184
+Total Bytes: 54452
+Showing lines 534 to 556
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+534:             </div>
+535:           </div>
+536: 
+537:           {/* Elegant Green Campus Pass on the right (horizontal Apple Wallet style) */}
+538:           {isPlatformCampus && (
+539:             <div className="hover-scale" style={{ 
+540:               background: 'linear-gradient(135deg, #1e7e34 0%, #0d4b1e 100%)', 
+541:               borderRadius: '20px', 
+542:               padding: '18px 22px', 
+543:               color: 'white',
+544:               boxShadow: '0 15px 35px rgba(19, 115, 51, 0.18)',
+545:               border: '1px solid rgba(255, 255, 255, 0.15)',
+546:               display: 'flex',
+547:               alignItems: 'center',
+548:               gap: '20px',
+549:               position: 'relative',
+550:               overflow: 'hidden',
+551:               width: '100%',
+552:               maxWidth: '340px',
+553:               height: '160px',
+554:               boxSizing: 'border-box',
+555:               flexShrink: 0
+556:             }}>
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

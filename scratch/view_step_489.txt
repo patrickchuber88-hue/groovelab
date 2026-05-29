@@ -1,0 +1,71 @@
+Created At: 2026-05-28T06:30:29Z
+Completed At: 2026-05-28T06:30:29Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 670
+Total Bytes: 30869
+Showing lines 300 to 500
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+300:           <X size={20} />
+301:         </button>
+302: 
+303:         {/* Detail-Kartei Cross-Tab Links */}
+304:         {onSwitchPlatform && (
+305:           <div style={{ marginBottom: '20px', display: 'flex' }}>
+306:             {activePlatform === 'groovelab' ? (
+307:               <button
+308:                 onClick={() => onSwitchPlatform('campus')}
+309:                 style={{
+310:                   background: '#22c55e',
+311:                   color: 'white',
+312:                   border: 'none',
+313:                   padding: '12px 24px',
+314:                   borderRadius: '16px',
+315:                   fontWeight: 900,
+316:                   fontSize: '0.85rem',
+317:                   cursor: 'pointer',
+318:                   boxShadow: '0 4px 14px rgba(34, 197, 94, 0.3)',
+319:                   transition: 'all 0.2s',
+320:                   display: 'flex',
+321:                   alignItems: 'center',
+322:                   gap: '8px'
+323:                 }}
+324:                 className="hover-scale"
+325:               >
+326:                 <span>[ 🟩 Zu Campus-Akte wechseln ]</span>
+327:               </button>
+328:             ) : activePlatform === 'campus' ? (
+329:               <button
+330:                 onClick={() => onSwitchPlatform('groovelab')}
+331:                 style={{
+332:                   background: '#fbbc05',
+333:                   color: '#09090b',
+334:                   border: 'none',
+335:                   padding: '12px 24px',
+336:                   borderRad
+<truncated 9640 bytes>
+x', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+477:                       <div>
+478:                         <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>{s.artist}</div>
+479:                         <div style={{ fontWeight: 900, fontSize: '1rem', color: '#1e293b' }}>{s.title}</div>
+480:                       </div>
+481:                       <div style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 900, background: s.level === 'starter' ? '#fffbeb' : '#eff6ff', color: s.level === 'starter' ? '#b45309' : '#2563eb' }}>
+482:                         {s.level === 'starter' ? '🚀 STARTER' : '⚡ PRO'}
+483:                       </div>
+484:                     </div>
+485:                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+486:                       {s.instruments.map((inst: any, idx: number) => (
+487:                         <div 
+488:                           key={idx} 
+489:                           title={`${inst.name}${inst.part_number > 1 || (s.instruments.filter((i:any) => i.name === inst.name).length > 1) ? ` ${inst.part_number}` : ''}`}
+490:                           style={{ 
+491:                             fontSize: '0.8rem', 
+492:                             fontWeight: 800, 
+493:                             padding: '4px 8px', 
+494:                             borderRadius: '8px', 
+495:                             background: 'white', 
+496:                             border: '1px solid #e2e8f0', 
+497:                             color: inst.progress === 100 ? '#10b981' : (inst.progress > 0 ? brandColor : '#94a3b8'),
+498:                             display: 'flex',
+499:                             alignItems: 'center',
+500:                             gap: '4px',
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

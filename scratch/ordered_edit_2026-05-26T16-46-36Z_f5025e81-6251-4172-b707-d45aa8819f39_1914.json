@@ -1,0 +1,18 @@
+{
+  "conv_id": "f5025e81-6251-4172-b707-d45aa8819f39",
+  "step_index": 1914,
+  "created_at": "2026-05-26T16:46:36Z",
+  "type": "replace_file_content",
+  "args": {
+    "AllowMultiple": "false",
+    "Description": "\"Import Zap icon from lucide-react in StudentAvatarDashboard.tsx\"",
+    "EndLine": "8",
+    "Instruction": "\"Add Zap to the list of icons imported from lucide-react.\"",
+    "ReplacementContent": "\"import { \\n  Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, \\n  ChevronRight, Coffee, Clock, Flame, BookOpen, Share2, Play, \\n  Pause, RotateCcw, Volume2, Moon, QrCode, X, EyeOff, Zap\\n} from 'lucide-react';\"",
+    "StartLine": "3",
+    "TargetContent": "\"import { \\n  Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, \\n  ChevronRight, Coffee, Clock, Flame, BookOpen, Share2, Play, \\n  Pause, RotateCcw, Volume2, Moon, QrCode, X, EyeOff\\n} from 'lucide-react';\"",
+    "TargetFile": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+    "toolAction": "\"Adding Zap icon import\"",
+    "toolSummary": "\"Import Zap in StudentAvatarDashboard\""
+  }
+}

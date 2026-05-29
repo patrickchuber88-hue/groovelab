@@ -1,0 +1,1 @@
+"                    ) : (\n                      <div className=\"animate-pulse\">\n                        <strong>🚨 Fokus unterbrochen!</strong>\n                        <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', opacity: 0.9 }}>Lege das Handy wieder auf das Display, um weiterzuüben.</p>\n                      </div>\n                    )}"

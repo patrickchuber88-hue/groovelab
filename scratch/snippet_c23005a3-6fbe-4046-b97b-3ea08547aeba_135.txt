@@ -1,0 +1,65 @@
+Created At: 2026-05-28T07:08:46Z
+Completed At: 2026-05-28T07:08:46Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/TeacherDashboard.tsx`
+Total Lines: 5471
+Total Bytes: 273533
+Showing lines 2650 to 2920
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+2650:                     
+2651:                     {/* TAGESPLAN (timeline schedule) */}
+2652:                     <div className="google-card" style={{ padding: '24px', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 4px 20px rgba(15, 23, 42, 0.02)', background: 'white' }}>
+2653:                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+2654:                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#1f2937' }}>
+2655:                           <Clock size={20} color="#0b57d0" />
+2656:                           <strong style={{ fontSize: '1.1rem', fontWeight: 800, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Tagesplan (Unterrichte Heute)</strong>
+2657:                         </div>
+2658:                         <span style={{
+2659:                           fontSize: '0.72rem',
+2660:                           fontWeight: 800,
+2661:                           padding: '4px 12px',
+2662:                           borderRadius: '100px',
+2663:                           background: '#e8f0fe',
+2664:                           color: '#0b57d0',
+2665:                           fontFamily: 'Inter'
+2666:                         }}>
+2667:                           LIVE
+2668:                         </span>
+2669:                       </div>
+2670: 
+2671:                       {/* Timeline content */}
+2672:                       <div style={{ display: 'flex', flexDirection: 'column', gap
+<truncated 15842 bytes>
+       fontSize: '0.75rem', fontWeight: 800
+2889:                                         }}>
+2890:                                           {song.status === 'verifiziert' ? '✓ Verifiziert' : 'Übt gerade'}
+2891:                                         </span>
+2892:                                       </div>
+2893:                                       {song.note && (
+2894:                                         <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '4px', fontStyle: 'italic' }}>
+2895:                                           "{song.note}"
+2896:                                         </div>
+2897:                                       )}
+2898:                                     </div>
+2899:                                   ))
+2900:                                 ) : (
+2901:                                   <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic' }}>Keine aktiven Songs dokumentiert.</div>
+2902:                                 )}
+2903:                               </div>
+2904:                             </div>
+2905:                           </div>
+2906:                         </div>
+2907:                       ) : (
+2908:                         <div style={{ background: '#f8fafc', padding: '24px', borderRadius: '24px', textAlign: 'center', color: '#64748b', fontSize: '0.85rem', border: '1px dashed #cbd5e1' }}>
+2909:                           Kein Schüler für die Vorbereitung erfasst.
+2910:                         </div>
+2911:                       )}
+2912:                     </div>
+2913: 
+2914:                   </div>
+2915:                 </div>
+2916:               ) : (
+2917:                 <div style={{ padding: '40px', textAlign: 'center', color: '#ef4444' }}>Fehler beim Laden des Briefings.</div>
+2918:               )}
+2919:             </div>
+2920: 
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

@@ -1,0 +1,1 @@
+"import { \n  Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, \n  ChevronRight, Coffee, Clock, Flame, BookOpen, Share2, Play, \n  Pause, RotateCcw, Volume2, Moon, QrCode, X, EyeOff, Zap\n} from 'lucide-react';"

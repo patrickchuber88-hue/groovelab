@@ -1,0 +1,67 @@
+Created At: 2026-05-28T06:15:46Z
+Completed At: 2026-05-28T06:15:46Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1282
+Total Bytes: 59899
+Showing lines 690 to 765
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+690:                     )}
+691:                   </div>
+692:                 </section>
+693:               </div>
+694: 
+695:               <aside style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+696:                 {/* Module & Einstellungen - iOS Switched Settings Card */}
+697:                 <section style={{ 
+698:                   background: '#ffffff', 
+699:                   borderRadius: '24px', 
+700:                   padding: '24px', 
+701:                   border: '1px solid rgba(0, 0, 0, 0.04)',
+702:                   boxShadow: '0 4px 16px rgba(0, 0, 0, 0.01)'
+703:                 }}>
+704:                   <h4 style={{ fontSize: '0.92rem', fontWeight: 700, color: '#1d1d1f', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+705:                     <Sliders size={16} style={{ color: '#86868b' }} /> Module & Einstellungen
+706:                   </h4>
+707:                   
+708:                   <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+709:                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+710:                       <div style={{ display: 'flex', flexDirection: 'column' }}>
+711:                         <span style={{ fontSize: '0.86rem', fontWeight: 600, color: '#1d1d1f' }}>Campus-Modul aktivieren</span>
+712:                         <span style={{ fontSize: '0.72rem', color: '#86868b' }}>Stundenplan & meisterwerke</span>
+713:                       </div>
+714:   
+<truncated 953 bytes>
+                  position: 'absolute',
+734:                           top: '2px',
+735:                           left: isCampusActive ? '22px' : '2px',
+736:                           transition: 'left 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
+737:                           boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+738:                         }} />
+739:                       </button>
+740:                     </div>
+741: 
+742:                     <div style={{ height: '0.5px', background: 'rgba(0, 0, 0, 0.06)' }} />
+743: 
+744:                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+745:                       <div style={{ display: 'flex', flexDirection: 'column' }}>
+746:                         <span style={{ fontSize: '0.86rem', fontWeight: 600, color: '#1d1d1f' }}>GrooveLab-Modul aktivieren</span>
+747:                         <span style={{ fontSize: '0.72rem', color: '#86868b' }}>Songbooks, Bands & üben</span>
+748:                       </div>
+749:                       <button 
+750:                         onClick={() => handleToggleGroovelab(!isGroovelabActive)}
+751:                         style={{
+752:                           width: '46px',
+753:                           height: '26px',
+754:                           borderRadius: '99px',
+755:                           background: isGroovelabActive ? '#007aff' : '#e5e5ea',
+756:                           border: 'none',
+757:                           cursor: 'pointer',
+758:                           position: 'relative',
+759:                           transition: 'background 0.25s ease',
+760:                           padding: 0
+761:                         }}
+762:                       >
+763:                         <div style={{
+764:                           width: '22px',
+765:                           height: '22px',
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

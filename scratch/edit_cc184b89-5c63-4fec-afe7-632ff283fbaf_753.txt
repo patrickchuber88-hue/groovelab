@@ -1,0 +1,1 @@
+"  const scrollToRef = (ref: React.RefObject<HTMLDivElement>, tabName: 'briefing' | 'songs' | 'practice_board' | 'campus_cup') => {\n    setActiveTab(tabName);\n    onTabChange?.(tabName);\n    if (ref.current) {\n      ref.current.scrollIntoView({ behavior: 'smooth', block: 'center' });\n    }\n  };"

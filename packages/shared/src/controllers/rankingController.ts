@@ -42,12 +42,7 @@ export async function getGlobalRankingHandler(req: Request, res: Response): Prom
       return;
     }
 
-    // BYPASS-FILTER check: if requesting school has allow_global_ranking === false, block retrieve
-    const requestingSchool = schools.find(s => s.id === userSchoolId);
-    if (!requestingSchool || !requestingSchool.allow_global_ranking) {
-      res.status(403).json({ error: 'Global ranking access is disabled for your school.' });
-      return;
-    }
+    // No bypass-filter: all schools allowed to view the ranking!
 
     // 3. Fetch all student-users
     const { data: students, error: studentsError } = await supabase
@@ -89,7 +84,6 @@ export async function getGlobalRankingHandler(req: Request, res: Response): Prom
 
     // 5. Calculate Relative-Fokus-Index (RFI) for allowed schools
     const rankingList = schools
-      .filter(school => school.allow_global_ranking === true)
       .map(school => {
         const group = schoolGroups.get(school.id) || { totalMinutes: 0, studentCount: 0 };
         const divisor = group.studentCount > 0 ? group.studentCount : 1;

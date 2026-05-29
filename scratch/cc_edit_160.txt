@@ -1,0 +1,5 @@
+{
+  "AbsolutePath": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "toolAction": "\"Viewing StudentAvatarDashboard.tsx\"",
+  "toolSummary": "\"View Student Avatar Dashboard File\""
+}

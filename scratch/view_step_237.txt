@@ -1,0 +1,59 @@
+Created At: 2026-05-28T06:16:45Z
+Completed At: 2026-05-28T06:16:45Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1285
+Total Bytes: 59614
+Showing lines 1080 to 1130
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+1080:                 <h4 style={{ fontSize: '0.92rem', fontWeight: 700, color: '#1d1d1f', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+1081:                   <Sliders size={16} style={{ color: '#86868b' }} /> Module & Einstellungen
+1082:                 </h4>
+1083:                 
+1084:                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+1085:                   <div style={{ display: 'flex', alignItems: 'center', justifycontent: 'space-between' }}>
+1086:                     <div style={{ display: 'flex', flexDirection: 'column' }}>
+1087:                       <span style={{ fontSize: '0.86rem', fontWeight: 600, color: '#1d1d1f' }}>Campus-Modul aktivieren</span>
+1088:                       <span style={{ fontSize: '0.72rem', color: '#86868b' }}>Stundenplan & meisterwerke</span>
+1089:                     </div>
+1090:                     <button 
+1091:                       onClick={() => handleToggleCampus(!isCampusActive)}
+1092:                       style={{
+1093:                         width: '46px',
+1094:                         height: '26px',
+1095:                         borderRadius: '99px',
+1096:                         background: isCampusActive ? '#34a853' : '#e5e5ea',
+1097:                         border: 'none',
+1098:                         cursor: 'pointer',
+1099:                         position: 'relative',
+1100:                         transition: 'background 0.25s ease',
+1101:                         padding: 0
+1102:                       }}
+1103:                     >
+1104:                       <div style={{
+1105:                         width: '22px',
+1106:                         height: '22px',
+1107:                         borderRadius: '50%',
+1108:                         background: '#ffffff',
+1109:                         position: 'absolute',
+1110:                         top: '2px',
+1111:                         left: isCampusActive ? '22px' : '2px',
+1112:                         transition: 'left 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
+1113:                         boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+1114:                       }} />
+1115:                     </button>
+1116:                   </div>
+1117: 
+1118:                   <div style={{ height: '0.5px', background: 'rgba(0, 0, 0, 0.06)' }} />
+1119: 
+1120:                   <div style={{ display: 'flex', alignItems: 'center', justifycontent: 'space-between' }}>
+1121:                     <div style={{ display: 'flex', flexDirection: 'column' }}>
+1122:                       <span style={{ fontSize: '0.86rem', fontWeight: 600, color: '#1d1d1f' }}>GrooveLab-Modul aktivieren</span>
+1123:                       <span style={{ fontSize: '0.72rem', color: '#86868b' }}>Songbooks, Bands & üben</span>
+1124:                     </div>
+1125:                     <button 
+1126:                       onClick={() => handleToggleGroovelab(!isGroovelabActive)}
+1127:                       style={{
+1128:                         width: '46px',
+1129:                         height: '26px',
+1130:                         borderRadius: '99px',
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

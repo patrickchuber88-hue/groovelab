@@ -1,0 +1,77 @@
+Created At: 2026-05-28T05:45:45Z
+Completed At: 2026-05-28T05:45:45Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1202
+Total Bytes: 55160
+Showing lines 376 to 444
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+376:         {/* Apple Segmented Control Style Tab Bar - only visible if BOTH active */}
+377:         {showTabSwitch && (
+378:           <div style={{ marginBottom: '32px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+379:             <div style={{ 
+380:               background: 'rgba(120, 120, 128, 0.12)', 
+381:               padding: '4px', 
+382:               borderRadius: '99px', 
+383:               display: 'inline-flex',
+384:               gap: '2px',
+385:               border: '0.5px solid rgba(0,0,0,0.04)'
+386:             }}>
+387:               <button
+388:                 onClick={() => {
+389:                   setLocalTab('campus');
+390:                   if (onSwitchPlatform) {
+391:                     onSwitchPlatform('campus');
+392:                     onClose();
+393:                   }
+394:                 }}
+395:                 style={{
+396:                   background: isPlatformCampus ? '#ffffff' : 'transparent',
+397:                   color: isPlatformCampus ? '#000000' : '#3c3c43',
+398:                   border: 'none',
+399:                   padding: '6px 20px',
+400:                   borderRadius: '99px',
+401:                   fontWeight: 650,
+402:                   fontSize: '0.82rem',
+403:                   cursor: 'pointer',
+404:                   boxShadow: isPlatformCampus ? '0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06)' : 'none',
+405:                   transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+406:                   display: 'flex',
+407:                   alignItems: 'center',
+408:                   gap: '6px'
+409:                 }}
+410:               >
+411:                 <GraduationCap size={15} />
+412:                 <span>Campus</span>
+413:               </button>
+414:               <button
+415:                 onClick={() => {
+416:                   setLocalTab('groovelab');
+417:                   if (onSwitchPlatform) {
+418:                     onSwitchPlatform('groovelab');
+419:                     onClose();
+420:                   }
+421:                 }}
+422:                 style={{
+423:                   background: !isPlatformCampus ? '#ffffff' : 'transparent',
+424:                   color: !isPlatformCampus ? '#000000' : '#3c3c43',
+425:                   border: 'none',
+426:                   padding: '6px 20px',
+427:                   borderRadius: '99px',
+428:                   fontWeight: 650,
+429:                   fontSize: '0.82rem',
+430:                   cursor: 'pointer',
+431:                   boxShadow: !isPlatformCampus ? '0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06)' : 'none',
+432:                   transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+433:                   display: 'flex',
+434:                   alignItems: 'center',
+435:                   gap: '6px'
+436:                 }}
+437:               >
+438:                 <Music size={15} />
+439:                 <span>GrooveLab</span>
+440:               </button>
+441:             </div>
+442:           </div>
+443:         )}
+444: 
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

@@ -1,0 +1,7 @@
+{
+  "AbsolutePath": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "EndLine": "195",
+  "StartLine": "175",
+  "toolAction": "\"Viewing state update around line 186 in StudentAvatarDashboard.tsx\"",
+  "toolSummary": "\"View state update context\""
+}

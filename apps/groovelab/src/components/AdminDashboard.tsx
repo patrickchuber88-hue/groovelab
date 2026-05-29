@@ -8,6 +8,8 @@ import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis
 } from 'recharts';
 import { renderInstrumentIcon } from '../utils/instruments';
+import { StudentDetailModal } from './StudentDetailModal';
+import { ScheduleBoard } from './ScheduleBoard';
 
 const cleanRoomName = (name: string | null | undefined): string => {
   if (!name) return 'Unbenannter Raum';
@@ -53,8 +55,44 @@ const ADMIN_INSTRUMENT_ICONS: Record<string, any> = {
   "E-Piano": renderInstrumentIcon("E-Piano"), 
   "Keys": renderInstrumentIcon("Keys")
 };
+const getInstrumentAvatarUrl = (instrument: string | null | undefined): string => {
+  if (!instrument) return '/avatars/guitar_avatar.png';
+  const inst = instrument.toLowerCase().trim();
+  if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/guitar_avatar.png';
+  if (inst.includes('bass')) return '/avatars/bass_avatar.png';
+  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/drums_avatar.png';
+  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/piano_avatar.png';
+  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/vocals_avatar.png';
+  if (inst.includes('trompete') || inst.includes('trumpet')) return '/avatars/trumpet_avatar.png';
+  if (inst.includes('posaune') || inst.includes('trombone')) return '/avatars/trombone_avatar.png';
+  if (inst.includes('horn')) return '/avatars/horn_avatar.png';
+  if (inst.includes('cello')) return '/avatars/cello_avatar.png';
+  if (inst.includes('geige') || inst.includes('violin') || inst.includes('violine')) return '/avatars/violin_avatar.png';
+  if (inst.includes('klarinette') || inst.includes('clarinet')) return '/avatars/clarinet_avatar.png';
+  if (inst.includes('querflöte') || inst.includes('flute')) return '/avatars/flute_avatar.png';
+  if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return '/avatars/saxophone_avatar.png';
+  return '/avatars/guitar_avatar.png';
+};
+
+const getInstrumentTypeKey = (instrument: string | null | undefined): string => {
+  if (!instrument) return 'guitarist';
+  const inst = instrument.toLowerCase().trim();
+  if (inst.includes('guitar') || inst.includes('gitarre')) return 'guitarist';
+  if (inst.includes('bass')) return 'bassist';
+  if (inst.includes('drum') || inst.includes('schlagzeug')) return 'drummer';
+  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return 'keyboardist';
+  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return 'vocalist';
+  if (inst.includes('trompete') || inst.includes('trumpet')) return 'trumpetist';
+  if (inst.includes('posaune') || inst.includes('trombone')) return 'trombonist';
+  if (inst.includes('horn')) return 'hornist';
+  if (inst.includes('cello')) return 'cellist';
+  if (inst.includes('geige') || inst.includes('violin') || inst.includes('violine')) return 'violinist';
+  if (inst.includes('klarinette') || inst.includes('clarinet')) return 'clarinetist';
+  if (inst.includes('querflöte') || inst.includes('flute')) return 'flutist';
+  if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return 'saxophonist';
+  return 'guitarist';
+};
 const brandColor = "#eab308";
-// Removed unused import
 import { TeacherDashboard } from './TeacherDashboard';
 import { ElegantBirthdayPicker } from './ElegantBirthdayPicker';
 import QRCode from 'react-qr-code';
@@ -72,77 +110,19 @@ const TEACHER_AVATARS = [
 ];
 
 const STUDENT_AVATARS = [
-  // NEW AVATARS (Alternating Girl, Boy)
-  { id: 'student_girl_blonde_guitar', url: '/avatars/student_girl_blonde_guitar.png', label: 'Blonde Girl Guitar' },
-  { id: 'student_boy_blonde_guitar', url: '/avatars/student_boy_blonde_guitar.png', label: 'Blonde Boy Guitar' },
-  { id: 'student_girl_black_drums', url: '/avatars/student_girl_black_drums.png', label: 'Black Girl Drums' },
-  { id: 'student_boy_black_drums', url: '/avatars/student_boy_black_drums.png', label: 'Black Boy Drums' },
-  { id: 'student_girl_lightbrown_piano', url: '/avatars/student_girl_lightbrown_piano.png', label: 'Light Brown Girl Synth' },
-  { id: 'student_boy_lightbrown_piano', url: '/avatars/student_boy_lightbrown_piano.png', label: 'Light Brown Boy Keyboard' },
-  { id: 'student_girl_black_bass', url: '/avatars/student_girl_black_bass.png', label: 'Black Girl Bass' },
-  { id: 'student_boy_black_bass', url: '/avatars/student_boy_black_bass.png', label: 'Black Boy Bass' },
-  { id: 'student_girl_red_vocals', url: '/avatars/student_girl_red_vocals.png', label: 'Red Hair Girl Singer' },
-  { id: 'student_boy_red_vocals', url: '/avatars/student_boy_red_vocals.png', label: 'Red Hair Boy Singer' },
-  { id: 'student_girl_black_guitar', url: '/avatars/student_girl_black_guitar.png', label: 'Black Girl Guitar' },
-  { id: 'student_boy_black_guitar', url: '/avatars/student_boy_black_guitar.png', label: 'Black Boy Guitar' },
-  { id: 'student_girl_blonde_drums', url: '/avatars/student_girl_blonde_drums.png', label: 'Blonde Girl Drums' },
-  { id: 'student_boy_blonde_drums', url: '/avatars/student_boy_blonde_drums.png', label: 'Blonde Boy Drums' },
-  { id: 'student_girl_black_piano', url: '/avatars/student_girl_black_piano.png', label: 'Black Girl Piano' },
-  { id: 'student_boy_black_piano', url: '/avatars/student_boy_black_piano.png', label: 'Black Boy Piano' },
-
-  // EXISTING AVATARS (Alternating Girl, Boy)
-  { id: 'g_guitar', url: '/avatar_girl_guitar.jpg', label: 'Classic Girl Guitar' },
-  { id: 'b_guitar', url: '/avatar_boy_guitar.jpg', label: 'Classic Boy Guitar' },
-  { id: 'g_piano', url: '/avatar_girl_piano.jpg', label: 'Classic Girl Piano' },
-  { id: 'b_piano', url: '/avatar_boy_piano.jpg', label: 'Classic Boy Piano' },
-  { id: 'g_drums', url: '/avatar_girl_drums.jpg', label: 'Classic Girl Drums' },
-  { id: 'b_drums', url: '/avatar_boy_drums.jpg', label: 'Classic Boy Drums' },
-  { id: 'g_bass', url: '/avatar_girl_bass.jpg', label: 'Classic Girl Bass' },
-  { id: 'b_bass', url: '/avatar_boy_bass.jpg', label: 'Classic Boy Bass' },
-
-  { id: 'teen_girl_eguitar_focused', url: '/avatars/teen_girl_eguitar_focused.png', label: 'Teen Girl Electric Guitar' },
-  { id: 'student_teen_boy_guitar_1', url: '/avatars/student_teen_boy_guitar_1.png', label: 'Teen Boy Guitar (Casual)' },
-  { id: 'student_girl_eguitar_3', url: '/avatars/student_girl_eguitar_3.png', label: 'Student Girl Guitar 3' },
-  { id: 'teen_boy_eguitar_17', url: '/avatars/teen_boy_eguitar_17.png', label: 'Teen Boy Guitar (Rock)' },
-  { id: 'student_girl_piano_2', url: '/avatars/student_girl_piano_2.png', label: 'Student Girl Piano 2' },
-  { id: 'student_boy_vocals_1', url: '/avatars/student_boy_vocals_1.png', label: 'Student Boy Singer' },
-  { id: 'student_girl_eguitar_2', url: '/avatars/student_girl_eguitar_2.png', label: 'Student Girl Guitar 2' },
-  { id: 'student_boy_piano_2', url: '/avatars/student_boy_piano_2.png', label: 'Student Boy Piano 2' },
-  { id: 'student_girl_ebass_1', url: '/avatars/student_girl_ebass_1.png', label: 'Student Girl Bass 1' },
-  { id: 'student_boy_keyboard_1', url: '/avatars/student_boy_keyboard_1.png', label: 'Student Boy Keyboard' },
-  { id: 'student_girl_drums_2', url: '/avatars/student_girl_drums_2.png', label: 'Student Girl Drums 2' },
-  { id: 'student_boy_eguitar_2', url: '/avatars/student_boy_eguitar_2.png', label: 'Student Boy Guitar 2' },
-  { id: 'student_girl_drums_3', url: '/avatars/student_girl_drums_3.png', label: 'Student Girl Drums 3' },
-  { id: 'student_boy_ebass_1', url: '/avatars/student_boy_ebass_1.png', label: 'Student Boy Bass 1' },
-  { id: 'student_girl_vocals_1', url: '/avatars/student_girl_vocals_1.png', label: 'Student Girl Singer' },
-  { id: 'student_boy_drums_2', url: '/avatars/student_boy_drums_2.png', label: 'Student Boy Drums 2' },
-  { id: 'voc_f', url: '/vocalist_female.png', label: 'Vocalist Female' },
-  { id: 'student_boy_drums_3', url: '/avatars/student_boy_drums_3.png', label: 'Student Boy Drums 3' },
-
-  { id: 'bandstyle_girl_eguitar', url: '/avatars/bandstyle_girl_eguitar.png', label: 'Bandstyle Girl Guitar' },
-  { id: 'student_boy_producer_1', url: '/avatars/student_boy_producer_1.png', label: 'Student Boy Producer' },
-  { id: 'bandstyle_girl_ebass', url: '/avatars/bandstyle_girl_ebass.png', label: 'Bandstyle Girl Bass' },
-  { id: 'voc_m', url: '/vocalist_male.png', label: 'Vocalist Male' },
-  { id: 'bandstyle_girl_edrums', url: '/avatars/bandstyle_girl_edrums.png', label: 'Bandstyle Girl Drums' },
-  { id: 'student_bass_1', url: '/avatars/student_bass_1.png', label: 'Student Bass 1' },
-  { id: 'bandstyle_girl_epiano', url: '/avatars/bandstyle_girl_epiano.png', label: 'Bandstyle Girl Piano' },
-  { id: 'student_drums_1', url: '/avatars/student_drums_1.png', label: 'Student Drums 1' },
-
-  // Remaining Neutral/Male Avatars
-  { id: 'student_eguitar_1', url: '/avatars/student_eguitar_1.png', label: 'Student Guitar 1' },
-  { id: 'student_piano_1', url: '/avatars/student_piano_1.png', label: 'Student Piano 1' },
-  { id: 'student_vocals_1', url: '/avatars/student_vocals_1.png', label: 'Student Singer 1' },
-  { id: 'student_tech_1', url: '/avatars/student_tech_1.png', label: 'Student Tech Pro' },
-  { id: 'bandstyle_boy_eguitar', url: '/avatars/bandstyle_boy_eguitar.png', label: 'Bandstyle Boy Guitar' },
-  { id: 'bandstyle_boy_ebass', url: '/avatars/bandstyle_boy_ebass.png', label: 'Bandstyle Boy Bass' },
-  { id: 'bandstyle_boy_edrums', url: '/avatars/bandstyle_boy_edrums.png', label: 'Bandstyle Boy Drums' },
-  { id: 'bandstyle_boy_epiano', url: '/avatars/bandstyle_boy_epiano.png', label: 'Bandstyle Boy Piano' },
-
-  // REQUESTED END-AVATARS
-  { id: 'teen_girl_acoustic_guitar', url: '/avatars/teen_girl_acoustic_guitar.png', label: 'Teen Girl Acoustic Guitar' },
-  { id: 'teen_boy_acoustic_guitar', url: '/avatars/teen_boy_acoustic_guitar.png', label: 'Teen Boy Acoustic Guitar' },
-  { id: 'avatar_girl_new', url: '/avatar_girl_1777237237899.png', label: 'Girl (Premium)' },
-  { id: 'b_def', url: '/avatar_boy.jpg', label: 'Classic Boy' }
+  { id: 'avatar_guitar', url: '/avatars/guitar_avatar.png', label: 'Gitarre' },
+  { id: 'avatar_bass', url: '/avatars/bass_avatar.png', label: 'Bass' },
+  { id: 'avatar_drums', url: '/avatars/drums_avatar.png', label: 'Drums' },
+  { id: 'avatar_piano', url: '/avatars/piano_avatar.png', label: 'Piano / Keys' },
+  { id: 'avatar_vocals', url: '/avatars/vocals_avatar.png', label: 'Vocals' },
+  { id: 'avatar_trumpet', url: '/avatars/trumpet_avatar.png', label: 'Trompete' },
+  { id: 'avatar_trombone', url: '/avatars/trombone_avatar.png', label: 'Posaune' },
+  { id: 'avatar_horn', url: '/avatars/horn_avatar.png', label: 'Horn' },
+  { id: 'avatar_cello', url: '/avatars/cello_avatar.png', label: 'Cello' },
+  { id: 'avatar_violin', url: '/avatars/violin_avatar.png', label: 'Geige' },
+  { id: 'avatar_clarinet', url: '/avatars/clarinet_avatar.png', label: 'Klarinette' },
+  { id: 'avatar_flute', url: '/avatars/flute_avatar.png', label: 'Querflöte' },
+  { id: 'avatar_saxophone', url: '/avatars/saxophone_avatar.png', label: 'Saxofon' }
 ];
 
 const getStationColor = (name: string | null | undefined) => {
@@ -181,6 +161,26 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [kiosks, setKiosks] = useState<any[] | null>(null);
   const tabStorageKey = activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab';
   const [activeTab, setActiveTab] = useState<string>(() => localStorage.getItem(activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab') || forceTab || 'live');
+  const [mediathekTab, setMediathekTab] = useState<'songs' | 'lehrwerke'>('songs');
+  const [lehrwerke, setLehrwerke] = useState<any[]>(() => {
+    try {
+      const stored = localStorage.getItem('campus_lehrwerke');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return parsed.map((item: any) => ({ ...item, totalPages: item.totalPages || 50 }));
+      }
+    } catch (e) {}
+    return [
+      { id: '1', title: 'GrooveLab Guitar Vol. 1', instrument: 'Guitar', type: 'Standardwerk für E-Gitarre', progress: 60, emoji: '🎸', color: '#34a853', totalPages: 50 },
+      { id: '2', title: 'GrooveLab Drums Vol. 1', instrument: 'Drums', type: 'Standardwerk für Schlagzeug', progress: 45, emoji: '🥁', color: '#4f46e5', totalPages: 50 },
+      { id: '3', title: 'GrooveLab Bass Vol. 1', instrument: 'Bass', type: 'Standardwerk für E-Bass', progress: 30, emoji: '🎸', color: '#f59e0b', totalPages: 50 },
+      { id: '4', title: 'GrooveLab Keys Vol. 1', instrument: 'Keys', type: 'Standardwerk für Keyboard', progress: 80, emoji: '🎹', color: '#ec4899', totalPages: 50 },
+      { id: '5', title: 'GrooveLab Vocals Vol. 1', instrument: 'Vocals', type: 'Standardwerk für Gesang', progress: 50, emoji: '🎤', color: '#3b82f6', totalPages: 50 }
+    ];
+  });
+  const [showAddLehrwerk, setShowAddLehrwerk] = useState(false);
+  const [newLehrwerk, setNewLehrwerk] = useState({ title: '', instrument: 'Guitar', type: '', progress: 0, emoji: '📚', color: '#3b82f6', totalPages: 50 });
+  const [editingLehrwerk, setEditingLehrwerk] = useState<any | null>(null);
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
   const [draggedStationId, setDraggedStationId] = useState<string | null>(null);
   const [dragOverStationId, setDragOverStationId] = useState<string | null>(null);
@@ -298,7 +298,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [externalInstrument, setExternalInstrument] = useState('Vocals');
   
   const [showAddStudent, setShowAddStudent] = useState(false);
-  const [newStudent, setNewStudent] = useState({ firstName: '', lastName: '', birthDate: '', photoUrl: '/avatar_ghost.jpg', isExternalVocalist: false });
+  const [newStudent, setNewStudent] = useState({ firstName: '', lastName: '', birthDate: '', photoUrl: '/avatar_ghost.jpg', isExternalVocalist: false, instrument: 'Gitarre' });
   const [vocalistOnlyMode, setVocalistOnlyMode] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'green' | 'yellow' | 'red'>('all');
   const [studentsXP, setStudentsXP] = useState<Record<string, number>>({});
@@ -1114,6 +1114,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     }
     
     const qrToken = crypto.randomUUID();
+    const studentInstrument = newStudent.isExternalVocalist ? 'Vocals' : (newStudent.instrument || 'Gitarre');
+    const studentAvatarUrl = getInstrumentAvatarUrl(studentInstrument);
     
     const { data, error } = await supabase.from('users').insert({
       school_id: admin.school_id, 
@@ -1122,24 +1124,39 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       last_name: newStudent.lastName.length > 1 ? newStudent.lastName.charAt(0) + '.' : newStudent.lastName, 
       birth_date: null,
       photo_url: newStudent.photoUrl || '/avatar_ghost.jpg',
+      avatar_url: studentAvatarUrl,
       qr_token: qrToken,
       is_external_vocalist: newStudent.isExternalVocalist,
-      instrument: newStudent.isExternalVocalist ? 'Vocals' : 'Musiker',
+      instrument: studentInstrument,
       is_campus_active: activePlatform === 'campus',
       is_groovelab_active: activePlatform === 'groovelab'
     }).select().single();
     
     if (error) alert('Fehler: ' + error.message);
     else if (data) { 
+      // Also automatically create/sync their avatars record
+      await supabase.from('avatars').upsert({
+        user_id: data.id,
+        avatar_style: 'Premium_Hero',
+        instrument_type: getInstrumentTypeKey(studentInstrument),
+        evolution_level: 1,
+        xp: 0,
+        asset_path: studentAvatarUrl,
+        streak_flame: 0
+      });
+
       setStudents([...students, data]); 
       setShowAddStudent(false); 
-      setNewStudent({ firstName: '', lastName: '', birthDate: '', photoUrl: '/avatar_ghost.jpg', isExternalVocalist: false }); 
+      setNewStudent({ firstName: '', lastName: '', birthDate: '', photoUrl: '/avatar_ghost.jpg', isExternalVocalist: false, instrument: 'Gitarre' }); 
     }
   };
 
   const handleUpdateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingStudent) return;
+    const studentInstrument = editingStudent.instrument || 'Gitarre';
+    const studentAvatarUrl = getInstrumentAvatarUrl(studentInstrument);
+
     const { error } = await supabase.from('users').update({
       first_name: editingStudent.first_name,
       last_name: editingStudent.last_name,
@@ -1147,12 +1164,26 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       status: editingStudent.status || 'active',
       is_trial: editingStudent.is_trial || false,
       trial_ends_at: editingStudent.trial_ends_at || null,
-      contract_ends_at: editingStudent.contract_ends_at || null
+      contract_ends_at: editingStudent.contract_ends_at || null,
+      instrument: studentInstrument,
+      avatar_url: studentAvatarUrl
     }).eq('id', editingStudent.id);
     
     if (error) alert('Fehler: ' + error.message);
     else {
-      setStudents(students.map(s => s.id === editingStudent.id ? editingStudent : s));
+      // Keep their avatars record in sync too
+      await supabase.from('avatars').upsert({
+        user_id: editingStudent.id,
+        avatar_style: 'Premium_Hero',
+        instrument_type: getInstrumentTypeKey(studentInstrument),
+        evolution_level: 1,
+        asset_path: studentAvatarUrl
+      });
+
+      setStudents(students.map(s => s.id === editingStudent.id ? {
+        ...editingStudent,
+        avatar_url: studentAvatarUrl
+      } : s));
       setEditingStudent(null);
     }
   };
@@ -2101,6 +2132,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         key={`${activePlatform}-${activeTab}`}
         userId={userId} 
         hideHeader={activePlatform === 'campus' ? false : true} 
+        hideSidebar={true}
         viewMode="admin" 
         initialTab={activePlatform === 'campus' ? 'briefing' : 'live'}
         onTabChange={(id) => onTabChange?.(id)}
@@ -2676,6 +2708,29 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               </div>
             </div>
 
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Instrument</label>
+              <select 
+                value={newStudent.instrument || 'Gitarre'} 
+                onChange={e => setNewStudent({...newStudent, instrument: e.target.value})} 
+                style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }}
+              >
+                <option value="Gitarre">Gitarre</option>
+                <option value="Bass">Bass</option>
+                <option value="Drums">Drums</option>
+                <option value="Piano / Keys">Piano / Keys</option>
+                <option value="Vocals">Vocals</option>
+                <option value="Trompete">Trompete</option>
+                <option value="Posaune">Posaune</option>
+                <option value="Horn">Horn</option>
+                <option value="Cello">Cello</option>
+                <option value="Geige">Geige</option>
+                <option value="Klarinette">Klarinette</option>
+                <option value="Querflöte">Querflöte</option>
+                <option value="Saxofon">Saxofon</option>
+              </select>
+            </div>
+
             {/* External Vocalist Toggle */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
                <div 
@@ -2711,6 +2766,29 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <input required placeholder="Vorname" value={editingStudent.first_name || ''} onChange={e => setEditingStudent({...editingStudent, first_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
               <input required placeholder="Nachname" value={editingStudent.last_name || ''} onChange={e => setEditingStudent({...editingStudent, last_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', gridColumn: '1 / -1' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Instrument</label>
+                <select 
+                  value={editingStudent.instrument || 'Gitarre'} 
+                  onChange={e => setEditingStudent({...editingStudent, instrument: e.target.value})} 
+                  style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600 }}
+                >
+                  <option value="Gitarre">Gitarre</option>
+                  <option value="Bass">Bass</option>
+                  <option value="Drums">Drums</option>
+                  <option value="Piano / Keys">Piano / Keys</option>
+                  <option value="Vocals">Vocals</option>
+                  <option value="Trompete">Trompete</option>
+                  <option value="Posaune">Posaune</option>
+                  <option value="Horn">Horn</option>
+                  <option value="Cello">Cello</option>
+                  <option value="Geige">Geige</option>
+                  <option value="Klarinette">Klarinette</option>
+                  <option value="Querflöte">Querflöte</option>
+                  <option value="Saxofon">Saxofon</option>
+                </select>
+              </div>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', gridColumn: '1 / -1' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Genereller Login-Status</label>
@@ -3886,10 +3964,374 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     </div>
   );
 
-  const renderSongsTab = () => (
-    <div style={{ marginTop: '24px' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+  const renderSongsTab = () => {
+    const renderLehrwerkeSection = () => {
+      const filteredLehrwerke = lehrwerke.filter(item => 
+        item.title.toLowerCase().includes(songSearch.toLowerCase()) || 
+        item.type.toLowerCase().includes(songSearch.toLowerCase())
+      );
+
+      const handleAddLehrwerkSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newLehrwerk.title) return;
+        const created = {
+          ...newLehrwerk,
+          id: Math.random().toString(),
+          progress: Number(newLehrwerk.progress) || 0,
+          totalPages: Number(newLehrwerk.totalPages) || 50
+        };
+        const updated = [...lehrwerke, created];
+        setLehrwerke(updated);
+        localStorage.setItem('campus_lehrwerke', JSON.stringify(updated));
+        setShowAddLehrwerk(false);
+        setNewLehrwerk({ title: '', instrument: 'Guitar', type: '', progress: 0, emoji: '📚', color: '#3b82f6', totalPages: 50 });
+      };
+
+      const handleEditLehrwerkSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingLehrwerk || !editingLehrwerk.title) return;
+        const updated = lehrwerke.map(item => item.id === editingLehrwerk.id ? editingLehrwerk : item);
+        setLehrwerke(updated);
+        localStorage.setItem('campus_lehrwerke', JSON.stringify(updated));
+        setEditingLehrwerk(null);
+      };
+
+      const handleDeleteLehrwerk = (id: string) => {
+        const updated = lehrwerke.filter(item => item.id !== id);
+        setLehrwerke(updated);
+        localStorage.setItem('campus_lehrwerke', JSON.stringify(updated));
+        if (editingLehrwerk?.id === id) setEditingLehrwerk(null);
+      };
+
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>📚 Lehrwerke verwalten</h3>
+              <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '2px 0 0 0', fontWeight: 600 }}>Erstelle und pflege Schulbücher für den Campus</p>
+            </div>
+            <button 
+              type="button"
+              onClick={() => {
+                setShowAddLehrwerk(!showAddLehrwerk);
+                setEditingLehrwerk(null);
+              }} 
+              style={{ 
+                background: `linear-gradient(135deg, ${brandColor}, ${brandColor}ee)`, 
+                color: 'white', 
+                border: 'none', 
+                padding: '12px 24px', 
+                borderRadius: '16px', 
+                cursor: 'pointer', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '10px', 
+                fontSize: '0.9rem', 
+                fontWeight: 900,
+                boxShadow: `0 8px 20px -6px ${brandColor}60`,
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <Plus size={20} strokeWidth={3} /> Lehrwerk hinzufügen
+            </button>
+          </div>
+
+          {showAddLehrwerk && (
+            <form onSubmit={handleAddLehrwerkSubmit} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: 'white', borderRadius: '24px', border: `1px solid ${brandColor}20` }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Neues Lehrwerk anlegen</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Titel des Buchs</label>
+                  <input required placeholder="z.B. GrooveLab Drums Vol. 2" value={newLehrwerk.title} onChange={e => setNewLehrwerk({...newLehrwerk, title: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Beschreibung</label>
+                  <input required placeholder="z.B. Standardwerk für Fortgeschrittene" value={newLehrwerk.type} onChange={e => setNewLehrwerk({...newLehrwerk, type: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Instrument</label>
+                  <select value={newLehrwerk.instrument} onChange={e => {
+                    const inst = e.target.value;
+                    let emoji = '📚';
+                    let color = '#3b82f6';
+                    if (inst === 'Guitar') { emoji = '🎸'; color = '#34a853'; }
+                    else if (inst === 'Drums') { emoji = '🥁'; color = '#4f46e5'; }
+                    else if (inst === 'Bass') { emoji = '🎸'; color = '#f59e0b'; }
+                    else if (inst === 'Keys') { emoji = '🎹'; color = '#ec4899'; }
+                    else if (inst === 'Vocals') { emoji = '🎤'; color = '#3b82f6'; }
+                    setNewLehrwerk({...newLehrwerk, instrument: inst, emoji, color});
+                  }} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }}>
+                    <option value="Guitar">Gitarre</option>
+                    <option value="Drums">Schlagzeug</option>
+                    <option value="Bass">Bass</option>
+                    <option value="Keys">Keyboard</option>
+                    <option value="Vocals">Gesang</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Seitenzahl des Buchs</label>
+                  <input type="number" min="1" max="1000" placeholder="50" value={newLehrwerk.totalPages} onChange={e => setNewLehrwerk({...newLehrwerk, totalPages: Number(e.target.value) || 50})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Fortschritt (%)</label>
+                  <input type="number" min="0" max="100" placeholder="0" value={newLehrwerk.progress} onChange={e => setNewLehrwerk({...newLehrwerk, progress: Number(e.target.value)})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button type="submit" style={{ flex: 1, background: brandColor, color: 'white', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 800, cursor: 'pointer' }}>Speichern</button>
+                <button type="button" onClick={() => setShowAddLehrwerk(false)} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 700, cursor: 'pointer' }}>Abbrechen</button>
+              </div>
+            </form>
+          )}
+
+          {editingLehrwerk && (
+            <form onSubmit={handleEditLehrwerkSubmit} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: 'white', borderRadius: '24px', border: `1px solid ${brandColor}20`, animation: 'fadeIn 0.2s' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>📚 Lehrwerk bearbeiten: {editingLehrwerk.title}</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Titel des Buchs</label>
+                  <input required placeholder="z.B. GrooveLab Drums Vol. 2" value={editingLehrwerk.title} onChange={e => setEditingLehrwerk({...editingLehrwerk, title: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Beschreibung</label>
+                  <input required placeholder="z.B. Standardwerk für Fortgeschrittene" value={editingLehrwerk.type} onChange={e => setEditingLehrwerk({...editingLehrwerk, type: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Instrument</label>
+                  <select value={editingLehrwerk.instrument} onChange={e => {
+                    const inst = e.target.value;
+                    let emoji = '📚';
+                    let color = '#3b82f6';
+                    if (inst === 'Guitar') { emoji = '🎸'; color = '#34a853'; }
+                    else if (inst === 'Drums') { emoji = '🥁'; color = '#4f46e5'; }
+                    else if (inst === 'Bass') { emoji = '🎸'; color = '#f59e0b'; }
+                    else if (inst === 'Keys') { emoji = '🎹'; color = '#ec4899'; }
+                    else if (inst === 'Vocals') { emoji = '🎤'; color = '#3b82f6'; }
+                    setEditingLehrwerk({...editingLehrwerk, instrument: inst, emoji, color});
+                  }} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }}>
+                    <option value="Guitar">Gitarre</option>
+                    <option value="Drums">Schlagzeug</option>
+                    <option value="Bass">Bass</option>
+                    <option value="Keys">Keyboard</option>
+                    <option value="Vocals">Gesang</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Seitenzahl des Buchs</label>
+                  <input type="number" min="1" max="1000" placeholder="50" value={editingLehrwerk.totalPages || 50} onChange={e => setEditingLehrwerk({...editingLehrwerk, totalPages: Number(e.target.value) || 50})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Fortschritt (%)</label>
+                  <input type="number" min="0" max="100" placeholder="0" value={editingLehrwerk.progress} onChange={e => setEditingLehrwerk({...editingLehrwerk, progress: Number(e.target.value)})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button type="submit" style={{ flex: 1, background: brandColor, color: 'white', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 800, cursor: 'pointer' }}>Änderungen speichern</button>
+                <button type="button" onClick={() => setEditingLehrwerk(null)} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 700, cursor: 'pointer' }}>Abbrechen</button>
+              </div>
+            </form>
+          )}
+
+          <div style={{ position: 'relative', marginBottom: '8px' }}>
+            <Search size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+            <input 
+              type="text" 
+              placeholder="Lehrwerke suchen..." 
+              value={songSearch}
+              onChange={e => setSongSearch(e.target.value)}
+              style={{ width: '100%', padding: '14px 14px 14px 48px', borderRadius: '16px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600, fontSize: '0.95rem', outline: 'none', transition: 'all 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+            {filteredLehrwerke.map(item => (
+              <div 
+                key={item.id} 
+                className="glass-panel hover-scale" 
+                onClick={() => {
+                  setEditingLehrwerk(item);
+                  setShowAddLehrwerk(false);
+                }}
+                style={{ 
+                  padding: '20px', 
+                  background: 'white', 
+                  display: 'flex', 
+                  gap: '16px', 
+                  alignItems: 'center', 
+                  borderRadius: '24px', 
+                  border: editingLehrwerk?.id === item.id ? `2px solid ${brandColor}` : '1px solid #e2e8f0', 
+                  boxShadow: '0 10px 25px -5px rgba(0,0,0,0.02)',
+                  position: 'relative',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <div style={{ 
+                  width: '64px', 
+                  height: '84px', 
+                  background: item.color || brandColor, 
+                  borderRadius: '8px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  color: 'white', 
+                  fontSize: '24px', 
+                  fontWeight: 900, 
+                  boxShadow: `0 4px 12px ${(item.color || brandColor)}40` 
+                }}>
+                  {item.emoji || '📚'}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>{item.title}</h4>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>{item.type}</p>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>📖 {item.totalPages || 50} Seiten</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ flex: 1, height: '6px', background: '#e2e8f0', borderRadius: '9999px', overflow: 'hidden' }}>
+                      <div style={{ width: `${item.progress}%`, height: '100%', background: item.color || brandColor, borderRadius: '9999px' }}></div>
+                    </div>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: item.color || brandColor }}>{item.progress}%</span>
+                  </div>
+
+                  {/* Student Assignment Select */}
+                  <div 
+                    onClick={(e) => e.stopPropagation()} 
+                    style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <select
+                      onChange={(e) => {
+                        const studentId = e.target.value;
+                        if (!studentId) return;
+                        
+                        try {
+                          const stored = localStorage.getItem('student_lehrwerke_progress');
+                          const parsed = stored ? JSON.parse(stored) : [];
+                          
+                          // Check if already assigned
+                          if (parsed.some((assignment: any) => assignment.studentId === studentId && assignment.lehrwerkId === item.id)) {
+                            alert('Dieses Lehrwerk ist diesem Schüler bereits zugewiesen!');
+                            e.target.value = '';
+                            return;
+                          }
+
+                          const newAssignment = {
+                            studentId: studentId,
+                            lehrwerkId: item.id,
+                            assignedAt: new Date().toISOString(),
+                            pageStates: {}
+                          };
+
+                          const updated = [...parsed, newAssignment];
+                          localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
+                          
+                          const targetStudent = students.find(s => s.id === studentId);
+                          alert(`📚 "${item.title}" wurde erfolgreich an ${targetStudent ? `${targetStudent.first_name} ${targetStudent.last_name}` : 'den Schüler'} zugewiesen!`);
+                          e.target.value = '';
+                        } catch (err) {
+                          console.error(err);
+                        }
+                      }}
+                      defaultValue=""
+                      style={{
+                        padding: '6px 10px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        background: '#f8fafc',
+                        color: '#475569',
+                        outline: 'none',
+                        cursor: 'pointer',
+                        width: '100%'
+                      }}
+                    >
+                      <option value="" disabled>👥 Schüler zuweisen...</option>
+                      {students.map(s => (
+                        <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <button 
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteLehrwerk(item.id);
+                  }} 
+                  style={{ 
+                    position: 'absolute', 
+                    right: '16px', 
+                    top: '16px', 
+                    background: '#fff1f2', 
+                    border: 'none', 
+                    width: '32px', 
+                    height: '32px', 
+                    borderRadius: '10px', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    cursor: 'pointer', 
+                    color: '#ef4444', 
+                    transition: 'all 0.2s' 
+                  }}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    };
+
+    return (
+      <div style={{ marginTop: '24px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {activePlatform === 'campus' && (
+            <div style={{ display: 'flex', background: '#f1f5f9', padding: '6px', borderRadius: '18px', width: 'fit-content', gap: '8px', marginBottom: '8px' }}>
+              <button 
+                type="button"
+                onClick={() => setMediathekTab('songs')}
+                style={{
+                  padding: '10px 24px',
+                  borderRadius: '14px',
+                  border: 'none',
+                  background: mediathekTab === 'songs' ? 'white' : 'transparent',
+                  color: mediathekTab === 'songs' ? '#1e293b' : '#64748b',
+                  fontWeight: 950,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  boxShadow: mediathekTab === 'songs' ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
+                  transition: 'all 0.2s'
+                }}
+              >
+                🎵 Songs
+              </button>
+              <button 
+                type="button"
+                onClick={() => setMediathekTab('lehrwerke')}
+                style={{
+                  padding: '10px 24px',
+                  borderRadius: '14px',
+                  border: 'none',
+                  background: mediathekTab === 'lehrwerke' ? 'white' : 'transparent',
+                  color: mediathekTab === 'lehrwerke' ? '#1e293b' : '#64748b',
+                  fontWeight: 950,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  boxShadow: mediathekTab === 'lehrwerke' ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
+                  transition: 'all 0.2s'
+                }}
+              >
+                📚 Lehrwerke
+              </button>
+            </div>
+          )}
+
+          {activePlatform === 'campus' && mediathekTab === 'lehrwerke' ? (
+            renderLehrwerkeSection()
+          ) : (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 950, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '14px', margin: 0 }}>
             <div style={{ background: `${brandColor}15`, color: brandColor, padding: '10px', borderRadius: '14px', display: 'flex', alignItems: 'center' }}>
               <Library size={24} />
@@ -4267,9 +4709,12 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             </div>
           ))}
         </div>
+            </>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderStatsTab = () => {
     if (!stats) return (
@@ -4517,830 +4962,17 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const renderStudentDetailModal = () => {
     if (!selectedStudent) return null;
 
-
-
-    const memberSince = selectedStudent.created_at
-      ? new Date(selectedStudent.created_at).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
-      : '';
-
-    const weekSessions = (() => {
-      if (!studentPlanning || studentPlanning.length === 0) return [];
-
-      const dayOrder: { [day: string]: number } = { 'Mo': 1, 'Di': 2, 'Mi': 3, 'Do': 4, 'Fr': 5, 'Sa': 6, 'So': 7 };
-      const slotsByDay: { [day: string]: string[] } = {};
-      
-      studentPlanning.forEach(s => {
-        if (!slotsByDay[s.day]) slotsByDay[s.day] = [];
-        slotsByDay[s.day].push(s.time);
-      });
-
-      const presenceList: { dayStr: string; rangeStr: string; sortKey: number }[] = [];
-
-      Object.entries(slotsByDay).forEach(([day, times]) => {
-        times.sort();
-
-        const add15 = (t: string) => {
-          let [h, m] = t.split(':').map(Number);
-          m += 15;
-          if (m >= 60) { h += 1; m = 0; }
-          return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-        };
-
-        const toMin = (t: string) => {
-          const [h, m] = t.split(':').map(Number);
-          return h * 60 + m;
-        };
-
-        const ranges: { start: string; end: string }[] = [];
-        let currentRange: { start: string; end: string } | null = null;
-
-        times.forEach(t => {
-          if (!currentRange) {
-            currentRange = { start: t, end: add15(t) };
-          } else {
-            if (toMin(t) === toMin(currentRange.end)) {
-              currentRange.end = add15(t);
-            } else {
-              ranges.push(currentRange);
-              currentRange = { start: t, end: add15(t) };
-            }
-          }
-        });
-        if (currentRange) ranges.push(currentRange);
-
-        ranges.forEach(r => {
-          presenceList.push({
-            dayStr: day,
-            rangeStr: `${r.start} Uhr - ${r.end} Uhr`,
-            sortKey: (dayOrder[day] || 99) * 10000 + toMin(r.start)
-          });
-        });
-      });
-
-      presenceList.sort((a, b) => a.sortKey - b.sortKey);
-      return presenceList;
-    })();
-
-
-    // Instrument normalization helper
-    const getInstrumentIcon = (name: string) => {
-      return renderInstrumentIcon(name);
-    };
-
-    const STUDENT_MODAL_INSTRUMENT_ICONS: Record<string, any> = { 
-      Guitar: renderInstrumentIcon('Guitar'), 
-      Keys: '🎹', 
-      Drums: '🥁', 
-      Bass: renderInstrumentIcon('Bass'), 
-      Vocals: '🎤' 
-    };
-
-    // Grouping logic for songs
-    const groupedSongs = (studentDetails || []).reduce((acc: any, s: any) => {
-      const songId = s.song_id;
-      const level = s.difficulty_level;
-      const key = `${songId}_${level}`;
-      if (!acc[key]) {
-        acc[key] = {
-          id: songId,
-          title: s.songs?.title,
-          artist: s.songs?.artist,
-          level: level,
-          instruments: []
-        };
-      }
-      acc[key].instruments.push({
-        name: s.instrument,
-        part_number: s.part_number || 1,
-        progress: s.is_stage_ready ? 100 : (s.progress_percent || 0),
-        is_stage_ready: s.is_stage_ready
-      });
-      return acc;
-    }, {});
-
-    const songsArray = Object.values(groupedSongs).map((s: any) => {
-      const getBaseInst = (name: string) => {
-        const n = (name || '').toLowerCase();
-        if (n.includes('gitarre') || n.includes('guitar')) return 'Guitar';
-        if (n.includes('drums') || n.includes('schlagzeug')) return 'Drums';
-        if (n.includes('piano') || n.includes('keys')) return 'Piano';
-        if (n.includes('bass')) return 'Bass';
-        return name;
-      };
-      const orderMap: Record<string, number> = { 'Guitar': 1, 'Drums': 2, 'Piano': 3, 'Bass': 4 };
-      const sortedInstruments = [...s.instruments].sort((a, b) => {
-        const idxA = orderMap[getBaseInst(a.name)] || 99;
-        const idxB = orderMap[getBaseInst(b.name)] || 99;
-        if (idxA !== idxB) return idxA - idxB;
-        return (a.part_number || 1) - (b.part_number || 1);
-      });
-      return { ...s, instruments: sortedInstruments };
-    });
-    const practiceBoard = songsArray.filter((s: any) => s.instruments.some((i: any) => i.progress > 0 && !i.is_stage_ready));
-    const repertoire = songsArray.filter((s: any) => s.instruments.some((i: any) => i.is_stage_ready));
-
-    const studentRadarData = (() => {
-      const radarBase: Record<string, number> = { Guitar: 0, Bass: 0, Drums: 0, Keys: 0, Vocals: 0 };
-      (studentDetails || []).forEach((s: any) => {
-        const sInst = s.instrument?.toLowerCase();
-        if (!sInst) return;
-        
-        let target: string | null = null;
-        if (sInst === 'guitar' || sInst === 'e-gitarre') target = 'Guitar';
-        else if (sInst === 'bass' || sInst === 'e-bass') target = 'Bass';
-        else if (sInst === 'drums' || sInst === 'e-drums') target = 'Drums';
-        else if (sInst === 'keys' || sInst === 'piano' || sInst === 'e-piano') target = 'Keys';
-        else if (sInst === 'vocals' || sInst === 'gesang') target = 'Vocals';
-        
-        if (target && radarBase[target] !== undefined) {
-          const prog = s.progress_percent || 0;
-          const xp = (s.is_stage_ready || prog === 100) ? 500 : prog * 2;
-          radarBase[target] += xp;
-        }
-      });
-      return Object.entries(radarBase).map(([inst, xp]) => ({ instrument: inst, xp }));
-    })();
-
     return (
-      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-        <div className="glass-panel animation-slide-up" style={{ background: 'white', padding: '32px', borderRadius: '32px', maxWidth: '920px', width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
-          
-          {/* Close button */}
-          <button onClick={() => setSelectedStudent(null)} style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(0,0,0,0.05)', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s', zIndex: 10 }}>
-            <X size={20} />
-          </button>
-
-          {/* Student Profile Header */}
-          <div style={{ display: 'flex', gap: '24px', marginBottom: '32px', alignItems: 'center', width: '100%' }}>
-            <div style={{ display: 'flex', gap: '24px', alignItems: 'center', flexShrink: 0 }}>
-              <div 
-                onClick={() => setShowFullPhoto(true)}
-                style={{ width: '100px', height: '100px', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', border: '4px solid white', background: '#f1f5f9', flexShrink: 0, cursor: 'pointer', transition: 'all 0.2s ease' }}
-                className="hover-scale"
-              >
-                <img src={selectedStudent.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              </div>
-              <div>
-                <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0, whiteSpace: 'nowrap' }}>{selectedStudent.first_name} {selectedStudent.last_name}</h2>
-                <div style={{ display: 'flex', gap: '16px', marginTop: '8px', alignItems: 'center', flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
-                    <Calendar size={14} /> Member seit {memberSince}
-                  </div>
-
-                  <div style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', padding: '4px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 950, display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }}>
-                    <Star size={12} fill="white" /> {(studentDetails || []).filter((s: any) => s.is_stage_ready).length * 100} XP
-                  </div>
-                </div>
-                
-                {/* Instrument Master Counters */}
-                <div style={{ display: 'flex', gap: '12px', marginTop: '12px', flexWrap: 'nowrap', alignItems: 'center' }}>
-                  {['Guitar', 'Drums', 'Keys', 'Bass', 'Vocals'].map(inst => {
-                    const count = (studentDetails || []).filter((s: any) => {
-                      const sInst = s.instrument?.toLowerCase();
-                      const target = inst.toLowerCase();
-                      let match = false;
-                      if (target === 'guitar') match = sInst === 'guitar' || sInst === 'e-gitarre';
-                      else if (target === 'bass') match = sInst === 'bass' || sInst === 'e-bass';
-                      else if (target === 'drums') match = sInst === 'drums' || sInst === 'e-drums';
-                      else if (target === 'keys') match = sInst === 'keys' || sInst === 'piano' || sInst === 'e-piano';
-                      else if (target === 'vocals') match = sInst === 'vocals' || sInst === 'gesang';
-                      else match = sInst === target;
-                      return match && s.is_stage_ready;
-                    }).length;
-
-                    return (
-                      <div key={inst} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', padding: '6px 10px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
-                        <span style={{ fontSize: '1rem' }}>{STUDENT_MODAL_INSTRUMENT_ICONS[inst] || '🎵'}</span>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 900, color: count > 0 ? brandColor : '#94a3b8' }}>{count}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-                {/* Instrument Badge - One line below */}
-                <div style={{ marginTop: '10px' }}>
-                  <div style={{ display: 'inline-block', background: '#f1f5f9', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', height: 'fit-content' }}>
-                    {selectedStudent.instrument || 'Multi-Talent'}
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
-            {/* Skill Radar centered dynamically in the empty space */}
-            <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', minWidth: '240px' }}>
-              <div style={{ width: '240px', height: '165px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'transparent' }}>
-                <RadarChart cx="50%" cy="50%" outerRadius="75%" width={240} height={165} data={studentRadarData}>
-                  <PolarGrid stroke="#e2e8f0" />
-                  <PolarAngleAxis dataKey="instrument" tick={({ x, y, payload }) => (
-                    <text x={x} y={y} textAnchor="middle" dominantBaseline="central" style={{ fontSize: 10, fontWeight: 900, fill: '#94a3b8' }}>
-                      {payload.value}
-                    </text>
-                  )} />
-                  <Radar name="XP" dataKey="xp" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.4} />
-                </RadarChart>
-              </div>
-            </div>
-          </div>
-
-          {/* Premium Tab Navigation */}
-          <div style={{ display: 'flex', gap: '16px', borderBottom: '2px solid #f1f5f9', padding: '0 0 12px 0', marginBottom: '28px' }}>
-            <button
-              onClick={() => setStudentDetailTab('profile')}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                padding: '8px 16px',
-                fontSize: '0.9rem',
-                fontWeight: 900,
-                color: studentDetailTab === 'profile' ? brandColor : '#94a3b8',
-                borderBottom: studentDetailTab === 'profile' ? `3px solid ${brandColor}` : '3px solid transparent',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.2s',
-                marginBottom: '-14px',
-                outline: 'none'
-              }}
-            >
-              <Music size={16} /> Profil & Musik
-            </button>
-            <button
-              onClick={() => setStudentDetailTab('logbook')}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                padding: '8px 16px',
-                fontSize: '0.9rem',
-                fontWeight: 900,
-                color: studentDetailTab === 'logbook' ? brandColor : '#94a3b8',
-                borderBottom: studentDetailTab === 'logbook' ? `3px solid ${brandColor}` : '3px solid transparent',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.2s',
-                marginBottom: '-14px',
-                outline: 'none'
-              }}
-            >
-              <Clock size={16} /> Logbuch & Notizen
-            </button>
-            <button
-              onClick={() => setStudentDetailTab('contract')}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                padding: '8px 16px',
-                fontSize: '0.9rem',
-                fontWeight: 900,
-                color: studentDetailTab === 'contract' ? brandColor : '#94a3b8',
-                borderBottom: studentDetailTab === 'contract' ? `3px solid ${brandColor}` : '3px solid transparent',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.2s',
-                marginBottom: '-14px',
-                outline: 'none'
-              }}
-            >
-              <Shield size={16} /> Zugang & Vertrag
-            </button>
-          </div>
-
-          {/* Tab Content Rendering */}
-          {studentDetailTab === 'profile' ? (
-            /* TAB 1: PROFIL & MUSIK */
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '32px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-                {/* Üben Board */}
-                <section>
-                  <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#3b82f6', letterSpacing: '0.1em', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Clock size={16} /> Üben Board
-                  </h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {practiceBoard.map((s: any) => (
-                      <div key={s.id + s.level} style={{ background: '#f8fafc', padding: '16px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                          <div>
-                            <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>{s.artist}</div>
-                            <div style={{ fontWeight: 900, fontSize: '1rem', color: '#1e293b' }}>{s.title}</div>
-                          </div>
-                          <div style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 900, background: s.level === 'starter' ? '#fffbeb' : '#eff6ff', color: s.level === 'starter' ? '#b45309' : '#2563eb' }}>
-                            {s.level === 'starter' ? '🚀 STARTER' : '⚡ PRO'}
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                          {s.instruments.map((inst: any, idx: number) => (
-                            <div 
-                              key={idx} 
-                              title={`${inst.name}${inst.part_number > 1 || (s.instruments.filter((i:any) => i.name === inst.name).length > 1) ? ` ${inst.part_number}` : ''}`}
-                              style={{ 
-                                fontSize: '0.8rem', 
-                                fontWeight: 800, 
-                                padding: '4px 8px', 
-                                borderRadius: '8px', 
-                                background: 'white', 
-                                border: '1px solid #e2e8f0', 
-                                color: inst.progress === 100 ? '#10b981' : (inst.progress > 0 ? brandColor : '#94a3b8'),
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                cursor: 'help'
-                              }}
-                            >
-                              <span>{getInstrumentIcon(inst.name)}</span>
-                              <span>{inst.progress}%</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                    {practiceBoard.length === 0 && (
-                      <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', padding: '8px 0' }}>Keine Songs am Board.</div>
-                    )}
-                  </div>
-                </section>
-
-                {/* Repertoire */}
-                <section>
-                  <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#10b981', letterSpacing: '0.1em', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Award size={16} /> Repertoire
-                  </h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {repertoire.map((s: any) => (
-                      <div key={s.id + s.level} style={{ background: '#f0fdf4', padding: '16px', borderRadius: '20px', border: '1px solid #bbf7d0' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                          <div>
-                            <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#15803d', opacity: 0.7, textTransform: 'uppercase' }}>{s.artist}</div>
-                            <div style={{ fontWeight: 900, fontSize: '1rem', color: '#166534' }}>{s.title}</div>
-                          </div>
-                          <div style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 900, background: '#dcfce7', color: '#15803d' }}>
-                            {s.level === 'starter' ? '🚀 STARTER' : '⚡ PRO'}
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                          {s.instruments.filter((i: any) => i.is_stage_ready).map((inst: any, idx: number) => (
-                            <div 
-                              key={idx} 
-                              title={`${inst.name}${inst.part_number > 1 || (s.instruments.filter((i:any) => i.name === inst.name).length > 1) ? ` ${inst.part_number}` : ''}`}
-                              style={{ 
-                                fontSize: '0.8rem', 
-                                fontWeight: 800, 
-                                padding: '4px 8px', 
-                                borderRadius: '8px', 
-                                background: 'white', 
-                                border: '1px solid #bbf7d0', 
-                                color: '#10b981',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                cursor: 'help'
-                              }}
-                            >
-                              <span>{getInstrumentIcon(inst.name)}</span>
-                              <span>100%</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                    {repertoire.length === 0 && (
-                      <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', padding: '8px 0' }}>Noch kein Repertoire.</div>
-                    )}
-                  </div>
-                </section>
-              </div>
-
-              <aside style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                {/* Meine Bands */}
-                <section>
-                  <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#ec4899', letterSpacing: '0.1em', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Users size={16} /> Bands
-                  </h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {studentBands.map((b: any) => (
-                      <div 
-                        key={b.id} 
-                        onClick={() => {
-                          setEditingBand(b);
-                          setSelectedStudent(null);
-                        }}
-                        className="clickable-band-item"
-                        style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '12px', 
-                          padding: '12px 16px', 
-                          background: '#fdf2f8', 
-                          borderRadius: '20px', 
-                          border: '1px solid #fbcfe8',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <div style={{ width: '44px', height: '44px', borderRadius: '12px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
-                          <img src={b.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        </div>
-                        <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#9d174d' }}>{b.name}</div>
-                      </div>
-                    ))}
-                    {studentBands.length === 0 && (
-                      <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', padding: '8px 0' }}>In keiner Band aktiv.</div>
-                    )}
-                  </div>
-                </section>
-
-                {/* Wochenplan-Zeiten */}
-                <section style={{ marginTop: '16px' }}>
-                  <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#f59e0b', letterSpacing: '0.1em', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Calendar size={16} /> Wochenplan-Zeiten
-                  </h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {weekSessions.map((pres, idx) => (
-                      <div key={idx} style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '10px', 
-                        background: '#fffbeb', 
-                        border: '1px solid #fef3c7', 
-                        padding: '12px 14px', 
-                        borderRadius: '16px',
-                        fontSize: '0.85rem',
-                        fontWeight: 700,
-                        color: '#b45309'
-                      }}>
-                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', flexShrink: 0 }}></div>
-                        <div>
-                          {pres.dayStr}. {pres.rangeStr}
-                        </div>
-                      </div>
-                    ))}
-                    {weekSessions.length === 0 && (
-                      <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', background: '#f8fafc', padding: '12px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>Keine reservierten Zeiten diese Woche.</div>
-                    )}
-                  </div>
-                </section>
-              </aside>
-            </div>
-          ) : studentDetailTab === 'logbook' ? (
-            /* TAB 2: LOGBUCH & NOTIZEN */
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.1fr', gap: '32px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                {/* Pädagogische Notizen */}
-                <section style={{ padding: '24px', background: '#f8fafc', borderRadius: '24px', border: '1px solid #f1f5f9' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>Pädagogische Notizen</div>
-                  <textarea 
-                    defaultValue={selectedStudent.teacher_notes || ''}
-                    onBlur={async (e) => {
-                      await supabase.from('users').update({ teacher_notes: e.target.value }).eq('id', selectedStudent.id);
-                    }}
-                    placeholder="Eindrücke festhalten..."
-                    style={{ width: '100%', background: 'transparent', border: 'none', resize: 'none', minHeight: '120px', fontSize: '0.9rem', color: '#475569', fontWeight: 500, outline: 'none' }}
-                  />
-                </section>
-
-                {/* Aktivität & Status */}
-                <section style={{ padding: '24px', background: '#f8fafc', borderRadius: '24px', border: '1px solid #f1f5f9' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '12px' }}>Aktivität & Status</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }}></div>
-                      <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#475569' }}>Konto aktiv</span>
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>Registriert seit: {new Date(selectedStudent.created_at).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
-                  </div>
-                </section>
-
-                {/* Digital ID Pass Button */}
-                <section>
-                  <button onClick={() => setSelectedQRUser(selectedStudent)} style={{ width: '100%', background: `${brandColor}10`, color: brandColor, border: `1px solid ${brandColor}30`, padding: '16px', borderRadius: '20px', fontWeight: 900, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', transition: 'all 0.2s' }}>
-                    <QrCode size={20} /> Digitalen ID-Pass anzeigen
-                  </button>
-                </section>
-              </div>
-
-              <aside style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                {/* Anwesenheit / Logbuch */}
-                <section style={{ padding: '24px', background: '#f8fafc', borderRadius: '24px', border: '1px solid #f1f5f9' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Logbuch / Anwesenheit</div>
-                    {studentSessions && studentSessions.length > 0 && (
-                      <button 
-                        onClick={() => {
-                          const getW = (d: Date) => {
-                            const date = new Date(d.getTime());
-                            date.setHours(0, 0, 0, 0);
-                            date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
-                            const week1 = new Date(date.getFullYear(), 0, 4);
-                            return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
-                          };
-                          
-                          const groups: Record<string, any[]> = {};
-                          studentSessions.forEach(s => {
-                            const d = new Date(s.check_in_time);
-                            const kw = getW(d);
-                            const key = `${d.getFullYear()}-W${kw}`;
-                            if (!groups[key]) groups[key] = [];
-                            groups[key].push(s);
-                          });
-
-                          let text = `LOGBUCH: ${selectedStudent.first_name} ${selectedStudent.last_name}\n`;
-                          text += `Stand: ${new Date().toLocaleDateString()}\n\n`;
-
-                          Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0])).forEach(([key, sessions]) => {
-                            const kw = key.split('-W')[1];
-                            let line = `KW${kw}: `;
-                            
-                            const dayGroups: Record<string, any[]> = {};
-                            sessions.forEach(s => {
-                              const date = new Date(s.check_in_time).toISOString().split('T')[0];
-                              if (!dayGroups[date]) dayGroups[date] = [];
-                              dayGroups[date].push(s);
-                            });
-
-                            const openingHours = admin?.schools?.opening_hours;
-
-                            Object.entries(dayGroups).sort((a, b) => a[0].localeCompare(b[0])).forEach(([date, daySessions], idx) => {
-                              const sorted = daySessions.sort((a,b) => new Date(a.check_in_time).getTime() - new Date(b.check_in_time).getTime());
-                              const first = sorted[0];
-                              const last = sorted[sorted.length - 1];
-                              
-                              const d = new Date(first.check_in_time);
-                              const dayName = ['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA'][d.getDay()];
-                              
-                              const sessionStart = new Date(first.check_in_time);
-                              const sessionEnd = last.check_out_time ? new Date(last.check_out_time) : new Date();
-
-                              let minutes = 0;
-                              let displayStart = sessionStart;
-                              const dayKey = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][sessionStart.getDay()];
-                              const config = openingHours?.[dayKey];
-
-                              if (config && config.active) {
-                                const [sH, sM] = config.start.split(':').map(Number);
-                                const [eH, eM] = config.end.split(':').map(Number);
-                                const oStart = new Date(sessionStart); oStart.setHours(sH, sM, 0, 0);
-                                const oEnd = new Date(sessionStart); oEnd.setHours(eH, eM, 0, 0);
-                                
-                                const finalS = new Date(Math.max(sessionStart.getTime(), oStart.getTime()));
-                                const finalE = new Date(Math.min(sessionEnd.getTime(), oEnd.getTime()));
-                                
-                                if (finalS < finalE) {
-                                  minutes = Math.floor((finalE.getTime() - finalS.getTime()) / 60000);
-                                  displayStart = finalS;
-                                } else {
-                                  return;
-                                }
-                              }
-                              
-                              const displayTime = displayStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                              const dur = minutes >= 60 ? `${Math.floor(minutes/60)}h ${minutes%60}m` : `${minutes}m`;
-                              line += `${idx > 0 ? ' | ' : ''}${dayName} ${displayTime} Uhr (${dur})`;
-                            });
-                            text += line + '\n';
-                          });
-
-                          const blob = new Blob([text], { type: 'text/plain' });
-                          const url = URL.createObjectURL(blob);
-                          const link = document.createElement('a');
-                          link.href = url;
-                          link.download = `Anwesenheit_${selectedStudent.first_name}_${selectedStudent.last_name}.txt`;
-                          link.click();
-                          URL.revokeObjectURL(url);
-                        }}
-                        style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px 12px', fontSize: '0.65rem', fontWeight: 800, color: brandColor, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-                      >
-                        <Download size={12} /> EXPORT (.txt)
-                      </button>
-                    )}
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '350px', overflowY: 'auto', paddingRight: '4px' }}>
-                    {(() => {
-                      if (!studentSessions || studentSessions.length === 0) {
-                        return <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>Noch keine Sessions aufgezeichnet.</div>;
-                      }
-
-                      const getWeekNum = (d: Date) => {
-                        const date = new Date(d.getTime());
-                        date.setHours(0, 0, 0, 0);
-                        date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
-                        const week1 = new Date(date.getFullYear(), 0, 4);
-                        return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
-                      };
-
-                      const groups: Record<string, any[]> = {};
-                      studentSessions.forEach(s => {
-                        const d = new Date(s.check_in_time);
-                        const kw = getWeekNum(d);
-                        const year = d.getFullYear();
-                        const key = `${year}-W${kw}`;
-                        if (!groups[key]) groups[key] = [];
-                        groups[key].push(s);
-                      });
-
-                      return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0])).map(([key, sessions]) => {
-                        const kw = key.split('-W')[1];
-                        return (
-                          <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px' }}>
-                            <span style={{ fontWeight: 800, color: brandColor, minWidth: '40px', marginTop: '4px' }}>KW{kw}</span>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                              {(() => {
-                                const dayGroups: Record<string, any[]> = {};
-                                sessions.forEach(s => {
-                                  const dStr = new Date(s.check_in_time).toISOString().split('T')[0];
-                                  if (!dayGroups[dStr]) dayGroups[dStr] = [];
-                                  dayGroups[dStr].push(s);
-                                });
-
-                                return Object.entries(dayGroups).sort((a, b) => a[0].localeCompare(b[0])).map(([date, daySessions], idx) => {
-                                  const sorted = daySessions.sort((a,b) => new Date(a.check_in_time).getTime() - new Date(b.check_in_time).getTime());
-                                  const first = sorted[0];
-                                  const last = sorted[sorted.length - 1];
-                                  
-                                  const d = new Date(first.check_in_time);
-                                  const day = ['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA'][d.getDay()];
-                                  
-                                  const sessionStart = new Date(first.check_in_time);
-                                  const sessionEnd = last.check_out_time ? new Date(last.check_out_time) : new Date();
-
-                                  let minutes = 0;
-                                  let displayStart = sessionStart;
-                                  const openingHours = admin?.schools?.opening_hours;
-                                  const dayKey = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][sessionStart.getDay()];
-                                  const config = openingHours?.[dayKey];
-
-                                  if (config && config.active) {
-                                    const [sH, sM] = config.start.split(':').map(Number);
-                                    const [eH, eM] = config.end.split(':').map(Number);
-                                    const oStart = new Date(sessionStart); oStart.setHours(sH, sM, 0, 0);
-                                    const oEnd = new Date(sessionStart); oEnd.setHours(eH, eM, 0, 0);
-                                    
-                                    const finalS = new Date(Math.max(sessionStart.getTime(), oStart.getTime()));
-                                    const finalE = new Date(Math.min(sessionEnd.getTime(), oEnd.getTime()));
-                                    
-                                    if (finalS < finalE) {
-                                      minutes = Math.floor((finalE.getTime() - finalS.getTime()) / 60000);
-                                      displayStart = finalS;
-                                    } else {
-                                      return null;
-                                    }
-                                  }
-
-                                  const displayTime = displayStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                                  const duration = minutes >= 60 ? `${Math.floor(minutes/60)}h ${minutes%60}m` : `${minutes}m`;
-                                  
-                                  return (
-                                    <span key={idx} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'white', padding: '4px 8px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.75rem' }}>
-                                      <span style={{ fontWeight: 900, color: '#1e293b' }}>{day}</span>
-                                      <span style={{ fontWeight: 600 }}>{displayTime}</span>
-                                      <span style={{ color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700 }}>({duration})</span>
-                                    </span>
-                                  );
-                                });
-                              })()}
-                            </div>
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
-                </section>
-              </aside>
-            </div>
-          ) : studentDetailTab === 'contract' ? (
-            /* TAB 3: ZUGANG & VERTRAG */
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '32px' }}>
-              <section style={{ padding: '24px', background: '#f8fafc', borderRadius: '24px', border: '1px solid #f1f5f9' }}>
-                <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.1em', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Shield size={16} /> Zugang & Vertragsdetails
-                </h3>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Genereller Login-Status</label>
-                    <div style={{ display: 'flex', background: '#e2e8f0', borderRadius: '12px', padding: '4px', maxWidth: '400px' }}>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          const updates = { status: 'active' };
-                          await supabase.from('users').update(updates).eq('id', selectedStudent.id);
-                          setSelectedStudent({...selectedStudent, status: 'active'});
-                          setStudents(students.map(s => s.id === selectedStudent.id ? {...s, status: 'active'} : s));
-                        }}
-                        style={{
-                          flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
-                          background: (selectedStudent.status || 'active') === 'active' ? '#ffffff' : 'transparent',
-                          color: (selectedStudent.status || 'active') === 'active' ? '#16a34a' : '#64748b',
-                          fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
-                          boxShadow: (selectedStudent.status || 'active') === 'active' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
-                        }}
-                      >
-                        ✅ Aktiv
-                      </button>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          const updates = { status: 'bypass' };
-                          await supabase.from('users').update(updates).eq('id', selectedStudent.id);
-                          setSelectedStudent({...selectedStudent, status: 'bypass'});
-                          setStudents(students.map(s => s.id === selectedStudent.id ? {...s, status: 'bypass'} : s));
-                        }}
-                        style={{
-                          flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
-                          background: selectedStudent.status === 'bypass' ? '#ffffff' : 'transparent',
-                          color: selectedStudent.status === 'bypass' ? '#ef4444' : '#64748b',
-                          fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
-                          boxShadow: selectedStudent.status === 'bypass' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
-                        }}
-                      >
-                        🚫 Gesperrt (Bypass)
-                      </button>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', justifyContent: 'center' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 700, color: '#1e293b' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={selectedStudent.is_trial || false} 
-                        onChange={async (e) => {
-                          const val = e.target.checked;
-                          await supabase.from('users').update({ is_trial: val }).eq('id', selectedStudent.id);
-                          setSelectedStudent({...selectedStudent, is_trial: val});
-                          setStudents(students.map(s => s.id === selectedStudent.id ? {...s, is_trial: val} : s));
-                        }} 
-                      />
-                      In Probezeit
-                    </label>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', maxWidth: '600px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Probezeit Ende</label>
-                      <input 
-                        type="date" 
-                        value={selectedStudent.trial_ends_at ? new Date(selectedStudent.trial_ends_at).toISOString().split('T')[0] : ''} 
-                        onChange={async (e) => {
-                          const val = e.target.value || null;
-                          await supabase.from('users').update({ trial_ends_at: val }).eq('id', selectedStudent.id);
-                          setSelectedStudent({...selectedStudent, trial_ends_at: val});
-                          setStudents(students.map(s => s.id === selectedStudent.id ? {...s, trial_ends_at: val} : s));
-                        }} 
-                        style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} 
-                        disabled={!selectedStudent.is_trial}
-                      />
-                    </div>
-                    
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Vertragsende</label>
-                      <input 
-                        type="date" 
-                        value={selectedStudent.contract_ends_at ? new Date(selectedStudent.contract_ends_at).toISOString().split('T')[0] : ''} 
-                        onChange={async (e) => {
-                          const val = e.target.value || null;
-                          await supabase.from('users').update({ contract_ends_at: val }).eq('id', selectedStudent.id);
-                          setSelectedStudent({...selectedStudent, contract_ends_at: val});
-                          setStudents(students.map(s => s.id === selectedStudent.id ? {...s, contract_ends_at: val} : s));
-                        }} 
-                        style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} 
-                      />
-                    </div>
-                  </div>
-                </div>
-              </section>
-            </div>
-          ) : null}
-        </div>
-        {showFullPhoto && (
-          <div 
-            onClick={() => setShowFullPhoto(false)}
-            style={{ 
-              position: 'fixed', 
-              inset: 0, 
-              zIndex: 4000, 
-              background: 'rgba(0,0,0,0.85)', 
-              backdropFilter: 'blur(20px)', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center', 
-              cursor: 'zoom-out'
-            }}
-          >
-            <img 
-              src={selectedStudent.photo_url || '/avatar_ghost.jpg'} 
-              style={{ 
-                maxWidth: '90%', 
-                maxHeight: '90%', 
-                borderRadius: '24px', 
-                boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
-                border: '4px solid white'
-              }} 
-            />
-          </div>
-        )}
-      </div>
+      <StudentDetailModal 
+        student={selectedStudent} 
+        onClose={() => setSelectedStudent(null)} 
+        onOpenBandProfile={(band) => {
+          setEditingBand(band);
+          setSelectedStudent(null);
+        }}
+        activePlatform={activePlatform === "campus" ? "campus" : "groovelab"}
+        onSwitchPlatform={(p) => {}}
+      />
     );
   };
 
@@ -6009,7 +5641,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   return (
     <div style={{ 
       flex: 1, 
-      padding: activeTab === 'live' ? '0px 16px 16px 16px' : '0px 48px 48px 48px', 
+      padding: (activeTab === 'live' || activeTab === 'schedule') ? '0px 16px 16px 16px' : '0px 48px 48px 48px', 
       overflowY: activeTab === 'live' ? 'hidden' : 'auto',
       height: activeTab === 'live' ? '100%' : 'auto',
       display: 'flex',
@@ -6055,6 +5687,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       )}
 
       {activeTab === 'live' && renderLiveTab()}
+      {activeTab === 'schedule' && <ScheduleBoard schoolId={admin.school_id} userId={userId} />}
       {activeTab === 'bands' && renderBandsTab()}
       {activeTab === 'students' && renderStudentsTab()}
       {activeTab === 'team' && renderTeachersTab()}

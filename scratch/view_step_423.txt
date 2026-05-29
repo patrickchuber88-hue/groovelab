@@ -1,0 +1,72 @@
+Created At: 2026-05-28T06:25:19Z
+Completed At: 2026-05-28T06:25:19Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1285
+Total Bytes: 59656
+Showing lines 430 to 560
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+430:               >
+431:                 <Music size={15} />
+432:                 <span>GrooveLab</span>
+433:               </button>
+434:             </div>
+435:           </div>
+436:         )}
+437: 
+438:         {/* Profile Card Header - Spacious & Clean iOS Widget Look */}
+439:         <div style={{ display: 'flex', gap: '32px', marginBottom: '40px', alignItems: 'center', width: '100%', flexWrap: 'wrap' }}>
+440:           <div style={{ display: 'flex', gap: '32px', alignItems: 'center', flex: '1 1 450px' }}>
+441:             <div 
+442:               onClick={() => setShowFullPhoto(true)}
+443:               style={{ 
+444:                 width: '110px', 
+445:                 height: '110px', 
+446:                 borderRadius: '24px', 
+447:                 overflow: 'hidden', 
+448:                 boxShadow: '0 8px 24px rgba(0, 0, 0, 0.04)', 
+449:                 border: '1px solid rgba(0, 0, 0, 0.04)',
+450:                 flexShrink: 0, 
+451:                 cursor: 'pointer', 
+452:                 transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+453:               }}
+454:               className="hover-scale"
+455:             >
+456:               <img src={student.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+457:             </div>
+458:             
+459:             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+460:               <h2 style={{ 
+461:                 fontSize: '2.1rem', 
+462:                 fontWeight: 800
+<truncated 3350 bytes>
+              🎸 GrooveLab
+532:                   </div>
+533:                 )}
+534:               </div>
+535:             </div>
+536:           </div>
+537:         </div>
+538: 
+539:         {/* ---------------- CAMPUS SPECIFIC VIEW ---------------- */}
+540:         {isPlatformCampus ? (
+541:           <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+542:             <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr', gap: '40px', alignItems: 'start' }}>
+543:               <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+544:                 {/* Stundenplan & Tageskompass Section - Clean Apple Lists */}
+545:                 <section>
+546:                   <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1d1d1f', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.02em' }}>
+547:                     Stundenplan & Unterricht
+548:                   </h3>
+549:                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'rgba(0, 0, 0, 0.04)', borderRadius: '24px', overflow: 'hidden', padding: '1px' }}>
+550:                     {campusSchedules.map((sched: any) => (
+551:                       <div key={sched.id} style={{ 
+552:                         background: '#ffffff', 
+553:                         padding: '20px 24px', 
+554:                         display: 'flex',
+555:                         alignItems: 'center',
+556:                         justifyContent: 'space-between',
+557:                         borderBottom: '0.5px solid rgba(0, 0, 0, 0.04)'
+558:                       }}>
+559:                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+560:                           <span style={{ fontSize: '0.92rem', fontWeight: 650, color: '#1d1d1f' }}>
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

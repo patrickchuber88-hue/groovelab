@@ -1,0 +1,16 @@
+{
+  "conv_id": "f5025e81-6251-4172-b707-d45aa8819f39",
+  "step_index": 1771,
+  "created_at": "2026-05-26T15:57:50Z",
+  "type": "write_to_file",
+  "args": {
+    "ArtifactMetadata": "{\"ArtifactType\":\"other\",\"RequestFeedback\":false,\"Summary\":\"Student avatar dashboard with Premium Digital Detox timer (Google Fit style, Gyro-controlled AMOLED black screen, haptic warning), Campus Wrapped & Monthly Flashback 9:16 story generator (locked/blurred for free accounts, full unblurred + QR code share for premium).\"}",
+    "CodeContent": "\"import React, { useState, useEffect, useRef } from 'react';\\nimport { supabase } from '../lib/supabase';\\nimport { \\n  Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, \\n  ChevronRight, Coffee, Clock, Flame, BookOpen, Share2, Play, \\n  Pause, RotateCcw, Volume2, Moon, QrCode, X, EyeOff\\n} from 'lucide-react';\\nimport QRCode from 'react-qr-code';\\n\\ninterface Avatar {\\n  avatar_style: string;\\n  instrument_type: string;\\n  evolution_level: number;\\n  xp: number;\\n  asset_path: string;\\n  streak_flame?: number;\\n}\\n\\ninterface StudentAvatarDashboardProps {\\n  studentId: string;\\n}\\n\\nconst LEVEL_NAMES: Record<string, Record<number, string>> = {\\n  guitarist: {\\n    1: 'Garagen-Gitarrist (Lvl 1)',\\n    2: 'Band-Mitglied (Lvl 2)',\\n    3: 'Rockstar (Lvl 3)'\\n  },\\n  drummer: {\\n    1: 'Takt-Anf\u00e4nger (Lvl 1)',\\n    2: 'Studio-Drummer (Lvl 2)',\\n    3: 'Rhythmus-Gott (Lvl 3)'\\n  },\\n  keyboardist: {\\n    1: 'Melodien-Sucher (Lvl 1)',\\n    2: 'Synthie-Pionier (Lvl 2)',\\n    3: 'Tasten-Virtuose (Lvl 3)'\\n  },\\n  vocalist: {\\n    1: 'Dusch-S\u00e4nger (Lvl 1)',\\n    2: 'B\u00fchnen-Neuling (Lvl 2)',\\n    3: 'Stimm-K\u00f6nig/in (Lvl 3)'\\n  }\\n};\\n\\nconst HERO_CLASSES = [\\n  { id: 'guitarist', name: 'Gitarren-Held', icon: '\ud83c\udfb8', desc: 'Melodien und Soli rocken' },\\n  { id: 'drummer', name: 'Beat-Master', icon: '\ud83e\udd41', desc: 'Den Groove und Takt angeben' },\\n  { id: 'keyboardist', name: 'Tasten-Magier', icon: '\ud83c\udfb9', desc: 'Synthesizer und Klavier beherrschen' },\\n  { id: 'vocalist', name: 'Vocal-Star', icon: '\ud83c\udfa4', desc: 'Die B\u00fchne mit deiner Stimme erobern' }\\n];\\n\\nexport function StudentAvatarDashboard({ studentId }: StudentAvatarDashboardProps) {\\n  const [isAppUser, setIsAppUser] = useState(false);\\n  const [isPremiumUser, setIsPremiumUser] = useState(false);\\n  const [avatar, setAvatar] = useState<Avatar | null>(null);\\n  const [loading, setLoading] = useState(true);\\n  const [error, setError] = useState<string | null>(null);\\n  \\n  // Selection Screen State\\n  const [showSelector, setShowSelector] = useState(fa\n<truncated 63180 bytes>",
+    "Description": "\"Update StudentAvatarDashboard.tsx to implement premium detox focus timers and wrapped stories.\"",
+    "IsArtifact": "false",
+    "Overwrite": "true",
+    "TargetFile": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+    "toolAction": "\"Updating StudentAvatarDashboard.tsx\"",
+    "toolSummary": "\"Write to file\""
+  }
+}

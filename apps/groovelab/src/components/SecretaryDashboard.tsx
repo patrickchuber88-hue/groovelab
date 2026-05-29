@@ -7,7 +7,7 @@ import {
   Coffee, Sparkles, Clock, ClipboardList, Upload, Plus,
   Trash2, Shield, Calendar, BookOpen, Music, CheckSquare, XSquare, Check as CheckIcon,
   LayoutDashboard, Award, UserPlus, GraduationCap, ZoomIn, ZoomOut, ChevronLeft, X, AlertCircle, MoreVertical,
-  School, User
+  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3
 } from 'lucide-react';
 import { TeacherDashboard } from './TeacherDashboard';
 import { StudentDetailModal } from './StudentDetailModal';
@@ -649,7 +649,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     if (saved === 'campus' || saved === 'groovelab' || saved === 'secretary') return saved as any;
     return 'secretary';
   });
-  const [secretarySubTab, setSecretarySubTab] = useState<'briefing' | 'employees' | 'linking' | 'licenses' | 'setup'>('briefing');
+  const [secretarySubTab, setSecretarySubTab] = useState<'briefing' | 'employees' | 'linking' | 'licenses' | 'setup' | 'rooms' | 'equipment'>('briefing');
   const [campusSubTab, setCampusSubTab] = useState<'briefing' | 'onboarding' | 'schedules' | 'status'>('briefing');
   const [groovelabSubTab, setGroovelabSubTab] = useState<'briefing' | 'live' | 'students' | 'coaches' | 'kiosk' | 'status'>('briefing');
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
@@ -717,6 +717,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           last_name: updatedData.lastName,
           email: updatedData.email,
           instrument: updatedData.instrument,
+          required_equipment: updatedData.requiredEquipment || [],
           ausweis_nummer: updatedData.ausweisNummer,
           is_campus_active: updatedData.isCampusActive,
           is_groovelab_active: updatedData.isGroovelabActive,
@@ -810,6 +811,28 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [campusTeachers, setCampusTeachers] = useState<any[]>([]);
   const [pendingSchedules, setPendingSchedules] = useState<PendingSchedule[]>([]);
   
+  // Room Planner Matrix states
+  const [matrixAllocations, setMatrixAllocations] = useState<any[]>([]);
+  const [selectedDayPlan, setSelectedDayPlan] = useState<any | null>(null);
+  const [draggedPlanId, setDraggedPlanId] = useState<string | null>(null);
+  const [draggedPlanDay, setDraggedPlanDay] = useState<number | null>(null);
+
+  // Räume-Verwaltung State
+  const [roomsSubView, setRoomsSubView] = useState<'overview' | 'plan' | 'settings'>('overview');
+  const [editingRoom, setEditingRoom] = useState<any | null>(null);
+  const [roomFormName, setRoomFormName] = useState('');
+  const [roomFormEquipment, setRoomFormEquipment] = useState<string[]>([]);
+  const [roomFormMaxTeachers, setRoomFormMaxTeachers] = useState(1);
+  const [roomFormMaxStudents, setRoomFormMaxStudents] = useState(1);
+  const [roomFormQm, setRoomFormQm] = useState(0);
+  const [roomSaving, setRoomSaving] = useState(false);
+  const INSTRUMENT_TAGS = ['Schlagzeug', 'Piano', 'Gitarre', 'Gesang', 'Geige', 'Querflöte', 'Saxophon', 'Bass', 'Keyboard', 'Trompete'];
+
+  // Equipment State
+  const [schoolEquipment, setSchoolEquipment] = useState<any[]>([]);
+  const [equipmentFormName, setEquipmentFormName] = useState('');
+  const [editingEquipment, setEditingEquipment] = useState<any | null>(null);
+  const [equipmentSaving, setEquipmentSaving] = useState(false);
   // Helpers
   const [userMap, setUserMap] = useState<Record<string, string>>({});
   const [roomMap, setRoomMap] = useState<Record<string, string>>({});
@@ -1114,16 +1137,28 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         .select('*')
         .eq('school_id', schoolId);
 
-      setRooms(roomsData || []);
-      if (roomsData && roomsData.length > 0 && !selectedRoomId) {
-        setSelectedRoomId(roomsData[0].id);
+      const mappedRooms = (roomsData || []).map(r => ({
+        ...r,
+        equipment: r.allowed_instruments || []
+      }));
+      setRooms(mappedRooms);
+      if (mappedRooms.length > 0 && !selectedRoomId) {
+        setSelectedRoomId(mappedRooms[0].id);
       }
 
       const rMap: Record<string, string> = {};
-      roomsData?.forEach(r => {
+      mappedRooms.forEach(r => {
         rMap[r.id] = r.name;
       });
       setRoomMap(rMap);
+
+      // Fetch school equipment
+      const { data: equipmentData } = await supabase
+        .from('school_equipment')
+        .select('*')
+        .eq('school_id', schoolId)
+        .order('name');
+      setSchoolEquipment(equipmentData || []);
 
       // Fetch stations
       const { data: stationsData } = await supabase
@@ -1153,21 +1188,75 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       }));
       setAlerts(mappedAlerts);
 
-      // Fetch pending schedules
-      const { data: schedulesData, error: schedErr } = await supabase
+      // Fetch all schedules for this school to build the Room Planner Matrix
+      const { data: allSchedulesData, error: schedErr } = await supabase
         .from('schedules')
         .select('*')
-        .eq('school_id', schoolId)
-        .eq('status', 'ready_for_admin_review');
+        .eq('school_id', schoolId);
 
       if (schedErr) throw schedErr;
-      const mappedSchedules = (schedulesData || []).map(s => ({
-        ...s,
-        teacher_name: map[s.teacher_id] || 'Unbekannte Lehrkraft',
-        student_name: map[s.student_id] || 'Unbekannter Schüler',
-        room_name: s.room_id ? rMap[s.room_id] || 'Unbekannter Raum' : 'Kein Raum'
-      }));
+      const mappedSchedules = (allSchedulesData || [])
+        .filter(s => s.status === 'ready_for_admin_review')
+        .map(s => ({
+          ...s,
+          teacher_name: map[s.teacher_id] || 'Unbekannte Lehrkraft',
+          student_name: map[s.student_id] || 'Unbekannter Schüler',
+          room_name: s.room_id ? rMap[s.room_id] || 'Unbekannter Raum' : 'Kein Raum'
+        }));
       setPendingSchedules(mappedSchedules);
+
+      // Group schedules by teacher_id and day_of_week to build matrixAllocations
+      const teacherDays: Record<string, any[]> = {};
+      (allSchedulesData || []).forEach(s => {
+        if (s.status !== 'approved' && s.status !== 'ready_for_admin_review') return;
+        const key = `${s.teacher_id}_${s.day_of_week}`;
+        if (!teacherDays[key]) teacherDays[key] = [];
+        teacherDays[key].push(s);
+      });
+
+      const initialAllocations = Object.entries(teacherDays).map(([key, slots]) => {
+        const [teacherId, dayOfWeekStr] = key.split('_');
+        const dayOfWeek = parseInt(dayOfWeekStr);
+
+        const sortedSlots = [...slots].sort((a, b) => (a.time_slot || '').localeCompare(b.time_slot || ''));
+        const startTime = sortedSlots[0]?.time_slot || '14:00';
+        
+        const addMins = (t: string, m: number) => {
+          const [hStr, mStr] = t.split(':');
+          let h = parseInt(hStr) || 0;
+          let mVal = parseInt(mStr) || 0;
+          mVal += m;
+          h += Math.floor(mVal / 60);
+          mVal = mVal % 60;
+          h = h % 24;
+          return `${String(h).padStart(2, '0')}:${String(mVal).padStart(2, '0')}`;
+        };
+
+        const lastSlot = sortedSlots[sortedSlots.length - 1];
+        const endTime = lastSlot ? addMins(lastSlot.time_slot, lastSlot.duration || 45) : '15:00';
+
+        const isPending = sortedSlots.some(s => s.status === 'ready_for_admin_review');
+        const roomId = sortedSlots.find(s => s.room_id)?.room_id || null;
+
+        const teacherProfile = campusTeachersList.find(t => t.id === teacherId);
+        const teacherName = map[teacherId] || 'Unbekannte Lehrkraft';
+        const instrument = teacherProfile?.instrument || 'Instrument';
+
+        return {
+          id: key,
+          teacherId,
+          teacherName,
+          instrument,
+          dayOfWeek,
+          startTime,
+          endTime,
+          roomId,
+          status: isPending ? 'pending' : 'approved',
+          slots: sortedSlots
+        };
+      });
+
+      setMatrixAllocations(initialAllocations);
 
       // Calculate stats
       const activeAlertsCount = mappedAlerts.filter(a => !a.resolved && a.type === 'capacity_overrun').length;
@@ -1840,17 +1929,353 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     }
   };
 
-  // Get active tab title helper
+  // CSP Solver for Room Allocation
+  const runAutoRoomAllocation = () => {
+    // 1. Sort plans: variable ordering (drums/schlagzeug first since they are the most constrained)
+    const sortedPlans = [...matrixAllocations].sort((a, b) => {
+      const aIsDrums = a.instrument?.toLowerCase().includes('schlagzeug') || a.instrument?.toLowerCase().includes('drums');
+      const bIsDrums = b.instrument?.toLowerCase().includes('schlagzeug') || b.instrument?.toLowerCase().includes('drums');
+      if (aIsDrums && !bIsDrums) return -1;
+      if (!aIsDrums && bIsDrums) return 1;
+      return 0;
+    });
+
+    const isOverlap = (p1: any, p2: any) => {
+      return p1.startTime < p2.endTime && p2.startTime < p1.endTime;
+    };
+
+    // Tracks current allocations during solver execution
+    const assigned: Record<string, string> = {};
+
+    // Keep already manually assigned rooms
+    matrixAllocations.forEach(p => {
+      if (p.roomId) {
+        assigned[p.id] = p.roomId;
+      }
+    });
+
+    // Find historical room assignments for teachers to fulfill the soft constraint
+    const teacherHistory: Record<string, string> = {};
+    matrixAllocations.forEach(p => {
+      if (p.roomId) {
+        teacherHistory[p.teacherId] = p.roomId;
+      }
+    });
+
+    for (const plan of sortedPlans) {
+      if (plan.roomId) continue;
+
+      let bestRoomId: string | null = null;
+      let candidates = [...rooms];
+      const instr = plan.instrument?.toLowerCase() || '';
+
+      // Instrument matching using name and r.equipment
+      if (instr.includes('schlagzeug') || instr.includes('drums')) {
+        candidates = rooms.filter(r => {
+          const eq = r.equipment;
+          const hasEquip = Array.isArray(eq) && (eq.includes('drums') || eq.includes('schlagzeug') || eq.includes('drum'));
+          return hasEquip || r.name.toLowerCase().includes('schlagzeug') || r.name.toLowerCase().includes('drums') || r.name.toLowerCase().includes('band') || r.name.toLowerCase().includes('drum');
+        });
+        if (candidates.length === 0) candidates = [...rooms];
+      } else if (instr.includes('klavier') || instr.includes('piano')) {
+        candidates = rooms.filter(r => {
+          const eq = r.equipment;
+          const hasEquip = Array.isArray(eq) && (eq.includes('piano') || eq.includes('klavier') || eq.includes('keys'));
+          return hasEquip || r.name.toLowerCase().includes('klavier') || r.name.toLowerCase().includes('piano') || r.name.toLowerCase().includes('flügel');
+        });
+        if (candidates.length === 0) candidates = [...rooms];
+      }
+
+      // Soft Constraint check: prioritize historically assigned rooms for this teacher
+      const historicalRoomId = teacherHistory[plan.teacherId];
+      if (historicalRoomId) {
+        const hasConflict = sortedPlans.some(p => {
+          const allocatedRoom = assigned[p.id] || p.roomId;
+          return allocatedRoom === historicalRoomId && p.dayOfWeek === plan.dayOfWeek && isOverlap(p, plan);
+        });
+        if (!hasConflict) {
+          bestRoomId = historicalRoomId;
+        }
+      }
+
+      // If no historical match, search candidate rooms first
+      if (!bestRoomId) {
+        for (const room of candidates) {
+          const hasConflict = sortedPlans.some(p => {
+            const allocatedRoom = assigned[p.id] || p.roomId;
+            return allocatedRoom === room.id && p.dayOfWeek === plan.dayOfWeek && isOverlap(p, plan);
+          });
+
+          if (!hasConflict) {
+            bestRoomId = room.id;
+            break;
+          }
+        }
+      }
+
+      // Fallback: search all rooms if candidate rooms are exhausted or full
+      if (!bestRoomId) {
+        for (const room of rooms) {
+          const hasConflict = sortedPlans.some(p => {
+            const allocatedRoom = assigned[p.id] || p.roomId;
+            return allocatedRoom === room.id && p.dayOfWeek === plan.dayOfWeek && isOverlap(p, plan);
+          });
+
+          if (!hasConflict) {
+            bestRoomId = room.id;
+            break;
+          }
+        }
+      }
+
+      if (bestRoomId) {
+        assigned[plan.id] = bestRoomId;
+      }
+    }
+
+    setMatrixAllocations(prev => prev.map(p => ({
+      ...p,
+      roomId: assigned[p.id] || p.roomId
+    })));
+  };
+
+  // Bulk save and approve to database
+  const handleSaveAndApproveAll = async () => {
+    try {
+      const promises = [];
+      for (const plan of matrixAllocations) {
+        const slotIds = plan.slots.map((s: any) => s.id);
+        if (slotIds.length === 0) continue;
+
+        const promise = supabase
+          .from('schedules')
+          .update({
+            room_id: plan.roomId || null,
+            status: 'approved'
+          })
+          .in('id', slotIds);
+
+        promises.push(promise);
+      }
+
+      await Promise.all(promises);
+      alert('Raumzuteilung erfolgreich gespeichert und alle Stundenpläne freigegeben!');
+      fetchDashboardData();
+    } catch (err: any) {
+      console.error('Error saving allocations:', err);
+      alert('Fehler: ' + err.message);
+    }
+  };
+
+  // Reject an entire teacher's day plan back to draft
+  const handleRejectTeacherDayPlan = async (plan: any) => {
+    if (!window.confirm(`Möchtest du den Stundenplan von ${plan.teacherName} für diesen Tag wirklich zur Überarbeitung zurückweisen?`)) return;
+    try {
+      const slotIds = plan.slots.map((s: any) => s.id);
+      if (slotIds.length === 0) return;
+
+      const { error } = await supabase
+        .from('schedules')
+        .update({ status: 'draft' })
+        .in('id', slotIds);
+
+      if (error) throw error;
+      setSelectedDayPlan(null);
+      alert('Stundenplan erfolgreich zur Überarbeitung zurückgewiesen.');
+      fetchDashboardData();
+    } catch (err: any) {
+      console.error('Error rejecting plan:', err);
+      alert('Fehler: ' + err.message);
+    }
+  };
+
+  // Drag and drop matrix logic
+  const handleDragStartMatrix = (planId: string) => {
+    setDraggedPlanId(planId);
+    const plan = matrixAllocations.find(p => p.id === planId);
+    setDraggedPlanDay(plan?.dayOfWeek ?? null);
+  };
+
+  const handleDropOnMatrix = (targetRoomId: string | null, targetDay: number) => {
+    if (!draggedPlanId || draggedPlanDay === null) return;
+    // ── Day-lock: only allow drops within the same weekday column ──
+    if (targetDay !== draggedPlanDay) {
+      setDraggedPlanId(null);
+      setDraggedPlanDay(null);
+      return;
+    }
+    setMatrixAllocations(prev => prev.map(p => {
+      if (p.id === draggedPlanId) {
+        return { ...p, roomId: targetRoomId };
+      }
+      return p;
+    }));
+    setDraggedPlanId(null);
+    setDraggedPlanDay(null);
+  };
+
+  // ── Räume CRUD ──────────────────────────────────────────────────────────
+  const handleSaveRoom = async () => {
+    if (!roomFormName.trim() || !schoolId) return;
+    setRoomSaving(true);
+    try {
+      if (editingRoom) {
+        const { error } = await supabase.from('rooms').update({
+          name: roomFormName.trim(),
+          allowed_instruments: roomFormEquipment,
+          max_teachers: roomFormMaxTeachers,
+          max_students: roomFormMaxStudents,
+          qm: roomFormQm
+        }).eq('id', editingRoom.id);
+        
+        if (error) throw error;
+
+        setRooms(prev => prev.map(r => r.id === editingRoom.id
+          ? { 
+              ...r, 
+              name: roomFormName.trim(), 
+              allowed_instruments: roomFormEquipment, 
+              equipment: roomFormEquipment, 
+              max_teachers: roomFormMaxTeachers,
+              max_students: roomFormMaxStudents,
+              qm: roomFormQm
+            }
+          : r));
+      } else {
+        const { data, error } = await supabase.from('rooms').insert({
+          school_id: schoolId,
+          name: roomFormName.trim(),
+          allowed_instruments: roomFormEquipment,
+          max_teachers: roomFormMaxTeachers,
+          max_students: roomFormMaxStudents,
+          qm: roomFormQm,
+          sort_order: rooms.length,
+        }).select().single();
+        
+        if (error) throw error;
+        if (data) {
+          setRooms(prev => [...prev, {
+            ...data,
+            equipment: data.allowed_instruments || []
+          }]);
+        }
+      }
+      setEditingRoom(null);
+      setRoomFormName('');
+      setRoomFormEquipment([]);
+      setRoomFormMaxTeachers(1);
+      setRoomFormMaxStudents(1);
+      setRoomFormQm(0);
+      setRoomsSubView('overview');
+    } catch (e: any) {
+      console.error('Room save error:', e);
+      alert('Fehler beim Speichern des Raumes: ' + e.message);
+    } finally {
+      setRoomSaving(false);
+    }
+  };
+
+  const handleDeleteRoom = async (roomId: string) => {
+    const hasSchedules = matrixAllocations.some(p => p.roomId === roomId);
+    if (hasSchedules) {
+      alert('Dieser Raum ist noch aktiven Stundenplänen zugewiesen. Bitte zuerst im Stundenplan-Board die Zuweisung entfernen.');
+      return;
+    }
+    if (!window.confirm('Raum wirklich löschen?')) return;
+    try {
+      const { error } = await supabase.from('rooms').delete().eq('id', roomId);
+      if (error) throw error;
+      setRooms(prev => prev.filter(r => r.id !== roomId));
+    } catch (err: any) {
+      console.error('Error deleting room:', err);
+      alert('Fehler beim Löschen des Raumes: ' + err.message);
+    }
+  };
+
+  const openRoomEditor = (room?: any) => {
+    if (room) {
+      setEditingRoom(room);
+      setRoomFormName(room.name || '');
+      setRoomFormEquipment(Array.isArray(room.equipment) ? room.equipment : []);
+      setRoomFormMaxTeachers(room.max_teachers || 1);
+      setRoomFormMaxStudents(room.max_students || 1);
+      setRoomFormQm(room.qm || 0);
+    } else {
+      setEditingRoom(null);
+      setRoomFormName('');
+      setRoomFormEquipment([]);
+      setRoomFormMaxTeachers(1);
+      setRoomFormMaxStudents(1);
+      setRoomFormQm(0);
+    }
+    setRoomsSubView('settings');
+  };
+
+
+  const handleSaveEquipment = async () => {
+    if (!equipmentFormName.trim() || !schoolId) return;
+    setEquipmentSaving(true);
+    try {
+      if (editingEquipment) {
+        const { error } = await supabase.from('school_equipment').update({
+          name: equipmentFormName.trim()
+        }).eq('id', editingEquipment.id);
+        if (error) throw error;
+        setSchoolEquipment(prev => prev.map(e => e.id === editingEquipment.id ? { ...e, name: equipmentFormName.trim() } : e));
+      } else {
+        const { data, error } = await supabase.from('school_equipment').insert({
+          school_id: schoolId,
+          name: equipmentFormName.trim()
+        }).select().single();
+        if (error) throw error;
+        if (data) setSchoolEquipment(prev => [...prev, data]);
+      }
+      setEditingEquipment(null);
+      setEquipmentFormName('');
+    } catch (e: any) {
+      console.error('Equipment save error:', e);
+      alert('Fehler beim Speichern der Ausstattung: ' + e.message);
+    } finally {
+      setEquipmentSaving(false);
+    }
+  };
+
+  const handleDeleteEquipment = async (id: string) => {
+    if (!window.confirm('Ausstattung wirklich löschen? Dieser Eintrag wird auch aus Räumen entfernt, in denen er verwendet wird.')) return;
+    try {
+      const { error } = await supabase.from('school_equipment').delete().eq('id', id);
+      if (error) throw error;
+      setSchoolEquipment(prev => prev.filter(e => e.id !== id));
+      // Optionally re-fetch rooms or manually pull it out from rooms locally
+      const { data: roomsData } = await supabase.from('rooms').select('*').eq('school_id', schoolId);
+      setRooms((roomsData || []).map(r => ({ ...r, equipment: r.allowed_instruments || [] })));
+    } catch (err: any) {
+      console.error('Error deleting equipment:', err);
+      alert('Fehler beim Löschen: ' + err.message);
+    }
+  };
+
+  const openEquipmentEditor = (eq?: any) => {
+    if (eq) {
+      setEditingEquipment(eq);
+      setEquipmentFormName(eq.name);
+    } else {
+      setEditingEquipment(null);
+      setEquipmentFormName('');
+    }
+  };
+
   const getTabTitle = () => {
     switch (activeTab) {
       case 'secretary':
         switch (secretarySubTab) {
           case 'briefing': return '📊 Tägliches Briefing & Status';
+          case 'equipment': return '🎸 Instrumente & Ausstattung';
           case 'employees': return '👥 Mitarbeiterverwaltung';
           case 'linking': return '🔗 Schüler-Profilverknüpfung';
           case 'licenses': return '🎫 Lizenzen & Abrechnung';
           case 'setup': return '⚙️ Setup & Systemeinstellungen';
-          default: return '💼 Sekretariat';
+          default: return '💼 Verwaltung';
         }
       case 'campus':
         switch (campusSubTab) {
@@ -2085,7 +2510,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             letterSpacing: '-0.02em',
             fontFamily: "'Plus Jakarta Sans', sans-serif"
           }}>
-            {activeTab === 'secretary' ? 'Sekretariat' : activeTab === 'campus' ? 'Campus' : 'GrooveLab'}
+            {activeTab === 'secretary' ? 'Verwaltung' : activeTab === 'campus' ? 'Campus' : 'GrooveLab'}
           </div>
         </div>
 
@@ -2095,6 +2520,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           {/* If activeTab is Secretary */}
           {activeTab === 'secretary' && [
             { id: 'briefing', label: 'Briefing', icon: LayoutDashboard },
+            { id: 'rooms', label: 'Räume', icon: DoorOpen },
+            { id: 'equipment', label: 'Instrumente & Ausstattung', icon: Settings },
             { id: 'employees', label: 'Mitarbeiter', icon: Users },
             { id: 'linking', label: 'Profil-Verknüpfung', icon: LinkIcon },
             { id: 'licenses', label: 'Lizenzen', icon: Award },
@@ -2211,7 +2638,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {currentUserProfile?.nickname || currentUserProfile?.first_name || 'Sekretariat'}
+                {currentUserProfile?.nickname || currentUserProfile?.first_name || 'Verwaltung'}
               </div>
               <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 Schulsekretariat
@@ -2311,7 +2738,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               }}
             >
               <Shield size={15} color={activeTab === 'secretary' ? '#ffffff' : '#ea4335'} />
-              <span>Sekretariat</span>
+              <span>Verwaltung</span>
             </div>
 
             {hasCampusSub && (
@@ -2419,7 +2846,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             }}>
               <Shield size={14} color="#8b5cf6" />
               <span style={{ color: '#8b5cf6', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Sekretariat
+                Verwaltung
               </span>
             </div>
 
@@ -3059,7 +3486,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
             {/* List of employees */}
             <div className="google-card">
-              <h3 style={{ margin: '0 0 20px 0', fontSize: '1rem', fontWeight: 800 }}>👥 Sekretariat & Administration</h3>
+              <h3 style={{ margin: '0 0 20px 0', fontSize: '1rem', fontWeight: 800 }}>👥 Verwaltung &amp; Administration</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
                 {employees.map(emp => (
                   <div key={emp.id} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#ffffff', display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -3078,7 +3505,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         </span>
                       </div>
                       <span style={{ fontSize: '0.62rem', background: '#e8f0fe', color: '#0b57d0', padding: '2px 8px', borderRadius: '100px', fontWeight: 800 }}>
-                        {emp.role === 'admin' ? 'Admin' : 'Sekretariat'}
+                        {emp.role === 'admin' ? 'Admin' : 'Verwaltung'}
                       </span>
                     </div>
                     
@@ -3844,41 +4271,229 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 );
               })()}
 
-              {/* Subtab: Schedules */}
+              {/* Subtab: Schedules – Hybride Raumplanungs-Zentrale */}
               {campusSubTab === 'schedules' && (
-                <div className="google-card" style={{ paddingLeft: '44px' }}>
-                  <div className="google-kpi-bar bg-google-blue" />
-                  <h3 style={{ margin: '0 0 6px 0', fontSize: '1.1rem', fontWeight: 800 }}>🗓️ Stundenplan Freigabe-Zentrale</h3>
-                  <p style={{ margin: '0 0 20px 0', fontSize: '0.82rem', color: '#64748b' }}>Genehmige Stundenpläne oder weise sie zur Überarbeitung zurück.</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', fontFamily: 'Inter, sans-serif' }}>
 
-                  {pendingSchedules.length === 0 ? (
-                    <p style={{ color: '#64748b', textAlign: 'center', padding: '24px', fontSize: '0.88rem' }}>Keine ausstehenden Zuweisungen.</p>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {pendingSchedules.map(sched => (
-                        <div key={sched.id} style={{ padding: '18px 20px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <strong style={{ color: '#1d1d1f' }}>{sched.teacher_name}</strong>
-                              <span style={{ color: '#cbd5e1' }}>&rarr;</span>
-                              <strong style={{ color: '#1d1d1f' }}>{sched.student_name}</strong>
-                            </div>
-                            <div style={{ display: 'flex', gap: '12px', marginTop: '4px', fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }}>
-                              <span>Wochentag: {['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'][sched.day_of_week]}</span>
-                              <span>&bull;</span>
-                              <span>Zeitslot: {sched.time_slot}</span>
-                              <span>&bull;</span>
-                              <span>Zugeordneter Raum: {sched.room_name}</span>
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <button onClick={() => handleScheduleDecision(sched.id, true)} className="google-btn-primary" style={{ padding: '6px 14px', fontSize: '0.75rem', background: '#34a853', boxShadow: '0 4px 12px rgba(52,168,83,0.18)' }}>Freigeben</button>
-                            <button onClick={() => handleScheduleDecision(sched.id, false)} className="google-btn-secondary" style={{ padding: '6px 14px', fontSize: '0.75rem', color: '#ea4335', borderColor: '#fce8e6' }}>Ablehnen</button>
-                          </div>
+                  {/* Action Toolbar */}
+                  <div style={{ background: 'white', borderRadius: '24px', padding: '20px 24px', border: '1px solid rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)' }}>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>🗓️ Raumplanungs- & Freigabe-Zentrale</h3>
+                      <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 550 }}>Weise Lehrkräfte direkt den Unterrichtstagen zu · Erkenne Konflikte · 1-Klick-Automatik</p>
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={runAutoRoomAllocation}
+                        disabled={matrixAllocations.filter(p => !p.roomId).length === 0}
+                        style={{ background: 'white', border: '1.5px solid #cbd5e1', color: '#475569', fontWeight: 800, padding: '10px 18px', borderRadius: '12px', fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: matrixAllocations.filter(p => !p.roomId).length === 0 ? 0.5 : 1, transition: 'all 0.2s' }}
+                      >
+                        ⚡ Räume automatisch zuteilen
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveAndApproveAll}
+                        style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', border: 'none', fontWeight: 800, padding: '11px 20px', borderRadius: '12px', fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(16,185,129,0.2)' }}
+                      >
+                        💾 Zuteilung speichern & freigeben
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Full-width Matrix: Nicht-zugewiesen row + Rooms rows */}
+                  <div style={{ overflowX: 'auto', background: 'white', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', padding: '24px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)' }}>
+                    {rooms.length === 0 ? (
+                      <div style={{ padding: '48px 24px', textAlign: 'center', color: '#94a3b8' }}>
+                        <span style={{ fontSize: '2rem', display: 'block', marginBottom: '8px' }}>🏫</span>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>Keine Räume gefunden. Bitte zuerst Räume im System anlegen.</span>
+                      </div>
+                    ) : (
+                      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: '700px' }}>
+                        <colgroup>
+                          <col style={{ width: '130px' }} />
+                          {[1,2,3,4,5].map(d => <col key={d} />)}
+                        </colgroup>
+
+                        {/* Header */}
+                        <thead>
+                          <tr style={{ borderBottom: '2px solid #f1f5f9' }}>
+                            <th style={{ padding: '10px 12px', fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'left' }}>Raum</th>
+                            {[1,2,3,4,5].map(d => (
+                              <th key={d} style={{ padding: '10px 10px', fontSize: '0.75rem', fontWeight: 900, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'left' }}>
+                                {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag'][d]}
+                                {matrixAllocations.filter(p => !p.roomId && p.dayOfWeek === d).length > 0 && (
+                                  <span style={{ marginLeft: '6px', background: '#fef3c7', color: '#b45309', fontSize: '0.6rem', fontWeight: 900, padding: '1px 6px', borderRadius: '6px' }}>
+                                    {matrixAllocations.filter(p => !p.roomId && p.dayOfWeek === d).length} offen
+                                  </span>
+                                )}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+
+                        <tbody>
+                          {/* ── Nicht zugewiesen row ── */}
+                          <tr style={{ borderBottom: '2px solid #fef3c7', background: '#fffbeb' }}>
+                            <td style={{ padding: '10px 12px', verticalAlign: 'top' }}>
+                              <strong style={{ fontSize: '0.7rem', color: '#b45309', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>Kein Raum</strong>
+                              <span style={{ fontSize: '0.6rem', color: '#d97706', fontWeight: 700 }}>↓ in Raum ziehen</span>
+                            </td>
+                            {[1,2,3,4,5].map(dayNum => {
+                              const unassigned = matrixAllocations.filter(p => !p.roomId && p.dayOfWeek === dayNum);
+                              return (
+                                <td
+                                  key={dayNum}
+                                  onDragOver={(e) => e.preventDefault()}
+                                  onDrop={() => handleDropOnMatrix(null, dayNum)}
+                                  style={{ padding: '8px', verticalAlign: 'top', minHeight: '72px' }}
+                                >
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minHeight: '64px', borderRadius: '10px', border: draggedPlanDay === dayNum ? '2px dashed #fcd34d' : '2px dashed transparent', background: draggedPlanDay === dayNum ? 'rgba(253,211,77,0.06)' : draggedPlanId ? 'rgba(0,0,0,0.02)' : 'transparent', padding: draggedPlanDay === dayNum ? '4px' : '0', opacity: draggedPlanId && draggedPlanDay !== dayNum ? 0.4 : 1, transition: 'all 0.2s' }}>
+                                    {unassigned.map(plan => (
+                                      <div
+                                        key={plan.id}
+                                        draggable
+                                        onDragStart={() => handleDragStartMatrix(plan.id)}
+                                        onClick={() => setSelectedDayPlan(plan)}
+                                        style={{ background: 'white', border: '1px solid #fde68a', borderLeft: '4px solid #f59e0b', borderRadius: '10px', padding: '7px 9px', cursor: 'grab', display: 'flex', flexDirection: 'column', gap: '2px', boxShadow: '0 1px 4px rgba(245,158,11,0.08)', transition: 'all 0.15s' }}
+                                      >
+                                        <span style={{ fontSize: '0.73rem', fontWeight: 800, color: '#92400e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{plan.teacherName}</span>
+                                        <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#b45309' }}>{plan.instrument}</span>
+                                        <span style={{ fontSize: '0.62rem', fontWeight: 900, fontFamily: 'monospace', color: '#d97706' }}>⏱ {plan.startTime}–{plan.endTime}</span>
+                                      </div>
+                                    ))}
+                                    {unassigned.length === 0 && (
+                                      <div style={{ height: '40px' }} />
+                                    )}
+                                  </div>
+                                </td>
+                              );
+                            })}
+                          </tr>
+
+                          {/* ── Room rows ── */}
+                          {rooms.map((room, rIdx) => (
+                            <tr key={room.id} style={{ borderBottom: rIdx < rooms.length - 1 ? '1px solid #f8fafc' : 'none' }}>
+                              <td style={{ padding: '12px', verticalAlign: 'top' }}>
+                                <strong style={{ fontSize: '0.78rem', color: '#0f172a', fontWeight: 800, display: 'block' }}>{room.name}</strong>
+                                <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 600 }}>{room.equipment?.join(' · ') || '—'}</span>
+                              </td>
+                              {[1,2,3,4,5].map(dayNum => {
+                                const cellPlans = matrixAllocations.filter(p => p.roomId === room.id && p.dayOfWeek === dayNum);
+                                const isDragOver = !!draggedPlanId;
+                                return (
+                                  <td
+                                    key={dayNum}
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onDrop={() => handleDropOnMatrix(room.id, dayNum)}
+                                    style={{ padding: '8px', verticalAlign: 'top' }}
+                                  >
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minHeight: '64px', borderRadius: '10px', border: draggedPlanDay === dayNum ? '2px dashed #a7f3d0' : '2px dashed transparent', background: draggedPlanDay === dayNum ? 'rgba(16,185,129,0.04)' : 'transparent', opacity: draggedPlanId && draggedPlanDay !== dayNum ? 0.35 : 1, padding: draggedPlanDay === dayNum ? '4px' : '0', transition: 'all 0.2s', cursor: draggedPlanId && draggedPlanDay !== dayNum ? 'not-allowed' : 'default' }}>
+                                      {cellPlans.map(plan => {
+                                        const hasOverlap = cellPlans.some(p => p.id !== plan.id && p.startTime < plan.endTime && plan.startTime < p.endTime);
+                                        return (
+                                          <div
+                                            key={plan.id}
+                                            draggable
+                                            onDragStart={() => handleDragStartMatrix(plan.id)}
+                                            onClick={() => setSelectedDayPlan(plan)}
+                                            style={{ background: hasOverlap ? '#fef2f2' : 'white', border: hasOverlap ? '2px dashed #ef4444' : '1px solid #e2e8f0', borderLeft: hasOverlap ? '4px solid #ef4444' : '4px solid #10b981', borderRadius: '10px', padding: '7px 9px', cursor: 'grab', display: 'flex', flexDirection: 'column', gap: '2px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', transition: 'all 0.15s' }}
+                                          >
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
+                                              <span style={{ fontSize: '0.73rem', fontWeight: 800, color: hasOverlap ? '#991b1b' : '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {plan.teacherName}
+                                              </span>
+                                              {hasOverlap && <span style={{ fontSize: '0.6rem', flexShrink: 0 }} title="Zeitkonflikt!">⚠️</span>}
+                                            </div>
+                                            <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#94a3b8' }}>{plan.instrument}</span>
+                                            <span style={{ fontSize: '0.62rem', fontWeight: 900, fontFamily: 'monospace', color: hasOverlap ? '#ef4444' : '#059669' }}>
+                                              ⏱ {plan.startTime}–{plan.endTime}
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
+                                      {cellPlans.length === 0 && <div style={{ height: '40px' }} />}
+                                    </div>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+
+                  {/* Detail Drawer Panel */}
+                  {selectedDayPlan && (
+                    <div style={{ position: 'fixed', top: 0, right: 0, width: '400px', height: '100vh', background: 'white', boxShadow: '-12px 0 48px rgba(15,23,42,0.14)', borderLeft: '1px solid #e2e8f0', zIndex: 1050, display: 'flex', flexDirection: 'column', padding: '24px', animation: 'modalFadeIn 0.3s cubic-bezier(0.16,1,0.3,1)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px', marginBottom: '16px' }}>
+                        <div>
+                          <span style={{ fontSize: '0.63rem', fontWeight: 800, color: '#f59e0b', background: '#fffbeb', border: '1px solid rgba(245,158,11,0.2)', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', display: 'inline-block', marginBottom: '6px' }}>
+                            {['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'][selectedDayPlan.dayOfWeek]} Plan
+                          </span>
+                          <h3 style={{ margin: '0 0 2px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>{selectedDayPlan.teacherName}</h3>
+                          <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>🎸 {selectedDayPlan.instrument}</span>
                         </div>
-                      ))}
+                        <button onClick={() => setSelectedDayPlan(null)} style={{ background: '#f1f5f9', border: 'none', color: '#64748b', cursor: 'pointer', padding: '7px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <X size={16} />
+                        </button>
+                      </div>
+
+                      {/* Room selector */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px', marginBottom: '16px' }}>
+                        <label style={{ fontSize: '0.67rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.06em' }}>Unterrichtsraum zuweisen</label>
+                        <select
+                          value={selectedDayPlan.roomId || ''}
+                          onChange={(e) => {
+                            const targetRoomId = e.target.value || null;
+                            setMatrixAllocations(prev => prev.map(p => {
+                              if (p.id === selectedDayPlan.id) {
+                                const updated = { ...p, roomId: targetRoomId };
+                                setTimeout(() => setSelectedDayPlan(updated), 0);
+                                return updated;
+                              }
+                              return p;
+                            }));
+                          }}
+                          style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '9px 12px', fontSize: '0.8rem', fontWeight: 700, color: '#475569', outline: 'none', cursor: 'pointer' }}
+                        >
+                          <option value="">— Kein Raum (zurücksetzen) —</option>
+                          {rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                        </select>
+                        <button
+                          onClick={() => handleRejectTeacherDayPlan(selectedDayPlan)}
+                          style={{ background: 'rgba(239,68,68,0.05)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', padding: '9px 14px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', width: '100%' }}
+                        >
+                          ↩ Zur Überarbeitung zurückweisen
+                        </button>
+                      </div>
+
+                      {/* Slot list */}
+                      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                        <h4 style={{ margin: '0 0 8px 0', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.06em' }}>Stundenliste</h4>
+                        {selectedDayPlan.slots.map((slot: any, idx: number) => {
+                          const isBreak = !slot.student_id;
+                          return (
+                            <div key={idx} style={{ padding: '9px 11px', borderRadius: '10px', border: '1px solid #f1f5f9', background: isBreak ? '#fffbeb' : '#f8fafc', borderLeft: isBreak ? '4px solid #f59e0b' : '4px solid #3b82f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d1d1f' }}>
+                                  {isBreak ? '☕ Pause' : slot.student_name}
+                                </span>
+                                <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 650, display: 'block', marginTop: '1px' }}>
+                                  {isBreak ? 'Pause' : `Instrument: ${selectedDayPlan.instrument}`}
+                                </span>
+                              </div>
+                              <div style={{ textAlign: 'right' }}>
+                                <span style={{ fontSize: '0.73rem', fontWeight: 900, fontFamily: 'monospace', color: isBreak ? '#b45309' : '#0f172a' }}>{slot.time_slot}</span>
+                                <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 700, display: 'block', marginTop: '1px' }}>{slot.duration} Min</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
+
                 </div>
               )}
 
@@ -3897,20 +4512,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         style={{ width: '18px', height: '18px', accentColor: '#34a853' }}
                       />
                     </label>
-                  </div>
-
-                  <div className="google-card" style={{ paddingLeft: '44px' }}>
-                    <div className="google-kpi-bar bg-google-blue" />
-                    <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 800 }}>Campus Integration Link</h3>
-                    <div>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, display: 'block', marginBottom: '4px' }}>Direkter Campus Anmeldelink für Lehrkräfte</span>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <input readOnly value={`${window.location.origin}/?school_id=${schoolId}`} style={{ flex: 1, padding: '8px', border: '1px solid #e2e8f0', borderRadius: '12px', fontSize: '0.75rem', fontFamily: 'monospace' }} />
-                        <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/?school_id=${schoolId}`); setCopyingCampus(true); setTimeout(() => setCopyingCampus(false), 2000); }} style={{ padding: '10px', border: '1px solid #cbd5e1', borderRadius: '12px', background: '#ffffff', cursor: 'pointer' }}>
-                          {copyingCampus ? <CheckIcon size={14} color="#1a73e8" /> : <Copy size={14} />}
-                        </button>
-                      </div>
-                    </div>
                   </div>
                 </div>
               )}
@@ -3979,35 +4580,63 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 </div>
               )}
 
-              {/* Schedules Sidebar */}
+              {/* Schedules Sidebar – Live Stats */}
               {campusSubTab === 'schedules' && (
                 <div className="google-card" style={{ padding: '20px' }}>
                   <h4 style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 800, color: '#0b57d0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    📊 Wochenauslastung &amp; Status
+                    📊 Wochenauslastung
                   </h4>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '0.82rem' }}>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <div style={{ flex: 1, background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '12px', textAlign: 'center' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block', textTransform: 'uppercase' }}>Review</span>
-                        <strong style={{ fontSize: '1.25rem', color: '#0b57d0' }}>{pendingSchedules.length}</strong>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: '12px 8px', borderRadius: '12px', textAlign: 'center' }}>
+                        <span style={{ fontSize: '0.65rem', color: '#2563eb', display: 'block', textTransform: 'uppercase', fontWeight: 800, marginBottom: '2px' }}>Review</span>
+                        <strong style={{ fontSize: '1.4rem', color: '#1d4ed8', lineHeight: 1 }}>{pendingSchedules.length}</strong>
                       </div>
-                      <div style={{ flex: 1, background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '12px', textAlign: 'center' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block', textTransform: 'uppercase' }}>Konflikte</span>
-                        <strong style={{ fontSize: '1.25rem', color: '#ea4335' }}>0</strong>
+                      <div style={{ background: matrixAllocations.some(p => !p.roomId) ? '#fffbeb' : '#f0fdf4', border: `1px solid ${matrixAllocations.some(p => !p.roomId) ? '#fde68a' : '#bbf7d0'}`, padding: '12px 8px', borderRadius: '12px', textAlign: 'center' }}>
+                        <span style={{ fontSize: '0.65rem', color: matrixAllocations.some(p => !p.roomId) ? '#b45309' : '#16a34a', display: 'block', textTransform: 'uppercase', fontWeight: 800, marginBottom: '2px' }}>Offen</span>
+                        <strong style={{ fontSize: '1.4rem', color: matrixAllocations.some(p => !p.roomId) ? '#b45309' : '#16a34a', lineHeight: 1 }}>{matrixAllocations.filter(p => !p.roomId).length}</strong>
+                      </div>
+                      <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '12px 8px', borderRadius: '12px', textAlign: 'center' }}>
+                        <span style={{ fontSize: '0.65rem', color: '#16a34a', display: 'block', textTransform: 'uppercase', fontWeight: 800, marginBottom: '2px' }}>Verteilt</span>
+                        <strong style={{ fontSize: '1.4rem', color: '#15803d', lineHeight: 1 }}>{matrixAllocations.filter(p => p.roomId).length}</strong>
+                      </div>
+                      <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '12px 8px', borderRadius: '12px', textAlign: 'center' }}>
+                        <span style={{ fontSize: '0.65rem', color: '#ef4444', display: 'block', textTransform: 'uppercase', fontWeight: 800, marginBottom: '2px' }}>Konflikte</span>
+                        <strong style={{ fontSize: '1.4rem', color: '#ef4444', lineHeight: 1 }}>
+                          {(() => {
+                            let conflicts = 0;
+                            const byRoomDay: Record<string, any[]> = {};
+                            matrixAllocations.filter(p => p.roomId).forEach(p => {
+                              const k = `${p.roomId}_${p.dayOfWeek}`;
+                              if (!byRoomDay[k]) byRoomDay[k] = [];
+                              byRoomDay[k].push(p);
+                            });
+                            Object.values(byRoomDay).forEach(group => {
+                              if (group.length > 1) {
+                                group.forEach((p, i) => {
+                                  group.forEach((q, j) => {
+                                    if (i < j && p.startTime < q.endTime && q.startTime < p.endTime) conflicts++;
+                                  });
+                                });
+                              }
+                            });
+                            return conflicts;
+                          })()}
+                        </strong>
                       </div>
                     </div>
 
                     <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '12px', borderRadius: '12px' }}>
-                      <strong style={{ display: 'block', marginBottom: '4px', color: '#1f2937' }}>Kapazitätsgrenzen:</strong>
-                      <p style={{ margin: 0, color: '#5f6368', lineHeight: '1.4' }}>
-                        Bei Freigabe prüft das System automatisch, ob das Stunden-Limit der Lehrkraft oder die Raumbelegung überschritten wird.
+                      <strong style={{ display: 'block', marginBottom: '4px', color: '#1f2937', fontSize: '0.78rem' }}>Räume verfügbar:</strong>
+                      <p style={{ margin: 0, color: '#5f6368', lineHeight: '1.4', fontSize: '0.76rem' }}>
+                        {rooms.length} Räume · {rooms.length * 5} mögliche Tageszuteilungen pro Woche
                       </p>
                     </div>
 
                     <div style={{ background: '#fee2e2', border: '1px solid #fecaca', padding: '12px', borderRadius: '12px', color: '#7f1d1d' }}>
-                      <strong style={{ display: 'block', marginBottom: '4px' }}>Wichtiger Hinweis:</strong>
-                      <p style={{ margin: 0, fontSize: '0.78rem', lineHeight: '1.4' }}>
-                        Abgelehnte Stundenpläne werden zurück in den "Draft"-Zustand versetzt. Die Lehrkraft erhält eine automatische Benachrichtigung zur Anpassung.
+                      <strong style={{ display: 'block', marginBottom: '4px', fontSize: '0.78rem' }}>Hinweis:</strong>
+                      <p style={{ margin: 0, fontSize: '0.75rem', lineHeight: '1.4' }}>
+                        Abgelehnte Stundenpläne gehen zurück in den Draft-Zustand. Lehrkräfte können erneut einreichen.
                       </p>
                     </div>
                   </div>
@@ -4633,7 +5262,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       >
                         <option value="">-- Neue Rolle zuweisen (Optional) --</option>
                         <option value="teacher">Lehrkraft / Coach</option>
-                        <option value="admin">Administrator / Sekretariat</option>
+                        <option value="admin">Administrator / Verwaltung</option>
                       </select>
 
                       <button type="submit" className="google-btn-primary" style={{ background: '#eab308', color: '#ffffff' }}>Überschreiben speichern</button>
@@ -4804,15 +5433,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 <div className="google-card" style={{ padding: '24px', background: '#ffffff', border: '1px solid #e2e8f0', color: '#1e293b' }}>
                   <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', fontWeight: 800, color: '#b45309' }}>🔌 Tablets &amp; Kiosk-Integration</h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    <div>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, display: 'block', marginBottom: '4px' }}>GrooveLab Kiosk QR Scanner API Token</span>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <input readOnly value={kioskToken ? `${window.location.origin}/?kiosk_token=${kioskToken}` : 'Kein Token'} style={{ flex: 1, padding: '8px', border: '1px solid #e2e8f0', borderRadius: '12px', fontSize: '0.75rem', fontFamily: 'monospace', background: '#f8fafc', color: '#1e293b' }} />
-                        <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/?kiosk_token=${kioskToken}`); setCopyingKiosk(true); setTimeout(() => setCopyingKiosk(false), 2000); }} style={{ padding: '10px', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc', cursor: 'pointer' }}>
-                          {copyingKiosk ? <CheckIcon size={14} color="#fbbc05" /> : <Copy size={14} color="#a1a1aa" />}
-                        </button>
-                      </div>
-                    </div>
                     
                     <button onClick={handleRegenerateTokens} className="google-btn-secondary" style={{ alignSelf: 'flex-start', fontSize: '0.78rem', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#1e293b' }}>
                       Kiosk Token regenerieren
@@ -4979,9 +5599,492 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           </div>
         )}
 
+        {/* TAB: SECRETARY - RÄUME */}
+        {activeTab === 'secretary' && secretarySubTab === 'rooms' && (() => {
+          // Compute per-room utilization from approved/pending allocations
+          const getOccupiedDays = (roomId: string) =>
+            [1,2,3,4,5].filter(d => matrixAllocations.some(p => p.roomId === roomId && p.dayOfWeek === d));
+          const INSTRUMENT_COLOR: Record<string, string> = {
+            Schlagzeug: '#ef4444', Piano: '#3b82f6', Gitarre: '#10b981',
+            Gesang: '#8b5cf6', Geige: '#f59e0b', Querflöte: '#06b6d4',
+            Saxophon: '#f97316', Bass: '#64748b', Keyboard: '#ec4899', Trompete: '#eab308',
+          };
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', fontFamily: 'Inter, sans-serif' }}>
+
+              {/* Header + Sub-nav */}
+              <div style={{ background: 'white', borderRadius: '24px', padding: '20px 24px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <DoorOpen size={20} color="#0b57d0" /> Raumverwaltung
+                  </h3>
+                  <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 550 }}>{rooms.length} Räume · Ausstattung & Belegung im Blick</p>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {(['overview', 'plan', 'settings'] as const).map(v => (
+                    <button
+                      key={v}
+                      onClick={() => { setRoomsSubView(v); if (v !== 'settings') setEditingRoom(null); }}
+                      style={{ padding: '8px 16px', borderRadius: '10px', border: '1.5px solid', borderColor: roomsSubView === v ? '#0b57d0' : '#e2e8f0', background: roomsSubView === v ? '#eff6ff' : 'white', color: roomsSubView === v ? '#0b57d0' : '#475569', fontWeight: 800, fontSize: '0.75rem', cursor: 'pointer', transition: 'all 0.2s' }}
+                    >
+                      {v === 'overview' ? '🏫 Übersicht' : v === 'plan' ? '📅 Belegungsplan' : '⚙️ Raum anlegen / bearbeiten'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── VIEW 1: Übersicht ── */}
+              {roomsSubView === 'overview' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {rooms.length === 0 ? (
+                    <div style={{ background: 'white', borderRadius: '20px', padding: '48px 24px', textAlign: 'center', color: '#94a3b8', border: '2px dashed #e2e8f0' }}>
+                      <DoorOpen size={36} style={{ marginBottom: '12px', opacity: 0.4 }} />
+                      <p style={{ margin: 0, fontWeight: 700, fontSize: '0.9rem' }}>Noch keine Räume angelegt.</p>
+                      <button onClick={() => openRoomEditor()} style={{ marginTop: '16px', background: '#0b57d0', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '10px', fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer' }}>
+                        + Ersten Raum anlegen
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+                      {rooms.map(room => {
+                        const occupied = getOccupiedDays(room.id);
+                        const pct = Math.round((occupied.length / 5) * 100);
+                        const status = pct === 0 ? { label: 'Frei', color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' }
+                          : pct < 80 ? { label: 'Teilbelegt', color: '#d97706', bg: '#fffbeb', border: '#fde68a' }
+                          : { label: 'Voll', color: '#ef4444', bg: '#fef2f2', border: '#fecaca' };
+                        const equipment: string[] = Array.isArray(room.equipment) ? room.equipment : [];
+                        return (
+                          <div key={room.id} style={{ background: 'white', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '20px', padding: '20px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                            {/* Room header */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                              <div>
+                                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>{room.name}</h4>
+                                <div style={{ display: 'flex', gap: '8px', marginTop: '2px', fontSize: '0.65rem', color: '#94a3b8', fontWeight: 700 }}>
+                                  <span>👤 Max. {room.max_teachers || 1} Lehrkraft</span>
+                                  <span>👥 Max. {room.max_students || 1} Schüler</span>
+                                  <span>📏 {room.qm || 0} qm</span>
+                                </div>
+                              </div>
+                              <span style={{ fontSize: '0.65rem', fontWeight: 900, padding: '3px 9px', borderRadius: '8px', background: status.bg, color: status.color, border: `1px solid ${status.border}` }}>
+                                {status.label}
+                              </span>
+                            </div>
+                            {/* Equipment tags */}
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                              {equipment.length > 0 ? equipment.map(tag => (
+                                <span key={tag} style={{ fontSize: '0.62rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', background: `${INSTRUMENT_COLOR[tag] || '#94a3b8'}15`, color: INSTRUMENT_COLOR[tag] || '#64748b', border: `1px solid ${INSTRUMENT_COLOR[tag] || '#94a3b8'}30` }}>
+                                  {tag}
+                                </span>
+                              )) : (
+                                <span style={{ fontSize: '0.62rem', color: '#cbd5e1', fontWeight: 600 }}>Keine Ausstattung hinterlegt</span>
+                              )}
+                            </div>
+                            {/* Weekly utilization bar */}
+                            <div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.63rem', fontWeight: 800, color: '#94a3b8', marginBottom: '5px' }}>
+                                <span>Wochenauslastung</span>
+                                <span style={{ color: status.color }}>{occupied.length}/5 Tage</span>
+                              </div>
+                              <div style={{ display: 'flex', gap: '3px' }}>
+                                {[1,2,3,4,5].map(d => (
+                                  <div key={d} style={{ flex: 1, height: '6px', borderRadius: '3px', background: occupied.includes(d) ? status.color : '#e2e8f0', transition: 'background 0.2s' }} title={['','Mo','Di','Mi','Do','Fr'][d]} />
+                                ))}
+                              </div>
+                              <div style={{ display: 'flex', gap: '3px', marginTop: '3px' }}>
+                                {[1,2,3,4,5].map(d => (
+                                  <div key={d} style={{ flex: 1, fontSize: '0.5rem', textAlign: 'center', color: '#94a3b8', fontWeight: 700 }}>
+                                    {['','Mo','Di','Mi','Do','Fr'][d]}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            {/* Assigned teachers for this room */}
+                            {matrixAllocations.filter(p => p.roomId === room.id).length > 0 && (
+                              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                {matrixAllocations.filter(p => p.roomId === room.id).map(plan => (
+                                  <div key={plan.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem', background: '#f8fafc', borderRadius: '7px', padding: '5px 8px' }}>
+                                    <span style={{ fontWeight: 800, color: '#0f172a' }}>{plan.teacherName}</span>
+                                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                      <span style={{ color: '#94a3b8', fontWeight: 700 }}>{['','Mo','Di','Mi','Do','Fr'][plan.dayOfWeek]}</span>
+                                      <span style={{ fontFamily: 'monospace', fontWeight: 900, color: '#059669', fontSize: '0.65rem' }}>{plan.startTime}–{plan.endTime}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {/* Actions */}
+                            <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
+                              <button onClick={() => { setRoomsSubView('plan'); }} style={{ flex: 1, padding: '7px', borderRadius: '9px', border: '1px solid #e2e8f0', background: 'white', color: '#475569', fontWeight: 700, fontSize: '0.7rem', cursor: 'pointer' }}>
+                                📅 Belegung
+                              </button>
+                              <button onClick={() => openRoomEditor(room)} style={{ flex: 1, padding: '7px', borderRadius: '9px', border: '1px solid #e2e8f0', background: 'white', color: '#0b57d0', fontWeight: 700, fontSize: '0.7rem', cursor: 'pointer' }}>
+                                ✏️ Bearbeiten
+                              </button>
+                              <button onClick={() => handleDeleteRoom(room.id)} style={{ padding: '7px 10px', borderRadius: '9px', border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.04)', color: '#ef4444', fontWeight: 700, fontSize: '0.7rem', cursor: 'pointer' }}>
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {/* Add room card */}
+                      <button onClick={() => openRoomEditor()} style={{ background: 'white', border: '2px dashed #e2e8f0', borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px', cursor: 'pointer', color: '#94a3b8', minHeight: '180px', transition: 'all 0.2s' }}>
+                        <Plus size={24} />
+                        <span style={{ fontSize: '0.78rem', fontWeight: 800 }}>Raum hinzufügen</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── VIEW 2: Belegungsplan (read-only matrix) ── */}
+              {roomsSubView === 'plan' && (
+                <div style={{ background: 'white', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', padding: '24px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', overflowX: 'auto' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>📅 Wöchentlicher Belegungsplan</h4>
+                      <p style={{ margin: '3px 0 0 0', fontSize: '0.75rem', color: '#64748b' }}>Lese-Ansicht · Zum Bearbeiten → Campus › Stundenpläne</p>
+                    </div>
+                    <button
+                      onClick={() => { /* switch to campus schedules */ }}
+                      style={{ background: '#eff6ff', color: '#0b57d0', border: '1px solid #bfdbfe', padding: '8px 14px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}
+                    >
+                      🗓️ Im Stundenplan bearbeiten
+                    </button>
+                  </div>
+                  {rooms.length === 0 ? (
+                    <p style={{ textAlign: 'center', color: '#94a3b8', padding: '32px', fontWeight: 700 }}>Noch keine Räume vorhanden.</p>
+                  ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: '600px' }}>
+                      <colgroup>
+                        <col style={{ width: '130px' }} />
+                        {[1,2,3,4,5].map(d => <col key={d} />)}
+                      </colgroup>
+                      <thead>
+                        <tr style={{ borderBottom: '2px solid #f1f5f9' }}>
+                          <th style={{ padding: '10px 12px', fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'left' }}>Raum</th>
+                          {[1,2,3,4,5].map(d => (
+                            <th key={d} style={{ padding: '10px 10px', fontSize: '0.73rem', fontWeight: 900, color: '#334155', textTransform: 'uppercase', textAlign: 'left' }}>
+                              {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag'][d]}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rooms.map((room, rIdx) => {
+                          const equipment: string[] = Array.isArray(room.equipment) ? room.equipment : [];
+                          return (
+                            <tr key={room.id} style={{ borderBottom: rIdx < rooms.length - 1 ? '1px solid #f8fafc' : 'none' }}>
+                              <td style={{ padding: '12px', verticalAlign: 'top' }}>
+                                <strong style={{ fontSize: '0.78rem', color: '#0f172a', fontWeight: 800, display: 'block' }}>{room.name}</strong>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '4px' }}>
+                                  {equipment.map(tag => (
+                                    <span key={tag} style={{ fontSize: '0.55rem', fontWeight: 800, padding: '1px 5px', borderRadius: '5px', background: `${INSTRUMENT_COLOR[tag] || '#94a3b8'}18`, color: INSTRUMENT_COLOR[tag] || '#64748b' }}>{tag}</span>
+                                  ))}
+                                </div>
+                              </td>
+                              {[1,2,3,4,5].map(dayNum => {
+                                const cellPlans = matrixAllocations.filter(p => p.roomId === room.id && p.dayOfWeek === dayNum);
+                                return (
+                                  <td key={dayNum} style={{ padding: '8px', verticalAlign: 'top' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minHeight: '56px' }}>
+                                      {cellPlans.map(plan => {
+                                        const color = INSTRUMENT_COLOR[plan.instrument] || '#64748b';
+                                        return (
+                                          <div
+                                            key={plan.id}
+                                            onClick={() => setSelectedDayPlan(plan)}
+                                            style={{ background: `${color}10`, border: `1px solid ${color}30`, borderLeft: `4px solid ${color}`, borderRadius: '9px', padding: '7px 9px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px', transition: 'all 0.15s' }}
+                                          >
+                                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>{plan.teacherName}</span>
+                                            <span style={{ fontSize: '0.6rem', fontWeight: 700, color }}>{plan.instrument}</span>
+                                            <span style={{ fontSize: '0.62rem', fontFamily: 'monospace', fontWeight: 900, color: '#475569' }}>⏱ {plan.startTime}–{plan.endTime}</span>
+                                          </div>
+                                        );
+                                      })}
+                                      {cellPlans.length === 0 && (
+                                        <div style={{ height: '44px', borderRadius: '8px', background: '#f8fafc', border: '1px dashed #e2e8f0' }} />
+                                      )}
+                                    </div>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                  {/* Drawer for clicked plan details — reuse same selectedDayPlan drawer rendered below */}
+                </div>
+              )}
+
+              {/* ── VIEW 3: Einstellungen / Editor ── */}
+              {roomsSubView === 'settings' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '20px', alignItems: 'start' }}>
+                  {/* Form */}
+                  <div style={{ background: 'white', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', padding: '28px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Edit3 size={16} color="#0b57d0" /> {editingRoom ? `„${editingRoom.name}" bearbeiten` : 'Neuen Raum anlegen'}
+                    </h4>
+
+                    {/* Name */}
+                    <div>
+                      <label style={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Raumname *</label>
+                      <input
+                        value={roomFormName}
+                        onChange={e => setRoomFormName(e.target.value)}
+                        placeholder='z.B. „Raum 1 – Schlagzeug" oder „Studio Nord"'
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc', transition: 'border-color 0.2s' }}
+                      />
+                    </div>
+
+                    {/* Max students & QM */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                      <div>
+                        <label style={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Max. Anzahl Schüler</label>
+                        <input
+                          type="number"
+                          value={roomFormMaxStudents}
+                          onChange={e => setRoomFormMaxStudents(parseInt(e.target.value) || 1)}
+                          min="1"
+                          style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc', transition: 'border-color 0.2s' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Größe in qm</label>
+                        <input
+                          type="number"
+                          value={roomFormQm}
+                          onChange={e => setRoomFormQm(parseFloat(e.target.value) || 0)}
+                          min="0"
+                          style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc', transition: 'border-color 0.2s' }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Max teachers */}
+                    <div>
+                      <label style={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Max. Lehrkräfte gleichzeitig</label>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        {[1,2,3].map(n => (
+                          <button key={n} onClick={() => setRoomFormMaxTeachers(n)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1.5px solid', borderColor: roomFormMaxTeachers === n ? '#0b57d0' : '#e2e8f0', background: roomFormMaxTeachers === n ? '#eff6ff' : 'white', color: roomFormMaxTeachers === n ? '#0b57d0' : '#475569', fontWeight: 900, fontSize: '0.88rem', cursor: 'pointer', transition: 'all 0.2s' }}>
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Instrument tags */}
+                    <div>
+                      <label style={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>Ausstattung / Instrumente</label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
+                        {(() => {
+                          const availableEquipment = schoolEquipment.length > 0 ? schoolEquipment.map(e => e.name) : INSTRUMENT_TAGS;
+                          return availableEquipment.map(tag => {
+                            const active = roomFormEquipment.includes(tag);
+                            const color = INSTRUMENT_COLOR[tag] || '#64748b';
+                            return (
+                              <button
+                                key={tag}
+                                onClick={() => setRoomFormEquipment(prev => active ? prev.filter(t => t !== tag) : [...prev, tag])}
+                                style={{ padding: '6px 13px', borderRadius: '20px', border: `1.5px solid ${active ? color : '#e2e8f0'}`, background: active ? `${color}15` : 'white', color: active ? color : '#64748b', fontWeight: 800, fontSize: '0.72rem', cursor: 'pointer', transition: 'all 0.2s' }}
+                              >
+                                {tag}
+                              </button>
+                            );
+                          });
+                        })()}
+                      </div>
+                      {roomFormEquipment.length > 0 && (
+                        <p style={{ margin: '8px 0 0 0', fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>
+                          ✓ {roomFormEquipment.join(' · ')} ausgewählt — der CSP-Solver kann Lehrkräfte instrument-konform zuweisen.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Save / Cancel */}
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                      <button
+                        onClick={handleSaveRoom}
+                        disabled={roomSaving || !roomFormName.trim()}
+                        style={{ flex: 1, background: 'linear-gradient(135deg, #0b57d0 0%, #1a73e8 100%)', color: 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 900, fontSize: '0.82rem', cursor: 'pointer', opacity: roomSaving || !roomFormName.trim() ? 0.6 : 1, transition: 'all 0.2s' }}
+                      >
+                        {roomSaving ? 'Speichert…' : editingRoom ? '💾 Änderungen speichern' : '+ Raum anlegen'}
+                      </button>
+                      <button onClick={() => { setRoomsSubView('overview'); setEditingRoom(null); }} style={{ padding: '12px 18px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: 'white', color: '#64748b', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer' }}>
+                        Abbrechen
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Existing rooms list (quick edit) */}
+                  <div style={{ background: 'white', borderRadius: '20px', border: '1px solid rgba(0,0,0,0.05)', padding: '20px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <h5 style={{ margin: 0, fontSize: '0.78rem', fontWeight: 900, color: '#0f172a' }}>Alle Räume ({rooms.length})</h5>
+                      <button onClick={() => openRoomEditor()} style={{ background: '#0b57d0', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '8px', fontWeight: 800, fontSize: '0.65rem', cursor: 'pointer' }}>
+                        + Neu
+                      </button>
+                    </div>
+                    {rooms.map(room => {
+                      const occupied = getOccupiedDays(room.id);
+                      return (
+                        <div key={room.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', borderRadius: '10px', border: editingRoom?.id === room.id ? '1.5px solid #0b57d0' : '1px solid #f1f5f9', background: editingRoom?.id === room.id ? '#eff6ff' : '#f8fafc', cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => openRoomEditor(room)}>
+                          <div>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>{room.name}</span>
+                            <span style={{ display: 'block', fontSize: '0.6rem', color: '#94a3b8', fontWeight: 600 }}>{occupied.length}/5 Tage belegt</span>
+                          </div>
+                          <Edit3 size={13} color="#94a3b8" />
+                        </div>
+                      );
+                    })}
+                    {rooms.length === 0 && <p style={{ textAlign: 'center', color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 700, padding: '16px 0' }}>Noch keine Räume</p>}
+                  </div>
+                </div>
+              )}
+
+              {/* Re-use the same selectedDayPlan detail drawer */}
+              {selectedDayPlan && roomsSubView === 'plan' && (
+                <div style={{ position: 'fixed', top: 0, right: 0, width: '380px', height: '100vh', background: 'white', boxShadow: '-12px 0 48px rgba(15,23,42,0.14)', borderLeft: '1px solid #e2e8f0', zIndex: 1050, display: 'flex', flexDirection: 'column', padding: '24px', animation: 'modalFadeIn 0.3s cubic-bezier(0.16,1,0.3,1)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px', marginBottom: '16px' }}>
+                    <div>
+                      <span style={{ fontSize: '0.63rem', fontWeight: 800, color: '#f59e0b', background: '#fffbeb', border: '1px solid rgba(245,158,11,0.2)', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', display: 'inline-block', marginBottom: '6px' }}>
+                        {['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'][selectedDayPlan.dayOfWeek]} · Lese-Ansicht
+                      </span>
+                      <h3 style={{ margin: '0 0 2px 0', fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>{selectedDayPlan.teacherName}</h3>
+                      <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>🎸 {selectedDayPlan.instrument}</span>
+                    </div>
+                    <button onClick={() => setSelectedDayPlan(null)} style={{ background: '#f1f5f9', border: 'none', color: '#64748b', cursor: 'pointer', padding: '7px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <X size={16} />
+                    </button>
+                  </div>
+                  <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                    <h4 style={{ margin: '0 0 8px 0', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.06em' }}>Stundenliste</h4>
+                    {selectedDayPlan.slots.map((slot: any, idx: number) => {
+                      const isBreak = !slot.student_id;
+                      return (
+                        <div key={idx} style={{ padding: '9px 11px', borderRadius: '10px', border: '1px solid #f1f5f9', background: isBreak ? '#fffbeb' : '#f8fafc', borderLeft: isBreak ? '4px solid #f59e0b' : '4px solid #3b82f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d1d1f' }}>{isBreak ? '☕ Pause' : slot.student_name}</span>
+                          <span style={{ fontSize: '0.73rem', fontWeight: 900, fontFamily: 'monospace', color: isBreak ? '#b45309' : '#0f172a' }}>{slot.time_slot}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+            </div>
+          );
+        })()}
+
+        {/* TAB 1.7.5: SECRETARY - EQUIPMENT */}
+
+        {activeTab === 'secretary' && secretarySubTab === 'equipment' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', fontFamily: 'Inter, sans-serif' }}>
+            {/* Header */}
+            <div style={{ background: 'white', borderRadius: '24px', padding: '20px 24px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Settings size={20} color="#0b57d0" /> Instrumente & Ausstattung
+                </h3>
+                <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 550 }}>
+                  Definiere die Ausstattungsmerkmale (Instrumente, Equipment), die Räumen und Lehrern zugewiesen werden können.
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '20px', alignItems: 'start' }}>
+              {/* Form */}
+              <div style={{ background: 'white', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', padding: '28px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Edit3 size={16} color="#0b57d0" /> {editingEquipment ? `„${editingEquipment.name}" bearbeiten` : 'Neue Ausstattung anlegen'}
+                </h4>
+
+                <div>
+                  <label style={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Name der Ausstattung *</label>
+                  <input
+                    value={equipmentFormName}
+                    onChange={e => setEquipmentFormName(e.target.value)}
+                    placeholder='z.B. „Schlagzeug" oder „Beamer"'
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc', transition: 'border-color 0.2s' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                  <button
+                    onClick={handleSaveEquipment}
+                    disabled={equipmentSaving || !equipmentFormName.trim()}
+                    style={{ flex: 1, background: 'linear-gradient(135deg, #0b57d0 0%, #1a73e8 100%)', color: 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 900, fontSize: '0.82rem', cursor: 'pointer', opacity: equipmentSaving || !equipmentFormName.trim() ? 0.6 : 1, transition: 'all 0.2s' }}
+                  >
+                    {equipmentSaving ? 'Speichert…' : editingEquipment ? '💾 Änderungen speichern' : '+ Ausstattung anlegen'}
+                  </button>
+                  {editingEquipment && (
+                    <button onClick={() => openEquipmentEditor(null)} style={{ padding: '12px 18px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: 'white', color: '#64748b', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer' }}>
+                      Abbrechen
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Existing Equipment list */}
+              <div style={{ background: 'white', borderRadius: '20px', border: '1px solid rgba(0,0,0,0.05)', padding: '20px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <h5 style={{ margin: 0, fontSize: '0.78rem', fontWeight: 900, color: '#0f172a' }}>Alle Ausstattungen ({schoolEquipment.length})</h5>
+                  <button onClick={() => openEquipmentEditor(null)} style={{ background: '#0b57d0', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '8px', fontWeight: 800, fontSize: '0.65rem', cursor: 'pointer' }}>
+                    + Neu
+                  </button>
+                </div>
+                {schoolEquipment.map(eq => (
+                  <div key={eq.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', borderRadius: '10px', border: editingEquipment?.id === eq.id ? '1.5px solid #0b57d0' : '1px solid #f1f5f9', background: editingEquipment?.id === eq.id ? '#eff6ff' : '#f8fafc', cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => openEquipmentEditor(eq)}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>{eq.name}</span>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button onClick={(e) => { e.stopPropagation(); openEquipmentEditor(eq); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#0b57d0' }}>
+                        <Edit3 size={13} />
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); handleDeleteEquipment(eq.id); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444' }}>
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {schoolEquipment.length === 0 && <p style={{ textAlign: 'center', color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 700, padding: '16px 0' }}>Noch keine Ausstattung</p>}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* TAB 1.8: SECRETARY - SETUP */}
+
         {activeTab === 'secretary' && secretarySubTab === 'setup' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+            {/* Schul-ID & Integration Link (Campus & GrooveLab) */}
+            <div className="google-card" style={{ paddingLeft: '44px', borderRadius: '24px', border: '1px solid #f1f5f9', background: 'white' }}>
+              <div className="google-kpi-bar bg-google-blue" />
+              <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', fontWeight: 800 }}>🏫 Schul-ID &amp; Integration Link (Campus &amp; GrooveLab)</h3>
+              <div>
+                <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block', marginBottom: '8px' }}>
+                  Dies ist der einheitliche Anmeldelink für deine Musikschule. Er gilt sowohl für den Campus als auch für GrooveLab.
+                </span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input 
+                    readOnly 
+                    value={`${window.location.origin}/?school_id=${schoolId}`} 
+                    style={{ flex: 1, padding: '10px', borderRadius: '12px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.85rem', fontFamily: 'monospace', background: '#f8fafc', color: '#1e293b' }} 
+                  />
+                  <button 
+                    onClick={() => { 
+                      navigator.clipboard.writeText(`${window.location.origin}/?school_id=${schoolId}`); 
+                      alert('Schul-Integrationslink kopiert!'); 
+                    }} 
+                    className="google-btn-primary" 
+                    style={{ padding: '10px 18px', fontSize: '0.8rem' }}
+                  >
+                    Link kopieren
+                  </button>
+                </div>
+              </div>
+            </div>
             
             {/* Branding settings */}
             <div className="google-card" style={{ paddingLeft: '44px' }}>
@@ -5180,7 +6283,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
                     Lehrkräfte-Kartei
                   </h3>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>Sekretariat &bull; ID: #{manageTeacher.id.substring(0, 8)}</p>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>Verwaltung &bull; ID: #{manageTeacher.id.substring(0, 8)}</p>
                 </div>
               </div>
               <button 
@@ -5309,6 +6412,40 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     outline: 'none'
                   }}
                 />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Benötigte Ausstattung (Für Räume)</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {(() => {
+                    const availableEquipment = schoolEquipment.length > 0 ? schoolEquipment.map(e => e.name) : INSTRUMENT_TAGS;
+                    const requiredEquipment = Array.isArray(manageTeacher.requiredEquipment) ? manageTeacher.requiredEquipment : (Array.isArray(manageTeacher.required_equipment) ? manageTeacher.required_equipment : []);
+                    return availableEquipment.map((tag: string) => {
+                      const active = requiredEquipment.includes(tag);
+                      return (
+                        <button
+                          key={tag}
+                          onClick={() => {
+                            const newEq = active ? requiredEquipment.filter((t: string) => t !== tag) : [...requiredEquipment, tag];
+                            setManageTeacher({ ...manageTeacher, requiredEquipment: newEq });
+                          }}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '20px',
+                            border: `1px solid ${active ? '#0b57d0' : '#e2e8f0'}`,
+                            background: active ? '#eff6ff' : 'white',
+                            color: active ? '#0b57d0' : '#64748b',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {tag}
+                        </button>
+                      );
+                    });
+                  })()}
+                </div>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>

@@ -1,0 +1,7 @@
+{
+  "AbsolutePath": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "EndLine": "208",
+  "StartLine": "198",
+  "toolAction": "\"Viewing hook portion of student dashboard\"",
+  "toolSummary": "\"View useEffect location\""
+}

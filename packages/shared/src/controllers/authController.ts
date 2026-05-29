@@ -33,7 +33,7 @@ export async function activateAccountHandler(req: Request, res: Response): Promi
     // Find user by QR Token or Ausweis ID
     let query = supabase.from('users').select('*');
     if (token) {
-      query = query.eq('qr_token', token);
+      query = query.or(`qr_token.eq."${token}",teacher_qr_token.eq."${token}"`);
     } else {
       query = query.eq('ausweis_id', ausweisId);
     }
@@ -145,7 +145,7 @@ export async function universalLoginHandler(req: Request, res: Response): Promis
       const { data, error } = await supabase
         .from('users')
         .select('*')
-        .eq('qr_token', qrToken)
+        .or(`qr_token.eq."${qrToken}",teacher_qr_token.eq."${qrToken}"`)
         .maybeSingle();
 
       if (error || !data) {

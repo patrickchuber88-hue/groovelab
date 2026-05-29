@@ -1,0 +1,6 @@
+{
+  "AbsolutePath": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "StartLine": "980",
+  "toolAction": "\"Viewing bottom lines of dashboard file\"",
+  "toolSummary": "\"View bottom braces of StudentAvatarDashboard\""
+}

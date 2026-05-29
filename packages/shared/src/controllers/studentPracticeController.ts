@@ -37,6 +37,17 @@ export async function finishSessionHandler(req: Request, res: Response): Promise
       return;
     }
 
+    // Fetch custom streak targets from users profile
+    const { data: studentUser } = await supabase
+      .from('users')
+      .select('streak_flame1_mins, streak_flame2_mins, streak_flame3_mins')
+      .eq('id', studentId)
+      .maybeSingle();
+
+    const flame1Mins = studentUser?.streak_flame1_mins ?? 3;
+    const flame2Mins = studentUser?.streak_flame2_mins ?? 5;
+    const flame3Mins = studentUser?.streak_flame3_mins ?? 10;
+
     const todayStr = new Date().toISOString().split('T')[0];
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);

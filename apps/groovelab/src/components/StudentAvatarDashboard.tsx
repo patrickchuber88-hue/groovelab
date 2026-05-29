@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { 
   Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, 
   ChevronRight, Coffee, Clock, Flame, BookOpen, Share2, Play, 
-  Pause, RotateCcw, Volume2, Moon, QrCode, X, EyeOff, Zap, Music, Library
+  Pause, RotateCcw, Volume2, Moon, QrCode, X, EyeOff, Zap, Music, Library, Calendar, Check, Target, MessageSquare, Send
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 
@@ -20,6 +20,7 @@ interface StudentAvatarDashboardProps {
   studentId: string;
   parentActiveTab?: string;
   onTabChange?: (tab: string) => void;
+  onProfileUpdate?: (updatedFields: any) => void;
 }
 
 const LEVEL_NAMES: Record<string, Record<number, string>> = {
@@ -66,21 +67,378 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   // Daily Briefing State
   const [briefingData, setBriefingData] = useState<any>(null);
   const [briefingLoading, setBriefingLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'briefing' | 'hero' | 'songs' | 'practice_board' | 'campus_cup'>(() => {
-    const initial = parentActiveTab === 'profile' ? 'briefing' : parentActiveTab;
+  const [scheduleOccurrences, setScheduleOccurrences] = useState<any[]>([]);
+  const [loadingSchedule, setLoadingSchedule] = useState(false);
+  const [schoolYearOccurrences, setSchoolYearOccurrences] = useState<any[]>([]);
+  const [loadingSchoolYearSchedule, setLoadingSchoolYearSchedule] = useState(false);
+  const [appointmentFilter, setAppointmentFilter] = useState<'all' | 'upcoming' | 'past'>('upcoming');
+
+  // Direct Chat states inside appointment popup (Shoutbox)
+  const [showAppointmentChat, setShowAppointmentChat] = useState(false);
+  const [appointmentChatData, setAppointmentChatData] = useState<{ teacherId: string; date: string; start_time: string; label: string } | null>(null);
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [chatTypedMessage, setChatTypedMessage] = useState('');
+  const chatMessagesEndRef = useRef<HTMLDivElement>(null);
+
+  const fetchChat = async (teacherId: string) => {
+    if (!studentId || !teacherId) return;
+    const { data } = await supabase
+      .from('campus_direct_messages')
+      .select('*')
+      .or(`and(sender_id.eq.${studentId},recipient_id.eq.${teacherId}),and(sender_id.eq.${teacherId},recipient_id.eq.${studentId})`)
+      .order('created_at', { ascending: true });
+    if (data) {
+      setChatMessages(data);
+      setTimeout(() => chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
+    }
+  };
+
+  useEffect(() => {
+    if (!appointmentChatData || !showAppointmentChat) {
+      setChatMessages([]);
+      return;
+    }
+
+    fetchChat(appointmentChatData.teacherId);
+
+    const channel = supabase
+      .channel(`chat_student_occ_${appointmentChatData.teacherId}`)
+      .on('postgres_changes', { schema: 'public', event: '*', table: 'campus_direct_messages' }, () => {
+        fetchChat(appointmentChatData.teacherId);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [appointmentChatData, showAppointmentChat, studentId]);
+
+  const handleSendChatMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatTypedMessage.trim() || !appointmentChatData) return;
+
+    const messageContent = `[Termin ${appointmentChatData.label}] ${chatTypedMessage.trim()}`;
+
+    try {
+      // Optimistic update
+      const tempId = `temp-${Date.now()}`;
+      const optimisticMessage = {
+        id: tempId,
+        sender_id: studentId,
+        recipient_id: appointmentChatData.teacherId,
+        content: messageContent,
+        created_at: new Date().toISOString(),
+        is_read: false
+      };
+      setChatMessages(prev => [...prev, optimisticMessage]);
+      setChatTypedMessage('');
+      setTimeout(() => chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+
+      const { error } = await supabase.from('campus_direct_messages').insert({
+        sender_id: studentId,
+        recipient_id: appointmentChatData.teacherId,
+        content: messageContent
+      });
+      if (error) throw error;
+      
+      await fetchChat(appointmentChatData.teacherId);
+    } catch (err) {
+      console.error('Error sending quick chat message:', err);
+    }
+  };
+
+  const fetchSchedule = async () => {
+    if (!studentId) return;
+    setLoadingSchedule(true);
+    try {
+      const { data, error } = await supabase
+        .from('schedule_occurrences')
+        .select('*, schedule:schedule_id(*), teacher:users!schedule_occurrences_teacher_id_fkey(first_name, last_name)')
+        .eq('student_id', studentId)
+        .gte('date', new Date().toLocaleDateString('sv-SE'))
+        .order('date', { ascending: true })
+        .order('start_time', { ascending: true });
+      
+      if (!error && data) {
+        setScheduleOccurrences(data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingSchedule(false);
+    }
+  };
+
+  const fetchSchoolYearSchedule = async () => {
+    if (!studentId) return;
+    setLoadingSchoolYearSchedule(true);
+    try {
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth();
+
+      let schoolYearStart = new Date(currentYear - 1, 8, 1);
+      let schoolYearEnd = new Date(currentYear, 6, 31);
+
+      if (currentMonth >= 7) {
+        schoolYearStart = new Date(currentYear, 8, 1);
+        schoolYearEnd = new Date(currentYear + 1, 6, 31);
+      }
+
+      const startStr = schoolYearStart.toLocaleDateString('sv-SE');
+      const endStr = schoolYearEnd.toLocaleDateString('sv-SE');
+
+      const { data: occurrences, error: occErr } = await supabase
+        .from('schedule_occurrences')
+        .select('*, schedule:schedule_id(*), teacher:users!schedule_occurrences_teacher_id_fkey(first_name, last_name)')
+        .eq('student_id', studentId)
+        .gte('date', startStr)
+        .lte('date', endStr)
+        .order('date', { ascending: true })
+        .order('start_time', { ascending: true });
+
+      const { data: schedules, error: schErr } = await supabase
+        .from('schedules')
+        .select('*, teacher:users!schedules_teacher_id_fkey(first_name, last_name)')
+        .eq('student_id', studentId);
+
+      if (occErr) throw occErr;
+      if (schErr) throw schErr;
+
+      const allMergedOccurrences: any[] = [];
+      const usedActualIds = new Set<string>();
+
+      if (schedules) {
+        schedules.forEach(sch => {
+          let current = new Date(schoolYearStart);
+          while (current <= schoolYearEnd) {
+            const currentDay = current.getDay() || 7;
+            const diff = sch.day_of_week - currentDay;
+            const targetDate = new Date(current);
+            targetDate.setDate(current.getDate() + diff);
+
+            if (targetDate >= schoolYearStart && targetDate <= schoolYearEnd) {
+              const dateStr = targetDate.toLocaleDateString('sv-SE');
+              const actual = occurrences?.find(occ => 
+                (occ.schedule_id === sch.id || occ.student_id === studentId) && 
+                (occ.original_date === dateStr || (!occ.original_date && occ.date === dateStr))
+              );
+
+              if (actual) {
+                allMergedOccurrences.push(actual);
+                usedActualIds.add(actual.id);
+              } else {
+                allMergedOccurrences.push({
+                  id: `virtual-${sch.id}-${dateStr}`,
+                  schedule_id: sch.id,
+                  student_id: studentId,
+                  teacher_id: sch.teacher_id,
+                  date: dateStr,
+                  start_time: sch.time_slot + (sch.time_slot.split(':').length === 2 ? ':00' : ''),
+                  duration: sch.duration || 45,
+                  status: 'scheduled',
+                  is_virtual: true,
+                  teacher: sch.teacher,
+                  schedule: sch
+                });
+              }
+            }
+            current.setDate(current.getDate() + 7);
+          }
+        });
+      }
+
+      if (occurrences) {
+        occurrences.forEach(occ => {
+          if (!usedActualIds.has(occ.id)) {
+            allMergedOccurrences.push(occ);
+          }
+        });
+      }
+
+      allMergedOccurrences.sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        return (a.start_time || '').localeCompare(b.start_time || '');
+      });
+
+      setSchoolYearOccurrences(allMergedOccurrences);
+    } catch (err) {
+      console.error('Error fetching school year schedule:', err);
+    } finally {
+      setLoadingSchoolYearSchedule(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSchedule();
+    fetchSchoolYearSchedule();
+
+    if (!studentId) return;
+
+    const channel = supabase
+      .channel(`realtime_student_schedule_${studentId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'schedule_occurrences',
+          filter: `student_id=eq.${studentId}`
+        },
+        () => {
+          fetchSchedule();
+          fetchSchoolYearSchedule();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [studentId]);
+
+  const handleConfirmReschedule = async (occId: string) => {
+    try {
+      const { error } = await supabase
+        .from('schedule_occurrences')
+        .update({ status: 'rescheduled_confirmed', student_acknowledged: true })
+        .eq('id', occId);
+      if (error) throw error;
+      fetchSchedule();
+    } catch (err) {
+      console.error('Error confirming reschedule:', err);
+    }
+  };
+
+  const handleAcknowledgeCancellation = async (occId: string) => {
+    try {
+      const { error } = await supabase
+        .from('schedule_occurrences')
+        .update({ student_acknowledged: true })
+        .eq('id', occId);
+      if (error) throw error;
+      fetchSchedule();
+    } catch (err) {
+      console.error('Error acknowledging cancellation:', err);
+    }
+  };
+
+  const handleCancelOccurrence = async (occ: any) => {
+    const d = new Date(occ.date);
+    const formattedDate = d.toLocaleDateString('de-DE');
+    if (!confirm(`Möchtest du deinen Termin am ${formattedDate} um ${occ.start_time?.substring(0,5)} Uhr wirklich absagen?`)) return;
+
+    try {
+      if (occ.is_virtual) {
+        const { error: insertErr } = await supabase
+          .from('schedule_occurrences')
+          .insert({
+            schedule_id: occ.schedule_id,
+            student_id: studentId,
+            teacher_id: occ.teacher_id,
+            date: occ.date,
+            start_time: occ.start_time,
+            duration: occ.duration || 45,
+            status: 'canceled_by_student',
+            student_acknowledged: true
+          });
+        if (insertErr) throw insertErr;
+      } else {
+        const { error: updateErr } = await supabase
+          .from('schedule_occurrences')
+          .update({ status: 'canceled_by_student', student_acknowledged: true })
+          .eq('id', occ.id);
+        if (updateErr) throw updateErr;
+      }
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('first_name, last_name')
+        .eq('id', studentId)
+        .single();
+      const studentName = userData ? `${userData.first_name} ${userData.last_name}` : 'Ein Schüler';
+
+      await supabase.from('system_alerts').insert({
+        school_id: occ.schedule?.school_id || null,
+        teacher_id: occ.teacher_id,
+        type: 'Termin abgesagt',
+        message: `❌ Absage: ${studentName} hat den Termin am ${formattedDate} um ${occ.start_time?.substring(0,5)} Uhr abgesagt.`
+      });
+
+      fetchSchedule();
+      fetchSchoolYearSchedule();
+      alert('Der Termin wurde erfolgreich abgesagt.');
+    } catch (err) {
+      console.error('Error canceling occurrence:', err);
+      alert('Fehler beim Absagen des Termins.');
+    }
+  };
+
+  const handleRejectReschedule = async (occ: any) => {
+    try {
+      const originalDate = occ.original_date || occ.date;
+      const originalStartTime = occ.original_start_time || occ.start_time;
+
+      // 1. Reset occurrence back to original date/time and set status to cancelled
+      const { error: updateErr } = await supabase
+        .from('schedule_occurrences')
+        .update({
+          date: originalDate,
+          start_time: originalStartTime,
+          status: 'cancelled',
+          student_acknowledged: false // Student will see it as cancelled in their dashboard
+        })
+        .eq('id', occ.id);
+
+      if (updateErr) throw updateErr;
+
+      // 2. Alert the teacher
+      const { data: userData } = await supabase
+        .from('users')
+        .select('first_name, last_name')
+        .eq('id', studentId)
+        .single();
+      const studentName = userData ? `${userData.first_name} ${userData.last_name}` : 'Ein Schüler';
+      const formattedDate = new Date(occ.date).toLocaleDateString('de-DE');
+
+      await supabase.from('system_alerts').insert({
+        school_id: occ.schedule?.school_id || null,
+        teacher_id: occ.teacher_id,
+        type: 'Verschiebung abgelehnt',
+        message: `❌ ${studentName} hat den Verschiebungstermin am ${formattedDate} abgelehnt. Der Termin wurde auf den Originaltermin zurückgesetzt und für diese Woche abgesagt.`
+      });
+
+      fetchSchedule();
+    } catch (err) {
+      console.error('Error rejecting reschedule:', err);
+    }
+  };
+  
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    let initial = parentActiveTab === 'profile' ? 'briefing' : parentActiveTab;
+    if (initial === 'mediathek') initial = 'songs';
+    if (initial === 'termine' || initial === 'all_appointments') initial = 'events';
     return (initial as any) || 'briefing';
   });
 
   useEffect(() => {
     if (parentActiveTab) {
-      const mapped = parentActiveTab === 'profile' ? 'briefing' : parentActiveTab;
-      if (['briefing', 'hero', 'songs', 'practice_board', 'campus_cup'].includes(mapped)) {
+      let mapped = parentActiveTab === 'profile' ? 'briefing' : parentActiveTab;
+      if (mapped === 'mediathek') mapped = 'songs';
+      if (mapped === 'termine' || mapped === 'all_appointments') mapped = 'events';
+      if (['briefing', 'hero', 'songs', 'practice_board', 'campus_cup', 'events'].includes(mapped)) {
         setActiveTab(mapped as any);
       }
     }
   }, [parentActiveTab]);
 
-  const handleTabChangeLocal = (tab: 'briefing' | 'hero' | 'songs' | 'practice_board' | 'campus_cup') => {
+  useEffect(() => {
+    if (activeTab === 'events') {
+      fetchSchoolYearSchedule();
+    }
+  }, [activeTab, studentId]);
+
+  const handleTabChangeLocal = (tab: string) => {
     setActiveTab(tab);
     if (onTabChange) {
       onTabChange(tab);
@@ -122,7 +480,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
   // progress matrix state
   const [progressItems, setProgressItems] = useState<any[]>([]);
-  const [isPremiumActive, setIsPremiumActive] = useState(false);
   const [progressLoading, setProgressLoading] = useState(false);
 
   const fetchStudentProgress = async () => {
@@ -136,7 +493,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       });
       if (resp.ok) {
         const data = await resp.json();
-        setIsPremiumActive(data.isPremiumActive ?? false);
+        
         setProgressItems(data.progress || []);
         setProgressLoading(false);
         return;
@@ -150,7 +507,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         .maybeSingle();
 
       const premium = premiumInfo?.is_premium_active ?? false;
-      setIsPremiumActive(premium);
+      
 
       const { data: matrixItems } = await supabase
         .from('progress_matrix')
@@ -241,13 +598,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           .maybeSingle();
 
         const userSchoolName = (user?.schools as any)?.name || 'Meine Musikschule';
-        const allowGlobal = (user?.schools as any)?.allow_global_ranking ?? true;
-
-        if (!allowGlobal) {
-          setRankingError('Global ranking access is disabled for your school.');
-          setRankingLoading(false);
-          return;
-        }
+        // allowGlobal is bypassed - all schools can view global ranking!
 
         // Generate mock data representing fair Relative-Focus-Index (RFI)
         const mockSchools = [
@@ -612,6 +963,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 id,
                 time_slot,
                 status,
+                teacher_id,
                 rooms (name),
                 teacher:users!schedules_teacher_id_fkey (first_name, last_name)
               `)
@@ -629,6 +981,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 time: todaySchedules.time_slot,
                 room: (todaySchedules.rooms as any)?.name || 'Unterrichtsraum',
                 teacher: teacherName,
+                teacher_id: todaySchedules.teacher_id,
                 status: todaySchedules.status,
                 displayString: `Heute ${todaySchedules.time_slot} Uhr, ${(todaySchedules.rooms as any)?.name || 'Raum'} bei ${teacherName}`
               };
@@ -856,51 +1209,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     );
   }
 
-  // WENN IS_APP_USER = FALSE
-  if (!isAppUser) {
-    return (
-      <div className="max-w-md mx-auto bg-slate-900/40 border border-slate-800/80 backdrop-blur-xl rounded-3xl p-6 text-center shadow-2xl animate-fadeIn">
-        <div className="relative inline-block mb-6">
-          <div className="w-40 h-40 mx-auto rounded-full bg-slate-800/50 border border-slate-700/50 flex items-center justify-center overflow-hidden">
-            <span className="text-[6rem] grayscale opacity-25">👨‍🎤</span>
-          </div>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="bg-slate-950/80 border border-slate-700 text-amber-500 h-14 w-14 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/10">
-              <Lock size={24} className="animate-pulse" />
-            </div>
-          </div>
-        </div>
 
-        <h3 className="text-xl font-black text-white tracking-tight mb-2">Musik-Held gesperrt</h3>
-        
-        <div className="bg-slate-950/50 border border-slate-800/60 p-5 rounded-2xl text-left space-y-4 mb-6">
-          <div className="flex gap-3">
-            <div className="h-8 w-8 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-xl flex items-center justify-center shrink-0">
-              <Smartphone size={16} />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-white">App-Account erforderlich</h4>
-              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                Dieses Konto ist aktuell als analoges Profil registriert. Mit der GrooveLab App kannst du deinen eigenen Charakter steuern!
-              </p>
-            </div>
-          </div>
-
-          <div className="flex gap-3 pt-2 border-t border-slate-850">
-            <div className="h-8 w-8 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-xl flex items-center justify-center shrink-0">
-              <Sparkles size={16} />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-white">Sammle XP & steige auf</h4>
-              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                Schalte deinen eigenen Musik-Helden frei, sammle XP im Unterricht und werde zum Rockstar! Frage deine Musikschule nach dem App-Zugang.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // WENN IS_APP_USER = TRUE (Selector Screen if no avatar chosen yet)
   if (showSelector) {
@@ -961,10 +1270,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const strokeDashoffset = circleCircumference - (xpPercentage / 100) * circleCircumference;
 
   return (
-    <div style={{ fontFamily: '"Outfit", "Inter", sans-serif', maxWidth: '480px', margin: '0 auto' }}>
+    <div style={{ fontFamily: '"Outfit", "Inter", sans-serif', maxWidth: '100%', margin: '0 auto', width: '100%' }}>
       
-      {/* Top Tab Switcher */}
-      <div style={{ display: 'flex', gap: '8px', background: '#f1f3f4', padding: '6px', borderRadius: '100px', marginBottom: '24px' }}>
+      {/* Top Tab Switcher - Removed per user request */}
+      <div style={{ display: 'none', gap: '8px', background: '#f1f3f4', padding: '6px', borderRadius: '100px', marginBottom: '24px' }}>
         <button
           onClick={() => handleTabChangeLocal('briefing')}
           style={{
@@ -1088,69 +1397,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
       {activeTab === 'practice_board' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', position: 'relative' }}>
-          {!isPremiumActive ? (
-            /* 1. BASIC MODE BLOCKED OVERLAY */
-            <div style={{
-              background: 'rgba(15, 23, 42, 0.95)',
-              backdropFilter: 'blur(12px)',
-              borderRadius: '24px',
-              padding: '40px 24px',
-              textAlign: 'center',
-              border: '1.5px solid #334155',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '24px',
-              minHeight: '400px',
-              color: 'white',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-            }} className="animation-slide-up">
-              <div style={{
-                background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                color: 'white',
-                width: '64px',
-                height: '64px',
-                borderRadius: '20px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 0 25px rgba(245, 158, 11, 0.4)',
-                border: '2px solid rgba(255, 255, 255, 0.2)'
-              }} className="animate-pulse">
-                <Lock size={32} />
-              </div>
-              <div style={{ maxWidth: '320px' }}>
-                <h4 style={{ fontWeight: 900, fontSize: '1.25rem', letterSpacing: '-0.02em', color: '#fef08a' }}>
-                  Übe-Board gesperrt
-                </h4>
-                <p style={{ fontSize: '0.85rem', color: '#cbd5e1', marginTop: '10px', fontWeight: 600, lineHeight: 1.5 }}>
-                  Lass deine Flamme brennen! Schalte den fokussierten Übe-Timer, deinen Avatar-Level und den automatischen Streak-Zähler für nur 0,49 € frei.
-                </p>
-              </div>
-              <button
-                onClick={handleUpgrade}
-                style={{
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #ca8a04 100%)',
-                  color: 'white',
-                  border: 'none',
-                  padding: '14px 32px',
-                  borderRadius: '100px',
-                  fontWeight: 950,
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  boxShadow: '0 10px 20px rgba(245,158,11,0.25)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em'
-                }}
-                className="hover-scale"
-              >
-                Jetzt upgraden
-              </button>
-            </div>
-          ) : (
-            /* 2. PREMIUM MODE: ÜBE-BOARD Timer & Gyro Detox */
-            <div style={{
+          <div style={{
               background: '#ffffff',
               border: '1px solid #e2e8f0',
               borderRadius: '24px',
@@ -1174,7 +1421,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
               {!sessionActive ? (
                 /* Timer setup before starting */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '400px', margin: '0 auto', width: '100%' }}>
                   {/* Missions-Auswahl (Dropdown) */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>
@@ -1415,7 +1662,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 </div>
               )}
             </div>
-          )}
         </div>
       )}
 
@@ -1446,8 +1692,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 </div>
               </div>
 
-              {isPremiumActive ? (
-                /* PREMIUM MODE: Beautiful tile grid */
+                {/* PREMIUM MODE: Beautiful tile grid */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   {/* Pinned current homework "Aktuelle Mission" */}
                   {progressItems.some(item => item.is_current_homework) && (
@@ -1522,7 +1767,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         Noch keine Songs am Board.
                       </div>
                     ) : (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }} className="grid-cols-1 sm:grid-cols-2">
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
                         {progressItems.map(item => {
                           let tileBg = 'white';
                           let tileBorder = '1px solid #e2e8f0';
@@ -1594,122 +1839,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     )}
                   </div>
                 </div>
-              ) : (
-                /* BASIC MODE: Reduced plain text list & Stripe CTA */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  {/* Lifeless text list */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {progressItems.length === 0 ? (
-                      <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem', fontStyle: 'italic' }}>
-                        Keine Einträge vorhanden.
-                      </div>
-                    ) : (
-                      progressItems.map(item => (
-                        <div 
-                          key={item.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '12px',
-                            padding: '12px 16px',
-                            background: '#f8fafc',
-                            borderRadius: '14px',
-                            border: '1px solid #e2e8f0'
-                          }}
-                        >
-                          {/* Gray lifeless standard icon */}
-                          <div style={{
-                            background: '#e2e8f0',
-                            color: '#94a3b8',
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}>
-                            <Music size={14} />
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#64748b' }}>
-                              {item.topic_name}
-                            </span>
-                            {/* Blurred teacher notes */}
-                            <div 
-                              className="blur-md select-none" 
-                              style={{ 
-                                fontSize: '0.72rem', 
-                                color: '#94a3b8', 
-                                marginTop: '4px',
-                                userSelect: 'none'
-                              }}
-                            >
-                              {item.teacher_notes}
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  {/* Golden Premium Stripe CTA Card */}
-                  <div style={{
-                    background: 'linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)',
-                    border: '2px solid #f59e0b',
-                    borderRadius: '24px',
-                    padding: '24px',
-                    textAlign: 'center',
-                    boxShadow: '0 10px 25px rgba(245, 158, 11, 0.15)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '14px',
-                    marginTop: '8px'
-                  }} className="hover-scale">
-                    <div style={{
-                      background: '#f59e0b',
-                      color: 'white',
-                      width: '44px',
-                      height: '44px',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 4px 10px rgba(245, 158, 11, 0.3)'
-                    }}>
-                      <Flame size={20} fill="white" />
-                    </div>
-                    <div>
-                      <h5 style={{ fontWeight: 900, fontSize: '0.98rem', color: '#78350f', margin: 0 }}>
-                        Hol dir das Meisterwerk-Dashboard!
-                      </h5>
-                      <p style={{ fontSize: '0.78rem', color: '#92400e', marginTop: '6px', fontWeight: 600, lineHeight: 1.4 }}>
-                        Schalte dein interaktives Übe-Dashboard und die farbigen Meister-Kacheln für nur 0,49 € / Monat frei!
-                      </p>
-                    </div>
-                    <button
-                      onClick={handleUpgrade}
-                      style={{
-                        background: '#f59e0b',
-                        color: 'white',
-                        border: 'none',
-                        padding: '12px 24px',
-                        borderRadius: '100px',
-                        fontWeight: 950,
-                        fontSize: '0.8rem',
-                        cursor: 'pointer',
-                        boxShadow: '0 4px 12px rgba(245, 158, 11, 0.25)',
-                        transition: 'all 0.2s',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
-                      }}
-                      className="hover-scale"
-                    >
-                      Jetzt freischalten
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -1770,7 +1899,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               </div>
 
               {/* Leaderboard Table List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
                 
                 {/* Render Top 3 */}
                 {rankingData.slice(0, 3).map((item) => {
@@ -1925,43 +2054,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
               </div>
 
-              {/* Premium Brake Check */}
-              {!isPremiumActive ? (
-                <div style={{
-                  background: 'linear-gradient(135deg, #fef2f2 0%, #fff1f2 100%)',
-                  border: '1.5px solid #fca5a5',
-                  padding: '16px 20px',
-                  borderRadius: '20px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px',
-                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.05)',
-                  marginTop: '10px'
-                }}>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#991b1b', lineHeight: 1.45 }}>
-                    ⚠️ Deine heute geübten Fokus-Minuten wurden nicht für den Campus-Cup gezählt! Aktiviere jetzt Premium für 0,49 €, um deine Schule im Ranking nach oben zu schießen!
-                  </div>
-                  <button
-                    onClick={handleUpgrade}
-                    style={{
-                      background: 'linear-gradient(135deg, #f59e0b 0%, #ca8a04 100%)',
-                      color: 'white',
-                      border: 'none',
-                      padding: '10px 22px',
-                      borderRadius: '100px',
-                      fontWeight: 950,
-                      fontSize: '0.78rem',
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 10px rgba(245,158,11,0.25)',
-                      alignSelf: 'flex-start',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.02em'
-                    }}
-                  >
-                    Jetzt upgraden
-                  </button>
-                </div>
-              ) : (
                 <div style={{
                   background: '#f0fdf4',
                   border: '1.5px solid #bbf7d0',
@@ -1979,262 +2071,818 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   <span style={{ fontSize: '1.2rem', fontWeight: 900 }}>✓</span>
                   <span>Du hast diesen Monat bereits <strong>{monthlyFocusMinutes}</strong> Minuten zum Erfolg deiner Schule beigetragen! Weiter so!</span>
                 </div>
-              )}
 
             </div>
           )}
         </div>
       )}
 
-      {activeTab === 'briefing' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {!briefingLoading && briefingData ? (
-            <div style={{
-              background: '#ffffff',
-              border: '1px solid #e2e8f0',
-              borderRadius: '24px',
-              padding: '24px',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.02)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '20px'
-            }}>
-              {/* Header */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '14px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ background: '#e0e7ff', color: '#4f46e5', padding: '8px', borderRadius: '12px' }}>
-                    <Coffee size={18} className="animate-pulse" />
+      {activeTab === 'events' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', position: 'relative' }}>
+          {(() => {
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentMonth = now.getMonth();
+            let startYear = currentYear;
+            let endYear = currentYear + 1;
+            if (currentMonth < 7) {
+              startYear = currentYear - 1;
+              endYear = currentYear;
+            }
+            const schoolYearText = `Schuljahr ${startYear}/${endYear}`;
+
+            return (
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.65)',
+                backdropFilter: 'blur(25px) saturate(190%)',
+                border: '1px solid rgba(0, 0, 0, 0.05)',
+                borderRadius: '24px',
+                padding: '24px',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.02)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '24px',
+                position: 'relative'
+              }} className="animation-slide-up">
+                {/* Header */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '16px' }}>
+                  <div style={{ background: 'rgba(0, 113, 227, 0.1)', color: '#0071e3', padding: '8px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Calendar size={18} />
                   </div>
                   <div>
-                    <h4 style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e293b', margin: 0 }}>Guten Morgen!</h4>
-                    <p style={{ fontSize: '0.7rem', color: '#94a3b8', margin: '2px 0 0 0', fontWeight: 600 }}>Dein heutiger Motivations-Anker</p>
+                    <h4 style={{ fontWeight: 700, fontSize: '1rem', color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>{schoolYearText}</h4>
+                    <p style={{ fontSize: '0.72rem', color: '#86868b', margin: '2px 0 0 0', fontWeight: 500, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>Deine geplanten Unterrichtsstunden & Konzerte des laufenden Schuljahres</p>
                   </div>
                 </div>
-                
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#fff7ed', border: '1px solid #ffedd5', color: '#ea580c', fontWeight: 800, fontSize: '0.75rem', padding: '4px 10px', borderRadius: '100px' }}>
-                  <Flame size={12} className="fill-orange-600 text-orange-600" />
-                  <span>{avatar.streak_flame || briefingData.gamification.streakFlame} Tage</span>
-                </div>
-              </div>
 
-              {/* Today's lesson */}
-              {briefingData.todayLesson ? (
-                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {briefingData.todayLesson.status === 'canceled_by_student' ? (
-                    <div>
-                      <span style={{ fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 800, color: '#ef4444', display: 'block', marginBottom: '4px' }}>Abgesagt</span>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b' }}>Du hast diesen Unterrichtstermin heute abgesagt. Dein Slot ist als Freisprech-Slot markiert.</span>
+                {/* Filter Toggle Switch */}
+                <div style={{ display: 'flex', background: 'rgba(120, 120, 128, 0.08)', padding: '3px', borderRadius: '9px', width: 'fit-content', gap: '2px', margin: '0 0 8px 0' }}>
+                  <button
+                    onClick={() => setAppointmentFilter('upcoming')}
+                    style={{
+                      border: 'none',
+                      background: appointmentFilter === 'upcoming' ? 'white' : 'transparent',
+                      color: appointmentFilter === 'upcoming' ? '#1d1d1f' : '#86868b',
+                      padding: '5px 12px',
+                      borderRadius: '7px',
+                      fontWeight: 600,
+                      fontSize: '0.74rem',
+                      cursor: 'pointer',
+                      boxShadow: appointmentFilter === 'upcoming' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                      transition: 'all 0.2s',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+                    }}
+                  >
+                    Kommende
+                  </button>
+                  <button
+                    onClick={() => setAppointmentFilter('past')}
+                    style={{
+                      border: 'none',
+                      background: appointmentFilter === 'past' ? 'white' : 'transparent',
+                      color: appointmentFilter === 'past' ? '#1d1d1f' : '#86868b',
+                      padding: '5px 12px',
+                      borderRadius: '7px',
+                      fontWeight: 600,
+                      fontSize: '0.74rem',
+                      cursor: 'pointer',
+                      boxShadow: appointmentFilter === 'past' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                      transition: 'all 0.2s',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+                    }}
+                  >
+                    Vergangene
+                  </button>
+                  <button
+                    onClick={() => setAppointmentFilter('all')}
+                    style={{
+                      border: 'none',
+                      background: appointmentFilter === 'all' ? 'white' : 'transparent',
+                      color: appointmentFilter === 'all' ? '#1d1d1f' : '#86868b',
+                      padding: '5px 12px',
+                      borderRadius: '7px',
+                      fontWeight: 600,
+                      fontSize: '0.74rem',
+                      cursor: 'pointer',
+                      boxShadow: appointmentFilter === 'all' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                      transition: 'all 0.2s',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+                    }}
+                  >
+                    Alle
+                  </button>
+                </div>
+
+                {/* List */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', maxWidth: '100%', margin: '0 auto', width: '100%' }}>
+                  {loadingSchoolYearSchedule ? (
+                    <div style={{ textAlign: 'center', padding: '40px', color: '#86868b', fontWeight: 500, fontSize: '0.8rem', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>
+                      Termine werden geladen...
                     </div>
-                  ) : briefingData.todayLesson.status === 'teacher_sick' ? (
-                    <div style={{ background: '#fee2e2', border: '1px solid #fecaca', padding: '12px', borderRadius: '12px', color: '#b91c1c' }}>
-                      <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 900, display: 'block', marginBottom: '4px' }}>🚨 Unterrichtsausfall</span>
-                      <span style={{ fontSize: '0.8rem', fontWeight: 850 }}>Unterricht entfällt wegen akuter Erkrankung der Lehrkraft. Ihr Kontingent wird gutgeschrieben.</span>
-                    </div>
-                  ) : briefingData.todayLesson.status === 'pending_parent_approval' ? (
-                    <div>
-                      <span style={{ fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 800, color: '#d97706', display: 'block', marginBottom: '8px' }}>Eltern-Zustimmung ausstehend</span>
-                      <span style={{ fontSize: '0.8rem', fontWeight: 750, color: '#1e293b', display: 'block', marginBottom: '8px' }}>
-                        Vorschlag: Heute {briefingData.todayLesson.time} Uhr in {briefingData.todayLesson.room} bei {briefingData.todayLesson.teacher}
-                      </span>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button 
-                          onClick={() => handleParentApproval(briefingData.todayLesson.id, true)}
-                          style={{ background: '#10b981', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
-                        >
-                          Zustimmen
-                        </button>
-                        <button 
-                          onClick={() => handleParentApproval(briefingData.todayLesson.id, false)}
-                          style={{ background: '#ef4444', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
-                        >
-                          Ablehnen
-                        </button>
+                  ) : schoolYearOccurrences && schoolYearOccurrences.length > 0 ? (
+                (() => {
+                  const filteredOccurrences = schoolYearOccurrences.filter(occ => {
+                    const isPast = (() => {
+                      const todayStr = new Date().toLocaleDateString('sv-SE');
+                      if (occ.date < todayStr) return true;
+                      if (occ.date > todayStr) return false;
+                      const nowTimeStr = new Date().toTimeString().substring(0, 8);
+                      const startTime = occ.start_time || '00:00:00';
+                      return startTime < nowTimeStr;
+                    })();
+
+                    if (appointmentFilter === 'upcoming') return !isPast;
+                    if (appointmentFilter === 'past') return isPast;
+                    return true;
+                  });
+
+                  if (filteredOccurrences.length === 0) {
+                    return (
+                      <div style={{ 
+                        gridColumn: '1 / -1',
+                        background: '#f8fafc', 
+                        border: '1.5px dashed #e2e8f0', 
+                        borderRadius: '16px', 
+                        padding: '40px 24px', 
+                        textAlign: 'center', 
+                        color: '#64748b', 
+                        fontWeight: 700,
+                        fontSize: '0.9rem'
+                      }}>
+                        <div style={{ fontSize: '2rem', marginBottom: '8px' }}>📅</div>
+                        {appointmentFilter === 'upcoming' 
+                          ? 'Keine kommenden Termine eingetragen.' 
+                          : appointmentFilter === 'past' 
+                            ? 'Keine vergangenen Termine eingetragen.' 
+                            : 'Keine Termine eingetragen.'}
                       </div>
-                    </div>
-                  ) : (
-                    <>
-                      <span style={{ fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 800, color: '#64748b', display: 'block' }}>Dein Termin heute</span>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                        <Clock size={16} color="#0b57d0" style={{ marginTop: '2px', flexShrink: 0 }} />
-                        <div style={{ flex: 1 }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b', display: 'block' }}>
-                            {briefingData.todayLesson.time} Uhr
-                          </span>
-                          <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 650, display: 'block', marginTop: '2px' }}>
-                            {briefingData.todayLesson.room} bei {briefingData.todayLesson.teacher}
-                          </span>
+                    );
+                  }
+
+                  const groups: Record<string, any[]> = {};
+                  filteredOccurrences.forEach(occ => {
+                    const monthKey = occ.date.substring(0, 7);
+                    if (!groups[monthKey]) {
+                      groups[monthKey] = [];
+                    }
+                    groups[monthKey].push(occ);
+                  });
+
+                  const sortedMonthKeys = Object.keys(groups).sort();
+
+                  return sortedMonthKeys.map(monthKey => {
+                    const monthDate = new Date(monthKey + '-02');
+                    const monthName = monthDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+
+                    return (
+                      <div key={monthKey} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <h3 style={{ 
+                          fontSize: '0.95rem', 
+                          fontWeight: 855, 
+                          color: '#0b57d0', 
+                          margin: '16px 0 4px 0', 
+                          borderBottom: '2px solid rgba(11, 87, 208, 0.08)', 
+                          paddingBottom: '6px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}>
+                          <span>📅</span> {monthName}
+                        </h3>
+                        
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {groups[monthKey].map(occ => {
+                            const d = new Date(occ.date);
+                            const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'teacher_sick' || occ.status === 'cancelled';
+                            const isPast = (() => {
+                              const todayStr = new Date().toLocaleDateString('sv-SE');
+                              if (occ.date < todayStr) return true;
+                              if (occ.date > todayStr) return false;
+                              const nowTimeStr = new Date().toTimeString().substring(0, 8);
+                              const startTime = occ.start_time || '00:00:00';
+                              return startTime < nowTimeStr;
+                            })();
+                            
+                            let statusBadgeText = 'Regulär';
+                            let statusBadgeColor = '#22c55e';
+                            let statusBadgeBg = '#dcfce7';
+                            
+                            if (occ.status === 'canceled_by_student' || occ.status === 'cancelled' || occ.status === 'teacher_sick') {
+                              statusBadgeText = 'Abgesagt';
+                              statusBadgeColor = '#ef4444';
+                              statusBadgeBg = '#fee2e2';
+                            } else if (occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed') {
+                              statusBadgeText = 'Verschoben';
+                              statusBadgeColor = '#f59e0b';
+                              statusBadgeBg = '#fef3c7';
+                            }
+
+                             return (
+                              <div 
+                                key={occ.id} 
+                                style={{ 
+                                  display: 'flex', 
+                                  gap: '12px', 
+                                  alignItems: 'center', 
+                                  padding: '10px 14px', 
+                                  borderRadius: '12px', 
+                                  border: '1px solid #e2e8f0', 
+                                  background: '#f8fafc',
+                                  opacity: isPast ? 0.45 : isCanceled ? 0.6 : 1,
+                                  transition: 'transform 0.2s',
+                                  boxShadow: '0 2px 8px rgba(0,0,0,0.01)'
+                                }}
+                                className="hover-scale-subtle"
+                              >
+                                <div style={{ 
+                                  width: '46px', 
+                                  borderRadius: '10px', 
+                                  overflow: 'hidden', 
+                                  border: '1.5px solid #e2e8f0', 
+                                  display: 'flex', 
+                                  flexDirection: 'column', 
+                                  textAlign: 'center',
+                                  flexShrink: 0
+                                }}>
+                                  <div style={{ background: isPast || isCanceled ? '#94a3b8' : '#ef4444', color: 'white', fontSize: '0.55rem', fontWeight: 900, padding: '2px 0', textTransform: 'uppercase' }}>
+                                    {d.toLocaleDateString('de-DE', {month: 'short'})}
+                                  </div>
+                                  <div style={{ background: 'white', color: '#1e293b', fontSize: '1.1rem', fontWeight: 900, padding: '3px 0', lineHeight: 1.1 }}>
+                                    {d.toLocaleDateString('de-DE', {day: '2-digit'})}
+                                  </div>
+                                </div>
+
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
+                                    <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>
+                                      • {occ.is_virtual ? 'Regulär' : 'Spezifisch'}
+                                    </span>
+                                  </div>
+                                  <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                                    <span>⏱️ {occ.start_time?.substring(0,5)} Uhr</span>
+                                    <span>• {occ.duration || 45} Min</span>
+                                    {occ.schedule?.room && (
+                                      <span style={{ color: '#0b57d0' }}>• Raum: {occ.schedule.room}</span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                  <div style={{ 
+                                    background: statusBadgeBg, 
+                                    color: statusBadgeColor, 
+                                    fontSize: '0.62rem', 
+                                    fontWeight: 900, 
+                                    padding: '4px 8px', 
+                                    borderRadius: '100px', 
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.02em'
+                                  }}>
+                                    {statusBadgeText}
+                                  </div>
+                                  {!isCanceled && !isPast && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleCancelOccurrence(occ);
+                                      }}
+                                      style={{
+                                        background: 'transparent',
+                                        border: '1px solid #fee2e2',
+                                        color: '#ef4444',
+                                        fontSize: '0.62rem',
+                                        fontWeight: 800,
+                                        padding: '4px 8px',
+                                        borderRadius: '8px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                      }}
+                                      onMouseOver={(e) => { e.currentTarget.style.background = '#fee2e2'; }}
+                                      onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                                    >
+                                      Absagen
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
-                      <button 
-                        onClick={() => handleCancelLesson(briefingData.todayLesson.id)}
-                        style={{ alignSelf: 'flex-start', background: 'transparent', border: '1px solid #cbd5e1', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#ef4444', cursor: 'pointer', transition: 'all 0.2s' }}
-                      >
-                        Für heute absagen
-                      </button>
-                    </>
-                  )}
-                </div>
+                    );
+                  });
+                })()
               ) : (
-                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
-                  <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>Heute steht kein Unterricht an. Nutze den Tag zum Üben!</span>
+                <div style={{ 
+                  background: '#f8fafc', 
+                  border: '1.5px dashed #e2e8f0', 
+                  borderRadius: '16px', 
+                  padding: '40px 24px', 
+                  textAlign: 'center', 
+                  color: '#64748b', 
+                  fontWeight: 700,
+                  fontSize: '0.9rem'
+                }}>
+                  <div style={{ fontSize: '2rem', marginBottom: '8px' }}>📅</div>
+                  Keine Termine für das laufende Schuljahr eingetragen.
                 </div>
               )}
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  )}
 
-              {/* DIGITAL DETOX FOKUSMODUS INTERFACE */}
-              <div style={{ background: '#09090b', borderRadius: '20px', padding: '20px', border: '1px solid #27272a', color: 'white', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Moon size={18} color="#eab308" className="animate-pulse" />
-                    <span style={{ fontWeight: 800, fontSize: '0.85rem', letterSpacing: '0.02em', textTransform: 'uppercase', color: '#f8fafc' }}>Fokusmodus</span>
-                  </div>
-                  {!isPremiumUser && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(234,179,8,0.15)', border: '1px solid rgba(234,179,8,0.3)', color: '#eab308', padding: '2px 8px', borderRadius: '100px', fontSize: '0.65rem', fontWeight: 900 }}>
-                      <Lock size={10} /> PRO
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div style={{ position: 'relative', width: '70px', height: '70px', flexShrink: 0 }}>
-                    {/* Circle Background */}
-                    <svg width="70" height="70" viewBox="0 0 70 70">
-                      <circle cx="35" cy="35" r="30" fill="none" stroke="#27272a" strokeWidth="6" />
-                      <circle 
-                        cx="35" 
-                        cy="35" 
-                        r="30" 
-                        fill="none" 
-                        stroke={isPremiumUser ? '#eab308' : '#71717a'} 
-                        strokeWidth="6" 
-                        strokeDasharray={2 * Math.PI * 30}
-                        strokeDashoffset={2 * Math.PI * 30 * 0.4} // mock fill
-                        strokeLinecap="round"
-                        transform="rotate(-90 35 35)"
-                      />
-                    </svg>
-                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 900 }}>
-                      {detoxMinutes}m
-                    </div>
-                  </div>
-                  
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: '0.78rem', color: '#a1a1aa', margin: 0, lineHeight: '1.4' }}>
-                      {isPremiumUser 
-                        ? 'Handy umdrehen (flach aufs Display legen) zum Starten. Bildschirm schaltet ab. Drehen pausiert den Timer mit haptischem Feedback.' 
-                        : 'Fokus-Timer und haptische Detox-Erlebnisse sind für Premium-Mitglieder reserviert. Upgrade jetzt, um XP-Streaks freizuschalten.'
-                      }
-                    </p>
-                    
-                    {isPremiumUser ? (
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                        <button 
-                          onClick={handleStartDetox}
-                          style={{ background: '#eab308', color: '#09090b', border: 'none', padding: '8px 16px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
-                        >
-                          Fokus starten
-                        </button>
-                        <select 
-                          value={detoxMinutes} 
-                          onChange={(e) => setDetoxMinutes(Number(e.target.value))}
-                          style={{ background: '#27272a', color: 'white', border: '1px solid #3f3f46', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700 }}
-                        >
-                          <option value={1}>1 Minute (Test)</option>
-                          <option value={5}>5 Minuten</option>
-                          <option value={15}>15 Minuten</option>
-                          <option value={30}>30 Minuten</option>
-                        </select>
-                      </div>
-                    ) : (
-                      <button 
-                        onClick={() => alert("Upgrade auf Premium erforderlich! (Kosten: 0,49 €/Monat)")}
-                        style={{ marginTop: '12px', background: '#27272a', border: '1px solid #3f3f46', color: '#a1a1aa', padding: '8px 16px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-                      >
-                        <Lock size={12} /> Detox freischalten
-                      </button>
-                    )}
-                  </div>
-                </div>
+      {activeTab === 'briefing' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          
+          {/* TOP 4 KPIs ROW */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+            
+            {/* KPI 1: XP */}
+            <div style={{ 
+              background: 'linear-gradient(135deg, #0b57d0 0%, #3b82f6 100%)', 
+              borderRadius: '16px', 
+              color: 'white', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '12px', 
+              padding: '12px 16px', 
+              position: 'relative', 
+              overflow: 'hidden', 
+              boxShadow: '0 4px 15px rgba(11, 87, 208, 0.1)' 
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.18)', borderRadius: '10px', width: '32px', height: '32px', flexShrink: 0 }}>
+                <Star size={16} fill="currentColor" />
               </div>
-
-              {/* CAMPUS WRAPPED / MONTHLY FLASHBACK TRIGGER */}
-              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                    Rückblick &amp; Highlights
-                  </span>
-                  <Sparkles size={16} color="#4f46e5" />
-                </div>
-                
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <button 
-                    onClick={loadWrappedStory}
-                    disabled={wrappedLoading}
-                    style={{ 
-                      flex: 1, 
-                      padding: '14px', 
-                      background: 'linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%)', 
-                      color: 'white', 
-                      border: 'none', 
-                      borderRadius: '14px', 
-                      fontSize: '0.8rem', 
-                      fontWeight: 800, 
-                      cursor: 'pointer', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center', 
-                      gap: '8px', 
-                      boxShadow: '0 4px 12px rgba(79, 70, 229, 0.15)' 
-                    }}
-                  >
-                    {isPremiumUser ? '🎬 Monats-Story' : '🔒 Monats-Story'}
-                  </button>
-                  
-                  <button 
-                    onClick={loadWrappedStory}
-                    disabled={wrappedLoading}
-                    style={{ 
-                      flex: 1, 
-                      padding: '14px', 
-                      background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)', 
-                      color: 'white', 
-                      border: 'none', 
-                      borderRadius: '14px', 
-                      fontSize: '0.8rem', 
-                      fontWeight: 800, 
-                      cursor: 'pointer', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center', 
-                      gap: '8px', 
-                      boxShadow: '0 4px 12px rgba(234, 179, 8, 0.15)' 
-                    }}
-                  >
-                    {isPremiumUser ? '🔥 Campus Wrapped' : '🔒 Campus Wrapped'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Gamification progress */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.78rem' }}>
-                  <span style={{ fontWeight: 800, color: '#64748b' }}>Milestone-Ziel</span>
-                  <span style={{ fontWeight: 900, color: '#0b57d0', background: '#e8f0fe', padding: '2px 8px', borderRadius: '6px' }}>
-                    {briefingData.gamification.xpTargetMessage}
-                  </span>
-                </div>
-                <div style={{ width: '100%', background: '#f1f5f9', height: '10px', borderRadius: '100px', overflow: 'hidden' }}>
-                  <div 
-                    style={{ width: `${Math.max(10, Math.min(100, 100 - (briefingData.gamification.remainingXp / 50) * 100))}%`, height: '100%', borderRadius: '100px', background: 'linear-gradient(90deg, #ea580c, #f59e0b)', transition: 'all 0.5s' }}
-                  />
-                </div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Urbanist', sans-serif" }}>{currentXp || 0} XP</span>
+                <span style={{ fontSize: '0.65rem', fontWeight: 750, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>XP gesammelt</span>
               </div>
             </div>
-          ) : (
-            <div style={{ color: '#64748b', fontSize: '0.85rem' }}>Lade Briefing...</div>
-          )}
+
+            {/* KPI 2: Songs */}
+            <div style={{ 
+              background: 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)', 
+              borderRadius: '16px', 
+              color: 'white', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '12px', 
+              padding: '12px 16px', 
+              position: 'relative', 
+              overflow: 'hidden', 
+              boxShadow: '0 4px 15px rgba(22, 163, 74, 0.1)' 
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.18)', borderRadius: '10px', width: '32px', height: '32px', flexShrink: 0 }}>
+                <Award size={16} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Urbanist', sans-serif" }}>{wrappedData?.monthlyFlashback?.masteredSongsCount || 0} / 3</span>
+                <span style={{ fontSize: '0.65rem', fontWeight: 750, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>Songs verifiziert</span>
+              </div>
+            </div>
+
+            {/* KPI 3: Fokus */}
+            <div style={{ 
+              background: 'linear-gradient(135deg, #eab308 0%, #facc15 100%)', 
+              borderRadius: '16px', 
+              color: '#1f2937', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '12px', 
+              padding: '12px 16px', 
+              position: 'relative', 
+              overflow: 'hidden', 
+              boxShadow: '0 4px 15px rgba(234, 179, 8, 0.1)' 
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.06)', borderRadius: '10px', width: '32px', height: '32px', flexShrink: 0 }}>
+                <Clock size={16} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Urbanist', sans-serif" }}>{wrappedData?.monthlyFlashback?.focusMinutes || 0} Min</span>
+                <span style={{ fontSize: '0.65rem', fontWeight: 750, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>Fokus-Übezeit</span>
+              </div>
+            </div>
+
+            {/* KPI 4: Streak */}
+            <div style={{ 
+              background: 'linear-gradient(135deg, #ea580c 0%, #f97316 100%)', 
+              borderRadius: '16px', 
+              color: 'white', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '12px', 
+              padding: '12px 16px', 
+              position: 'relative', 
+              overflow: 'hidden', 
+              boxShadow: '0 4px 15px rgba(234, 88, 12, 0.1)' 
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.18)', borderRadius: '10px', width: '32px', height: '32px', flexShrink: 0 }}>
+                <Flame size={16} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Urbanist', sans-serif" }}>{avatar?.streak_flame || 0} Tage</span>
+                <span style={{ fontSize: '0.65rem', fontWeight: 750, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>Serie am Laufen</span>
+              </div>
+            </div>
+
+          </div>
+
+          {/* MAIN 2-COLUMN LAYOUT */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '24px', alignItems: 'start' }}>
+            
+            {/* LEFT COLUMN */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              
+              {/* Welcome Block */}
+              <div style={{ background: '#ffffff', borderRadius: '24px', padding: '18px 24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', position: 'relative', overflow: 'hidden' }}>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: 900, margin: '0 0 10px 0', color: '#1e293b', fontFamily: "'Urbanist', sans-serif" }}>
+                  Hallo. <span style={{ color: '#0b57d0' }}>Schüler 👋</span>
+                </h2>
+                <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                  <p style={{ fontSize: '0.9rem', color: '#475569', lineHeight: 1.5, margin: 0, flex: 1, fontWeight: 500 }}>
+                    Ein neuer Moment für Musik. Nimm dir heute ein paar Minuten für deine Übungsziele und sichere dir deine tägliche Serie!
+                  </p>
+                  <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Music size={30} color="#0b57d0" strokeWidth={1.5} />
+                  </div>
+                </div>
+                
+                {briefingData?.todayLesson || scheduleOccurrences?.length > 0 ? (() => {
+                  const nextOcc = scheduleOccurrences[0];
+                  const hasToday = !!briefingData?.todayLesson;
+                  
+                  const teacherId = hasToday ? briefingData.todayLesson.teacher_id : nextOcc?.teacher_id;
+                  const teacherName = hasToday ? briefingData.todayLesson.teacher : (nextOcc?.teacher ? `Herr/Frau ${nextOcc.teacher.last_name}` : 'Lehrkraft');
+                  const timeLabel = hasToday ? briefingData.todayLesson.time : nextOcc?.start_time?.substring(0, 5);
+                  
+                  const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+                  const dayLabel = hasToday ? 'Heute' : (nextOcc ? DAYS_DE[new Date(nextOcc.date).getDay()] : 'Termin');
+                  const label = `${dayLabel} ${timeLabel} Uhr`;
+
+                  return (
+                    <div style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#f5f3ff', color: '#7c3aed', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700 }}>
+                        <Calendar size={13} />
+                        <span>Nächster Unterricht: {hasToday ? `Heute, ${briefingData.todayLesson.time} Uhr` : (() => {
+                          if(!nextOcc) return 'Demnächst';
+                          const d = new Date(nextOcc.date);
+                          return `${d.toLocaleDateString('de-DE', {weekday: 'long', day: '2-digit', month: '2-digit'})} - ${nextOcc.start_time?.substring(0,5)} Uhr`;
+                        })()}</span>
+                      </div>
+
+                      {teacherId && (
+                        <button 
+                          onClick={() => {
+                            setAppointmentChatData({
+                              teacherId,
+                              date: hasToday ? new Date().toISOString().split('T')[0] : nextOcc.date,
+                              start_time: timeLabel,
+                              label
+                            });
+                            setShowAppointmentChat(true);
+                          }}
+                          style={{ 
+                            display: 'inline-flex', 
+                            alignItems: 'center', 
+                            gap: '6px', 
+                            background: '#dbeafe', 
+                            color: '#1e40af', 
+                            padding: '6px 12px', 
+                            borderRadius: '10px', 
+                            fontSize: '0.75rem', 
+                            fontWeight: 700,
+                            border: 'none',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseOver={e => e.currentTarget.style.background = '#bfdbfe'}
+                          onMouseOut={e => e.currentTarget.style.background = '#dbeafe'}
+                        >
+                          <MessageSquare size={13} />
+                          <span>Absprache (Shoutbox)</span>
+                        </button>
+                      )}
+                    </div>
+                  );
+                })() : (
+                  <div style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#f5f3ff', color: '#7c3aed', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700 }}>
+                    <Calendar size={13} />
+                    <span>Nächster Unterricht: Demnächst</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Hausaufgaben & Übesoll Row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                {/* Hausaufgaben */}
+                <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', borderLeft: '6px solid #22c55e' }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#16a34a', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '16px' }}>AKTUELLE HAUSAUFGABEN (2):</div>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    🎹 🎸 GrooveLab Guitar Vol. 1
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '8px 12px', borderRadius: '8px' }}>
+                      <span style={{ fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}><strong>S. 6</strong> Nr. 5 ist gut üben</span>
+                      <div style={{ background: '#dcfce7', color: '#16a34a', borderRadius: '4px', padding: '2px 4px' }}><Check size={14} strokeWidth={3} /></div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '8px 12px', borderRadius: '8px' }}>
+                      <span style={{ fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}><strong>S. 7</strong> Inhalt der Seite üben und meistern! 📖</span>
+                      <div style={{ background: '#dcfce7', color: '#16a34a', borderRadius: '4px', padding: '2px 4px' }}><Check size={14} strokeWidth={3} /></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Übesoll */}
+                <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', flex: 1 }}>
+                    <div style={{ color: '#cbd5e1' }}>
+                      <Flame size={32} fill="currentColor" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '4px' }}>TÄGLICHES ÜBESOLL (HEUTE)</div>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', marginBottom: '8px' }}>Tägliche Übezeit noch offen</div>
+                      <div style={{ fontSize: '0.8rem', color: '#64748b', lineHeight: 1.4 }}>Starte jetzt deinen Fokus-Übemodus, um deine Flammen zu schützen! ⚡️</div>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setActiveTab('practice_board')}
+                    style={{ background: '#4f46e5', color: 'white', border: 'none', borderRadius: '12px', padding: '12px', fontWeight: 800, fontSize: '0.9rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.2)' }}>
+                    🚀 Üben starten
+                  </button>
+                </div>
+              </div>
+
+              {/* Flame Tiers */}
+              <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>🔥 Übe-Serie & Flammen</h3>
+                  <div style={{ background: '#ffedd5', color: '#ea580c', fontSize: '0.75rem', fontWeight: 800, padding: '4px 12px', borderRadius: '100px' }}>0 Tage</div>
+                </div>
+                <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '0 0 20px 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ color: '#ef4444' }}>🔥 Helden-Feuer aktiv! Mindestzeit: 10 Min.</span>
+                  <span style={{ color: '#eab308' }}>🔥 Serie aktiv! Täglich mindestens 10 Min. ⚡️</span>
+                </p>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '16px' }}>
+                  {/* Kleine Flamme */}
+                  <div style={{ background: '#fef08a', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', minHeight: '100px' }}>
+                    <div style={{ color: '#eab308' }}><Flame size={24} fill="currentColor" /></div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#854d0e' }}>Kleine Flamme</div>
+                    <div style={{ fontSize: '0.65rem', color: '#a16207' }}>Stufe 1 (Tag 3+) | 3 Min |</div>
+                  </div>
+                  {/* Mittlere Flamme */}
+                  <div style={{ background: '#ffedd5', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', minHeight: '100px' }}>
+                    <div style={{ color: '#f97316' }}><Flame size={24} fill="currentColor" /></div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#9a3412' }}>Mittlere Flamme</div>
+                    <div style={{ fontSize: '0.65rem', color: '#c2410c' }}>Stufe 2 (Tag 6+) | 5 Min |</div>
+                  </div>
+                  {/* Helden-Feuer */}
+                  <div style={{ background: '#fee2e2', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', minHeight: '100px' }}>
+                    <div style={{ color: '#ef4444' }}><Flame size={24} fill="currentColor" /></div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#991b1b' }}>Helden-Feuer</div>
+                    <div style={{ fontSize: '0.65rem', color: '#b91c1c' }}>Stufe 3 (Tag 9+) | 10 Min |</div>
+                  </div>
+                </div>
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: '#64748b' }}>
+                  <span>👍 Joker bereit</span>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <span>Test:</span>
+                    <select style={{ border: '1px solid #e2e8f0', borderRadius: '4px', padding: '2px 8px', fontSize: '0.7rem' }}><option>Tag 0</option></select>
+                    <select style={{ border: '1px solid #e2e8f0', borderRadius: '4px', padding: '2px 8px', fontSize: '0.7rem' }}><option>0 Fehl</option></select>
+                    <button style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '2px 8px', fontSize: '0.7rem', fontWeight: 600 }}>Real Geübt</button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* RIGHT COLUMN */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              
+              {/* Nächste Termine */}
+              <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Calendar size={18} color="#ef4444" />
+                    <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Nächste Termine</h3>
+                  </div>
+                  <button onClick={() => handleTabChangeLocal('events')} style={{ background: 'transparent', border: 'none', color: '#0b57d0', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>Alle anzeigen</button>
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {(() => {
+                    const upcomingConfirmed = (scheduleOccurrences || []).filter(occ => 
+                      occ.status === 'scheduled' || occ.status === 'rescheduled_confirmed'
+                    );
+                    if (upcomingConfirmed.length > 0) {
+                      return upcomingConfirmed.slice(0, 3).map(occ => {
+                        const d = new Date(occ.date);
+                        return (
+                          <div key={occ.id} style={{ display: 'flex', gap: '16px', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
+                            <div style={{ width: '48px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
+                              <div style={{ background: '#ef4444', color: 'white', fontSize: '0.6rem', fontWeight: 800, padding: '4px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
+                              <div style={{ background: 'white', color: '#1e293b', fontSize: '1.2rem', fontWeight: 900, padding: '6px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</div>
+                              <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>{occ.start_time?.substring(0,5)} <span style={{ color: '#22c55e' }}>Groovelab</span></div>
+                            </div>
+                          </div>
+                        );
+                      });
+                    } else {
+                      return <div style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', padding: '20px 0' }}>Keine Termine verfügbar.</div>;
+                    }
+                  })()}
+                </div>
+              </div>
+
+              {/* Terminänderungen */}
+              {(() => {
+                const appointmentChanges = (scheduleOccurrences || []).filter(occ => 
+                  !occ.student_acknowledged && (
+                    occ.status === 'pending_reschedule' || 
+                    occ.status === 'cancelled' || 
+                    (occ.status === 'scheduled' && occ.original_date && occ.date === occ.original_date)
+                  )
+                );
+                if (appointmentChanges.length === 0) return null;
+                
+                return (
+                  <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: '2px dashed #f59e0b' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                      <Calendar size={18} color="#f59e0b" />
+                      <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Terminänderungen</h3>
+                    </div>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {appointmentChanges.map(occ => {
+                        const d = new Date(occ.date);
+                        const isReschedule = occ.status === 'pending_reschedule';
+                        const isCancelled = occ.status === 'cancelled';
+                        const isRegularReset = occ.status === 'scheduled' && occ.original_date && occ.date === occ.original_date;
+                        
+                        let cardBg = '#fef2f2';
+                        let cardBorder = '#fecaca';
+                        let badgeText = '❌ Termin abgesagt';
+                        let badgeColor = '#991b1b';
+                        
+                        if (isReschedule) {
+                          cardBg = '#fffbeb';
+                          cardBorder = '#fef08a';
+                          badgeText = '🔄 Neuer Termin vorgeschlagen';
+                          badgeColor = '#854d0e';
+                        } else if (isRegularReset) {
+                          cardBg = '#ecfdf5';
+                          cardBorder = '#a7f3d0';
+                          badgeText = '❇️ Termin wieder regulär';
+                          badgeColor = '#065f46';
+                        }
+                        
+                        return (
+                          <div key={occ.id} style={{ 
+                            padding: '16px', 
+                            borderRadius: '16px', 
+                            background: cardBg, 
+                            border: `1.5px solid ${cardBorder}`, 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            gap: '12px' 
+                          }}>
+                            <div>
+                              <div style={{ fontSize: '0.75rem', fontWeight: 800, color: badgeColor, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+                                {badgeText}
+                              </div>
+                              <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>
+                                {d.toLocaleDateString('de-DE', {weekday: 'long', day: '2-digit', month: '2-digit'})}
+                              </div>
+                              <div style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600, marginTop: '2px' }}>
+                                {occ.start_time?.substring(0,5)} Uhr
+                              </div>
+                              {isRegularReset && (
+                                <div style={{ fontSize: '0.75rem', color: '#047857', fontWeight: 500, marginTop: '4px' }}>
+                                  Dieser Termin findet nun wieder wie ursprünglich geplant statt.
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                              {isReschedule ? (
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <button 
+                                    onClick={() => handleRejectReschedule(occ)}
+                                    style={{ 
+                                      background: '#ef4444', 
+                                      color: 'white', 
+                                      border: 'none', 
+                                      padding: '6px 12px', 
+                                      borderRadius: '8px', 
+                                      fontSize: '0.75rem', 
+                                      fontWeight: 700, 
+                                      cursor: 'pointer',
+                                      boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)',
+                                      transition: 'all 0.2s'
+                                    }}
+                                  >
+                                    Ablehnen
+                                  </button>
+                                  <button 
+                                    onClick={() => handleConfirmReschedule(occ.id)}
+                                    style={{ 
+                                      background: '#eab308', 
+                                      color: 'white', 
+                                      border: 'none', 
+                                      padding: '6px 12px', 
+                                      borderRadius: '8px', 
+                                      fontSize: '0.75rem', 
+                                      fontWeight: 700, 
+                                      cursor: 'pointer',
+                                      boxShadow: '0 2px 4px rgba(234, 179, 8, 0.2)',
+                                      transition: 'all 0.2s'
+                                    }}
+                                  >
+                                    Bestätigen
+                                  </button>
+                                </div>
+                              ) : (
+                                <button 
+                                  onClick={() => handleAcknowledgeCancellation(occ.id)}
+                                  style={{ 
+                                    background: isRegularReset ? '#10b981' : '#ef4444', 
+                                    color: 'white', 
+                                    border: 'none', 
+                                    padding: '6px 12px', 
+                                    borderRadius: '8px', 
+                                    fontSize: '0.75rem', 
+                                    fontWeight: 700, 
+                                    cursor: 'pointer',
+                                    boxShadow: `0 2px 4px ${isRegularReset ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
+                                    transition: 'all 0.2s'
+                                  }}
+                                >
+                                  Gelesen abhaken
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* LIVE CAMPUS FEED */}
+              <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px' }}>
+                  <Sparkles size={18} color="#eab308" />
+                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Live Campus Feed</h3>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  {/* Feed Item 1 */}
+                  <div style={{ position: 'relative' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ background: '#fef08a', color: '#854d0e', fontSize: '0.65rem', fontWeight: 800, padding: '4px 8px', borderRadius: '100px' }}>AKTION</span>
+                      <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Heute</span>
+                    </div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', marginBottom: '6px' }}>🎸 Sommer Rock-Bandcamp 2026</div>
+                    <div style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.5 }}>Melde dich jetzt für unser Band-Camp an! Frist endet in 4 Tagen.</div>
+                  </div>
+
+                  {/* Feed Item 2 */}
+                  <div style={{ position: 'relative' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ background: '#fee2e2', color: '#b91c1c', fontSize: '0.65rem', fontWeight: 800, padding: '4px 8px', borderRadius: '100px' }}>WICHTIG</span>
+                      <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Vor 2 Tagen</span>
+                    </div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', marginBottom: '6px' }}>🎹 Neue Digitalpianos im Studio 3</div>
+                    <div style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.5 }}>Ab sofort stehen euch 4 neue Yamaha Masterpianos zum Üben bereit!</div>
+                  </div>
+
+                  {/* Feed Item 3 */}
+                  <div style={{ position: 'relative' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ background: '#dcfce7', color: '#15803d', fontSize: '0.65rem', fontWeight: 800, padding: '4px 8px', borderRadius: '100px' }}>ERFOLG</span>
+                      <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Vor 3 Tagen</span>
+                    </div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', marginBottom: '6px' }}>🎉 Stuttgart knackt die 400</div>
+                    <div style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.5 }}>Über 400 aktive Musiker am Campus Stuttgart! Wir feiern euch.</div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
         </div>
       )}
-
+      
       {activeTab === 'hero' && (
         <div style={{
           background: '#ffffff',
@@ -2715,6 +3363,90 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Appointment Quick Chat (Shoutbox) Modal */}
+      {showAppointmentChat && appointmentChatData && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'white', padding: '24px', borderRadius: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.15)', width: '420px', maxWidth: '90vw', border: '1px solid rgba(255,255,255,0.5)', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', height: '480px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#1e293b' }}>Shoutbox – Terminabsprache</h3>
+                <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>1:1 Absprache mit deiner Lehrkraft</p>
+              </div>
+              <button 
+                onClick={() => setShowAppointmentChat(false)}
+                style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Chat messages viewport */}
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', paddingRight: '4px' }}>
+              {chatMessages.length === 0 ? (
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.8rem', textAlign: 'center', padding: '16px' }}>
+                  Noch keine Nachrichten. Schreib deiner Lehrkraft für eine schnelle Absprache.
+                </div>
+              ) : (
+                chatMessages.map((msg, idx) => {
+                  const isMe = msg.sender_id === studentId;
+                  const isTerminMsg = msg.content.startsWith('[Termin');
+                  let displayedContent = msg.content;
+                  let prefixText = '';
+                  if (isTerminMsg) {
+                    const closeBracketIdx = msg.content.indexOf(']');
+                    if (closeBracketIdx !== -1) {
+                      prefixText = msg.content.substring(1, closeBracketIdx);
+                      displayedContent = msg.content.substring(closeBracketIdx + 1).trim();
+                    }
+                  }
+
+                  return (
+                    <div key={msg.id || idx} style={{ display: 'flex', flexDirection: 'column', alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '85%' }}>
+                      {prefixText && (
+                        <span style={{ fontSize: '0.65rem', color: '#64748b', marginBottom: '2px', alignSelf: isMe ? 'flex-end' : 'flex-start', fontWeight: 600 }}>
+                          📅 {prefixText}
+                        </span>
+                      )}
+                      <div style={{ 
+                        background: isMe ? '#4f46e5' : '#f1f5f9', 
+                        color: isMe ? 'white' : '#1e293b', 
+                        padding: '8px 12px', 
+                        borderRadius: '12px', 
+                        borderBottomRightRadius: isMe ? '2px' : '12px',
+                        borderBottomLeftRadius: isMe ? '12px' : '2px',
+                        fontSize: '0.82rem',
+                        lineHeight: 1.4,
+                        wordBreak: 'break-word'
+                      }}>
+                        {displayedContent}
+                      </div>
+                      <span style={{ fontSize: '0.6rem', color: '#64748b', marginTop: '2px', alignSelf: isMe ? 'flex-end' : 'flex-start' }}>
+                        {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+              <div ref={chatMessagesEndRef} />
+            </div>
+
+            {/* Send Input Form */}
+            <form onSubmit={handleSendChatMessage} style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
+              <input 
+                type="text" 
+                placeholder="Nachricht senden..." 
+                value={chatTypedMessage}
+                onChange={e => setChatTypedMessage(e.target.value)}
+                style={{ flex: 1, padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+              />
+              <button type="submit" style={{ background: '#4f46e5', color: 'white', border: 'none', borderRadius: '12px', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.15)' }}>
+                <Send size={14} />
+              </button>
+            </form>
+          </div>
         </div>
       )}
       

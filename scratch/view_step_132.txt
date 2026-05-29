@@ -1,0 +1,73 @@
+Created At: 2026-05-28T06:14:30Z
+Completed At: 2026-05-28T06:14:30Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1186
+Total Bytes: 55333
+Showing lines 1 to 800
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+1: import React, { useState, useEffect } from 'react';
+2: import { X, Calendar, Music, Award, Star, Clock, User, Users, Shield, BookOpen, GraduationCap, LayoutDashboard, Sliders } from 'lucide-react';
+3: import { supabase } from '../lib/supabase';
+4: import QRCode from 'react-qr-code';
+5: import { 
+6:   ResponsiveContainer,
+7:   RadarChart, PolarGrid, PolarAngleAxis, Radar
+8: } from 'recharts';
+9: 
+10: import { renderInstrumentIcon } from '../utils/instruments';
+11: 
+12: interface StudentDetailModalProps {
+13:   student: any;
+14:   onClose: () => void;
+15:   onOpenBandProfile?: (band: any) => void;
+16:   activePlatform?: 'secretary' | 'campus' | 'groovelab';
+17:   onSwitchPlatform?: (newPlatform: 'campus' | 'groovelab') => void;
+18: }
+19: 
+20: export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student, onClose, onOpenBandProfile, activePlatform, onSwitchPlatform }) => {
+21:   const [skills, setSkills] = useState<any[]>([]);
+22:   const [bands, setBands] = useState<any[]>([]);
+23:   const [vocalsSongIds, setVocalsSongIds] = useState<Set<string>>(new Set());
+24:   const [loading, setLoading] = useState(true);
+25:   const [showFullPhoto, setShowFullPhoto] = useState(false);
+26:   const [sessionsList, setSessionsList] = useState<any[]>([]);
+27:   const [planningList, setPlanningList] = useState<any[]>([]);
+28:   const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? false);
+29:   const [isGroovelabActive, setIsGroovelabActive] = useState<boolean>(student.is_gr
+<truncated 35249 bytes>
+                   borderRadius: '50%',
+767:                           background: '#ffffff',
+768:                           position: 'absolute',
+769:                           top: '2px',
+770:                           left: isGroovelabActive ? '22px' : '2px',
+771:                           transition: 'left 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
+772:                           boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+773:                         }} />
+774:                       </button>
+775:                     </div>
+776:                   </div>
+777:                            {/* Premium Digital Campus ID Card Badge - APPLE WALLET STYLE (Vertical Edition) */}
+778:                 <div className="hover-scale" style={{ 
+779:                   background: 'linear-gradient(135deg, #137333 0%, #0c4a21 100%)', 
+780:                   borderRadius: '24px', 
+781:                   padding: '24px', 
+782:                   color: 'white',
+783:                   boxShadow: '0 20px 45px rgba(19, 115, 51, 0.15)',
+784:                   border: '1px solid rgba(255, 255, 255, 0.15)',
+785:                   display: 'flex',
+786:                   flexDirection: 'column',
+787:                   gap: '20px',
+788:                   position: 'relative',
+789:                   overflow: 'hidden',
+790:                   width: '100%',
+791:                   minHeight: '390px',
+792:                   boxSizing: 'border-box'
+793:                 }}>
+794:                   {/* Glossy light effect */}
+795:                   <div style={{
+796:                     position: 'absolute',
+797:                     top: '-40%', left: '-40%', right: '-40%', bottom: '-40%',
+798:                     background: 'radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 60%)',
+799:                     pointerEvents: 'none'
+800:                   }} />
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

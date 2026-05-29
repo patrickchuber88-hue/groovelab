@@ -1,0 +1,8 @@
+{
+  "AbsolutePath": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "EndLine": "520",
+  "IsSkillFile": "false",
+  "StartLine": "420",
+  "toolAction": "\"Viewing Briefing board in StudentAvatarDashboard.tsx\"",
+  "toolSummary": "\"Check student briefing board in StudentAvatarDashboard.tsx\""
+}

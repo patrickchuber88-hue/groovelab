@@ -1,0 +1,8 @@
+{
+  "Description": "\"Fix CSS style properties named tracking by converting them to letterSpacing in StudentAvatarDashboard.tsx.\"",
+  "Instruction": "\"Change tracking style properties to letterSpacing.\"",
+  "ReplacementChunks": "[{\"AllowMultiple\":false,\"EndLine\":817,\"ReplacementContent\":\"                  <span style={{ fontSize: '9px', fontWeight: 900, color: '#a855f7', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{mem.date}</span>\",\"StartLine\":813,\"TargetContent\":\"                  <span style={{ fontSize: '9px', fontWeight: 900, color: '#a855f7', textTransform: 'uppercase', tracking: '0.05em' }}>{mem.date}</span>\"},{\"AllowMultiple\":false,\"EndLine\":886,\"ReplacementContent\":\"                    <span style={{ fontSize: '48px', fontWeight: 900, fontFamily: 'monospace', letterSpacing: '0.05em' }}>{formatTime(secondsLeft)}</span>\",\"StartLine\":882,\"TargetContent\":\"                    <span style={{ fontSize: '48px', fontWeight: 900, fontFamily: 'monospace', tracking: '0.05em' }}>{formatTime(secondsLeft)}</span>\"}]",
+  "TargetFile": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "toolAction": "\"Replacing tracking style properties\"",
+  "toolSummary": "\"Fix tracking styles in StudentAvatarDashboard\""
+}

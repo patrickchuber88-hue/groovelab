@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
@@ -88,14 +88,39 @@ const renderBandAvatar = (name: string, photoUrl?: string | null, size: string =
 const brandColor = 'var(--primary-color)';
 
 // --- ANTI-FLICKER AVATAR SYSTEM ---
+const getInstrumentAvatarUrl = (instrument: string | null | undefined): string => {
+  if (!instrument) return '/avatars/guitar_avatar.png';
+  const inst = instrument.toLowerCase().trim();
+  if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/guitar_avatar.png';
+  if (inst.includes('bass')) return '/avatars/bass_avatar.png';
+  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/drums_avatar.png';
+  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/piano_avatar.png';
+  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/vocals_avatar.png';
+  if (inst.includes('trompete') || inst.includes('trumpet')) return '/avatars/trumpet_avatar.png';
+  if (inst.includes('posaune') || inst.includes('trombone')) return '/avatars/trombone_avatar.png';
+  if (inst.includes('horn')) return '/avatars/horn_avatar.png';
+  if (inst.includes('cello')) return '/avatars/cello_avatar.png';
+  if (inst.includes('geige') || inst.includes('violin') || inst.includes('violine')) return '/avatars/violin_avatar.png';
+  if (inst.includes('klarinette') || inst.includes('clarinet')) return '/avatars/clarinet_avatar.png';
+  if (inst.includes('querflöte') || inst.includes('flute')) return '/avatars/flute_avatar.png';
+  if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return '/avatars/saxophone_avatar.png';
+  return '/avatars/guitar_avatar.png';
+};
+
+// --- ANTI-FLICKER AVATAR SYSTEM ---
 const AvatarImage = React.memo(({ src, style, className, user, userId, onClick }: { src: string | null, style?: React.CSSProperties, className?: string, user?: any, userId?: string, onClick?: () => void }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
 
   const displaySrc = useMemo(() => {
+    // Campus rules: always enforce instrument avatar if available
+    const targetUser = user;
+    if (targetUser && (targetUser.instrument || targetUser.role === 'student' || targetUser.role === 'teacher')) {
+      return getInstrumentAvatarUrl(targetUser.instrument);
+    }
     if (hasError || !src) return '/avatar_ghost.jpg';
     return src;
-  }, [src, hasError]);
+  }, [src, hasError, user]);
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -488,6 +513,7 @@ interface TeacherDashboardProps {
   setIsSidebarCollapsed?: (collapsed: boolean) => void;
   onSidebarNotificationsChange?: (count: number) => void;
   activePlatform?: 'campus' | 'groovelab';
+  onSwitchPlatform?: (newPlatform: 'campus' | 'groovelab') => void;
 }
 
 export function TeacherDashboard({ 
@@ -776,6 +802,109 @@ export function TeacherDashboard({
   const [briefingData, setBriefingData] = useState<any>(null);
   const [briefingLoading, setBriefingLoading] = useState(true);
 
+  const [currentTimeStr, setCurrentTimeStr] = useState<string>(() => {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  });
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setCurrentTimeStr(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const activeStudent = useMemo(() => {
+    if (!briefingData?.timeline || briefingData.timeline.length === 0) return null;
+    
+    // 1. Try to find slot that is currently active by time
+    const activeSlot = briefingData.timeline.find((slot: any, idx: number) => {
+      const slotStart = slot.timeSlot;
+      const nextSlot = briefingData.timeline[idx + 1];
+      const slotEnd = nextSlot ? nextSlot.timeSlot : (() => {
+        const [sh, sm] = slotStart.split(':').map(Number);
+        const totalMin = sh * 60 + sm + 30;
+        return `${String(Math.floor(totalMin / 60) % 24).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')}`;
+      })();
+      return currentTimeStr >= slotStart && currentTimeStr < slotEnd && slot.student;
+    });
+    if (activeSlot?.student) return activeSlot.student;
+
+    // 2. Fallback to first upcoming student
+    const upcomingSlot = briefingData.timeline.find((slot: any) => {
+      return currentTimeStr < slot.timeSlot && slot.student;
+    });
+    if (upcomingSlot?.student) return upcomingSlot.student;
+
+    // 3. Fallback to first student of the day
+    const firstStudentSlot = briefingData.timeline.find((slot: any) => slot.student);
+    return firstStudentSlot?.student || null;
+  }, [briefingData?.timeline, currentTimeStr]);
+
+  const [dynamicPrepMirror, setDynamicPrepMirror] = useState<any>(null);
+  const [loadingPrepMirror, setLoadingPrepMirror] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!activeStudent?.id) {
+      setDynamicPrepMirror(null);
+      return;
+    }
+
+    const loadPrepForStudent = async () => {
+      try {
+        setLoadingPrepMirror(true);
+        const studentId = activeStudent.id;
+        
+        const [avatarRes, progressRes] = await Promise.all([
+          supabase
+            .from('avatars')
+            .select('evolution_level, xp, avatar_style')
+            .eq('user_id', studentId)
+            .maybeSingle(),
+          supabase
+            .from('user_progress')
+            .select(`
+              current_level,
+              stage_ready_badge,
+              last_updated,
+              exercises (title, description)
+            `)
+            .eq('user_id', studentId)
+            .order('last_updated', { ascending: false })
+            .limit(3)
+        ]);
+
+        const studentAvatar = avatarRes.data;
+        const recentProgress = progressRes.data;
+
+        const verifiedSongs = (recentProgress || []).map((p: any) => ({
+          title: p.exercises?.title || 'Übungssong',
+          status: p.stage_ready_badge ? 'verifiziert' : 'in_progress',
+          level: p.current_level || 1,
+          note: p.exercises?.description || ''
+        }));
+
+        setDynamicPrepMirror({
+          studentId,
+          studentName: activeStudent.name,
+          timeSlot: briefingData.timeline.find((s: any) => s.student?.id === studentId)?.timeSlot || '',
+          streakCount: studentAvatar?.avatar_style === 'Premium_Hero' ? 6 : 0,
+          evolutionLevel: studentAvatar?.evolution_level || 1,
+          verifiedSongs
+        });
+      } catch (e) {
+        console.error('Error loading dynamic prep:', e);
+      } finally {
+        setLoadingPrepMirror(false);
+      }
+    };
+
+    loadPrepForStudent();
+  }, [activeStudent?.id, briefingData?.timeline]);
+
   useEffect(() => {
     const loadBriefing = async () => {
       if (!userId) return;
@@ -794,18 +923,12 @@ export function TeacherDashboard({
         try {
           const { data: teacherProfile } = await supabase
             .from('users')
-            .select('school_id')
+            .select('school_id, schools(allow_messages_global)')
             .eq('id', userId)
             .single();
 
           if (!teacherProfile) return;
-          const schoolId = teacherProfile.school_id;
-
-          const { data: schoolData } = await supabase
-            .from('schools')
-            .select('allow_messages_global')
-            .eq('id', schoolId)
-            .single();
+          const schoolData = Array.isArray(teacherProfile.schools) ? teacherProfile.schools[0] : teacherProfile.schools;
           const allowMessages = schoolData?.allow_messages_global ?? true;
 
           const rawDay = new Date().getDay();
@@ -859,23 +982,28 @@ export function TeacherDashboard({
 
           if (nextSlot && nextSlot.student) {
             const studentId = nextSlot.student.id;
-            const { data: studentAvatar } = await supabase
-              .from('avatars')
-              .select('evolution_level, xp, avatar_style')
-              .eq('user_id', studentId)
-              .maybeSingle();
+            
+            const [avatarRes, progressRes] = await Promise.all([
+              supabase
+                .from('avatars')
+                .select('evolution_level, xp, avatar_style')
+                .eq('user_id', studentId)
+                .maybeSingle(),
+              supabase
+                .from('user_progress')
+                .select(`
+                  current_level,
+                  stage_ready_badge,
+                  last_updated,
+                  exercises (title, description)
+                `)
+                .eq('user_id', studentId)
+                .order('last_updated', { ascending: false })
+                .limit(3)
+            ]);
 
-            const { data: recentProgress } = await supabase
-              .from('user_progress')
-              .select(`
-                current_level,
-                stage_ready_badge,
-                last_updated,
-                exercises (title, description)
-              `)
-              .eq('user_id', studentId)
-              .order('last_updated', { ascending: false })
-              .limit(3);
+            const studentAvatar = avatarRes.data;
+            const recentProgress = progressRes.data;
 
             const verifiedSongs = (recentProgress || []).map((p: any) => ({
               title: p.exercises?.title || 'Übungssong',
@@ -982,11 +1110,19 @@ export function TeacherDashboard({
     supabase.from('users').update({ last_seen: new Date().toISOString() }).eq('id', userId).then(() => {});
 
     try {
-      // 0. Shoutbox
+      // 0. Shoutbox & Profile Info (Fetched in parallel first)
       let bIds: string[] = [];
-      const { data: mBands } = await supabase.from('band_members').select('band_id').eq('user_id', userId);
+      const [mBandsRes, cBandsRes, tDataRes] = await Promise.all([
+        supabase.from('band_members').select('band_id').eq('user_id', userId),
+        supabase.from('bands').select('id').eq('coach_id', userId),
+        supabase.from('users').select('*, schools(*)').eq('id', userId).single()
+      ]);
+
+      const mBands = mBandsRes.data;
+      const cBands = cBandsRes.data;
+      const tData = tDataRes.data;
+
       if (mBands) bIds.push(...mBands.map(b => b.band_id));
-      const { data: cBands } = await supabase.from('bands').select('id').eq('coach_id', userId);
       if (cBands) bIds.push(...cBands.map(b => b.id));
       bIds = [...new Set(bIds)];
 
@@ -997,20 +1133,69 @@ export function TeacherDashboard({
       }
 
       // 1. Info
-      const { data: tData } = await supabase.from('users').select('*, schools(*)').eq('id', userId).single();
       setTeacher(tData);
 
       if (tData?.school_id) {
-        // 2. Stations
-        const { data: rData } = await supabase
-          .from('rooms')
-          .select('*')
-          .eq('school_id', tData.school_id)
-          .order('sort_order', { ascending: true });
-        setRooms(rData || []);
+        // Prepare Student Query depending on platform
+        let studentQuery = supabase.from('users').select('*').eq('school_id', tData.school_id).eq('role', 'student');
+        if (activePlatform === 'campus') {
+          studentQuery = studentQuery.eq('is_campus_active', true);
+        } else {
+          studentQuery = studentQuery.eq('is_groovelab_active', true);
+        }
 
-        const { data: avData } = await supabase.from('user_availability').select('*');
+        // Concurrently query all school-based dashboard resources (11 queries in parallel)
+        const [
+          rRes,
+          avRes,
+          sessRes,
+          coachesRes,
+          subRes,
+          bRes,
+          studRes,
+          helpRes,
+          formingBandsRes,
+          wallRes,
+          occRes
+        ] = await Promise.all([
+          supabase.from('rooms').select('*').eq('school_id', tData.school_id).order('sort_order', { ascending: true }),
+          supabase.from('user_availability').select('*'),
+          supabase.from('sessions').select('*, users!inner(*), stations(*)').is('check_out_time', null),
+          supabase.from('users').select('*').in('role', ['teacher', 'admin']).eq('school_id', tData.school_id),
+          supabase.from('user_song_skills').select('*, users!user_id(*), songs(*)').eq('is_pending_approval', true),
+          supabase.from('bands').select('*, band_members(*, users(*)), coach:users!coach_id(id, first_name, last_name, photo_url), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))').eq('school_id', tData.school_id).order('name'),
+          studentQuery.order('first_name'),
+          viewMode !== 'student' 
+            ? supabase.from('help_requests').select('*, users(*)').eq('school_id', tData.school_id).eq('status', 'pending').order('created_at', { ascending: false })
+            : Promise.resolve({ data: null, error: null }),
+          supabase.from('bands').select('*, band_members(*, profiles:users(id, first_name, last_name, photo_url, created_at, birth_date)), songs(*), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, last_name, photo_url, created_at, birth_date)))').eq('school_id', tData.school_id).in('status', ['forming', 'active']),
+          supabase.from('songs').select(`
+            id, artist, title, media_link, instrumentation,
+            user_song_skills (
+              id, song_id, progress_percent, instrument, part_number, difficulty_level, is_stage_ready, user_id, created_at, formation_group,
+              profiles:users!user_song_skills_user_id_fkey(first_name, photo_url, school_id)
+            )
+          `).eq('school_id', tData.school_id),
+          supabase.from('band_song_slots').select('user_id, band_songs(song_id)')
+        ]);
+
+        const rData = rRes.data;
+        const avData = avRes.data;
+        const sessData = sessRes.data;
+        const sessErr = sessRes.error;
+        const allCoaches = coachesRes.data;
+        const subData = subRes.data;
+        const bData = bRes.data;
+        const studData = studRes.data;
+        const helpData = helpRes.data;
+        const formingBands = formingBandsRes.data;
+        const wallData = wallRes.data;
+        const wallErr = wallRes.error;
+        const occupiedSlots = occRes.data;
+
+        setRooms(rData || []);
         setAvailabilities(avData || []);
+        
         if (rData && rData.length > 0 && !selectedRoomId) {
           const savedRoomId = localStorage.getItem('groovelab_teacher_selected_room_id');
           if (savedRoomId && rData.some(r => r.id === savedRoomId)) {
@@ -1023,12 +1208,6 @@ export function TeacherDashboard({
         const { data: sData } = await supabase.from('stations').select('*').in('room_id', roomIds).order('name');
         setStations(sData || []);
 
-        // 3. Sessions - THE CORE
-        const { data: sessData, error: sessErr } = await supabase
-          .from('sessions')
-          .select('*, users!inner(*), stations(*)')
-          .is('check_out_time', null);
-        
         if (sessErr) {
           console.error('[Dashboard] Error fetching sessions:', sessErr);
           return;
@@ -1052,7 +1231,6 @@ export function TeacherDashboard({
         setActiveSessions(trulyActive);
 
         // 4. Coaches
-        const { data: allCoaches } = await supabase.from('users').select('*').in('role', ['teacher', 'admin']).eq('school_id', tData.school_id);
         const hidePresence = sessionStorage.getItem('groovelab_teacher_hide_presence') === 'true';
         const isHomeMode = sessionStorage.getItem('groovelab_location_mode') === 'home';
         
@@ -1066,7 +1244,6 @@ export function TeacherDashboard({
         setCoaches(activeCoaches.map(c => ({ id: c.id, users: c, session: trulyActive.find(s => s.user_id === c.id) })));
 
         // 5. Challenges
-        const { data: subData } = await supabase.from('user_song_skills').select('*, users!user_id(*), songs(*)').eq('is_pending_approval', true);
         const filteredSubs = (subData || []).filter((s: any) => (Array.isArray(s.users) ? s.users[0] : s.users)?.school_id === tData.school_id);
         const mappedSubs = filteredSubs.map((s: any) => ({ ...s, users: Array.isArray(s.users) ? s.users[0] : s.users, songs: Array.isArray(s.songs) ? s.songs[0] : s.songs }));
         setAllSubmissions(mappedSubs);
@@ -1076,49 +1253,13 @@ export function TeacherDashboard({
         setSubmissions(activeInLabSubs);
 
         // 6. Bands
-        const { data: bData } = await supabase.from('bands').select('*, band_members(*, users(*)), coach:users!coach_id(id, first_name, last_name, photo_url), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))').eq('school_id', tData.school_id).order('name');
         setAllBands(bData || []);
 
         // 7. Students
-        let studentQuery = supabase.from('users').select('*').eq('school_id', tData.school_id).eq('role', 'student');
-        if (activePlatform === 'campus') {
-          studentQuery = studentQuery.eq('is_campus_active', true);
-        } else {
-          studentQuery = studentQuery.eq('is_groovelab_active', true);
-        }
-        const { data: studData } = await studentQuery.order('first_name');
         setAllStudents(studData || []);
+
         // 8. Help
-        if (viewMode !== 'student') {
-          const { data: helpData } = await supabase.from('help_requests').select('*, users(*)').eq('school_id', tData.school_id).eq('status', 'pending').order('created_at', { ascending: false });
-          setHelpRequests(helpData || []);
-        } else {
-          setHelpRequests([]);
-        }
-
-        // Part B: Explicit Bands in Formation & Active (Fetched early to prevent TDZ errors in poolFormations)
-        const { data: formingBands } = await supabase
-          .from('bands')
-          .select('*, band_members(*, profiles:users(id, first_name, last_name, photo_url, created_at, birth_date)), songs(*), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, last_name, photo_url, created_at, birth_date)))')
-          .eq('school_id', tData.school_id)
-          .in('status', ['forming', 'active']);
-
-        // 9. Band-Matching (Comprehensive Pool)
-        // We fetch from 'songs' and also 'band_song_slots' to see who is already occupied
-        const { data: wallData, error: wallErr } = await supabase
-          .from('songs')
-          .select(`
-            id, artist, title, media_link, instrumentation,
-            user_song_skills (
-              id, song_id, progress_percent, instrument, part_number, difficulty_level, is_stage_ready, user_id, created_at, formation_group,
-              profiles:users!user_song_skills_user_id_fkey(first_name, photo_url, school_id)
-            )
-          `)
-          .eq('school_id', tData.school_id);
-
-        const { data: occupiedSlots } = await supabase
-          .from('band_song_slots')
-          .select('user_id, band_songs(song_id)');
+        setHelpRequests(helpData || []);
 
         if (wallErr) console.error('[Dashboard] Error fetching wallData:', wallErr);
 
@@ -2421,444 +2562,744 @@ export function TeacherDashboard({
       {/* Main Content Area */}
       <div style={{
         flex: 1,
-        padding: hideHeader ? '0' : '40px',
-        overflowY: 'auto',
+        padding: hideHeader ? '0' : (activeTab === 'briefing' ? '16px 40px 40px 40px' : '40px'),
+        overflowY: activeTab === 'briefing' ? 'hidden' : 'auto',
         height: '100vh',
         boxSizing: 'border-box',
         width: '100%'
       }}>
         {/* Header - only if hideHeader is false */}
-        {!hideHeader && (
-          <header style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {!hideHeader && activeTab !== 'briefing' && (
+          <header style={{ marginBottom: activeTab === 'live' ? '16px' : '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>
-                {activeTab === 'briefing' ? '📊 Tägliches Briefing' : activeTab === 'live' ? '🎸 Live Lab' : activeTab === 'students' ? '🎓 Schülerverwaltung' : '👥 Bands'}
-              </h2>
-              <p style={{ color: '#64748b', fontWeight: 600, fontSize: '0.85rem', marginTop: '4px' }}>
-                {teacher ? `${teacher.first_name} ${teacher.last_name} • ${teacher.instrument || 'Coach'}` : 'Zentrale'}
-              </p>
+              {activeTab !== 'live' && (
+                <>
+                  <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>
+                    {activeTab === 'students' ? '🎓 Schülerverwaltung' : '👥 Bands'}
+                  </h2>
+                  <p style={{ color: '#64748b', fontWeight: 600, fontSize: '0.85rem', marginTop: '4px' }}>
+                    {teacher ? `${teacher.first_name} ${teacher.last_name} • ${teacher.instrument || 'Coach'}` : 'Zentrale'}
+                  </p>
+                </>
+              )}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               {activeTab === 'live' && (
-                <button
-                  onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                  style={{
-                    background: 'white',
-                    border: '1.5px solid #e2e8f0',
-                    padding: '8px 16px',
-                    borderRadius: '12px',
-                    fontSize: '0.85rem',
-                    fontWeight: 800,
-                    color: '#475569',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-                    transition: 'all 0.15s'
-                  }}
-                  className="hover-scale"
-                >
-                  {isSidebarCollapsed ? (
-                    <>
-                      <ChevronLeft size={16} /> Sidebar einblenden
-                    </>
-                  ) : (
-                    <>
-                      Sidebar ausblenden <ChevronRight size={16} />
-                    </>
-                  )}
-                </button>
-              )}
-              <div style={{ background: '#e6f4ea', padding: '8px 16px', borderRadius: '100px', border: '1px solid #34a853', color: '#137333', fontSize: '0.85rem', fontWeight: 800 }}>
-                {activeSessions.length} im Lab
-              </div>
-            </div>
-          </header>
-        )}
-
-        {/* Tab content switch */}
-        {activeTab === 'briefing' && !hideHeader ? (
-          <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start', flexWrap: 'wrap', width: '100%' }}>
-            <div style={{ flex: 3, minWidth: '400px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              {briefingLoading ? (
-                <div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Briefing wird geladen...</div>
-              ) : briefingData ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                
-                {/* Hero / Welcome */}
-                <div className="google-card" style={{
-                  background: 'linear-gradient(135deg, #e8f0fe 0%, #ffffff 100%)',
-                  borderColor: '#b3d1ff',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '32px'
-                }}>
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: '#0b57d0' }}>
-                      Hallo, {teacher?.first_name || 'Coach'}!
-                    </h3>
-                    <p style={{ margin: '8px 0 0 0', color: '#475569', fontSize: '0.95rem', fontWeight: 600 }}>
-                      Hier ist deine Übersicht für den heutigen Tag.
-                    </p>
-                  </div>
-                  <div style={{ fontSize: '3rem' }}>☕</div>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '-8px' }}>
+                <>
                   <button
-                    onClick={handleReportIllness}
+                    onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
                     style={{
-                      background: '#fee2e2',
-                      color: '#b91c1c',
-                      border: '1.5px solid #fecaca',
-                      padding: '10px 20px',
-                      borderRadius: '100px',
+                      background: 'white',
+                      border: '1.5px solid #e2e8f0',
+                      padding: '8px 16px',
+                      borderRadius: '12px',
+                      fontSize: '0.85rem',
                       fontWeight: 800,
-                      fontSize: '0.82rem',
+                      color: '#475569',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      transition: 'all 0.2s'
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                      transition: 'all 0.15s'
                     }}
                     className="hover-scale"
                   >
-                    <span>🤒 Krankheit melden / Heute ausfallen lassen</span>
+                    {isSidebarCollapsed ? (
+                      <>
+                        <ChevronLeft size={16} /> Sidebar einblenden
+                      </>
+                    ) : (
+                      <>
+                        Sidebar ausblenden <ChevronRight size={16} />
+                      </>
+                    )}
                   </button>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
-                  {/* Today's Schedule Card */}
-                  <div className="google-card">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-                      <div style={{ background: '#e8f0fe', color: '#0b57d0', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Clock size={18} />
-                      </div>
-                      <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#1e293b' }}>Unterrichte Heute</h4>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {briefingData.timeline && briefingData.timeline.length > 0 ? (
-                        briefingData.timeline.map((slot: any, idx: number) => {
-                          const dragColor = activeDragScheduleId ? getTrafficLightColor(activeDragScheduleId, slot) : null;
-                          const isOver = dragOverSlotKey === slot.scheduleId;
-
-                          let slotBg = '#f8fafc';
-                          let slotBorder = '1px solid #e2e8f0';
-                          let labelColor = '#475569';
-                          let titleColor = '#0f172a';
-
-                          if (slot.status === 'canceled_by_student') {
-                            slotBg = '#fef2f2';
-                            slotBorder = '2px dashed #ef4444';
-                            labelColor = '#ef4444';
-                            titleColor = '#ef4444';
-                          } else if (slot.status === 'teacher_sick') {
-                            slotBg = '#fee2e2';
-                            slotBorder = '1px solid #fca5a5';
-                            labelColor = '#991b1b';
-                            titleColor = '#991b1b';
-                          } else if (slot.status === 'pending_parent_approval') {
-                            slotBg = '#fffbeb';
-                            slotBorder = '1.5px dashed #f59e0b';
-                            labelColor = '#d97706';
-                          }
-
-                          if (activeDragScheduleId && slot.scheduleId !== activeDragScheduleId) {
-                            if (dragColor === 'GREEN') {
-                              slotBg = isOver ? '#dcfce7' : '#f0fdf4';
-                              slotBorder = '2px dashed #22c55e';
-                            } else if (dragColor === 'YELLOW') {
-                              slotBg = isOver ? '#fef3c7' : '#fffbeb';
-                              slotBorder = '2px dashed #eab308';
-                            } else if (dragColor === 'RED') {
-                              slotBg = '#fef2f2';
-                              slotBorder = '2px dashed #ef4444';
-                            }
-                          }
-
-                          const isDraggable = slot.student && slot.status !== 'canceled_by_student' && slot.status !== 'teacher_sick';
-
-                          return (
-                            <div 
-                              key={idx} 
-                              draggable={isDraggable}
-                              onDragStart={(e) => isDraggable && handleDragStart(e, slot.scheduleId)}
-                              onDragOver={(e) => activeDragScheduleId && handleDragOver(e, slot.scheduleId, dragColor || 'RED')}
-                              onDrop={(e) => activeDragScheduleId && handleDrop(e, slot)}
-                              onClick={() => {
-                                if (slot.student) {
-                                  setDocStudent({
-                                    id: slot.student.id,
-                                    first_name: slot.student.name.split(' ')[0],
-                                    last_name: slot.student.name.split(' ').slice(1).join(' '),
-                                    photo_url: slot.student.photo_url || '/avatar_ghost.jpg'
-                                  });
-                                }
-                              }}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                padding: '12px 16px',
-                                background: slotBg,
-                                borderRadius: '16px',
-                                border: slotBorder,
-                                cursor: slot.student ? 'pointer' : (isDraggable ? 'grab' : 'default'),
-                                transition: 'all 0.2s'
-                              }}
-                            >
-                              <div>
-                                <div style={{ fontWeight: 800, color: titleColor, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  {isDraggable && <span style={{ opacity: 0.3, cursor: 'grab', fontSize: '0.8rem' }}>☰</span>}
-                                  {slot.status === 'canceled_by_student' ? (
-                                    <span>FREISPRECH-SLOT (Abgesagt)</span>
-                                  ) : slot.status === 'teacher_sick' ? (
-                                    <span>Ausfall (Krankheit)</span>
-                                  ) : (
-                                    <span>{slot.student?.name || 'Freier Slot'}</span>
-                                  )}
-                                </div>
-                                <div style={{ fontSize: '0.75rem', color: labelColor, fontWeight: 600, marginTop: '2px' }}>
-                                  {slot.status === 'pending_parent_approval' ? (
-                                    <strong>Warte auf Eltern-OK • </strong>
-                                  ) : null}
-                                  {slot.instrument} • {slot.room}
-                                </div>
-                              </div>
-                              <div style={{
-                                background: slot.status === 'canceled_by_student' ? '#fee2e2' : '#e8f0fe',
-                                color: slot.status === 'canceled_by_student' ? '#ef4444' : '#0b57d0',
-                                padding: '4px 10px',
-                                borderRadius: '8px',
-                                fontSize: '0.75rem',
-                                fontWeight: 800
-                              }}>
-                                {slot.timeSlot}
-                              </div>
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <div style={{ textAlign: 'center', padding: '30px 0', color: '#64748b', fontSize: '0.9rem' }}>
-                          Keine geplanten Termine für heute.
-                        </div>
-                      )}
-                    </div>
+                  <div style={{ background: '#e6f4ea', padding: '8px 16px', borderRadius: '100px', border: '1px solid #34a853', color: '#137333', fontSize: '0.85rem', fontWeight: 800 }}>
+                    {activeSessions.length} im Lab
                   </div>
-
-                  {/* Next Student Prep Mirror */}
-                  {briefingData.prepMirror && (
-                    <div className="google-card" style={{ borderLeft: '4px solid #10b981' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-                        <div style={{ background: '#e6f4ea', color: '#137333', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Award size={18} />
-                        </div>
-                        <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#1e293b' }}>Nächster Schüler Prep-Mirror</h4>
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        <div 
-                          style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
-                          onClick={() => {
-                            setDocStudent({
-                              id: briefingData.prepMirror.studentId,
-                              first_name: briefingData.prepMirror.studentName.split(' ')[0],
-                              last_name: briefingData.prepMirror.studentName.split(' ').slice(1).join(' '),
-                              photo_url: '/avatar_ghost.jpg'
-                            });
-                          }}
-                        >
-                          <div style={{
-                            width: '44px',
-                            height: '44px',
-                            borderRadius: '12px',
-                            background: '#34a853',
-                            color: 'white',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '1.25rem',
-                            fontWeight: 800
-                          }}>
-                            {briefingData.prepMirror.studentName.charAt(0)}
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 900, color: '#0f172a' }}>{briefingData.prepMirror.studentName}</div>
-                            <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
-                              Slot: {briefingData.prepMirror.timeSlot} • Level {briefingData.prepMirror.evolutionLevel}
-                            </div>
-                          </div>
-                        </div>
-
-                        {briefingData.prepMirror.streakCount > 0 && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fffbeb', border: '1px solid #fef3c7', padding: '10px 14px', borderRadius: '12px', color: '#b45309', fontSize: '0.85rem', fontWeight: 700 }}>
-                            <Flame size={16} fill="#f59e0b" color="#f59e0b" />
-                            <span>Premium-User Flammen-Streak: {briefingData.prepMirror.streakCount} Tage!</span>
-                          </div>
-                        )}
-
-                        <div>
-                          <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: '8px' }}>
-                            Aktuelle Songs / Hausaufgaben
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {briefingData.prepMirror.verifiedSongs && briefingData.prepMirror.verifiedSongs.length > 0 ? (
-                              briefingData.prepMirror.verifiedSongs.map((song: any, idx: number) => (
-                                <div key={idx} style={{
-                                  background: '#f8fafc',
-                                  padding: '10px 12px',
-                                  borderRadius: '12px',
-                                  border: '1px solid #e2e8f0',
-                                  fontSize: '0.85rem'
-                                }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#1e293b' }}>
-                                    <span>{song.title}</span>
-                                    <span style={{
-                                      color: song.status === 'verifiziert' ? '#137333' : '#b45309',
-                                      fontSize: '0.75rem',
-                                      fontWeight: 800
-                                    }}>
-                                      {song.status === 'verifiziert' ? '✓ Verifiziert' : 'Übt gerade'}
-                                    </span>
-                                  </div>
-                                  {song.note && (
-                                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px', fontStyle: 'italic' }}>
-                                      "{song.note}"
-                                    </div>
-                                  )}
-                                </div>
-                              ))
-                            ) : (
-                              <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Keine aktiven Songs dokumentiert.</div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-              </div>
-            ) : (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#ef4444' }}>Fehler beim Laden des Briefings.</div>
-            )}
+                </>
+              )}
             </div>
-
-            {/* Briefing Right Sidebar */}
-            <aside style={{ flex: 1, minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Activity size={18} color="#0b57d0" /> Live-Status
-                </h3>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-                  <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
-                    <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>Im Lab</div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 1000, color: '#0b57d0' }}>{activeSessions.length}</div>
-                  </div>
-                  <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
-                    <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>Bands</div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 1000, color: '#0b57d0' }}>{allBands.length}</div>
-                  </div>
-                  <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
-                    <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>Challenges</div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 1000, color: '#0b57d0' }}>{submissions.length}</div>
-                  </div>
-                  <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
-                    <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>Schüler</div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 1000, color: '#0b57d0' }}>{allStudents.length}</div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <button
-                    onClick={() => setActiveTab('live')}
-                    style={{
-                      background: '#0b57d0',
-                      color: 'white',
-                      border: 'none',
-                      padding: '12px',
-                      borderRadius: '16px',
-                      fontWeight: 800,
-                      fontSize: '0.82rem',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      width: '100%',
-                      boxShadow: '0 4px 12px rgba(11, 87, 208, 0.2)'
-                    }}
-                  >
-                    <Music size={16} /> Zum Live Lab
-                  </button>
+          </header>
+        )}
+        {activeTab === 'briefing' && !hideHeader ? (
+          <div style={{ display: 'grid', gridTemplateColumns: '3fr 0.7fr', gap: '32px', alignItems: 'start', width: '100%' }} className="dashboard-main-grid">
+            
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '16px',
+              maxHeight: 'calc(100vh - 60px)',
+              overflowY: 'auto',
+              paddingRight: '16px',
+              paddingBottom: '80px',
+              boxSizing: 'border-box'
+            }}>
+              {briefingLoading ? (
+                <div style={{ padding: '60px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Briefing wird geladen...</div>
+              ) : briefingData ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   
-                  {viewMode === 'admin' && (
-                    <button
-                      onClick={async () => {
-                        if (window.confirm('Alle Schüler ausloggen?')) {
-                          const now = new Date().toISOString();
-                          await supabase
-                            .from('sessions')
-                            .update({ check_out_time: now })
-                            .is('check_out_time', null)
-                            .in('user_id', allStudents.map(s => s.id));
-                          fetchData();
-                        }
-                      }}
-                      style={{
-                        background: '#fee2e2',
-                        color: '#ef4444',
-                        border: '1px solid #fecaca',
-                        padding: '12px',
-                        borderRadius: '16px',
-                        fontWeight: 800,
-                        fontSize: '0.82rem',
-                        cursor: 'pointer',
+                  {/* AdminLTE style KPI Cards row (Bold Swiss design, now super-compact and strictly one-line) */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '4px' }}>
+                    {/* Heutige Schüler Card (Blue) */}
+                    <div style={{ 
+                      position: 'relative', overflow: 'hidden', background: '#007bff', color: 'white',
+                      borderRadius: '12px', boxShadow: '0 4px 12px rgba(0, 123, 255, 0.06)',
+                      display: 'flex', alignItems: 'center', minHeight: '44px',
+                      transition: 'all 0.25s ease'
+                    }} className="hover-scale">
+                      <div style={{ padding: '8px 12px', position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
+                        <div style={{ fontSize: '1.3rem', fontWeight: 900, lineHeight: 1, fontFamily: "'Urbanist', sans-serif" }}>
+                          {briefingData.timeline ? briefingData.timeline.filter((s: any) => s.student).length : 0}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, opacity: 0.9, whiteSpace: 'nowrap' }}>Heutige Schüler</div>
+                      </div>
+                      <div style={{ position: 'absolute', top: '50%', right: '12px', transform: 'translateY(-50%)', zIndex: 1, opacity: 0.12, pointerEvents: 'none' }}>
+                        <Users size={20} color="white" />
+                      </div>
+                    </div>
+ 
+                    {/* Card 2: Im Live Lab aktiv (Green) */}
+                    <div style={{ 
+                      position: 'relative', overflow: 'hidden', background: '#28a745', color: 'white',
+                      borderRadius: '12px', boxShadow: '0 4px 12px rgba(40, 167, 69, 0.06)',
+                      display: 'flex', alignItems: 'center', minHeight: '44px',
+                      transition: 'all 0.25s ease'
+                    }} className="hover-scale">
+                      <div style={{ padding: '8px 12px', position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
+                        <div style={{ fontSize: '1.3rem', fontWeight: 900, lineHeight: 1, fontFamily: "'Urbanist', sans-serif" }}>
+                          {activeSessions.length}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, opacity: 0.9, whiteSpace: 'nowrap' }}>Im Live Lab aktiv</div>
+                      </div>
+                      <div style={{ position: 'absolute', top: '50%', right: '12px', transform: 'translateY(-50%)', zIndex: 1, opacity: 0.15, pointerEvents: 'none' }}>
+                        <Music size={20} color="white" />
+                      </div>
+                    </div>
+ 
+                    {/* Card 3: Aktive Bands (Yellow) */}
+                    <div style={{ 
+                      position: 'relative', overflow: 'hidden', background: '#ffc107', color: '#0f172a',
+                      borderRadius: '12px', boxShadow: '0 4px 12px rgba(255, 193, 7, 0.06)',
+                      display: 'flex', alignItems: 'center', minHeight: '44px',
+                      transition: 'all 0.25s ease'
+                    }} className="hover-scale">
+                      <div style={{ padding: '8px 12px', position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
+                        <div style={{ fontSize: '1.3rem', fontWeight: 900, lineHeight: 1, fontFamily: "'Urbanist', sans-serif", color: '#0f172a' }}>
+                          {allBands.length}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, opacity: 0.9, color: '#0f172a', whiteSpace: 'nowrap' }}>Aktive Bands</div>
+                      </div>
+                      <div style={{ position: 'absolute', top: '50%', right: '12px', transform: 'translateY(-50%)', zIndex: 1, opacity: 0.15, pointerEvents: 'none' }}>
+                        <Award size={20} color="#0f172a" />
+                      </div>
+                    </div>
+ 
+                    {/* Card 4: Ausfälle Heute (Red) */}
+                    <div style={{ 
+                      position: 'relative', overflow: 'hidden', background: '#dc3545', color: 'white',
+                      borderRadius: '12px', boxShadow: '0 4px 12px rgba(220, 53, 69, 0.06)',
+                      display: 'flex', alignItems: 'center', minHeight: '44px',
+                      transition: 'all 0.25s ease'
+                    }} className="hover-scale">
+                      <div style={{ padding: '8px 12px', position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
+                        <div style={{ fontSize: '1.3rem', fontWeight: 900, lineHeight: 1, fontFamily: "'Urbanist', sans-serif" }}>
+                          {briefingData.timeline ? briefingData.timeline.filter((s: any) => s.status === 'canceled_by_student' || s.status === 'teacher_sick').length : 0}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, opacity: 0.9, whiteSpace: 'nowrap' }}>Ausfälle Heute</div>
+                      </div>
+                      <div style={{ position: 'absolute', top: '50%', right: '12px', transform: 'translateY(-50%)', zIndex: 1, opacity: 0.15, pointerEvents: 'none' }}>
+                        <AlertCircle size={20} color="white" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Premium Greeting Banner with Avatar & Wave Design */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
+                    backdropFilter: 'blur(24px) saturate(1.8)',
+                    WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
+                    border: '1px solid rgba(255, 255, 255, 0.5)',
+                    borderRadius: '24px',
+                    padding: '14px 20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '20px',
+                    marginBottom: '4px',
+                    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+                    transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                      <div style={{
+                        width: '64px',
+                        height: '64px',
+                        borderRadius: '50%',
+                        border: '4px solid #ffffff',
+                        boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)',
+                        background: '#ffffff',
+                        flexShrink: 0,
+                        marginTop: '-18px',
+                        marginBottom: '-18px',
+                        position: 'relative',
+                        zIndex: 10,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '8px',
-                        width: '100%'
+                        overflow: 'hidden',
+                        transition: 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
                       }}
-                    >
-                      <Trash2 size={16} /> Alle ausloggen
-                    </button>
-                  )}
+                      className="hover-scale"
+                      >
+                        <img src={getInstrumentAvatarUrl(teacher?.instrument)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scale(1.15)' }} />
+                      </div>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          Hallo, <span style={{ 
+                            color: '#007aff', 
+                            fontSize: '1.15rem',
+                            fontWeight: 900,
+                            letterSpacing: '-0.01em',
+                            display: 'inline-flex',
+                            alignItems: 'center'
+                          }}>{teacher?.first_name || 'Coach'}</span>! 
+                          <span className="inline-block animate-bounce" style={{ marginLeft: '4px' }}>
+                            {(new Date().getDay() === 0 || new Date().getDay() === 6) ? '☀️' : '👋'}
+                          </span>
+                        </h3>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                          {(new Date().getDay() === 0 || new Date().getDay() === 6) 
+                            ? 'Wir wünschen dir ein schönes, erholsames Wochenende!' 
+                            : 'Hier ist deine Übersicht für den heutigen Tag.'}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Live Clock Badge */}
+                    <div style={{
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      padding: '5px 10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.01)',
+                      flexShrink: 0
+                    }}>
+                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }} />
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', letterSpacing: '0.02em', fontFamily: 'monospace' }}>
+                        {currentTimeStr || '13:00'} UHR
+                      </span>
+                    </div>
+                  </div>
+ 
+                  {/* SCHEDULE & PREP-MIRROR ROW */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '2.1fr 0.9fr', gap: '24px', alignItems: 'start' }}>
+                    
+                    {/* TAGESPLAN (timeline schedule) */}
+                    <div className="google-card" style={{ padding: '20px 24px', borderRadius: '20px', border: '1px solid #f1f5f9', boxShadow: '0 2px 12px rgba(0,0,0,0.04)', background: 'white' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#1f2937' }}>
+                          <Clock size={20} color="#0b57d0" />
+                          <strong style={{ fontSize: '1.05rem', fontWeight: 800, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Tagesplan (Unterrichte Heute)</strong>
+                        </div>
+                        <span style={{
+                          fontSize: '0.72rem',
+                          fontWeight: 800,
+                          padding: '4px 12px',
+                          borderRadius: '100px',
+                          background: '#e8f0fe',
+                          color: '#0b57d0',
+                          fontFamily: 'Inter'
+                        }}>
+                          LIVE
+                        </span>
+                      </div>
+ 
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative' }}>
+                        <div style={{ position: 'absolute', top: '16px', bottom: '16px', left: '9px', width: '2px', background: '#e2e8f0' }} />
+                        {briefingData.timeline && briefingData.timeline.length > 0 ? (
+                          briefingData.timeline.map((slot: any, idx: number) => {
+                            // Dynamic slot time range check
+                            const slotStart = slot.timeSlot;
+                            const nextSlot = briefingData.timeline[idx + 1];
+                            const slotEnd = nextSlot ? nextSlot.timeSlot : (() => {
+                              const [sh, sm] = slotStart.split(':').map(Number);
+                              const totalMin = sh * 60 + sm + 30;
+                              return `${String(Math.floor(totalMin / 60) % 24).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')}`;
+                            })();
+                            const isCurrentSlotActive = currentTimeStr >= slotStart && currentTimeStr < slotEnd;
+ 
+                            let slotBg = '#ffffff';
+                            let slotBorder = '1.5px solid #e2e8f0';
+                            let titleColor = '#1e293b';
+ 
+                            if (slot.status === 'canceled_by_student') {
+                              slotBg = '#fef2f2';
+                              slotBorder = '1.5px dashed #ef4444';
+                              titleColor = '#ef4444';
+                            } else if (slot.status === 'teacher_sick') {
+                              slotBg = '#fee2e2';
+                              slotBorder = '1px solid #fca5a5';
+                              titleColor = '#991b1b';
+                            } else if (isCurrentSlotActive) {
+                              slotBg = '#f0f7ff';
+                              slotBorder = '1.5px solid #bfdbfe';
+                              titleColor = '#1d4ed8';
+                            }
+ 
+                            return (
+                              <div 
+                                key={idx}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '12px',
+                                  position: 'relative',
+                                  width: '100%'
+                                }}
+                              >
+                                {/* Timeline Dot on the left */}
+                                <div style={{ width: '20px', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2, flexShrink: 0 }}>
+                                  {isCurrentSlotActive ? (
+                                    <div style={{
+                                      width: '20px',
+                                      height: '20px',
+                                      borderRadius: '50%',
+                                      border: '3px solid #0b57d0',
+                                      background: '#ffffff',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      boxSizing: 'border-box'
+                                    }}>
+                                      <div style={{
+                                        width: '8px',
+                                        height: '8px',
+                                        borderRadius: '50%',
+                                        background: '#0b57d0'
+                                      }} />
+                                    </div>
+                                  ) : (
+                                    <div style={{
+                                      width: '12px',
+                                      height: '12px',
+                                      borderRadius: '50%',
+                                      border: '3px solid #cbd5e1',
+                                      background: '#ffffff',
+                                      boxSizing: 'border-box'
+                                    }} />
+                                  )}
+                                </div>
+ 
+                                {/* Slot card on the right */}
+                                <div 
+                                  onClick={() => {
+                                    if (slot.student) {
+                                      setDocStudent({
+                                        id: slot.student.id,
+                                        first_name: slot.student.name.split(' ')[0],
+                                        last_name: slot.student.name.split(' ').slice(1).join(' '),
+                                        photo_url: slot.student.photo_url || '/avatar_ghost.jpg'
+                                      });
+                                    }
+                                  }}
+                                  style={{
+                                    flex: 1,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '8px 16px',
+                                    background: slotBg,
+                                    borderRadius: '12px',
+                                    border: slotBorder,
+                                    cursor: slot.student ? 'pointer' : 'default',
+                                    transition: 'all 0.2s',
+                                    boxShadow: isCurrentSlotActive ? '0 4px 12px rgba(59, 130, 246, 0.08)' : 'none',
+                                    minWidth: 0
+                                  }}
+                                  className="hover-scale"
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                                    <div style={{ minWidth: 0, flex: 1 }}>
+                                      <div style={{ fontWeight: 800, color: titleColor, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {slot.student ? (
+                                          <>
+                                            <span>{slot.student.name}</span>
+                                            <span style={{ color: '#cbd5e1', margin: '0 4px', fontWeight: 500 }}>•</span>
+                                            <span style={{ color: '#64748b', fontWeight: 600, fontSize: '0.8rem' }}>{slot.instrument || 'Musiker'}</span>
+                                            <span style={{ color: '#cbd5e1', margin: '0 4px', fontWeight: 500 }}>•</span>
+                                            <span style={{ color: '#64748b', fontWeight: 600, fontSize: '0.8rem' }}>{slot.room || 'Groovelab'}</span>
+                                          </>
+                                        ) : (
+                                          <span>☕️ Pause</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div style={{
+                                    background: slot.status === 'canceled_by_student' ? '#fee2e2' : isCurrentSlotActive ? '#dbeafe' : '#e8f0fe',
+                                    color: slot.status === 'canceled_by_student' ? '#ef4444' : isCurrentSlotActive ? '#1d4ed8' : '#0b57d0',
+                                    padding: '4px 8px',
+                                    borderRadius: '6px',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 800,
+                                    flexShrink: 0
+                                  }}>
+                                    {slot.timeSlot} Uhr
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div style={{
+                            background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                            borderRadius: '16px',
+                            padding: '32px 20px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '12px',
+                            border: '1px dashed #cbd5e1',
+                            boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.6)',
+                            textAlign: 'center',
+                            marginTop: '8px',
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}>
+                            {/* Decorative element */}
+                            <div style={{ position: 'absolute', top: '-10px', right: '-10px', opacity: 0.05, transform: 'rotate(15deg)' }}>
+                              <Sparkles size={100} color="#0b57d0" />
+                            </div>
+                            
+                            <div style={{ 
+                              width: '56px', height: '56px', 
+                              background: 'linear-gradient(135deg, #e0e7ff 0%, #dbeafe 100%)', 
+                              borderRadius: '50%', 
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              boxShadow: '0 8px 16px rgba(59, 130, 246, 0.12)',
+                              position: 'relative',
+                              zIndex: 2
+                            }}>
+                              <Sparkles size={28} color="#3b82f6" />
+                            </div>
+                            <div style={{ position: 'relative', zIndex: 2 }}>
+                              <h4 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
+                                Freier Tag!
+                              </h4>
+                              <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#64748b', fontWeight: 600, maxWidth: '250px', lineHeight: 1.5 }}>
+                                Heute stehen keine Unterrichte an. Zeit zum Durchatmen und Energie tanken.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Centered Schönen Feierabend success banner at the very end of the slots list */}
+                        {(() => {
+                          if (!briefingData.timeline || briefingData.timeline.length === 0) return null;
+                          const lastSlot = briefingData.timeline[briefingData.timeline.length - 1];
+                          const [lh, lm] = lastSlot.timeSlot.split(':').map(Number);
+                          const totalMin = lh * 60 + lm + 30;
+                          const lastSlotEndStr = `${String(Math.floor(totalMin / 60) % 24).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')}`;
+                          const isDayCompleted = currentTimeStr >= lastSlotEndStr;
+
+                          if (!isDayCompleted) return null;
+
+                          return (
+                            <div style={{
+                              background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                              border: '1.5px solid #bbf7d0',
+                              borderRadius: '16px',
+                              padding: '16px 20px',
+                              marginTop: '12px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '4px',
+                              boxShadow: '0 4px 14px rgba(34, 197, 94, 0.06)',
+                              textAlign: 'center'
+                            }}>
+                              <h4 style={{ margin: 0, fontWeight: 900, color: '#15803d', fontSize: '0.95rem', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Schönen Feierabend</h4>
+                              <p style={{ margin: 0, fontSize: '0.78rem', color: '#166534', fontWeight: 650, lineHeight: 1.4 }}>
+                                Alle Unterrichtsstunden für heute sind erfolgreich beendet. Hab einen wohlverdienten, erholsamen Feierabend.
+                              </p>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* Next Student Prep Mirror */}
+                    {(dynamicPrepMirror || briefingData.prepMirror) && (
+                      <div className="google-card" style={{ borderLeft: '4px solid #10b981', opacity: loadingPrepMirror ? 0.6 : 1, transition: 'opacity 0.2s' }}>
+                        {(() => {
+                          const prep = dynamicPrepMirror || briefingData.prepMirror;
+                          return (
+                            <>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                                <div style={{ background: '#e6f4ea', color: '#137333', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <Award size={18} />
+                                </div>
+                                <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#1e293b' }}>
+                                  {activeStudent?.id === prep.studentId ? 'Aktueller Schüler Prep-Mirror' : 'Nächster Schüler Prep-Mirror'}
+                                </h4>
+                              </div>
+
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <div 
+                                  style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
+                                  onClick={() => {
+                                    setDocStudent({
+                                      id: prep.studentId,
+                                      first_name: prep.studentName.split(' ')[0],
+                                      last_name: prep.studentName.split(' ').slice(1).join(' '),
+                                      photo_url: '/avatar_ghost.jpg'
+                                    });
+                                  }}
+                                >
+                                  <div style={{
+                                    width: '44px',
+                                    height: '44px',
+                                    borderRadius: '12px',
+                                    background: '#34a853',
+                                    color: 'white',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '1.25rem',
+                                    fontWeight: 800
+                                  }}>
+                                    {prep.studentName.charAt(0)}
+                                  </div>
+                                  <div>
+                                    <div style={{ fontWeight: 900, color: '#0f172a' }}>{prep.studentName}</div>
+                                    <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                                      Slot: {prep.timeSlot} Uhr • Level {prep.evolutionLevel}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {prep.streakCount > 0 && (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fffbeb', border: '1px solid #fef3c7', padding: '10px 14px', borderRadius: '12px', color: '#b45309', fontSize: '0.85rem', fontWeight: 700 }}>
+                                    <Flame size={16} fill="#f59e0b" color="#f59e0b" />
+                                    <span>Premium-User Flammen-Streak: {prep.streakCount} Tage!</span>
+                                  </div>
+                                )}
+
+                                <div>
+                                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: '8px' }}>
+                                    Aktuelle Songs / Hausaufgaben
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {prep.verifiedSongs && prep.verifiedSongs.length > 0 ? (
+                                      prep.verifiedSongs.map((song: any, idx: number) => (
+                                        <div key={idx} style={{
+                                          background: '#f8fafc',
+                                          padding: '10px 12px',
+                                          borderRadius: '12px',
+                                          border: '1px solid #e2e8f0',
+                                          fontSize: '0.85rem'
+                                        }}>
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#1e293b' }}>
+                                            <span>{song.title}</span>
+                                            <span style={{
+                                              color: song.status === 'verifiziert' ? '#137333' : '#b45309',
+                                              fontSize: '0.75rem',
+                                              fontWeight: 800
+                                            }}>
+                                              {song.status === 'verifiziert' ? '✓ Verifiziert' : 'Übt gerade'}
+                                            </span>
+                                          </div>
+                                          {song.note && (
+                                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px', fontStyle: 'italic' }}>
+                                              "{song.note}"
+                                            </div>
+                                          )}
+                                        </div>
+                                      ))
+                                    ) : (
+                                      <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Keine aktiven Songs dokumentiert.</div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              ) : (
+                <div style={{ padding: '40px', textAlign: 'center', color: '#ef4444' }}>Fehler beim Laden des Briefings.</div>
+              )}
+            </div>
+
+            {/* RESTORED briefing-right-sidebar */}
+            <aside style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '24px',
+              maxHeight: 'calc(100vh - 80px)',
+              overflowY: 'auto',
+              paddingRight: '6px',
+              paddingBottom: '80px',
+              boxSizing: 'border-box'
+            }} className="briefing-right-sidebar">
+              
+              {/* SICKNESS CARD */}
+              <div className="google-card" style={{ 
+                padding: '12px 18px', 
+                borderRadius: '16px',
+                background: '#fef2f2', 
+                border: '1px solid #fee2e2', 
+                boxShadow: '0 4px 12px rgba(220, 53, 69, 0.03)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                  <AlertTriangle size={16} color="#b91c1c" style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: '0.78rem', color: '#7f1d1d', fontWeight: 650, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    Heute krank? Stunden stornieren & Verwaltung benachrichtigen.
+                  </span>
+                </div>
+                <button
+                  onClick={handleReportIllness}
+                  style={{
+                    background: '#b91c1c',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '6px 12px',
+                    borderRadius: '10px',
+                    fontWeight: 800,
+                    fontSize: '0.72rem',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 2px 6px rgba(185, 28, 28, 0.1)',
+                    transition: 'all 0.2s',
+                    flexShrink: 0
+                  }}
+                  className="hover-scale"
+                >
+                  🤒 Jetzt krankmelden
+                </button>
+              </div>
+
+              {/* INFOS DER VERWALTUNG (Administration Bulletins) */}
+              <div className="google-card" style={{ 
+                padding: '24px 28px', 
+                borderRadius: '20px',
+                background: 'rgba(255, 255, 255, 0.8)', 
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                border: '1px solid rgba(0, 0, 0, 0.05)', 
+                boxShadow: '0 10px 30px rgba(0, 0, 0, 0.02)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '20px' }}>
+                  <Bell size={16} color="#ef4444" /> INFOS DER VERWALTUNG
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {[
+                    { id: 'admin1', tag: 'Aktion', title: '⚠️ 2 offene Terminanfragen von Eltern', body: 'Es warten Terminanfragen im Stundenplan auf deine Freigabe.', date: 'Dringend' },
+                    { id: 'admin2', tag: 'Termin', title: '📅 Lehrerkonferenz 2026', body: 'Freitag, 29. Mai um 14:00 Uhr in Raum 201 (Thema: Sommerkonzert & Mediathek-Lizenzen).', date: 'Fr, 14:00' },
+                    { id: 'admin3', tag: 'Mediathek', title: '📚 Neue E-Gitarren & Playalongs freigeschaltet', body: '5 neue Übestücke stehen ab sofort in der Mediathek für deine Schüler bereit.', date: 'Neu' }
+                  ].map((item, idx) => {
+                    let tagColor = '#64748b';
+                    if (item.tag === 'Aktion') tagColor = '#ef4444';
+                    else if (item.tag === 'Termin') tagColor = '#3b82f6';
+                    else if (item.tag === 'Mediathek') tagColor = '#10b981';
+
+                    return (
+                      <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', padding: '2px 8px', borderRadius: '6px', background: tagColor + '15', color: tagColor }}>
+                            {item.tag}
+                          </span>
+                          <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 700 }}>
+                            {item.date}
+                          </span>
+                        </div>
+                        <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
+                          {item.title}
+                        </h4>
+                        <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: 1.4, fontWeight: 500 }}>
+                          {item.body}
+                        </p>
+                        {idx < 2 && <div style={{ height: '1px', background: '#f1f5f9', marginTop: '8px' }} />}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Active Coaches Mini Panel */}
-              <div style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 900, color: '#1e293b' }}>
-                  Coaches im Dienst
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {coaches.map(c => (
-                    <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', overflow: 'hidden' }}>
-                        <AvatarImage src={c.users?.photo_url} user={c.users} />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {c.users?.first_name} {c.users?.last_name}
-                        </div>
-                        <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>
-                          {c.users?.instrument || 'Coach'}
-                        </div>
-                      </div>
-                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }} />
-                    </div>
-                  ))}
-                  {coaches.length === 0 && (
-                    <div style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>Aktuell keine Coaches eingeloggt.</div>
-                  )}
+              {/* LIVE CAMPUS FEED */}
+              <div className="google-card" style={{ 
+                padding: '24px 28px', 
+                borderRadius: '20px',
+                background: 'rgba(255, 255, 255, 0.8)', 
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                border: '1px solid rgba(0, 0, 0, 0.05)', 
+                boxShadow: '0 10px 30px rgba(0, 0, 0, 0.02)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '20px' }}>
+                  <Sparkles size={16} color="#f59e0b" /> LIVE CAMPUS FEED
                 </div>
-              </div>
-            </aside>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {[
+                    { id: 'f1', tag: 'Aktion', title: '🎸 Sommer Rock-Bandcamp 2026', body: 'Melde dich jetzt für unser Band-Camp an! Frist endet in 4 Tagen.', date: 'Heute' },
+                    { id: 'f2', tag: 'Wichtig', title: '🎹 Neue Digitalpianos im Studio 3', body: 'Ab sofort stehen euch 4 neue Yamaha Masterpianos zum Üben bereit!', date: 'Vor 2 Tagen' },
+                    { id: 'f3', tag: 'Erfolg', title: '🚀 Stuttgart knackt die 400 Min.', body: 'Herzlichen Glückwunsch an Stuttgart zum neuen Übe-Meilenstein!', date: 'Vor 3 Tagen' }
+                  ].map((item, idx, arr) => {
+                    let tagColor = '#6366f1';
+                    if (item.tag === 'Aktion') tagColor = '#eab308';
+                    else if (item.tag === 'Erfolg') tagColor = '#10b981';
+                    else if (item.tag === 'Wichtig') tagColor = '#ef4444';
+
+                    return (
+                      <div key={item.id} style={{
+                        paddingBottom: '16px',
+                        borderBottom: idx === arr.length - 1 ? 'none' : '1px solid rgba(0, 0, 0, 0.04)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{
+                            fontSize: '9px',
+                            fontWeight: 900,
+                            color: 'white',
+                            background: tagColor,
+                            padding: '2px 8px',
+                            borderRadius: '100px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.04em'
+                          }}>
+                            {item.tag}
+                          </span>
+                          <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600 }}>{item.date}</span>
+                        </div>
+                        
+                        <h5 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                          {item.title}
+                        </h5>
+                        <p style={{ fontSize: '0.78rem', color: '#64748b', margin: 0, fontWeight: 500, lineHeight: 1.4 }}>
+                          {item.body}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>            </aside>
           </div>
         ) : activeTab === 'live' ? (
         <div className={`live-lab-grid ${isSidebarCollapsed ? 'collapsed' : ''}`}>

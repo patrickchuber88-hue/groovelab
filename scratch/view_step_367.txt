@@ -1,0 +1,24 @@
+Created At: 2026-05-28T06:21:50Z
+Completed At: 2026-05-28T06:21:50Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1285
+Total Bytes: 59614
+Showing lines 10 to 25
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+10: import { renderInstrumentIcon } from '../utils/instruments';
+11: 
+12: interface StudentDetailModalProps {
+13:   student: any;
+14:   onClose: () => void;
+15:   onOpenBandProfile?: (band: any) => void;
+16:   activePlatform?: 'secretary' | 'campus' | 'groovelab';
+17:   onSwitchPlatform?: (newPlatform: 'campus' | 'groovelab') => void;
+18: }
+19: 
+20: export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student, onClose, onOpenBandProfile, activePlatform, onSwitchPlatform }) => {
+21:   const [skills, setSkills] = useState<any[]>([]);
+22:   const [bands, setBands] = useState<any[]>([]);
+23:   const [vocalsSongIds, setVocalsSongIds] = useState<Set<string>>(new Set());
+24:   const [loading, setLoading] = useState(true);
+25:   const [showFullPhoto, setShowFullPhoto] = useState(false);
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

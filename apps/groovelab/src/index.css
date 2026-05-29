@@ -1,6 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Urbanist:ital,wght@0,100..900;1,100..900&family=Inter:wght@300;400;500;600;700&display=swap');
+
 /* ============================================================
    GROOVELAB – GLOBAL DESIGN SYSTEM
-   Swiss + Liquid Glass Edition
+   Swiss + Liquid Glass Edition (Consulting SaaS Upgrade)
    ============================================================ */
 
 :root {
@@ -9,16 +11,16 @@
   --brand-yellow: #eab308;
 
   /* Swiss Neutral Palette */
-  --bg-color: #f4f6f8;
-  --bg-subtle: #f8fafc;
+  --bg-color: #f8fafc; /* Softer light background slate-50 */
+  --bg-subtle: #f1f5f9;
   --surface: #ffffff;
-  --border: rgba(0, 0, 0, 0.07);
-  --border-light: rgba(0, 0, 0, 0.04);
+  --border: #f1f5f9; /* Soft border */
+  --border-light: rgba(0, 0, 0, 0.02);
 
   /* Text */
-  --text-main: #12141a;
-  --text-secondary: #4a5568;
-  --text-muted: #8a94a6;
+  --text-main: #0f172a; /* slate-900 */
+  --text-secondary: #475569; /* slate-600 */
+  --text-muted: #94a3b8; /* slate-400 */
 
   /* Swiss Spacing Scale */
   --space-1: 4px;
@@ -31,30 +33,44 @@
   --space-10: 40px;
   --space-12: 48px;
 
-  /* Swiss Radius */
-  --radius-sm: 10px;
-  --radius-md: 16px;
-  --radius-lg: 22px;
-  --radius-xl: 28px;
+  /* Swiss Radius (Consulting SaaS Rounded corners) */
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 24px; /* 24px rounded-3xl */
+  --radius-xl: 32px;
   --radius-pill: 100px;
 
-  /* Liquid Glass (15% intensity) */
-  --glass-bg: rgba(255, 255, 255, 0.88);
-  --glass-bg-strong: rgba(255, 255, 255, 0.94);
-  --glass-border: rgba(255, 255, 255, 0.62);
-  --glass-blur: blur(22px) saturate(1.45);
-  --glass-shadow: 0 4px 24px rgba(0, 0, 0, 0.055), inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  --glass-shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  /* Liquid Glass (Advanced Apple Glassmorphism) */
+  --glass-bg: rgba(255, 255, 255, 0.70);
+  --glass-bg-strong: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.45);
+  --glass-blur: blur(25px) saturate(1.8);
+  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.04), inset 0 1px 1px 0 rgba(255, 255, 255, 0.80);
+  --glass-shadow-lg: 0 16px 48px 0 rgba(31, 38, 135, 0.08), inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.90);
 
   /* Legacy */
-  --surface-glass: rgba(255, 255, 255, 0.7);
+  --surface-glass: rgba(255, 255, 255, 0.75);
+}
+
+.liquid-glass {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%) !important;
+  backdrop-filter: blur(24px) saturate(1.8) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(1.8) !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.liquid-glass:hover {
+  transform: translateY(-2px) scale(1.01) !important;
+  box-shadow: 0 16px 48px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
 }
 
 /* ── Base ── */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', sans-serif;
   background-color: var(--bg-color);
   color: var(--text-main);
   -webkit-font-smoothing: antialiased;
@@ -65,42 +81,64 @@ body {
   line-height: 1.5;
 }
 
-/* ── Swiss Typography Scale ── */
-.swiss-h1 {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 2.2rem;
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  line-height: 1.08;
+/* ── Typography (Urbanist & Inter) ── */
+.swiss-h1, h1 {
+  font-family: 'Urbanist', sans-serif !important;
+  font-size: 2.25rem;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
   color: var(--text-main);
 }
-.swiss-h2 {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 1.35rem;
-  font-weight: 700;
-  letter-spacing: -0.025em;
+.swiss-h2, h2 {
+  font-family: 'Urbanist', sans-serif !important;
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--text-main);
+}
+.swiss-h3, h3 {
+  font-family: 'Urbanist', sans-serif !important;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
   line-height: 1.2;
   color: var(--text-main);
 }
-.swiss-h3 {
-  font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: -0.015em;
-  color: var(--text-main);
-}
 .swiss-label {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  font-family: 'Urbanist', sans-serif !important;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--brand-yellow); /* Brand Yellow */
+  color: var(--brand-yellow);
 }
 .swiss-body {
-  font-size: 0.875rem;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
   font-weight: 400;
   color: var(--text-secondary);
-  line-height: 1.6;
+  line-height: 1.55;
+}
+
+/* ── Custom Pulsing Glow Animations ── */
+@keyframes pulse-emerald-glow {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); border-color: rgba(16, 185, 129, 1); }
+  70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); border-color: rgba(16, 185, 129, 1); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); border-color: rgba(16, 185, 129, 1); }
+}
+.pulse-glow-emerald {
+  animation: pulse-emerald-glow 2s infinite;
+}
+
+@keyframes pulse-red-border {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); border-color: rgba(239, 68, 68, 1); }
+  70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); border-color: rgba(239, 68, 68, 1); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); border-color: rgba(239, 68, 68, 1); }
+}
+.pulse-glow-red {
+  animation: pulse-red-border 1.5s infinite;
 }
 
 /* ── Liquid Glass Components ── */
@@ -446,11 +484,18 @@ body {
 }
 
 .glass-panel {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%) !important;
+  backdrop-filter: blur(24px) saturate(1.8) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(1.8) !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
   border-radius: 32px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.glass-panel:hover {
+  transform: translateY(-2px) scale(1.01) !important;
+  box-shadow: 0 16px 48px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
 }
 
 @keyframes pulse {
@@ -807,3 +852,53 @@ button, a, [role="button"], [onClick] {
 .blueprint-viewport::-webkit-scrollbar-thumb:hover {
   background: rgba(99, 102, 241, 0.3);
 }
+
+/* Better Cancel Button Hover Effects */
+.cancel-btn-hover {
+  background: rgba(255, 59, 48, 0.08) !important;
+  box-shadow: 0 1px 2px rgba(255, 59, 48, 0);
+  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+.cancel-btn-hover:hover {
+  background: rgba(255, 59, 48, 0.15) !important;
+  box-shadow: 0 4px 12px rgba(255, 59, 48, 0.2) !important;
+  transform: translateY(-2px) scale(1.05) !important;
+  color: #d32f2f !important;
+}
+.cancel-btn-hover:active {
+  background: rgba(255, 59, 48, 0.2) !important;
+  box-shadow: 0 2px 4px rgba(255, 59, 48, 0.2) !important;
+  transform: translateY(0) scale(0.95) !important;
+}
+
+.cancel-btn-hover-mini {
+  background: rgba(255, 59, 48, 0.06) !important;
+  box-shadow: 0 1px 2px rgba(255, 59, 48, 0);
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+.cancel-btn-hover-mini:hover {
+  background: rgba(255, 59, 48, 0.15) !important;
+  box-shadow: 0 3px 8px rgba(255, 59, 48, 0.2) !important;
+  transform: translateY(-1px) scale(1.05) !important;
+  color: #d32f2f !important;
+}
+.cancel-btn-hover-mini:active {
+  background: rgba(255, 59, 48, 0.2) !important;
+  box-shadow: 0 1px 3px rgba(255, 59, 48, 0.2) !important;
+  transform: translateY(0) scale(0.95) !important;
+}
+
+/* Mini Time Input styling to hide native picker indicator and optimize spacing */
+.mini-time-input::-webkit-calendar-picker-indicator {
+  display: none !important;
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+.mini-time-input {
+  -webkit-appearance: none !important;
+  -moz-appearance: textfield !important;
+}
+

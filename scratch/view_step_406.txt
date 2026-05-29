@@ -1,0 +1,73 @@
+Created At: 2026-05-28T06:23:20Z
+Completed At: 2026-05-28T06:23:20Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1285
+Total Bytes: 59614
+Showing lines 730 to 800
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+730:                           width: '22px',
+731:                           height: '22px',
+732:                           borderRadius: '50%',
+733:                           background: '#ffffff',
+734:                           position: 'absolute',
+735:                           top: '2px',
+736:                           left: isCampusActive ? '22px' : '2px',
+737:                           transition: 'left 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
+738:                           boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+739:                         }} />
+740:                       </button>
+741:                     </div>
+742: 
+743:                     <div style={{ height: '0.5px', background: 'rgba(0, 0, 0, 0.06)' }} />
+744: 
+745:                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+746:                       <div style={{ display: 'flex', flexDirection: 'column' }}>
+747:                         <span style={{ fontSize: '0.86rem', fontWeight: 600, color: '#1d1d1f' }}>GrooveLab-Modul aktivieren</span>
+748:                         <span style={{ fontSize: '0.72rem', color: '#86868b' }}>Songbooks, Bands & üben</span>
+749:                       </div>
+750:                       <button 
+751:                         onClick={() => handleToggleGroovelab(!isGroovelabActive)}
+752:                         style={{
+753:                           width: '46px',
+754:                           height: '26px',
+755:                           borderRadius: '99px',
+756
+<truncated 416 bytes>
+                 <div style={{
+765:                           width: '22px',
+766:                           height: '22px',
+767:                           borderRadius: '50%',
+768:                           background: '#ffffff',
+769:                           position: 'absolute',
+770:                           top: '2px',
+771:                           left: isGroovelabActive ? '22px' : '2px',
+772:                           transition: 'left 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
+773:                           boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+774:                         }} />
+775:                       </button>
+776:                     </div>
+777:                   </div>
+778:                 </section>
+779: 
+780:                 {/* Premium Digital Campus ID Card Badge - APPLE WALLET STYLE (Vertical Edition) */}
+781:                 <div className="hover-scale" style={{ 
+782:                   background: 'linear-gradient(135deg, #064e3b 0%, #022c22 100%)', 
+783:                   borderRadius: '24px', 
+784:                   padding: '24px', 
+785:                   color: 'white',
+786:                   boxShadow: '0 20px 45px rgba(2, 44, 34, 0.25)',
+787:                   border: '1px solid rgba(255, 255, 255, 0.12)',
+788:                   display: 'flex',
+789:                   flexDirection: 'column',
+790:                   gap: '20px',
+791:                   position: 'relative',
+792:                   overflow: 'hidden',
+793:                   width: '100%',
+794:                   minHeight: '430px',
+795:                   boxSizing: 'border-box',
+796:                   fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif'
+797:                 }}>
+798:                   {/* Glossy light sheen overlay */}
+799:                   <div style={{
+800:                     position: 'absolute',
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

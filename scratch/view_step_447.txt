@@ -1,0 +1,84 @@
+Created At: 2026-05-28T06:29:07Z
+Completed At: 2026-05-28T06:29:07Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1384
+Total Bytes: 64011
+Showing lines 1280 to 1380
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+1280:               {/* Meine Bands */}
+1281:               <section>
+1282:                 <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1d1d1f', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.02em' }}>
+1283:                   <Users size={16} style={{ color: '#ff2d55' }} /> Meine Bands
+1284:                 </h3>
+1285:                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+1286:                   {bands.map((b: any) => (
+1287:                     <div 
+1288:                       key={b.id} 
+1289:                       onClick={() => {
+1290:                         if (onOpenBandProfile) {
+1291:                           onOpenBandProfile(b);
+1292:                         }
+1293:                       }}
+1294:                       className={onOpenBandProfile ? "clickable-band-item" : ""}
+1295:                       style={{ 
+1296:                         display: 'flex', 
+1297:                         alignItems: 'center', 
+1298:                         gap: '14px', 
+1299:                         padding: '14px 18px', 
+1300:                         background: '#ffffff', 
+1301:                         borderRadius: '20px', 
+1302:                         border: '1px solid rgba(0, 0, 0, 0.04)',
+1303:                         boxShadow: '0 4px 16px rgba(0, 0, 0, 0.01)',
+1304:                         cursor: onOpenBandProfile ? 'pointer' : 'default'
+1305:                       }}
+1306:                     >
+1307:     
+<truncated 1884 bytes>
+splay: 'flex',
+1335:                       alignItems: 'center',
+1336:                       justifyContent: 'space-between',
+1337:                       borderBottom: '0.5px solid rgba(0, 0, 0, 0.04)'
+1338:                     }}>
+1339:                       <span style={{ color: '#86868b' }}>{pres.dayStr}.</span>
+1340:                       <span>{pres.rangeStr}</span>
+1341:                     </div>
+1342:                   ))}
+1343:                   {weekSessions.length === 0 && (
+1344:                     <div style={{ fontSize: '0.85rem', color: '#86868b', background: '#ffffff', padding: '20px', textAlign: 'center' }}>
+1345:                       Keine reservierten Zeiten diese Woche.
+1346:                     </div>
+1347:                   )}
+1348:                 </div>
+1349:               </section>
+1350:             </aside>
+1351:           </div>
+1352:         )}
+1353:       </div>
+1354:       {showFullPhoto && (
+1355:         <div 
+1356:           onClick={() => setShowFullPhoto(false)}
+1357:           style={{ 
+1358:             position: 'fixed', 
+1359:             inset: 0, 
+1360:             zIndex: 4000, 
+1361:             background: 'rgba(0,0,0,0.85)', 
+1362:             backdropFilter: 'blur(20px)', 
+1363:             display: 'flex', 
+1364:             alignItems: 'center', 
+1365:             justifyContent: 'center', 
+1366:             cursor: 'zoom-out'
+1367:           }}
+1368:         >
+1369:           <img 
+1370:             src={student.photo_url || '/avatar_ghost.jpg'} 
+1371:             style={{ 
+1372:               maxWidth: '90%', 
+1373:               maxHeight: '90%', 
+1374:               borderRadius: '24px', 
+1375:               boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+1376:               border: '4px solid white'
+1377:             }} 
+1378:           />
+1379:         </div>
+1380:       )}
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

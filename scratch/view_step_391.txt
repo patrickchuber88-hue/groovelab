@@ -1,0 +1,97 @@
+Created At: 2026-05-28T06:22:35Z
+Completed At: 2026-05-28T06:22:35Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1285
+Total Bytes: 59614
+Showing lines 1 to 100
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+1: import React, { useState, useEffect } from 'react';
+2: import { X, Calendar, Music, Award, Star, Clock, User, Users, Shield, BookOpen, GraduationCap, LayoutDashboard, Sliders } from 'lucide-react';
+3: import { supabase } from '../lib/supabase';
+4: import QRCode from 'react-qr-code';
+5: import { 
+6:   ResponsiveContainer,
+7:   RadarChart, PolarGrid, PolarAngleAxis, Radar
+8: } from 'recharts';
+9: 
+10: import { renderInstrumentIcon } from '../utils/instruments';
+11: 
+12: interface StudentDetailModalProps {
+13:   student: any;
+14:   onClose: () => void;
+15:   onOpenBandProfile?: (band: any) => void;
+16:   activePlatform?: 'secretary' | 'campus' | 'groovelab';
+17:   onSwitchPlatform?: (newPlatform: 'campus' | 'groovelab') => void;
+18: }
+19: 
+20: export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student, onClose, onOpenBandProfile, activePlatform, onSwitchPlatform }) => {
+21:   const [skills, setSkills] = useState<any[]>([]);
+22:   const [bands, setBands] = useState<any[]>([]);
+23:   const [vocalsSongIds, setVocalsSongIds] = useState<Set<string>>(new Set());
+24:   const [loading, setLoading] = useState(true);
+25:   const [showFullPhoto, setShowFullPhoto] = useState(false);
+26:   const [sessionsList, setSessionsList] = useState<any[]>([]);
+27:   const [planningList, setPlanningList] = useState<any[]>([]);
+28:   const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? false);
+29:   const [isGroovelabActive, setIsGroovelabActive] = useState<boolean>(student.is_gr
+<truncated 683 bytes>
+oolean) => {
+43:     try {
+44:       const { error } = await supabase
+45:         .from('users')
+46:         .update({ is_campus_active: newVal })
+47:         .eq('id', student.id);
+48:       if (error) throw error;
+49:       setIsCampusActive(newVal);
+50:       student.is_campus_active = newVal;
+51:       if (newVal) {
+52:         setLocalTab('campus');
+53:       } else if (isGroovelabActive) {
+54:         setLocalTab('groovelab');
+55:       }
+56:     } catch (err: any) {
+57:       alert('Fehler beim Aktualisieren des Campus-Zugangs: ' + err.message);
+58:     }
+59:   };
+60: 
+61:   const handleToggleGroovelab = async (newVal: boolean) => {
+62:     try {
+63:       const { error } = await supabase
+64:         .from('users')
+65:         .update({ is_groovelab_active: newVal })
+66:         .eq('id', student.id);
+67:       if (error) throw error;
+68:       setIsGroovelabActive(newVal);
+69:       student.is_groovelab_active = newVal;
+70:       if (newVal) {
+71:         setLocalTab('groovelab');
+72:       } else if (isCampusActive) {
+73:         setLocalTab('campus');
+74:       }
+75:     } catch (err: any) {
+76:       alert('Fehler beim Aktualisieren des GrooveLab-Zugangs: ' + err.message);
+77:     }
+78:   };
+79: 
+80:   useEffect(() => {
+81:     const fetchData = async () => {
+82:       // Fetch skills
+83:       const { data: skillsData } = await supabase
+84:         .from('user_song_skills')
+85:         .select('*, songs(*)')
+86:         .eq('user_id', student.id);
+87:       setSkills(skillsData || []);
+88: 
+89:       // Fetch enriched bands
+90:       const { data: bandsData } = await supabase
+91:         .from('band_members')
+92:         .select(`
+93:           bands (
+94:             *,
+95:             band_members (
+96:               *,
+97:               users (*)
+98:             ),
+99:             band_songs (
+100:               *,
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

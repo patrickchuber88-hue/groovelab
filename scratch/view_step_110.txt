@@ -1,0 +1,68 @@
+Created At: 2026-05-28T06:11:23Z
+Completed At: 2026-05-28T06:11:23Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1124
+Total Bytes: 51115
+Showing lines 580 to 660
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+580:                       <div style={{ fontSize: '0.85rem', color: '#86868b', background: '#ffffff', padding: '24px', textAlign: 'center', fontWeight: 500 }}>
+581:                         Keine Unterrichtsstunden im Stundenplan eingetragen.
+582:                       </div>
+583:                     )}
+584:                   </div>
+585:                 </section>
+586: 
+587:                 {/* Progress Matrix & Dokumentations-Verlauf - Beautiful iOS Progress Cards */}
+588:                 <section>
+589:                   <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1d1d1f', marginBottom: '16px', letterSpacing: '-0.02em' }}>
+590:                     Meisterwerk-Fortschrittsmatrix
+591:                   </h3>
+592:                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+593:                     {campusProgress.map((item: any) => {
+594:                       const isMastered = item.status === 'MASTERED';
+595:                       const isPracticing = item.status === 'PRACTICING';
+596: 
+597:                       return (
+598:                         <div key={item.id} style={{ 
+599:                           background: '#ffffff', 
+600:                           borderRadius: '24px', 
+601:                           padding: '24px', 
+602:                           border: '1px solid rgba(0, 0, 0, 0.04)',
+603:                           boxShadow: '0 4px 16px rgba(0, 0, 0, 0.01)'
+604:                         }}>
+605:                           <div style={{ display: '
+<truncated 1831 bytes>
+'100%', 
+629:                                 background: isMastered ? '#34a853' : isPracticing ? '#007aff' : '#ff9500',
+630:                                 borderRadius: '2px'
+631:                               }}></div>
+632:                             </div>
+633:                             <span style={{ fontSize: '0.72rem', fontWeight: 650, color: '#86868b' }}>
+634:                               {isMastered ? '100%' : isPracticing ? '60%' : '25%'}
+635:                             </span>
+636:                           </div>
+637: 
+638:                           {item.teacher_notes && (
+639:                             <div style={{ 
+640:                               marginTop: '16px', 
+641:                               fontSize: '0.82rem', 
+642:                               lineHeight: '1.45', 
+643:                               background: 'rgba(0, 0, 0, 0.02)', 
+644:                               padding: '14px 18px', 
+645:                               borderRadius: '16px', 
+646:                               color: '#1d1d1f', 
+647:                               fontWeight: 500,
+648:                               border: '0.5px solid rgba(0, 0, 0, 0.02)'
+649:                             }}>
+650:                               {item.teacher_notes}
+651:                             </div>
+652:                           )}
+653:                         </div>
+654:                       );
+655:                     })}
+656:                     {campusProgress.length === 0 && (
+657:                       <div style={{ fontSize: '0.85rem', color: '#86868b', background: '#ffffff', padding: '24px', borderRadius: '24px', border: '1px solid rgba(0, 0, 0, 0.04)', textAlign: 'center' }}>
+658:                         Noch keine Einträge in der Fortschrittsmatrix vorhanden.
+659:                       </div>
+660:                     )}
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

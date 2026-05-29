@@ -1,0 +1,49 @@
+Created At: 2026-05-28T06:11:17Z
+Completed At: 2026-05-28T06:11:18Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1124
+Total Bytes: 51115
+Showing lines 695 to 735
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+695:                         padding: 0
+696:                       }}
+697:                     >
+698:                       <div style={{
+699:                         width: '22px',
+700:                         height: '22px',
+701:                         borderRadius: '50%',
+702:                         background: '#ffffff',
+703:                         position: 'absolute',
+704:                         top: '2px',
+705:                         left: isCampusActive ? '22px' : '2px',
+706:                         transition: 'left 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
+707:                         boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+708:                       }} />
+709:                     </button>
+710:                   </div>
+711: 
+712:                   <div style={{ height: '0.5px', background: 'rgba(0, 0, 0, 0.06)' }} />
+713: 
+714:                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+715:                     <div style={{ display: 'flex', flexDirection: 'column' }}>
+716:                       <span style={{ fontSize: '0.86rem', fontWeight: 600, color: '#1d1d1f' }}>GrooveLab-Modul aktivieren</span>
+717:                       <span style={{ fontSize: '0.72rem', color: '#86868b' }}>Songbooks, Bands & üben</span>
+718:                     </div>
+719:                     <button 
+720:                       onClick={() => handleToggleGroovelab(!isGroovelabActive)}
+721:                       style={{
+722:                         width: '46px',
+723:                         height: '26px',
+724:                         borderRadius: '99px',
+725:                         background: isGroovelabActive ? '#007aff' : '#e5e5ea',
+726:                         border: 'none',
+727:                         cursor: 'pointer',
+728:                         position: 'relative',
+729:                         transition: 'background 0.25s ease',
+730:                         padding: 0
+731:                       }}
+732:                     >
+733:                       <div style={{
+734:                         width: '22px',
+735:                         height: '22px',
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

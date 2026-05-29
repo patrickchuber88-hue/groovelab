@@ -1,0 +1,7 @@
+{
+  "AbsolutePath": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "EndLine": "977",
+  "StartLine": "730",
+  "toolAction": "\"Viewing student dashboard markup bottom section\"",
+  "toolSummary": "\"View bottom of dashboard markup\""
+}

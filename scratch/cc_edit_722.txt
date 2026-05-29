@@ -1,0 +1,7 @@
+{
+  "AbsolutePath": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "EndLine": "480",
+  "StartLine": "465",
+  "toolAction": "\"Viewing line 465 to 480 to find py style error\"",
+  "toolSummary": "\"View lines 465-480\""
+}

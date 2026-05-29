@@ -1,0 +1,8 @@
+with open('/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/scratch/recovered_part.txt', 'r', encoding='utf-8') as f:
+    text = f.read()
+
+lines = text.split('\n')
+print("Total lines in recovered_part.txt:", len(lines))
+print("Last 20 lines of recovered_part.txt:")
+for l in lines[-20:]:
+    print(l)

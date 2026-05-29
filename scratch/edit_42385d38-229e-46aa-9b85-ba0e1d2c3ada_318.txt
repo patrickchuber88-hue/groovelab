@@ -1,0 +1,1 @@
+"  // Daily Briefing State\n  const [briefingData, setBriefingData] = useState<any>(null);\n  const [briefingLoading, setBriefingLoading] = useState(true);\n  const [activeTab, setActiveTab] = useState<'briefing' | 'hero'>('briefing');"

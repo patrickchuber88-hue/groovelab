@@ -1,0 +1,7 @@
+{
+  "AbsolutePath": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "EndLine": "520",
+  "StartLine": "450",
+  "toolAction": "\"Viewing main wrapper style in student dashboard\"",
+  "toolSummary": "\"View main wrapper markup\""
+}

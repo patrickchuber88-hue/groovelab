@@ -1,0 +1,7 @@
+{
+  "AbsolutePath": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "EndLine": "835",
+  "StartLine": "820",
+  "toolAction": "\"Viewing main feed end block in student dashboard\"",
+  "toolSummary": "\"View closing main tag\""
+}

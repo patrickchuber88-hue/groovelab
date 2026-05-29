@@ -1,0 +1,63 @@
+Created At: 2026-05-28T06:15:29Z
+Completed At: 2026-05-28T06:15:29Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1186
+Total Bytes: 55333
+Showing lines 770 to 845
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+770:                           left: isGroovelabActive ? '22px' : '2px',
+771:                           transition: 'left 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
+772:                           boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+773:                         }} />
+774:                       </button>
+775:                     </div>
+776:                   </div>
+777:                            {/* Premium Digital Campus ID Card Badge - APPLE WALLET STYLE (Vertical Edition) */}
+778:                 <div className="hover-scale" style={{ 
+779:                   background: 'linear-gradient(135deg, #137333 0%, #0c4a21 100%)', 
+780:                   borderRadius: '24px', 
+781:                   padding: '24px', 
+782:                   color: 'white',
+783:                   boxShadow: '0 20px 45px rgba(19, 115, 51, 0.15)',
+784:                   border: '1px solid rgba(255, 255, 255, 0.15)',
+785:                   display: 'flex',
+786:                   flexDirection: 'column',
+787:                   gap: '20px',
+788:                   position: 'relative',
+789:                   overflow: 'hidden',
+790:                   width: '100%',
+791:                   minHeight: '390px',
+792:                   boxSizing: 'border-box'
+793:                 }}>
+794:                   {/* Glossy light effect */}
+795:                   <div style={{
+796:                     position: 'absolute',
+797:                     top: '-40%', left: '-40%', right: '-40%', bottom: '-40%',
+798:                     background: 'radial-grad
+<truncated 1587 bytes>
+an style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.6)', fontWeight: 650, letterSpacing: '0.1em' }}>SCAN ME TO CHECK IN</span>
+822:                   </div>
+823: 
+824:                   {/* Divider and bottom details */}
+825:                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderTop: '0.5px solid rgba(255,255,255,0.2)', paddingTop: '16px', width: '100%', zIndex: 1, marginTop: 'auto' }}>
+826:                     <div>
+827:                       <div style={{ fontSize: '1.1rem', fontWeight: 700, letterSpacing: '-0.02em', color: '#ffffff' }}>
+828:                         {student.first_name} {student.last_name}
+829:                       </div>
+830:                       <div style={{ fontSize: '0.72rem', fontWeight: 500, color: 'rgba(255, 255, 255, 0.6)', marginTop: '2px', fontFamily: 'monospace' }}>
+831:                         ID: {student.ausweis_nummer || student.id.substring(0, 8).toUpperCase()}
+832:                       </div>
+833:                     </div>
+834:                     <div style={{ textAlign: 'right' }}>
+835:                       <div style={{ fontSize: '0.55rem', fontWeight: 600, color: 'rgba(255, 255, 255, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Musikschule</div>
+836:                       <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#ffffff', marginTop: '1px' }}>{student.schools?.name || 'Campus Musikschule'}</div>
+837:                     </div>
+838:                   </div>
+839:                 </div>               </div>
+840:               </aside>
+841:             </div>
+842:           </div>
+843:         ) : (
+844:           // ---------------- GROOVELAB SPECIFIC VIEW (APPLE-LIKE OVERHAUL) ----------------
+845:           <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr', gap: '40px' }}>
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

@@ -1,0 +1,18 @@
+{
+  "conv_id": "881bec39-cbe6-4441-b3f5-94f5ef9ae10c",
+  "step_index": 675,
+  "created_at": "2026-05-26T20:56:07Z",
+  "type": "replace_file_content",
+  "args": {
+    "AllowMultiple": "false",
+    "Description": "\"Fetch student monthly focus minutes inside fetchStudentAndAvatar function in StudentAvatarDashboard.tsx.\"",
+    "EndLine": "542",
+    "Instruction": "\"Add a query to fetch the monthly_focus_minutes from the student_stats table and store it in monthlyFocusMinutes state.\"",
+    "ReplacementContent": "\"      if (!avatarRecord && user.is_app_user) {\\n        setShowSelector(true);\\n      } else {\\n        setAvatar(avatarRecord);\\n      }\\n\\n      // Fetch student stats for Campus Cup\\n      const { data: statsData } = await supabase\\n        .from('student_stats')\\n        .select('monthly_focus_minutes')\\n        .eq('student_id', studentId)\\n        .maybeSingle();\\n      setMonthlyFocusMinutes(statsData?.monthly_focus_minutes || 0);\"",
+    "StartLine": "537",
+    "TargetContent": "\"      if (!avatarRecord && user.is_app_user) {\\n        setShowSelector(true);\\n      } else {\\n        setAvatar(avatarRecord);\\n      }\"",
+    "TargetFile": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+    "toolAction": "\"Adding monthly focus minutes fetch to StudentAvatarDashboard.tsx\"",
+    "toolSummary": "\"Add monthly focus minutes fetch to StudentAvatarDashboard.tsx\""
+  }
+}

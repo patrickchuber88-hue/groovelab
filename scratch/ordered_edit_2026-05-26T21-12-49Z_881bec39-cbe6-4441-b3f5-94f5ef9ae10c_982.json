@@ -1,0 +1,18 @@
+{
+  "conv_id": "881bec39-cbe6-4441-b3f5-94f5ef9ae10c",
+  "step_index": 982,
+  "created_at": "2026-05-26T21:12:49Z",
+  "type": "replace_file_content",
+  "args": {
+    "AllowMultiple": "false",
+    "Description": "\"Update signature and add parent active tab syncing in StudentAvatarDashboard.\"",
+    "EndLine": "70",
+    "Instruction": "\"Update signature to destruct new props, configure initial state using parentActiveTab, and set up a useEffect hook.\"",
+    "ReplacementContent": "\"export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange }: StudentAvatarDashboardProps) {\\n  const [isAppUser, setIsAppUser] = useState(false);\\n  const [isPremiumUser, setIsPremiumUser] = useState(false);\\n  const [avatar, setAvatar] = useState<Avatar | null>(null);\\n  const [loading, setLoading] = useState(true);\\n  const [error, setError] = useState<string | null>(null);\\n  \\n  // Selection Screen State\\n  const [showSelector, setShowSelector] = useState(false);\\n  const [submittingSelection, setSubmittingSelection] = useState(false);\\n\\n  // Daily Briefing State\\n  const [briefingData, setBriefingData] = useState<any>(null);\\n  const [briefingLoading, setBriefingLoading] = useState(true);\\n  const [activeTab, setActiveTab] = useState<'briefing' | 'hero' | 'songs' | 'practice_board' | 'campus_cup'>(() => {\\n    const initial = parentActiveTab === 'profile' ? 'briefing' : parentActiveTab;\\n    return (initial as any) || 'briefing';\\n  });\\n\\n  useEffect(() => {\\n    if (parentActiveTab) {\\n      const mapped = parentActiveTab === 'profile' ? 'briefing' : parentActiveTab;\\n      if (['briefing', 'hero', 'songs', 'practice_board', 'campus_cup'].includes(mapped)) {\\n        setActiveTab(mapped as any);\\n      }\\n    }\\n  }, [parentActiveTab]);\\n\\n  const handleTabChangeLocal = (tab: 'briefing' | 'hero' | 'songs' | 'practice_board' | 'campus_cup') => {\\n    setActiveTab(tab);\\n    if (onTabChange) {\\n      onTabChange(tab);\\n    }\\n  };\"",
+    "StartLine": "55",
+    "TargetContent": "\"export function StudentAvatarDashboard({ studentId }: StudentAvatarDashboardProps) {\\n  const [isAppUser, setIsAppUser] = useState(false);\\n  const [isPremiumUser, setIsPremiumUser] = useState(false);\\n  const [avatar, setAvatar] = useState<Avatar | null>(null);\\n  const [loading, setLoading] = useState(true);\\n  const [error, setError] = useState<string | null>(null);\\n  \\n  // Selection Screen State\\n  const [showSelector, setShowSelector] = useState(false);\\n  const [submittingSelection, setSubmittingSelection] = useState(false);\\n\\n  // Daily Briefing State\\n  const [briefingData, setBriefingData] = useState<any>(null);\\n  const [briefingLoading, setBriefingLoading] = useState(true);\\n  const [activeTab, setActiveTab] = useState<'briefing' | 'hero' | 'songs' | 'practice_board' | 'campus_cup'>('briefing');\"",
+    "TargetFile": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+    "toolAction": "\"Modifying activeTab state and lifecycle logic in StudentAvatarDashboard\"",
+    "toolSummary": "\"Editing StudentAvatarDashboard.tsx\""
+  }
+}

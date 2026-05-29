@@ -1,0 +1,44 @@
+Created At: 2026-05-28T06:28:58Z
+Completed At: 2026-05-28T06:28:58Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1384
+Total Bytes: 64011
+Showing lines 910 to 945
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+910:                     zIndex: 1 
+911:                   }} />
+912:                   
+913:                   {/* QR Code Ticket Cutout */}
+914:                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', width: '100%', zIndex: 1, marginTop: 'auto' }}>
+915:                     <div style={{ 
+916:                       background: '#ffffff', 
+917:                       padding: '16px', 
+918:                       borderRadius: '20px', 
+919:                       boxShadow: '0 12px 30px rgba(0,0,0,0.3)', 
+920:                       display: 'flex', 
+921:                       alignItems: 'center', 
+922:                       justifyContent: 'center',
+923:                       border: '1px solid rgba(255, 255, 255, 0.8)'
+924:                     }}>
+925:                       <QRCode value={student.qr_token || student.id || ''} size={120} />
+926:                     </div>
+927:                     <span style={{ 
+928:                       fontSize: '0.58rem', 
+929:                       color: '#fbbf24', 
+930:                       fontWeight: 800, 
+931:                       letterSpacing: '0.15em',
+932:                       textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+933:                     }}>
+934:                       TICKER SCAN TO CHECK IN
+935:                     </span>
+936:                   </div>
+937:                 </div>
+938:               </aside>
+939:             </div>
+940:           </div>
+941:         ) : (
+942:           // ---------------- GROOVELAB SPECIFIC VIEW (APPLE-LIKE OVERHAUL) ----------------
+943:           <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr', gap: '40px', alignItems: 'start' }}>
+944:             <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+945:         {/* Profile Card Header - Spacious & Clean iOS Widget Look */}
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

@@ -1,24 +1,23 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy } from 'lucide-react';
-import { 
-  Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer,
-  BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell
-} from 'recharts';
-import Confetti from 'react-confetti';
+import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
+import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy, Compass, MapPin } from 'lucide-react';
 import { useWindowSize } from 'react-use';
-import BandProfileContent from './components/BandProfileContent';
-import { ArtistGateway } from './components/ArtistGateway';
 import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
 import { LoginScreen } from './components/LoginScreen';
 import { QRCodeModal } from './components/QRCodeModal';
 import { DeviceSetupScreen } from './components/DeviceSetupScreen';
-import { TeacherDashboard } from './components/TeacherDashboard';
-import { AdminDashboard } from './components/AdminDashboard';
-import { MasterAdminDashboard } from './components/MasterAdminDashboard';
-import { SecretaryDashboard } from './components/SecretaryDashboard';
-import { StudentAvatarDashboard } from './components/StudentAvatarDashboard';
 import { TeacherDetailModal } from './components/TeacherDetailModal';
 import { StudentDetailModal } from './components/StudentDetailModal';
+
+const TeacherDashboard = lazy(() => import('./components/TeacherDashboard').then(m => ({ default: m.TeacherDashboard })));
+const AdminDashboard = lazy(() => import('./components/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+const MasterAdminDashboard = lazy(() => import('./components/MasterAdminDashboard').then(m => ({ default: m.MasterAdminDashboard })));
+const SecretaryDashboard = lazy(() => import('./components/SecretaryDashboard').then(m => ({ default: m.SecretaryDashboard })));
+const StudentAvatarDashboard = lazy(() => import('./components/StudentAvatarDashboard').then(m => ({ default: m.StudentAvatarDashboard })));
+const BandProfileContent = lazy(() => import('./components/BandProfileContent'));
+const ArtistGateway = lazy(() => import('./components/ArtistGateway').then(m => ({ default: m.ArtistGateway })));
+const StudentRadarChart = lazy(() => import('./components/StudentRadarChart'));
+const ConfettiModal = lazy(() => import('./components/ConfettiModal'));
+const CampusDirectMessages = lazy(() => import('./components/CampusDirectMessages'));
 import { normalizeInstrument, renderInstrumentIcon } from './utils/instruments';
 import { getDistanceFromLatLonInM } from './utils/geo';
 import './App.css';
@@ -78,9 +77,82 @@ const APP_INSTRUMENT_COLORS: Record<string, string> = {
 const brandColor = "#f59e0b"; // Orange (matched with legend)
 
 // --- ANTI-FLICKER AVATAR SYSTEM ---
-const StudioAvatar = React.memo(({ src, style, className, user, userId, onClick }: { src: string | null | undefined, style?: React.CSSProperties, className?: string, user?: any, userId?: string, onClick?: () => void }) => {
+const getInstrumentAvatarUrl = (instrument: string | null | undefined): string => {
+  if (!instrument) return '/avatars/guitar_avatar.png';
+  const inst = instrument.toLowerCase().trim();
+  if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/guitar_avatar.png';
+  if (inst.includes('bass')) return '/avatars/bass_avatar.png';
+  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/drums_avatar.png';
+  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/piano_avatar.png';
+  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/vocals_avatar.png';
+  if (inst.includes('trompete') || inst.includes('trumpet')) return '/avatars/trumpet_avatar.png';
+  if (inst.includes('posaune') || inst.includes('trombone')) return '/avatars/trombone_avatar.png';
+  if (inst.includes('horn')) return '/avatars/horn_avatar.png';
+  if (inst.includes('cello')) return '/avatars/cello_avatar.png';
+  if (inst.includes('geige') || inst.includes('violin') || inst.includes('violine')) return '/avatars/violin_avatar.png';
+  if (inst.includes('klarinette') || inst.includes('clarinet')) return '/avatars/clarinet_avatar.png';
+  if (inst.includes('querflöte') || inst.includes('flute')) return '/avatars/flute_avatar.png';
+  if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return '/avatars/saxophone_avatar.png';
+  return '/avatars/guitar_avatar.png';
+};
+
+// --- ANTI-FLICKER AVATAR SYSTEM ---
+const getDefaultMusicianAvatarUrl = (instrument: string | null | undefined, role: string | null | undefined): string => {
+  const isTeacher = (role || '').toLowerCase() === 'teacher' || (role || '').toLowerCase() === 'admin';
+  if (isTeacher) return '/avatar_teacher_male.jpg';
+  
+  if (!instrument) return '/avatars/student_eguitar_1.png';
+  const inst = instrument.toLowerCase().trim();
+  if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/student_boy_black_guitar.png';
+  if (inst.includes('bass')) return '/avatars/student_boy_black_bass.png';
+  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/student_boy_black_drums.png';
+  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/student_boy_black_piano.png';
+  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/student_boy_red_vocals.png';
+  return '/avatars/student_eguitar_1.png';
+};
+
+const StudioAvatar = React.memo(({ src, style, className, user, userId, onClick, activePlatform }: { src: string | null | undefined, style?: React.CSSProperties, className?: string, user?: any, userId?: string, onClick?: () => void, activePlatform?: string }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   
+  const activePlat = activePlatform || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'groovelab');
+  let displaySrc = src;
+  
+  const targetUser = user;
+  
+  if (activePlat === 'campus') {
+    if (targetUser) {
+      const role = (targetUser.role || '').toLowerCase();
+      if (role === 'student' || role === 'teacher' || role === 'admin') {
+        displaySrc = getInstrumentAvatarUrl(targetUser.instrument);
+      }
+    } else {
+      if (src && !src.includes('_avatar.png') && !src.includes('avatar_ghost')) {
+        displaySrc = '/avatars/guitar_avatar.png';
+      }
+    }
+  } else {
+    // GrooveLab platform: strictly block instrument avatars and fall back to musician avatars
+    const isInstrumentAvatar = src && (
+      src.includes('avatar.png') || 
+      src.includes('guitar_avatar') || 
+      src.includes('bass_avatar') || 
+      src.includes('drums_avatar') || 
+      src.includes('piano_avatar') || 
+      src.includes('vocals_avatar') || 
+      src.includes('trumpet_avatar') || 
+      src.includes('trombone_avatar') || 
+      src.includes('horn_avatar') || 
+      src.includes('cello_avatar') || 
+      src.includes('violin_avatar') || 
+      src.includes('clarinet_avatar') || 
+      src.includes('flute_avatar') || 
+      src.includes('saxophone_avatar')
+    );
+    if (!src || isInstrumentAvatar || src === '/avatar_ghost.jpg') {
+      displaySrc = getDefaultMusicianAvatarUrl(targetUser?.instrument, targetUser?.role);
+    }
+  }
+
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (onClick) {
@@ -110,7 +182,7 @@ const StudioAvatar = React.memo(({ src, style, className, user, userId, onClick 
       className={`studio-avatar-wrapper ${hasAction ? 'hover-scale-mini' : ''} ${className || ''}`}
     >
       <img 
-        src={src || '/avatar_ghost.jpg'} 
+        src={displaySrc || '/avatar_ghost.jpg'} 
         onLoad={() => setIsLoaded(true)}
         style={{ 
           width: '100%', 
@@ -127,7 +199,7 @@ const StudioAvatar = React.memo(({ src, style, className, user, userId, onClick 
       />
     </div>
   );
-}, (prev, next) => prev.src === next.src && prev.user?.id === next.user?.id && prev.userId === next.userId);
+}, (prev, next) => prev.src === next.src && prev.user?.id === next.user?.id && prev.userId === next.userId && prev.user?.instrument === next.user?.instrument && prev.activePlatform === next.activePlatform);
 
 const renderBandAvatar = (name: string, photoUrl?: string | null, size: string = '64px', borderRadius: string = '18px') => {
   if (photoUrl) {
@@ -1480,7 +1552,12 @@ function App() {
 
   const [loading, setLoading] = useState(false);
   const [isSchoolPaused, setIsSchoolPaused] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUserRaw] = useState<any>(null);
+  const setUser = React.useCallback((val: any) => {
+    React.startTransition(() => {
+      setUserRaw(val);
+    });
+  }, []);
   const [session, setSession] = useState<any>(null);
   const [totalPresenceMins, setTotalPresenceMins] = useState(0);
   const [showEditProfile, setShowEditProfile] = useState(false);
@@ -1528,12 +1605,28 @@ function App() {
   const [globalSongs, setGlobalSongs] = useState<any[]>([]);
   const [plannedSlots, setPlannedSlots] = useState<string[]>([]);
   const [globalPlannedSlots, setGlobalPlannedSlots] = useState<any[]>([]);
-  const [activeStudentTab, setActiveStudentTab] = useState<string>(() => {
-    return localStorage.getItem('groovelab_active_tab') || 'profile';
-  });
-  const [activePlatform, setActivePlatform] = useState<'campus' | 'groovelab'>(() => {
+  const [activePlatform, setActivePlatformRaw] = useState<'campus' | 'groovelab'>(() => {
     return (localStorage.getItem('groovelab_active_platform') as 'campus' | 'groovelab') || 'groovelab';
   });
+  const setActivePlatform = React.useCallback((val: any) => {
+    React.startTransition(() => {
+      setActivePlatformRaw(val);
+    });
+  }, []);
+
+  const [activeStudentTab, setActiveStudentTabRaw] = useState<string>(() => {
+    const platform = (localStorage.getItem('groovelab_active_platform') as 'campus' | 'groovelab') || 'groovelab';
+    if (platform === 'campus') {
+      return localStorage.getItem('campus_active_tab') || 'profile';
+    }
+    return localStorage.getItem('groovelab_active_tab') || 'profile';
+  });
+  const setActiveStudentTab = React.useCallback((val: any) => {
+    React.startTransition(() => {
+      setActiveStudentTabRaw(val);
+    });
+  }, []);
+
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       return window.innerWidth < 1200;
@@ -1542,11 +1635,85 @@ function App() {
   });
   const [sidebarNotificationsCount, setSidebarNotificationsCount] = useState<number>(0);
   const [selectedMatchingInsts, setSelectedMatchingInsts] = useState<Record<string, string>>({});
-  const [activeBandSubTab, setActiveBandSubTab] = useState<'meine' | 'alle'>('meine');
-  const [selectedBandForProfile, setSelectedBandForProfile] = useState<any>(null);
-  const [selectedBandForGateway, setSelectedBandForGateway] = useState<any>(null);
+  const [activeBandSubTab, setActiveBandSubTab] = useState<'meine' | 'alle'>(() => {
+    return (localStorage.getItem('groovelab_active_band_subtab') as 'meine' | 'alle') || 'meine';
+  });
+  
+  const [campusTeacherStats, setCampusTeacherStats] = useState<{ studentCount: number, totalMinutes: number, teachingDays: string[], primaryRoom: string } | null>(null);
+
+  useEffect(() => {
+    if (activeStudentTab === 'profile' && activePlatform === 'campus' && user && (user.role === 'teacher' || user.role === 'admin')) {
+      const fetchStats = async () => {
+        try {
+          const { data: scheds } = await supabase
+            .from('schedules')
+            .select('*, rooms(name)')
+            .eq('teacher_id', user.id);
+          
+          if (scheds) {
+            const uniqueStudents = new Set(scheds.filter(s => s.student_id).map(s => s.student_id));
+            const totalMins = scheds.filter(s => s.student_id).reduce((acc, curr) => acc + (curr.duration || 30), 0);
+            
+            const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+            const uniqueDays = Array.from(new Set(scheds.map(s => s.day_of_week)))
+              .sort((a, b) => a - b)
+              .map(d => DAYS_DE[d]);
+
+            // Primary room calculation
+            const roomCounts: Record<string, number> = {};
+            scheds.forEach(s => {
+              const rName = s.rooms?.name;
+              if (rName) {
+                roomCounts[rName] = (roomCounts[rName] || 0) + 1;
+              }
+            });
+            let primary = 'Kein Raum';
+            let maxCount = 0;
+            Object.entries(roomCounts).forEach(([rName, count]) => {
+              if (count > maxCount) {
+                maxCount = count;
+                primary = rName;
+              }
+            });
+
+            setCampusTeacherStats({
+              studentCount: uniqueStudents.size,
+              totalMinutes: totalMins,
+              teachingDays: uniqueDays,
+              primaryRoom: primary
+            });
+          }
+        } catch (err) {
+          console.error('Error fetching teacher stats:', err);
+        }
+      };
+      fetchStats();
+    }
+  }, [activeStudentTab, activePlatform, user?.id]);
+
+  const [selectedBandForProfile, setSelectedBandForProfileRaw] = useState<any>(null);
+  const setSelectedBandForProfile = React.useCallback((val: any) => {
+    React.startTransition(() => {
+      setSelectedBandForProfileRaw(val);
+    });
+  }, []);
+
+  const [selectedBandForGateway, setSelectedBandForGatewayRaw] = useState<any>(null);
+  const setSelectedBandForGateway = React.useCallback((val: any) => {
+    React.startTransition(() => {
+      setSelectedBandForGatewayRaw(val);
+    });
+  }, []);
+
   const [expandedSongId, setExpandedSongId] = useState<string | null>(null);
-  const [showBandProfile, setShowBandProfile] = useState(() => localStorage.getItem('groovelab_show_band_profile') === 'true');
+
+  const [showBandProfile, setShowBandProfileRaw] = useState(() => localStorage.getItem('groovelab_show_band_profile') === 'true');
+  const setShowBandProfile = React.useCallback((val: any) => {
+    React.startTransition(() => {
+      setShowBandProfileRaw(val);
+    });
+  }, []);
+
   const [bandProfileView, setBandProfileView] = useState<'public' | 'backstage'>(() => {
     const saved = localStorage.getItem('groovelab_band_profile_view');
     return (saved === 'public' || saved === 'backstage') ? saved : 'public';
@@ -1587,6 +1754,12 @@ function App() {
   const [selectedStudentMessage, setSelectedStudentMessage] = useState<any>(null);
   const [studentMessagesFilter, setStudentMessagesFilter] = useState<'all' | 'school' | 'band'>('all');
   const [deletedMessageIds, setDeletedMessageIds] = useState<string[]>([]);
+
+  // Campus 1-on-1 Direct Messaging states
+  const [campusMessages, setCampusMessages] = useState<any[]>([]);
+  const [campusMessagesLoading, setCampusMessagesLoading] = useState(false);
+  const [campusUnreadCount, setCampusUnreadCount] = useState(0);
+  const [selectedCampusRecipient, setSelectedCampusRecipient] = useState<any>(null);
 
   useEffect(() => {
     if (user?.id) {
@@ -1645,6 +1818,33 @@ function App() {
       }
     }
   };
+
+  useEffect(() => {
+    if (selectedTeacher?.id) {
+      sessionStorage.setItem('groovelab_selected_teacher_id', selectedTeacher.id);
+    } else {
+      sessionStorage.removeItem('groovelab_selected_teacher_id');
+    }
+  }, [selectedTeacher]);
+
+  useEffect(() => {
+    if (selectedStudentProfile?.id) {
+      sessionStorage.setItem('groovelab_selected_student_id', selectedStudentProfile.id);
+    } else {
+      sessionStorage.removeItem('groovelab_selected_student_id');
+    }
+  }, [selectedStudentProfile]);
+
+  useEffect(() => {
+    const savedTeacherId = sessionStorage.getItem('groovelab_selected_teacher_id');
+    if (savedTeacherId && !selectedTeacher) {
+      openUserProfile(savedTeacherId);
+    }
+    const savedStudentId = sessionStorage.getItem('groovelab_selected_student_id');
+    if (savedStudentId && !selectedStudentProfile) {
+      openUserProfile(savedStudentId);
+    }
+  }, []);
 
   useEffect(() => {
     (window as any).openUserProfile = openUserProfile;
@@ -1933,75 +2133,22 @@ function App() {
   ];
 
   const STUDENT_AVATARS = [
-    // NEW AVATARS (Alternating Girl, Boy)
-    { id: 'student_girl_blonde_guitar', url: '/avatars/student_girl_blonde_guitar.png' },
-    { id: 'student_boy_blonde_guitar', url: '/avatars/student_boy_blonde_guitar.png' },
-    { id: 'student_girl_black_drums', url: '/avatars/student_girl_black_drums.png' },
-    { id: 'student_boy_black_drums', url: '/avatars/student_boy_black_drums.png' },
-    { id: 'student_girl_lightbrown_piano', url: '/avatars/student_girl_lightbrown_piano.png' },
-    { id: 'student_boy_lightbrown_piano', url: '/avatars/student_boy_lightbrown_piano.png' },
-    { id: 'student_girl_black_bass', url: '/avatars/student_girl_black_bass.png' },
-    { id: 'student_boy_black_bass', url: '/avatars/student_boy_black_bass.png' },
-    { id: 'student_girl_red_vocals', url: '/avatars/student_girl_red_vocals.png' },
-    { id: 'student_boy_red_vocals', url: '/avatars/student_boy_red_vocals.png' },
-    { id: 'student_girl_black_guitar', url: '/avatars/student_girl_black_guitar.png' },
-    { id: 'student_boy_black_guitar', url: '/avatars/student_boy_black_guitar.png' },
-    { id: 'student_girl_blonde_drums', url: '/avatars/student_girl_blonde_drums.png' },
-    { id: 'student_boy_blonde_drums', url: '/avatars/student_boy_blonde_drums.png' },
-    { id: 'student_girl_black_piano', url: '/avatars/student_girl_black_piano.png' },
-    { id: 'student_boy_black_piano', url: '/avatars/student_boy_black_piano.png' },
-
-    // EXISTING AVATARS (Alternating Girl, Boy)
-    { id: 'avatar_girl_guitar', url: '/avatar_girl_guitar.jpg' },
-    { id: 'avatar_boy_guitar', url: '/avatar_boy_guitar.jpg' },
-    { id: 'avatar_girl_piano', url: '/avatar_girl_piano.jpg' },
-    { id: 'avatar_boy_piano', url: '/avatar_boy_piano.jpg' },
-    { id: 'avatar_girl_drums', url: '/avatar_girl_drums.jpg' },
-    { id: 'avatar_boy_drums', url: '/avatar_boy_drums.jpg' },
-    { id: 'avatar_girl_bass', url: '/avatar_girl_bass.jpg' },
-    { id: 'avatar_boy_bass', url: '/avatar_boy_bass.jpg' },
-
-    { id: 'teen_girl_eguitar_focused', url: '/avatars/teen_girl_eguitar_focused.png' },
-    { id: 'student_teen_boy_guitar_1', url: '/avatars/student_teen_boy_guitar_1.png' },
-    { id: 'student_girl_eguitar_3', url: '/avatars/student_girl_eguitar_3.png' },
-    { id: 'teen_boy_eguitar_17', url: '/avatars/teen_boy_eguitar_17.png' },
-    { id: 'student_girl_piano_2', url: '/avatars/student_girl_piano_2.png' },
-    { id: 'student_boy_vocals_1', url: '/avatars/student_boy_vocals_1.png' },
-    { id: 'student_girl_eguitar_2', url: '/avatars/student_girl_eguitar_2.png' },
-    { id: 'student_boy_piano_2', url: '/avatars/student_boy_piano_2.png' },
-    { id: 'student_girl_ebass_1', url: '/avatars/student_girl_ebass_1.png' },
-    { id: 'student_boy_keyboard_1', url: '/avatars/student_boy_keyboard_1.png' },
-    { id: 'student_girl_drums_2', url: '/avatars/student_girl_drums_2.png' },
-    { id: 'student_boy_eguitar_2', url: '/avatars/student_boy_eguitar_2.png' },
-    { id: 'student_girl_drums_3', url: '/avatars/student_girl_drums_3.png' },
-    { id: 'student_boy_ebass_1', url: '/avatars/student_boy_ebass_1.png' },
-    { id: 'student_girl_vocals_1', url: '/avatars/student_girl_vocals_1.png' },
-    { id: 'student_boy_drums_2', url: '/avatars/student_boy_drums_2.png' },
-    { id: 'vocalist_female', url: '/vocalist_female.png' },
-    { id: 'student_boy_drums_3', url: '/avatars/student_boy_drums_3.png' },
-
-    { id: 'bandstyle_girl_eguitar', url: '/avatars/bandstyle_girl_eguitar.png' },
-    { id: 'student_boy_producer_1', url: '/avatars/student_boy_producer_1.png' },
-    { id: 'bandstyle_girl_ebass', url: '/avatars/bandstyle_girl_ebass.png' },
-    { id: 'vocalist_male', url: '/vocalist_male.png' },
-    { id: 'bandstyle_girl_edrums', url: '/avatars/bandstyle_girl_edrums.png' },
-    { id: 'student_bass_1', url: '/avatars/student_bass_1.png' },
-    { id: 'bandstyle_girl_epiano', url: '/avatars/bandstyle_girl_epiano.png' },
-    { id: 'student_drums_1', url: '/avatars/student_drums_1.png' },
-
-    // Remaining Neutral/Male Avatars
-    { id: 'student_eguitar_1', url: '/avatars/student_eguitar_1.png' },
-    { id: 'student_piano_1', url: '/avatars/student_piano_1.png' },
-    { id: 'student_vocals_1', url: '/avatars/student_vocals_1.png' },
-    { id: 'student_tech_1', url: '/avatars/student_tech_1.png' },
-    { id: 'bandstyle_boy_eguitar', url: '/avatars/bandstyle_boy_eguitar.png' },
-    { id: 'bandstyle_boy_ebass', url: '/avatars/bandstyle_boy_ebass.png' },
-    { id: 'bandstyle_boy_edrums', url: '/avatars/bandstyle_boy_edrums.png' },
-    { id: 'bandstyle_boy_epiano', url: '/avatars/bandstyle_boy_epiano.png' },
-    { id: 'teen_girl_acoustic_guitar', url: '/avatars/teen_girl_acoustic_guitar.png' },
-    { id: 'teen_boy_acoustic_guitar', url: '/avatars/teen_boy_acoustic_guitar.png' },
-    { id: 'avatar_girl_new', url: '/avatar_girl_1777237237899.png' },
-    { id: 'avatar_boy', url: '/avatar_boy.jpg' }
+    { id: 'student_boy_guitar_1', url: '/avatars/student_boy_black_guitar.png' },
+    { id: 'student_girl_guitar_1', url: '/avatars/student_girl_blonde_guitar.png' },
+    { id: 'student_boy_drums_1', url: '/avatars/student_boy_black_drums.png' },
+    { id: 'student_girl_drums_1', url: '/avatars/student_girl_blonde_drums.png' },
+    { id: 'student_boy_bass_1', url: '/avatars/student_boy_black_bass.png' },
+    { id: 'student_girl_bass_1', url: '/avatars/student_girl_black_bass.png' },
+    { id: 'student_boy_piano_1', url: '/avatars/student_boy_black_piano.png' },
+    { id: 'student_girl_piano_1', url: '/avatars/student_girl_black_piano.png' },
+    { id: 'student_boy_vocals_1', url: '/avatars/student_boy_red_vocals.png' },
+    { id: 'student_girl_vocals_1', url: '/avatars/student_girl_red_vocals.png' },
+    { id: 'student_eguitar_alt', url: '/avatars/student_eguitar_1.png' },
+    { id: 'student_drums_alt', url: '/avatars/student_drums_1.png' },
+    { id: 'student_vocals_alt', url: '/avatars/student_vocals_1.png' },
+    { id: 'student_piano_alt', url: '/avatars/student_piano_1.png' },
+    { id: 'student_bass_alt', url: '/avatars/student_bass_1.png' },
+    { id: 'student_tech_alt', url: '/avatars/student_tech_1.png' }
   ];
 
   const TEACHER_AVATARS = [
@@ -2057,26 +2204,27 @@ function App() {
 
   useEffect(() => {
     if (activePlatform === 'campus') {
-      localStorage.setItem('campus_active_tab', activeStudentTab);
+      // localStorage.setItem('campus_active_tab', activeStudentTab);
     } else {
       localStorage.setItem('groovelab_active_tab', activeStudentTab);
     }
   }, [activeStudentTab, activePlatform]);
 
-  // Track whether this is the first platform-switch render (not initial mount)
-  const platformInitialized = React.useRef(false);
+  const previousPlatform = React.useRef(activePlatform);
   useEffect(() => {
     localStorage.setItem('groovelab_active_platform', activePlatform);
-    // On initial mount, tabs are already restored from localStorage in useState initializer.
-    // Only restore saved tab when the user actively switches platforms.
-    if (!platformInitialized.current) {
-      platformInitialized.current = true;
+    if (previousPlatform.current === activePlatform) {
       return;
     }
-    const firstMenuTab = activePlatform === 'campus' ? 'briefing' : 'live';
+    previousPlatform.current = activePlatform;
+    
+    // Always load the first menu tab when actively switching platforms (Karteikarten)
+    const firstMenuTab = activePlatform === 'campus' 
+      ? (user?.role?.toLowerCase() === 'student' ? 'briefing' : 'live') 
+      : 'live';
     setActiveStudentTab(firstMenuTab);
     localStorage.setItem(activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab', firstMenuTab);
-  }, [activePlatform]);
+  }, [activePlatform, user?.role]);
   const { width, height } = useWindowSize();
 
   const [liveSessionMins, setLiveSessionMins] = useState(0);
@@ -2103,9 +2251,19 @@ function App() {
       })
       .subscribe();
 
+    // Realtime subscription for campus_direct_messages
+    const campusMessagesChannel = supabase
+      .channel('campus-messages-sync')
+      .on('postgres_changes', { schema: 'public', event: '*', table: 'campus_direct_messages' }, () => {
+        console.log('[Realtime] campus_direct_messages update detected');
+        fetchCampusMessages();
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(sessionChannel);
       supabase.removeChannel(skillsChannel);
+      supabase.removeChannel(campusMessagesChannel);
     };
   }, [user]);
 
@@ -3104,22 +3262,25 @@ function App() {
       setStudentActivity(last7);
 
 
-      // --- ANNOUNCEMENT & SHOUTBOX INITIALIZATION ---
+      // Fetch school users for both student and teacher to support direct messaging
+      const { data: allUsers } = await supabase
+        .from('users')
+        .select('id, first_name, last_name, role, photo_url')
+        .eq('school_id', schoolId)
+        .order('first_name');
+      if (allUsers) {
+        setSchoolUsers(allUsers);
+      }
+
       checkAnnouncements(schoolId, userData);
       if (userData.role !== 'student') {
         fetchAnnouncements(schoolId);
-        
-        const { data: allUsers } = await supabase
-          .from('users')
-          .select('id, first_name, last_name, role, photo_url')
-          .eq('school_id', schoolId)
-          .order('first_name');
-        if (allUsers) {
-          setSchoolUsers(allUsers);
-        }
       } else {
         fetchStudentMessagesBackground(schoolId, userId, bandIds);
       }
+
+      // Fetch Campus Direct Messages
+      fetchCampusMessages();
 
     } catch (error: any) {
       console.error('[Dashboard] UNCAUGHT ERROR in fetchDashboardData:', error);
@@ -3457,6 +3618,61 @@ function App() {
     const bandIds = userBands.map(b => b.id);
     await fetchStudentMessagesBackground(user.school_id, user.id, bandIds);
     setStudentMessagesLoading(false);
+  };
+
+  const fetchCampusMessages = React.useCallback(async () => {
+    const uid = sessionStorage.getItem('groovelab_user_id') || (user?.id);
+    if (!uid) return;
+    setCampusMessagesLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('campus_direct_messages')
+        .select('*')
+        .or(`sender_id.eq.${uid},recipient_id.eq.${uid}`)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      if (data) {
+        setCampusMessages(data);
+        const unread = data.filter((m: any) => m.recipient_id === uid && !m.is_read).length;
+        setCampusUnreadCount(unread);
+      }
+    } catch (err) {
+      console.error('Error fetching campus messages:', err);
+    } finally {
+      setCampusMessagesLoading(false);
+    }
+  }, [user?.id]);
+
+  const handleSendCampusMessage = async (recipientId: string, content: string) => {
+    const uid = sessionStorage.getItem('groovelab_user_id') || (user?.id);
+    if (!uid) return;
+    try {
+      const { error } = await supabase.from('campus_direct_messages').insert({
+        sender_id: uid,
+        recipient_id: recipientId,
+        content
+      });
+      if (error) throw error;
+      fetchCampusMessages();
+    } catch (err) {
+      console.error('Error sending campus message:', err);
+    }
+  };
+
+  const handleMarkCampusMessagesAsRead = async (senderId: string) => {
+    const uid = sessionStorage.getItem('groovelab_user_id') || (user?.id);
+    if (!uid) return;
+    try {
+      const { error } = await supabase
+        .from('campus_direct_messages')
+        .update({ is_read: true })
+        .eq('sender_id', senderId)
+        .eq('recipient_id', uid);
+      if (error) throw error;
+      fetchCampusMessages();
+    } catch (err) {
+      console.error('Error marking messages as read:', err);
+    }
   };
 
   const handleAcknowledgeStudentMessage = async (msg: any) => {
@@ -5196,22 +5412,42 @@ function App() {
             activePlatform === 'campus' ? (
               <>
                 <button onClick={() => setActiveStudentTab('briefing')} className={`sidebar-item ${['briefing', 'profile'].includes(activeStudentTab) ? `active ${activePlatform}` : ''}`}>
-                  <GraduationCap size={20} /> Briefing
-                </button>
-                <button onClick={() => setActiveStudentTab('songs')} className={`sidebar-item ${activeStudentTab === 'songs' ? `active ${activePlatform}` : ''}`}>
-                  <Music size={20} /> Songs
+                  <Monitor size={20} /> Briefing
                 </button>
                 <button onClick={() => setActiveStudentTab('practice_board')} className={`sidebar-item ${activeStudentTab === 'practice_board' ? `active ${activePlatform}` : ''}`}>
-                  <Play size={20} /> Übe-Board
+                  <Zap size={20} /> Übe-Board
+                </button>
+                <button onClick={() => setActiveStudentTab('mediathek')} className={`sidebar-item ${activeStudentTab === 'mediathek' ? `active ${activePlatform}` : ''}`}>
+                  <Library size={20} /> Mediathek
+                </button>
+                <button onClick={() => setActiveStudentTab('events')} className={`sidebar-item ${activeStudentTab === 'events' ? `active ${activePlatform}` : ''}`}>
+                  <Calendar size={20} /> Events
                 </button>
                 <button onClick={() => setActiveStudentTab('campus_cup')} className={`sidebar-item ${activeStudentTab === 'campus_cup' ? `active ${activePlatform}` : ''}`}>
                   <Trophy size={20} /> Campus-Cup
                 </button>
-                <button onClick={() => setActiveStudentTab('hero')} className={`sidebar-item ${activeStudentTab === 'hero' ? `active ${activePlatform}` : ''}`}>
-                  <Star size={20} /> Mein Held
+                <button onClick={() => setActiveStudentTab('flashback')} className={`sidebar-item ${activeStudentTab === 'flashback' ? `active ${activePlatform}` : ''}`}>
+                  <Clock size={20} /> Flashback
                 </button>
-                <button onClick={() => setActiveStudentTab('team')} className={`sidebar-item ${activeStudentTab === 'team' ? `active ${activePlatform}` : ''}`}>
-                  <Users size={20} /> Mein Team
+                <button onClick={() => setActiveStudentTab('messages')} className={`sidebar-item ${activeStudentTab === 'messages' ? `active ${activePlatform}` : ''}`} style={{ position: 'relative' }}>
+                  <Mail size={20} /> Nachrichten
+                  {campusUnreadCount > 0 && (
+                    <div style={{ 
+                      background: '#ef4444', 
+                      color: 'white', 
+                      borderRadius: '50%', 
+                      minWidth: '18px', 
+                      height: '18px', 
+                      padding: '0 5px',
+                      fontSize: '0.65rem', 
+                      fontWeight: 900, 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      marginLeft: 'auto',
+                      boxShadow: '0 2px 5px rgba(239, 68, 68, 0.4)'
+                    }}>{campusUnreadCount}</div>
+                  )}
                 </button>
               </>
             ) : (
@@ -5273,13 +5509,48 @@ function App() {
             activePlatform === 'campus' ? (
               <>
                 <button onClick={() => setActiveStudentTab('live')} className={`sidebar-item ${activeStudentTab === 'live' ? `active ${activePlatform}` : ''}`} style={{ position: 'relative' }}>
-                  <Monitor size={20} /> Stundenpläne & Briefing
+                  <Monitor size={20} /> Briefing
+                </button>
+                <button onClick={() => setActiveStudentTab('schedule')} className={`sidebar-item ${activeStudentTab === 'schedule' ? `active ${activePlatform}` : ''}`}>
+                  <Calendar size={20} /> Stundenplan
+                </button>
+                <button onClick={() => setActiveStudentTab('messages')} className={`sidebar-item ${activeStudentTab === 'messages' ? `active ${activePlatform}` : ''}`} style={{ position: 'relative' }}>
+                  <Mail size={20} /> Nachrichten
+                  {campusUnreadCount > 0 && (
+                    <div style={{ 
+                      background: '#ef4444', 
+                      color: 'white', 
+                      borderRadius: '50%', 
+                      minWidth: '18px', 
+                      height: '18px', 
+                      padding: '0 5px',
+                      fontSize: '0.65rem', 
+                      fontWeight: 900, 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      marginLeft: 'auto',
+                      boxShadow: '0 2px 5px rgba(239, 68, 68, 0.4)'
+                    }}>{campusUnreadCount}</div>
+                  )}
                 </button>
                 <button onClick={() => setActiveStudentTab('students')} className={`sidebar-item ${activeStudentTab === 'students' ? `active ${activePlatform}` : ''}`}>
-                  <Users size={20} /> Schüler verwalten
+                  <Users size={20} /> Schüler
                 </button>
-                <button onClick={() => setActiveStudentTab('team')} className={`sidebar-item ${activeStudentTab === 'team' ? `active ${activePlatform}` : ''}`}>
-                  <Shield size={20} /> Kollegium (Team)
+                <button onClick={() => setActiveStudentTab('songs')} className={`sidebar-item ${activeStudentTab === 'songs' ? `active ${activePlatform}` : ''}`}>
+                  <Library size={20} /> Mediathek
+                </button>
+                <button onClick={() => setActiveStudentTab('rooms')} className={`sidebar-item ${activeStudentTab === 'rooms' ? `active ${activePlatform}` : ''}`}>
+                  <Box size={20} /> Räume
+                </button>
+                <button onClick={() => setActiveStudentTab('missions')} className={`sidebar-item ${activeStudentTab === 'missions' ? `active ${activePlatform}` : ''}`}>
+                  <Compass size={20} /> Missions
+                </button>
+                <button onClick={() => setActiveStudentTab('stats')} className={`sidebar-item ${activeStudentTab === 'stats' ? `active ${activePlatform}` : ''}`}>
+                  <Trophy size={20} /> Performance & Cub
+                </button>
+                <button onClick={() => setActiveStudentTab('setup')} className={`sidebar-item ${activeStudentTab === 'setup' ? `active ${activePlatform}` : ''}`}>
+                  <Settings size={20} /> Setup
                 </button>
               </>
             ) : (
@@ -5342,7 +5613,7 @@ function App() {
           >
             <div style={{ position: 'relative', flexShrink: 0 }}>
               <div style={{ width: '40px', height: '40px', borderRadius: '12px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                <StudioAvatar src={user.photo_url} user={user} />
+                <StudioAvatar src={user.photo_url} user={user} activePlatform={activePlatform} />
               </div>
               {session && <div style={{ position: 'absolute', bottom: -2, right: -2, width: '10px', height: '10px', background: '#ef4444', borderRadius: '50%', border: '2px solid white' }}></div>}
             </div>
@@ -5350,8 +5621,8 @@ function App() {
               <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.first_name}</div>
               <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {activePlatform === 'campus'
-                  ? (user.role === 'admin' ? 'Campus Admin' : user.role === 'teacher' ? 'Campus Lehrkraft' : user.role === 'secretary' ? 'Campus Sekretariat' : 'Campus Schüler')
-                  : (user.role === 'admin' ? 'GrooveLab Admin' : user.role === 'teacher' ? 'GrooveLab Lehrer' : user.role === 'secretary' ? 'GrooveLab Sekretariat' : 'GrooveLab Schüler')}
+                  ? (user.role === 'admin' ? 'Campus Admin' : user.role === 'teacher' ? 'Campus Lehrkraft' : user.role === 'secretary' ? 'Campus Verwaltung' : 'Campus Schüler')
+                  : (user.role === 'admin' ? 'GrooveLab Admin' : user.role === 'teacher' ? 'GrooveLab Lehrer' : user.role === 'secretary' ? 'GrooveLab Verwaltung' : 'GrooveLab Schüler')}
               </div>
             </div>
             <ChevronRight size={16} color="#94a3b8" style={{ marginLeft: 'auto', flexShrink: 0 }} />
@@ -5408,7 +5679,12 @@ function App() {
             {/* Campus Tab */}
             {school?.has_campus_subscription && user?.is_campus_active && (
               <div 
-                onClick={() => setActivePlatform('campus')}
+                onClick={() => {
+                  setActivePlatform('campus');
+                  const firstTab = user?.role?.toLowerCase() === 'student' ? 'briefing' : 'live';
+                  setActiveStudentTab(firstTab);
+                  localStorage.setItem('campus_active_tab', firstTab);
+                }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -5441,7 +5717,11 @@ function App() {
             {/* GrooveLab Tab */}
             {school?.has_groovelab_subscription && user?.is_groovelab_active && (
               <div 
-                onClick={() => setActivePlatform('groovelab')}
+                onClick={() => {
+                  setActivePlatform('groovelab');
+                  setActiveStudentTab('live');
+                  localStorage.setItem('groovelab_active_tab', 'live');
+                }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -5495,95 +5775,103 @@ function App() {
                     </div>
                   )}
 
-                  {/* School Pill */}
-                  <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '8px', 
-                    background: user?.role === 'student' ? 'rgba(59, 130, 246, 0.04)' : 'rgba(239, 68, 68, 0.06)', 
-                    padding: windowWidth <= 768 ? '8px 12px' : '8px 16px', 
-                    borderRadius: '12px', 
-                    border: user?.role === 'student' ? '1px solid rgba(59, 130, 246, 0.12)' : '1px solid rgba(239, 68, 68, 0.18)',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-                  }}>
-                    <School size={14} color="#ef4444" />
-                    <span style={{ fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                      {user?.role === 'student' ? (
-                        <>
-                          <span style={{ color: '#ef4444' }}>
-                            {school?.name || 'Meine Musikschule'}
-                          </span>
-                          <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
-                          <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <User size={14} color="#3b82f6" />
-                            <span>
-                              {teachers.find(t => t.id === user.teacher_id) 
-                                ? `${teachers.find(t => t.id === user.teacher_id).first_name} ${teachers.find(t => t.id === user.teacher_id).last_name}` 
-                                : (teachers.length > 0 
-                                  ? `${teachers[0].first_name} ${teachers[0].last_name}` 
-                                  : 'Patrick Huber')}
+                  {/* Unified School, Teacher, Student, Admin & Secretary Pill */}
+                  {(() => {
+                    if (user?.role === 'student') {
+                      return (
+                        <div style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '8px', 
+                          background: 'rgba(59, 130, 246, 0.04)', 
+                          padding: windowWidth <= 768 ? '8px 12px' : '8px 16px', 
+                          borderRadius: '12px', 
+                          border: '1px solid rgba(59, 130, 246, 0.12)',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                        }}>
+                          <School size={14} color="#ef4444" />
+                          <span style={{ fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            <span style={{ color: '#ef4444' }}>
+                              {school?.name || 'Meine Musikschule'}
+                            </span>
+                            <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
+                            <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <User size={14} color="#3b82f6" />
+                              <span>
+                                {teachers.find(t => t.id === user.teacher_id) 
+                                  ? `${teachers.find(t => t.id === user.teacher_id).first_name} ${teachers.find(t => t.id === user.teacher_id).last_name}` 
+                                  : (teachers.length > 0 
+                                    ? `${teachers[0].first_name} ${teachers[0].last_name}` 
+                                    : 'Patrick Huber')}
+                              </span>
+                            </span>
+                            <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
+                            <span style={{ color: '#34a853', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <User size={14} color="#34a853" />
+                              <span>
+                                {user.first_name || 'Schüler'}
+                              </span>
                             </span>
                           </span>
-                        </>
-                      ) : (
-                        <span style={{ color: '#ef4444' }}>
-                          {school?.name === 'Testlauf' 
-                            ? `Lehrer: ${user.first_name} ${user.last_name}`
-                            : (school?.name || 'Meine Musikschule')}
-                        </span>
-                      )}
-                    </span>
-                  </div>
-
-                  {/* Role Pill (Hidden on Mobile) */}
-                  {windowWidth > 768 && (() => {
-                    let rolePillBg = 'rgba(52, 168, 83, 0.06)';
-                    let rolePillBorder = 'rgba(52, 168, 83, 0.18)';
-                    let rolePillTextColor = '#34a853';
-
-                    if (user?.role === 'student') {
-                      rolePillBg = 'rgba(52, 168, 83, 0.06)';
-                      rolePillBorder = 'rgba(52, 168, 83, 0.18)';
-                      rolePillTextColor = '#34a853';
-                    } else if (user?.role === 'teacher' || user?.role === 'admin') {
-                      rolePillBg = 'rgba(59, 130, 246, 0.06)';
-                      rolePillBorder = 'rgba(59, 130, 246, 0.18)';
-                      rolePillTextColor = '#3b82f6';
-                    } else if (user?.role === 'secretary') {
-                      rolePillBg = 'rgba(139, 92, 246, 0.06)';
-                      rolePillBorder = 'rgba(139, 92, 246, 0.18)';
-                      rolePillTextColor = '#8b5cf6';
+                        </div>
+                      );
+                    } else if (user?.role === 'teacher') {
+                      return (
+                        <div style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '8px', 
+                          background: 'rgba(59, 130, 246, 0.04)', 
+                          padding: windowWidth <= 768 ? '8px 12px' : '8px 16px', 
+                          borderRadius: '12px', 
+                          border: '1px solid rgba(59, 130, 246, 0.12)',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                        }}>
+                          <School size={14} color="#ef4444" />
+                          <span style={{ fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            <span style={{ color: '#ef4444' }}>
+                              {school?.name === 'Testlauf' 
+                                ? 'Testlauf'
+                                : (school?.name || 'Meine Musikschule')}
+                            </span>
+                            <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
+                            <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <User size={14} color="#3b82f6" />
+                              <span>
+                                {`${user.first_name} ${user.last_name}`}
+                              </span>
+                            </span>
+                          </span>
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '8px', 
+                          background: 'rgba(59, 130, 246, 0.04)', 
+                          padding: windowWidth <= 768 ? '8px 12px' : '8px 16px', 
+                          borderRadius: '12px', 
+                          border: '1px solid rgba(59, 130, 246, 0.12)',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                        }}>
+                          <School size={14} color="#ef4444" />
+                          <span style={{ fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            <span style={{ color: '#ef4444' }}>
+                              {school?.name || 'Meine Musikschule'}
+                            </span>
+                            <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
+                            <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <User size={14} color="#3b82f6" />
+                              <span>
+                                {`${user.first_name} ${user.last_name}`} • {user?.role === 'admin' ? 'CAMPUS ADMIN' : 'CAMPUS VERWALTUNG'}
+                              </span>
+                            </span>
+                          </span>
+                        </div>
+                      );
                     }
-                    
-                    return (
-                      <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '8px', 
-                        background: rolePillBg, 
-                        padding: '8px 16px', 
-                        borderRadius: '12px', 
-                        border: `1px solid ${rolePillBorder}`,
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-                      }}>
-                        {user?.role?.toLowerCase() === 'admin' ? (
-                          <Shield size={14} color={rolePillTextColor} />
-                        ) : user?.role?.toLowerCase() === 'secretary' ? (
-                          <Shield size={14} color={rolePillTextColor} />
-                        ) : (
-                          <User size={14} color={rolePillTextColor} />
-                        )}
-                        <span style={{ color: rolePillTextColor, fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                          {user?.role?.toLowerCase() === 'admin' 
-                            ? 'Campus Admin' 
-                            : user?.role?.toLowerCase() === 'teacher' 
-                              ? 'Lehrkraft' 
-                              : user?.role?.toLowerCase() === 'secretary'
-                                ? 'Sekretariat'
-                                : 'Schüler'}
-                        </span>
-                      </div>
-                    );
                   })()}
                 </>
               ) : (
@@ -5644,19 +5932,19 @@ function App() {
 
             {/* User Info */}
             <div style={{ display: 'flex', alignItems: 'center', gap: windowWidth <= 1024 ? '8px' : '16px', paddingLeft: windowWidth <= 1024 ? '8px' : '16px', borderLeft: '1px solid #f1f5f9' }}>
-              {windowWidth > 1024 && (
+              {windowWidth > 1024 && activePlatform !== 'campus' && (
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '1rem' }}>Hallo {user.first_name}</div>
                   <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                    {activePlatform === 'campus'
-                      ? (user.role === 'admin' ? 'Campus Admin' : user.role === 'teacher' ? 'Campus Lehrkraft' : user.role === 'secretary' ? 'Campus Sekretariat' : 'Campus Schüler')
-                      : (user.role === 'admin' ? 'GrooveLab Admin' : user.role === 'teacher' ? 'GrooveLab Lehrer' : user.role === 'secretary' ? 'GrooveLab Sekretariat' : 'GrooveLab Schüler')}
+                    {user.role === 'admin' ? 'GrooveLab Admin' : user.role === 'teacher' ? 'GrooveLab Lehrer' : user.role === 'secretary' ? 'GrooveLab Verwaltung' : 'GrooveLab Schüler'}
                   </div>
                 </div>
               )}
-              <div style={{ width: windowWidth <= 768 ? '40px' : '52px', height: windowWidth <= 768 ? '40px' : '52px', borderRadius: '16px', border: '3px solid white', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', overflow: 'hidden', flexShrink: 0 }}>
-                <img src={user.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
-              </div>
+              {activePlatform !== 'campus' && (
+                <div style={{ width: windowWidth <= 768 ? '40px' : '52px', height: windowWidth <= 768 ? '40px' : '52px', borderRadius: '16px', border: '3px solid white', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', overflow: 'hidden', flexShrink: 0 }}>
+                  <StudioAvatar src={user.photo_url} user={user} activePlatform={activePlatform} />
+                </div>
+              )}
               {/* Elegant Logout Button next to avatar */}
               <button 
                 onClick={() => handleLogout()}
@@ -5738,13 +6026,13 @@ function App() {
         )}
 
         {/* Student Campus Dashboard Tabs */}
-        {user.role?.toLowerCase() === 'student' && activePlatform === 'campus' && ['briefing', 'songs', 'practice_board', 'campus_cup', 'hero', 'profile', 'all_appointments'].includes(activeStudentTab) && (
+        {user.role?.toLowerCase() === 'student' && activePlatform === 'campus' && ['briefing', 'mediathek', 'practice_board', 'campus_cup', 'flashback', 'events', 'profile', 'all_appointments'].includes(activeStudentTab) && (
           <ErrorBoundary>
             <StudentAvatarDashboard 
               studentId={user.id} 
               parentActiveTab={activeStudentTab}
               onTabChange={(tab) => setActiveStudentTab(tab)}
-              onProfileUpdate={(updatedFields) => {
+              onProfileUpdate={(updatedFields: any) => {
                 setUser((prev: any) => prev ? { ...prev, ...updatedFields } : null);
               }}
             />
@@ -5754,7 +6042,287 @@ function App() {
         {/* Profile Tab */}
         {activeStudentTab === 'profile' && !(user.role?.toLowerCase() === 'student' && activePlatform === 'campus') && (
           <ErrorBoundary>
-            <>
+            {activePlatform === 'campus' && (user.role === 'teacher' || user.role === 'admin') ? (
+              /* --- WORLD-CLASS CAMPUS TEACHER PROFILE DESIGN --- */
+              <div className="animation-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '28px', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
+                {/* Hero Header Card with Premium Glassmorphism & Overlapping Elements */}
+                <div style={{
+                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.45) 100%)',
+                  backdropFilter: 'blur(24px) saturate(1.8)',
+                  WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
+                  border: '1px solid rgba(255, 255, 255, 0.5)',
+                  borderRadius: '32px',
+                  boxShadow: '0 12px 40px rgba(15, 23, 42, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+                  display: 'flex',
+                  overflow: 'visible',
+                  position: 'relative',
+                  minHeight: '240px',
+                  alignItems: 'center',
+                  padding: '32px 48px',
+                  gap: '32px',
+                  flexWrap: 'wrap'
+                }}>
+                  {/* Floating Shielded Avatar Frame */}
+                  <div style={{
+                    width: '128px',
+                    height: '128px',
+                    borderRadius: '50%',
+                    border: '5px solid #ffffff',
+                    boxShadow: '0 12px 32px rgba(15, 23, 42, 0.12)',
+                    background: '#ffffff',
+                    flexShrink: 0,
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    position: 'relative',
+                    zIndex: 2,
+                    transform: 'translateY(-10px)'
+                  }}>
+                    <img 
+                      src={getInstrumentAvatarUrl(user.instrument)} 
+                      alt="" 
+                      style={{ width: '95%', height: '95%', objectFit: 'contain' }} 
+                    />
+                  </div>
+
+                  {/* Profile Identity Details */}
+                  <div style={{ flex: 1, minWidth: '280px' }}>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
+                      <span style={{
+                        background: 'linear-gradient(135deg, #007aff 0%, #0056b3 100%)',
+                        color: 'white', 
+                        padding: '4px 14px', 
+                        borderRadius: '10px',
+                        fontSize: '0.7rem', 
+                        fontWeight: 900, 
+                        textTransform: 'uppercase', 
+                        letterSpacing: '0.08em',
+                        boxShadow: '0 4px 10px rgba(0, 122, 255, 0.2)'
+                      }}>
+                        Campus Lehrkraft
+                      </span>
+                      <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 750 }}>
+                        🏢 {user.schools?.name || 'Groovelab Campus'}
+                      </span>
+                      <span style={{ color: '#94a3b8', fontSize: '0.85rem', fontWeight: 500 }}>
+                        • Mitglied seit {new Date(user.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+
+                    <h1 style={{ fontSize: '2.8rem', fontWeight: 950, color: '#0f172a', margin: '0 0 12px 0', letterSpacing: '-0.03em', fontFamily: "'Urbanist', sans-serif" }}>
+                      {user.first_name} {user.last_name}
+                    </h1>
+
+                    {/* Instruments List */}
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {(user.instrument || '').split(',').map((inst: string) => inst.trim()).filter(Boolean).map((inst: string) => (
+                        <div key={inst} style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: 'rgba(0, 122, 255, 0.05)',
+                          border: '1px solid rgba(0, 122, 255, 0.12)',
+                          color: '#007aff',
+                          padding: '4px 12px',
+                          borderRadius: '12px',
+                          fontSize: '0.78rem',
+                          fontWeight: 800
+                        }}>
+                          <span>🎸</span>
+                          <span>{inst}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Profile Edit Action Button */}
+                  <button 
+                    onClick={() => {
+                      setEditingProfile({ ...user });
+                      setShowEditProfile(true);
+                    }} 
+                    style={{ 
+                      background: '#ffffff', 
+                      border: '1px solid rgba(0,0,0,0.06)', 
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+                      color: '#0f172a', 
+                      fontSize: '0.85rem', 
+                      fontWeight: 800, 
+                      cursor: 'pointer', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '8px', 
+                      padding: '12px 20px',
+                      borderRadius: '16px',
+                      transition: 'all 0.2s',
+                      marginLeft: 'auto'
+                    }}
+                    onMouseOver={(e) => { e.currentTarget.style.transform = 'scale(1.03)'; e.currentTarget.style.background = '#f8fafc'; }}
+                    onMouseOut={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#ffffff'; }}
+                  >
+                    <span>Profil bearbeiten</span>
+                    <Pencil size={15} />
+                  </button>
+                </div>
+
+                {/* Professional Teaching Metrics Grid (4 columns) */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
+                  {/* Metric 1: Schüler gesamt */}
+                  <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.01)' }}>
+                    <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: 'rgba(0, 122, 255, 0.08)', color: '#007aff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Users size={22} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>Schüler gesamt</div>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Urbanist', sans-serif" }}>
+                        {campusTeacherStats ? `${campusTeacherStats.studentCount} Schüler` : '0 Schüler'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Metric 2: Unterrichtszeit */}
+                  <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.01)' }}>
+                    <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: 'rgba(16, 185, 129, 0.08)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Clock size={22} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>Wochen-Unterricht</div>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Urbanist', sans-serif" }}>
+                        {campusTeacherStats ? `${(campusTeacherStats.totalMinutes / 60).toFixed(1)} Std.` : '0.0 Std.'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Metric 3: Unterrichtstage */}
+                  <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.01)' }}>
+                    <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: 'rgba(245, 158, 11, 0.08)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Calendar size={22} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>Präsenztage</div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Urbanist', sans-serif", textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '160px' }}>
+                        {campusTeacherStats && campusTeacherStats.teachingDays.length > 0 ? campusTeacherStats.teachingDays.join(', ') : 'Keine Tage'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Metric 4: Haupt-Raum */}
+                  <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.01)' }}>
+                    <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: 'rgba(139, 92, 246, 0.08)', color: '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <MapPin size={22} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>Stamm-Raum</div>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Urbanist', sans-serif" }}>
+                        {campusTeacherStats ? campusTeacherStats.primaryRoom : 'Kein Raum'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Split layout: Biography & Teaching Days Calendar Overview */}
+                <div style={{ display: 'grid', gridTemplateColumns: width < 900 ? '1fr' : '1.2fr 0.8fr', gap: '24px', alignItems: 'start' }}>
+                  
+                  {/* Day Availability Calendar Planner */}
+                  <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '32px', padding: '32px', boxShadow: '0 8px 30px rgba(0,0,0,0.01)' }}>
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: '0 0 20px 0', fontFamily: "'Urbanist', sans-serif", display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Calendar size={20} style={{ color: '#007aff' }} />
+                      Unterrichtstage & Startzeiten
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {(user.planned_boards || []).length > 0 ? (
+                        (user.planned_boards as any[]).map((board) => {
+                          const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+                          return (
+                            <div key={board.id} style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'space-between', 
+                              padding: '16px 20px', 
+                              background: '#f8fafc', 
+                              borderRadius: '16px', 
+                              border: '1px solid #f1f5f9' 
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div style={{ height: '36px', width: '36px', borderRadius: '10px', background: '#ffffff', border: '1px solid rgba(0,0,0,0.04)', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', fontWeight: 900 }}>
+                                  🗓️
+                                </div>
+                                <div>
+                                  <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem' }}>
+                                    {DAYS_DE[board.dayOfWeek]}s
+                                  </div>
+                                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>
+                                    Geplanter Beginn: {board.startAnchor} Uhr
+                                  </div>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ background: 'rgba(0, 122, 255, 0.08)', color: '#007aff', padding: '4px 10px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800 }}>
+                                  Aktiv
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', border: '2.5px dashed #cbd5e1', borderRadius: '20px' }}>
+                          Bisher keine Unterrichtstage im Stundenplaner angelegt.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Professional Biography / Werdegang */}
+                  <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '32px', padding: '32px', boxShadow: '0 8px 30px rgba(0,0,0,0.01)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div>
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: '0 0 12px 0', fontFamily: "'Urbanist', sans-serif" }}>
+                        Werdegang
+                      </h3>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 550, color: '#475569', lineHeight: 1.6, background: '#f8fafc', padding: '16px 20px', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
+                        {user.bio || 'Trage deinen Werdegang ein, um Schülern und Kollegen mehr über dich zu erzählen.'}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 style={{ fontSize: '0.72rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                        Zusatz-Qualifikationen
+                      </h4>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        {user.expertise ? (
+                          user.expertise.split(',').map((e: string) => e.trim()).filter(Boolean).map((exp: string) => (
+                            <span key={exp} style={{ background: '#f1f5f9', color: '#475569', padding: '4px 10px', borderRadius: '8px', fontSize: '0.72rem', fontWeight: 700 }}>
+                              {exp}
+                            </span>
+                          ))
+                        ) : (
+                          <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic' }}>Keine Expertise eingetragen</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mobile / Profile Page Legal Footer */}
+                <div style={{
+                  padding: '24px 0',
+                  borderTop: '1px solid #f1f5f9',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}>
+                  <div style={{ display: 'flex', gap: '20px', fontSize: '0.85rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    <span onClick={() => setShowPrivacy(true)} style={{ cursor: 'pointer' }}>Datenschutz</span>
+                    <span style={{ opacity: 0.5 }}>•</span>
+                    <span onClick={() => setShowImpressum(true)} style={{ cursor: 'pointer' }}>Impressum</span>
+                  </div>
+                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>GrooveLab App © {new Date().getFullYear()}</span>
+                </div>
+              </div>
+            ) : (
+              /* --- GROOVELAB PROFILE LOOK (ORIGINAL) --- */
+              <>
                 <div className="animation-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1200px', margin: '0 auto' }}>
               {/* Top: Massive Hero Card */}
               <div className="glass-panel" style={{ background: 'white', borderRadius: '32px', display: 'flex', overflow: 'hidden', minHeight: '340px' }}>
@@ -5922,19 +6490,9 @@ function App() {
                         <div style={{ color: '#f59e0b' }}><Music size={24} /></div>
                         Skill Radar
                       </h3>
-                      <div style={{ width: '100%', height: '300px' }}>
-                        <ResponsiveContainer>
-                          <RadarChart cx="50%" cy="50%" outerRadius="75%" data={studentRadarData}>
-                            <PolarGrid stroke="#f1f5f9" />
-                            <PolarAngleAxis dataKey="instrument" tick={({ x, y, payload }) => (
-                              <text x={x} y={y} textAnchor="middle" dominantBaseline="central" style={{ fontSize: 12, fontWeight: 700, fill: '#64748b' }}>
-                                {payload.value}
-                              </text>
-                            )} />
-                            <Radar name="XP" dataKey="xp" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.6} />
-                          </RadarChart>
-                        </ResponsiveContainer>
-                      </div>
+                      <Suspense fallback={<div style={{ height: '300px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Lade Radar...</div>}>
+                        <StudentRadarChart studentRadarData={studentRadarData} />
+                      </Suspense>
                     </div>
 
                     {/* Wochen-Planner */}
@@ -6770,12 +7328,12 @@ function App() {
                 </>
               )}
             </div>
-          </>
+          </>)}
         </ErrorBoundary>
       )}
 
         {/* Admin/Teacher Section Tabs (Unified) */}
-        {((user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'teacher')) && ['live', 'students', 'team', 'rooms', 'songs', 'stats', 'gallery', 'setup', 'bands'].includes(activeStudentTab) && (
+        {((user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'teacher')) && ['live', 'schedule', 'students', 'team', 'rooms', 'songs', 'stats', 'gallery', 'setup', 'bands', 'missions'].includes(activeStudentTab) && (
           <ErrorBoundary key={`${activePlatform}-${activeStudentTab}`}>
             <AdminDashboard 
               key={activePlatform}
@@ -6792,10 +7350,25 @@ function App() {
           </ErrorBoundary>
         )}
 
-        {/* Messages Tab (Apple Mail style) */}
+        {/* Messages Tab */}
         {activeStudentTab === 'messages' && (
-          user?.role?.toLowerCase() === 'student' ? (
+          activePlatform === 'campus' ? (
             <ErrorBoundary>
+              <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b', fontWeight: 600 }}>Lade Chats...</div>}>
+                <CampusDirectMessages
+                  user={user}
+                  schoolUsers={schoolUsers}
+                  campusMessages={campusMessages}
+                  onSendMessage={handleSendCampusMessage}
+                  onMarkAsRead={handleMarkCampusMessagesAsRead}
+                  selectedRecipient={selectedCampusRecipient}
+                  setSelectedRecipient={setSelectedCampusRecipient}
+                />
+              </Suspense>
+            </ErrorBoundary>
+          ) : (
+            user?.role?.toLowerCase() === 'student' ? (
+              <ErrorBoundary>
               <div className="animation-slide-up" style={{ 
                 padding: '32px', 
                 display: 'flex', 
@@ -7677,7 +8250,7 @@ function App() {
               </div>
             </div>
             </ErrorBoundary>
-          )
+          ))
         )}
 
         {/* Practice Tab */}
@@ -9089,20 +9662,15 @@ function App() {
 
       {/* Confetti Modal */}
       {showConfetti && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)' }}>
-          <Confetti width={width} height={height} />
-          <div className="glass-panel animation-slide-up" style={{ background: 'white', padding: '40px', borderRadius: '32px', textAlign: 'center', maxWidth: '400px' }}>
-            <h2 style={{ fontSize: '2rem', marginBottom: '16px', color: 'var(--text-main)' }}>🎉 Glückwunsch!</h2>
-            <p style={{ fontSize: '1.1rem', color: 'var(--text-muted)', marginBottom: '24px' }}>
-              Du hast eine vollständige Band für den Song<br/>
-              <strong>{showConfetti.bands?.band_songs?.[0]?.songs?.title || 'deinen neuen Song'}</strong><br/>
-              gefunden!
-            </p>
-            <button onClick={clearConfetti} style={{ background: brandColor, color: 'white', border: 'none', padding: '16px 32px', borderRadius: '12px', fontSize: '1.1rem', fontWeight: 700, cursor: 'pointer' }}>
-              Awesome!
-            </button>
-          </div>
-        </div>
+        <Suspense fallback={null}>
+          <ConfettiModal 
+            showConfetti={showConfetti} 
+            width={width} 
+            height={height} 
+            brandColor={brandColor} 
+            clearConfetti={clearConfetti} 
+          />
+        </Suspense>
       )}
 
       {/* Help FAB (Only for students in Lab Mode with active station) */}
@@ -9616,7 +10184,7 @@ function App() {
 
       {/* Modal: QR Code anzeigen */}
       {showQR && user?.qr_token && (
-        <QRCodeModal user={user} onClose={() => setShowQR(false)} />
+        <QRCodeModal user={user} activePlatform={activePlatform} onClose={() => setShowQR(false)} />
       )}
 
       {/* Privacy Policy Modal */}
@@ -9841,8 +10409,8 @@ function App() {
       {(() => {
         const getMobileButtonStyle = (tabName: string, activeClass: string = '') => {
           let isActive = false;
-          if (tabName === 'briefing') {
-            isActive = ['briefing', 'profile'].includes(activeStudentTab) && activePlatform === 'campus';
+          if (tabName === 'briefing' && user?.role === 'student' && activePlatform === 'campus') {
+            isActive = ['briefing', 'profile'].includes(activeStudentTab);
           } else {
             isActive = activeStudentTab === tabName;
           }
@@ -9853,6 +10421,9 @@ function App() {
           if (activeClass === 'campus') {
             activeBg = 'rgba(52, 168, 83, 0.08)';
             activeTextColor = '#137333';
+          } else if (activeClass === 'briefing') {
+            activeBg = 'rgba(234, 67, 53, 0.08)';
+            activeTextColor = '#ea4335';
           }
 
           const isCompact = windowWidth <= 600;
@@ -9894,263 +10465,153 @@ function App() {
               padding: isCompact ? '8px 12px 24px 12px' : '12px 16px 28px 16px'
             }}
           >
-            {user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'teacher' ? (
-              <>
-                {/* Live Lab */}
-                <button 
-                  onClick={() => setActiveStudentTab('live')} 
-                  style={{ ...getMobileButtonStyle('live'), position: 'relative' }}
-                  className="hover-scale"
-                  title="Live Lab"
-                >
-                  <Monitor size={20} />
-                  {!isCompact && <span>Live Lab</span>}
-                  <span style={{ 
-                    width: '8px', 
-                    height: '8px', 
-                    borderRadius: '50%', 
-                    background: '#ef4444', 
-                    boxShadow: '0 0 8px #ef4444',
-                    display: 'inline-block',
-                    marginLeft: isCompact ? '0' : '4px',
-                    position: isCompact ? 'absolute' : 'relative',
-                    top: isCompact ? '4px' : 'auto',
-                    right: isCompact ? '4px' : 'auto'
-                  }} className="animate-pulse"></span>
-                </button>
-
-                {/* Nachrichten */}
-                <button onClick={() => setActiveStudentTab('messages')} style={getMobileButtonStyle('messages')} title="Nachrichten">
-                  <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-                    <Mail size={20} />
+            {user?.role?.toLowerCase() === 'student' ? (
+              activePlatform === 'campus' ? (
+                <>
+                  <button onClick={() => setActiveStudentTab('briefing')} style={getMobileButtonStyle('briefing', 'campus')} className="hover-scale" title="Briefing">
+                    <Monitor size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Briefing</span>}
+                  </button>
+                  <button onClick={() => setActiveStudentTab('practice_board')} style={getMobileButtonStyle('practice_board', 'campus')} className="hover-scale" title="Übe-Board">
+                    <Zap size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Übe-Board</span>}
+                  </button>
+                  <button onClick={() => setActiveStudentTab('mediathek')} style={getMobileButtonStyle('mediathek', 'campus')} className="hover-scale" title="Mediathek">
+                    <Library size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Mediathek</span>}
+                  </button>
+                  <button onClick={() => setActiveStudentTab('events')} style={getMobileButtonStyle('events', 'campus')} className="hover-scale" title="Events">
+                    <Calendar size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Events</span>}
+                  </button>
+                  <button onClick={() => setActiveStudentTab('campus_cup')} style={getMobileButtonStyle('campus_cup', 'campus')} className="hover-scale" title="Campus-Cup">
+                    <Trophy size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Campus-Cup</span>}
+                  </button>
+                  <button onClick={() => setActiveStudentTab('flashback')} style={getMobileButtonStyle('flashback', 'campus')} className="hover-scale" title="Flashback">
+                    <Clock size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Flashback</span>}
+                  </button>
+                  <button onClick={() => setActiveStudentTab('profile')} style={getMobileButtonStyle('profile', 'campus')} className="hover-scale" title="Profil">
+                    <User size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Profil</span>}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button onClick={() => setActiveStudentTab('live')} style={{ ...getMobileButtonStyle('live', 'groovelab'), position: 'relative' }} className="hover-scale" title="Live Lab">
+                    <Monitor size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Live Lab</span>}
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444', position: 'absolute', top: isCompact ? '4px' : '6px', right: isCompact ? '4px' : '6px' }} className="animate-pulse"></div>
+                  </button>
+                  {!user.is_external_vocalist && (
+                    <>
+                      <button onClick={() => setActiveStudentTab('practice')} style={getMobileButtonStyle('practice', 'groovelab')} className="hover-scale" title="Üben">
+                        <Play size={isCompact ? 20 : 18} fill={activeStudentTab === 'practice' ? 'white' : 'none'} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Üben</span>}
+                      </button>
+                      <button onClick={() => setActiveStudentTab('library')} style={getMobileButtonStyle('library', 'groovelab')} className="hover-scale" title="Bibliothek">
+                        <Library size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Bibliothek</span>}
+                      </button>
+                    </>
+                  )}
+                  <button onClick={() => setActiveStudentTab('repertoire')} style={getMobileButtonStyle('repertoire', 'groovelab')} className="hover-scale" title="Repertoire">
+                    <Award size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Repertoire</span>}
+                  </button>
+                  {!user.is_external_vocalist && (
+                    <button onClick={() => setActiveStudentTab('matching')} style={getMobileButtonStyle('matching', 'groovelab')} className="hover-scale" title="Band-Matching">
+                      <Users size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Band-Matching</span>}
+                    </button>
+                  )}
+                  <button onClick={() => setActiveStudentTab('bands')} style={getMobileButtonStyle('bands', 'groovelab')} className="hover-scale" title="Bands">
+                    <Box size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Bands</span>}
+                  </button>
+                  <button onClick={() => setActiveStudentTab('messages')} style={{ ...getMobileButtonStyle('messages', 'groovelab'), position: 'relative' }} className="hover-scale" title="Nachrichten">
+                    <Megaphone size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Nachrichten</span>}
                     {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length > 0 && (
-                      <span style={{ 
-                        marginLeft: isCompact ? '0' : '6px',
+                      <div style={{ 
                         background: '#ef4444', 
                         color: 'white', 
-                        fontSize: '0.55rem', 
-                        fontWeight: 900, 
-                        padding: '1px 6px', 
-                        borderRadius: '10px',
-                        boxShadow: '0 2px 4px rgba(239, 68, 68, 0.3)',
-                        position: isCompact ? 'absolute' : 'relative',
-                        top: isCompact ? '-8px' : 'auto',
-                        right: isCompact ? '-12px' : 'auto'
-                      }}>
-                        {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length}
-                      </span>
-                    )}
-                  </div>
-                  {!isCompact && <span style={{ marginLeft: '4px' }}>Nachrichten</span>}
-                </button>
-
-                {/* Schüler */}
-                <button onClick={() => setActiveStudentTab('students')} style={getMobileButtonStyle('students')} title="Schüler">
-                  <Users size={20} />
-                  {!isCompact && <span>Schüler</span>}
-                </button>
-
-                {/* Team */}
-                <button onClick={() => setActiveStudentTab('team')} style={getMobileButtonStyle('team')} title="Team">
-                  <Shield size={20} />
-                  {!isCompact && <span>Team</span>}
-                </button>
-
-                {/* Räume */}
-                <button onClick={() => setActiveStudentTab('rooms')} style={getMobileButtonStyle('rooms')} title="Räume">
-                  <Box size={20} />
-                  {!isCompact && <span>Räume</span>}
-                </button>
-
-                {/* Songs */}
-                <button onClick={() => setActiveStudentTab('songs')} style={getMobileButtonStyle('songs')} title="Songs">
-                  <Library size={20} />
-                  {!isCompact && <span>Songs</span>}
-                </button>
-
-                {/* Bands */}
-                <button onClick={() => setActiveStudentTab('bands')} style={getMobileButtonStyle('bands')} title="Bands">
-                  <Box size={20} />
-                  {!isCompact && <span>Bands</span>}
-                </button>
-
-                {/* Statistik */}
-                <button onClick={() => setActiveStudentTab('stats')} style={getMobileButtonStyle('stats')} title="Statistik">
-                  <Music size={20} />
-                  {!isCompact && <span>Statistik</span>}
-                </button>
-
-                {/* ID Galerie */}
-                <button onClick={() => setActiveStudentTab('gallery')} style={getMobileButtonStyle('gallery')} title="ID Galerie">
-                  <QrCode size={20} />
-                  {!isCompact && <span>ID Galerie</span>}
-                </button>
-
-                {/* Setup */}
-                <button onClick={() => setActiveStudentTab('setup')} style={getMobileButtonStyle('setup')} title="Setup">
-                  <Settings size={20} />
-                  {!isCompact && <span>Setup</span>}
-                </button>
-              </>
-            ) : (
-              <>
-                {/* Student Bottom Navigation */}
-                {activePlatform === 'campus' ? (
-                  <>
-                    {/* Briefing */}
-                    <button 
-                      onClick={() => setActiveStudentTab('briefing')} 
-                      style={getMobileButtonStyle('briefing', 'campus')}
-                      title="Briefing"
-                    >
-                      <GraduationCap size={20} />
-                      {!isCompact && <span>Briefing</span>}
-                    </button>
-
-                    {/* Songs */}
-                    <button 
-                      onClick={() => setActiveStudentTab('songs')} 
-                      style={getMobileButtonStyle('songs', 'campus')}
-                      title="Songs"
-                    >
-                      <Music size={20} />
-                      {!isCompact && <span>Songs</span>}
-                    </button>
-
-                    {/* Übe-Board */}
-                    <button 
-                      onClick={() => setActiveStudentTab('practice_board')} 
-                      style={getMobileButtonStyle('practice_board', 'campus')}
-                      title="Übe-Board"
-                    >
-                      <Play size={20} />
-                      {!isCompact && <span>Übe-Board</span>}
-                    </button>
-
-                    {/* Campus-Cup */}
-                    <button 
-                      onClick={() => setActiveStudentTab('campus_cup')} 
-                      style={getMobileButtonStyle('campus_cup', 'campus')}
-                      title="Campus-Cup"
-                    >
-                      <Trophy size={20} />
-                      {!isCompact && <span>Campus-Cup</span>}
-                    </button>
-
-                    {/* Mein Held */}
-                    <button 
-                      onClick={() => setActiveStudentTab('hero')} 
-                      style={getMobileButtonStyle('hero', 'campus')}
-                      title="Mein Held"
-                    >
-                      <Star size={20} />
-                      {!isCompact && <span>Mein Held</span>}
-                    </button>
-
-                    {/* Mein Team */}
-                    <button 
-                      onClick={() => setActiveStudentTab('team')} 
-                      style={getMobileButtonStyle('team', 'campus')}
-                      title="Mein Team"
-                    >
-                      <Users size={20} />
-                      {!isCompact && <span>Mein Team</span>}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    {/* Live Lab */}
-                    <button 
-                      onClick={() => setActiveStudentTab('live')} 
-                      style={{ ...getMobileButtonStyle('live'), position: 'relative' }}
-                      className="hover-scale"
-                      title="Live Lab"
-                    >
-                      <Monitor size={20} />
-                      {!isCompact && <span>Live Lab</span>}
-                      <span style={{ 
-                        width: '8px', 
-                        height: '8px', 
                         borderRadius: '50%', 
-                        background: '#ef4444', 
-                        boxShadow: '0 0 8px #ef4444',
-                        display: 'inline-block',
-                        marginLeft: isCompact ? '0' : '4px',
-                        position: isCompact ? 'absolute' : 'relative',
-                        top: isCompact ? '4px' : 'auto',
-                        right: isCompact ? '4px' : 'auto'
-                      }} className="animate-pulse"></span>
-                    </button>
-
-                    {/* Üben (Instrumentalisten) */}
-                    {!user.is_external_vocalist && (
-                      <button onClick={() => setActiveStudentTab('practice')} style={getMobileButtonStyle('practice')} title="Üben">
-                        <Play size={20} />
-                        {!isCompact && <span>Üben</span>}
-                      </button>
+                        minWidth: '16px', 
+                        height: '16px', 
+                        padding: '0 4px',
+                        fontSize: '0.6rem', 
+                        fontWeight: 900, 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        position: 'absolute',
+                        top: isCompact ? '2px' : '4px',
+                        right: isCompact ? '0px' : '4px'
+                      }}>{studentMessages.filter(m => !m.read_by?.includes(user?.id)).length}</div>
                     )}
-
-                    {/* Bibliothek (Instrumentalisten) */}
-                    {!user.is_external_vocalist && (
-                      <button onClick={() => setActiveStudentTab('library')} style={getMobileButtonStyle('library')} title="Bibliothek">
-                        <Library size={20} />
-                        {!isCompact && <span>Bibliothek</span>}
-                      </button>
-                    )}
-
-                    {/* Repertoire */}
-                    <button onClick={() => setActiveStudentTab('repertoire')} style={getMobileButtonStyle('repertoire')} title="Repertoire">
-                      <Award size={20} />
-                      {!isCompact && <span>Repertoire</span>}
-                    </button>
-
-                    {/* Band-Matching (Instrumentalisten) */}
-                    {!user.is_external_vocalist && (
-                      <button onClick={() => setActiveStudentTab('matching')} style={getMobileButtonStyle('matching')} title="Band-Matching">
-                        <Users size={20} />
-                        {!isCompact && <span>Band-Matching</span>}
-                      </button>
-                    )}
-
-                    {/* Bands */}
-                    <button onClick={() => setActiveStudentTab('bands')} style={getMobileButtonStyle('bands')} title="Bands">
-                      <Box size={20} />
-                      {!isCompact && <span>Bands</span>}
-                    </button>
-
-                    {/* Nachrichten */}
-                    <button onClick={() => setActiveStudentTab('messages')} style={getMobileButtonStyle('messages')} title="Nachrichten">
-                      <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-                        <Megaphone size={20} />
-                        {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length > 0 && (
-                          <span style={{ 
-                            marginLeft: isCompact ? '0' : '6px',
-                            background: '#ef4444', 
-                            color: 'white', 
-                            fontSize: '0.55rem', 
-                            fontWeight: 900, 
-                            padding: '1px 6px', 
-                            borderRadius: '10px',
-                            boxShadow: '0 2px 4px rgba(239, 68, 68, 0.3)',
-                            position: isCompact ? 'absolute' : 'relative',
-                            top: isCompact ? '-8px' : 'auto',
-                            right: isCompact ? '-12px' : 'auto'
-                          }}>
-                            {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length}
-                          </span>
-                        )}
-                      </div>
-                      {!isCompact && <span style={{ marginLeft: '4px' }}>Nachrichten</span>}
-                    </button>
-
-                    {/* Profil */}
-                    <button onClick={() => setActiveStudentTab('profile')} style={getMobileButtonStyle('profile')} title="Profil">
-                      <Shield size={20} />
-                      {!isCompact && <span>Profil</span>}
-                    </button>
-                  </>
-                )}
-              </>
+                  </button>
+                  <button onClick={() => setActiveStudentTab('profile')} style={getMobileButtonStyle('profile', 'groovelab')} className="hover-scale" title="Profil">
+                    <User size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Profil</span>}
+                  </button>
+                </>
+              )
+            ) : (
+              activePlatform === 'campus' ? (
+                <>
+                  <button onClick={() => setActiveStudentTab('live')} style={getMobileButtonStyle('live', 'campus')} className="hover-scale" title="Briefing">
+                    <Monitor size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Briefing</span>}
+                  </button>
+                  <button onClick={() => setActiveStudentTab('schedule')} style={getMobileButtonStyle('schedule', 'campus')} className="hover-scale" title="Stundenplan">
+                    <Calendar size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Stundenplan</span>}
+                  </button>
+                  <button onClick={() => setActiveStudentTab('students')} style={getMobileButtonStyle('students', 'campus')} className="hover-scale" title="Schüler">
+                    <Users size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Schüler</span>}
+                  </button>
+                  <button onClick={() => setActiveStudentTab('songs')} style={getMobileButtonStyle('songs', 'campus')} className="hover-scale" title="Mediathek">
+                    <Library size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Mediathek</span>}
+                  </button>
+                  <button onClick={() => setActiveStudentTab('rooms')} style={getMobileButtonStyle('rooms', 'campus')} className="hover-scale" title="Räume">
+                    <Box size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Räume</span>}
+                  </button>
+                  <button onClick={() => setActiveStudentTab('missions')} style={getMobileButtonStyle('missions', 'campus')} className="hover-scale" title="Missions">
+                    <Compass size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Missions</span>}
+                  </button>
+                  <button onClick={() => setActiveStudentTab('stats')} style={getMobileButtonStyle('stats', 'campus')} className="hover-scale" title="Performance & Cub">
+                    <Trophy size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Performance & Cub</span>}
+                  </button>
+                  <button onClick={() => setActiveStudentTab('setup')} style={getMobileButtonStyle('setup', 'campus')} className="hover-scale" title="Setup">
+                    <Settings size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Setup</span>}
+                  </button>
+                  <button onClick={() => setActiveStudentTab('profile')} style={getMobileButtonStyle('profile', 'campus')} className="hover-scale" title="Profil">
+                    <User size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Profil</span>}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button onClick={() => setActiveStudentTab('live')} style={{ ...getMobileButtonStyle('live', 'groovelab'), position: 'relative' }} className="hover-scale" title="Live Lab">
+                    <Monitor size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Live Lab</span>}
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444', position: 'absolute', top: isCompact ? '4px' : '4px', right: isCompact ? '4px' : '4px' }} className="animate-pulse"></div>
+                  </button>
+                  <button onClick={() => setActiveStudentTab('messages')} style={getMobileButtonStyle('messages', 'groovelab')} className="hover-scale" title="Nachrichten">
+                    <Mail size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Nachrichten</span>}
+                  </button>
+                  <button onClick={() => setActiveStudentTab('students')} style={getMobileButtonStyle('students', 'groovelab')} className="hover-scale" title="Schüler">
+                    <Users size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Schüler</span>}
+                  </button>
+                  <button onClick={() => setActiveStudentTab('team')} style={getMobileButtonStyle('team', 'groovelab')} className="hover-scale" title="Team">
+                    <Shield size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Team</span>}
+                  </button>
+                  <button onClick={() => setActiveStudentTab('rooms')} style={getMobileButtonStyle('rooms', 'groovelab')} className="hover-scale" title="Räume">
+                    <Box size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Räume</span>}
+                  </button>
+                  <button onClick={() => setActiveStudentTab('songs')} style={getMobileButtonStyle('songs', 'groovelab')} className="hover-scale" title="Songs">
+                    <Library size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Songs</span>}
+                  </button>
+                  <button onClick={() => setActiveStudentTab('bands')} style={getMobileButtonStyle('bands', 'groovelab')} className="hover-scale" title="Bands">
+                    <Box size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Bands</span>}
+                  </button>
+                  <button onClick={() => setActiveStudentTab('stats')} style={getMobileButtonStyle('stats', 'groovelab')} className="hover-scale" title="Statistik">
+                    <Music size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Statistik</span>}
+                  </button>
+                  <button onClick={() => setActiveStudentTab('gallery')} style={getMobileButtonStyle('gallery', 'groovelab')} className="hover-scale" title="ID Galerie">
+                    <QrCode size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>ID Galerie</span>}
+                  </button>
+                  <button onClick={() => setActiveStudentTab('setup')} style={getMobileButtonStyle('setup', 'groovelab')} className="hover-scale" title="Setup">
+                    <Shield size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Setup</span>}
+                  </button>
+                  <button onClick={() => setActiveStudentTab('profile')} style={getMobileButtonStyle('profile', 'groovelab')} className="hover-scale" title="Profil">
+                    <User size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Profil</span>}
+                  </button>
+                </>
+              )
             )}
           </nav>
         );
@@ -10261,7 +10722,7 @@ function App() {
           activePlatform={activePlatform}
           onSwitchPlatform={(newPlatform) => {
             setActivePlatform(newPlatform);
-            setActiveStudentTab(newPlatform === 'campus' ? 'briefing' : 'live');
+            setActiveStudentTab(newPlatform === 'campus' ? (user?.role?.toLowerCase() === 'student' ? 'briefing' : 'live') : 'live');
           }}
         />
       )}
@@ -10690,9 +11151,10 @@ function App() {
                               fetchDashboardData(user.id);
                             }
                           } else {
-                            const { error } = await supabase.from('users').update({ photo_url: av.url }).eq('id', user.id);
+                            const { error } = await supabase.from('users').update({ photo_url: av.url, avatar_url: av.url }).eq('id', user.id);
                             if (!error) {
-                              setUser({...user, photo_url: av.url});
+                              await supabase.from('avatars').update({ asset_path: av.url }).eq('user_id', user.id);
+                              setUser({...user, photo_url: av.url, avatar_url: av.url});
                               setShowAvatarPicker(false);
                               fetchDashboardData(user.id);
                             }

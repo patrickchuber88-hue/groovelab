@@ -1,0 +1,74 @@
+Created At: 2026-05-28T06:14:13Z
+Completed At: 2026-05-28T06:14:13Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1220
+Total Bytes: 56064
+Showing lines 765 to 830
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+765:                           height: '22px',
+766:                           borderRadius: '50%',
+767:                           background: '#ffffff',
+768:                           position: 'absolute',
+769:                           top: '2px',
+770:                           left: isGroovelabActive ? '22px' : '2px',
+771:                           transition: 'left 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
+772:                           boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+773:                         }} />
+774:                       </button>
+775:                     </div>
+776:                   </div>
+777:                 </section>
+778: 
+779:                 {/* Vertical Campus Pass (Festival Backstage Pass Edition) */}
+780:                 <div className="hover-scale" style={{ 
+781:                   background: 'linear-gradient(180deg, #107231 0%, #073b18 100%)', 
+782:                   borderRadius: '28px', 
+783:                   padding: '28px 24px', 
+784:                   color: 'white',
+785:                   boxShadow: '0 25px 50px rgba(7, 59, 24, 0.25)',
+786:                   border: '1px solid rgba(255, 255, 255, 0.15)',
+787:                   display: 'flex',
+788:                   flexDirection: 'column',
+789:                   alignItems: 'center',
+790:                   gap: '24px',
+791:                   position: 'relative',
+792:                   overflow: 'hidden',
+793:                   width: '100%',
+794:                   minHeight: '390px',
+795:                   boxSizing: 'border-box'
+796:                 }}>
+797:                   {/* Glossy light sweep */}
+798:                   <div style={{
+799:                     position: 'absolute',
+800:                     top: '-30%', left: '-30%', right: '-30%', bottom: '-30%',
+801:                     background: 'radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 60%)',
+802:                     pointerEvents: 'none'
+803:                   }} />
+804: 
+805:                   {/* Lanyard Hanging Hole / Pill Slot */}
+806:                   <div style={{
+807:                     width: '50px',
+808:                     height: '10px',
+809:                     background: 'rgba(0, 0, 0, 0.35)',
+810:                     borderRadius: '99px',
+811:                     boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.5)',
+812:                     flexShrink: 0
+813:                   }} />
+814: 
+815:                   {/* Festival Headings */}
+816:                   <div style={{ textAlign: 'center', width: '100%' }}>
+817:                     <div style={{ 
+818:                       background: 'linear-gradient(90deg, #d97706 0%, #f59e0b 100%)',
+819:                       color: 'white', 
+820:                       padding: '5px 16px', 
+821:                       borderRadius: '8px', 
+822:                       fontSize: '0.68rem', 
+823:                       fontWeight: 900, 
+824:                       letterSpacing: '0.12em', 
+825:                       display: 'inline-block',
+826:                       boxShadow: '0 4px 10px rgba(217, 119, 6, 0.3)',
+827:                       textTransform: 'uppercase'
+828:                     }}>
+829:                       ★ Campus Artist ★
+830:                     </div>
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

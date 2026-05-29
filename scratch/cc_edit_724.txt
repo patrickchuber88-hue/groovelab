@@ -1,0 +1,12 @@
+{
+  "AllowMultiple": "false",
+  "Description": "\"Fix TS style error of py: 12px to padding: 12px 0.\"",
+  "EndLine": "475",
+  "Instruction": "\"Change py in style to padding.\"",
+  "ReplacementContent": "\"            <div style={{ padding: '12px 0', textAlign: 'center' }}>\"",
+  "StartLine": "471",
+  "TargetContent": "\"            <div style={{ py: '12px', textAlign: 'center' }}>\"",
+  "TargetFile": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "toolAction": "\"Fixing style property py\"",
+  "toolSummary": "\"Fix py style in StudentAvatarDashboard\""
+}

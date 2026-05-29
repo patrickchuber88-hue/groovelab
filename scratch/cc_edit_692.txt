@@ -1,0 +1,7 @@
+{
+  "AbsolutePath": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "EndLine": "220",
+  "StartLine": "190",
+  "toolAction": "\"Viewing student dashboard data loading hook\"",
+  "toolSummary": "\"View fetchAllData hook end\""
+}

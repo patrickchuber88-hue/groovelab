@@ -1,0 +1,12 @@
+{
+  "AllowMultiple": "false",
+  "Description": "\"Add flashbackRef to auto-scroll targets in StudentAvatarDashboard.tsx.\"",
+  "EndLine": "119",
+  "Instruction": "\"Add flashbackRef to list of scroll target refs.\"",
+  "ReplacementContent": "\"  // Refs for auto-scroll\\n  const briefingRef = useRef<HTMLDivElement>(null);\\n  const songsRef = useRef<HTMLDivElement>(null);\\n  const practiceRef = useRef<HTMLDivElement>(null);\\n  const cupRef = useRef<HTMLDivElement>(null);\\n  const flashbackRef = useRef<HTMLDivElement>(null);\"",
+  "StartLine": "114",
+  "TargetContent": "\"  // Refs for auto-scroll\\n  const briefingRef = useRef<HTMLDivElement>(null);\\n  const songsRef = useRef<HTMLDivElement>(null);\\n  const practiceRef = useRef<HTMLDivElement>(null);\\n  const cupRef = useRef<HTMLDivElement>(null);\"",
+  "TargetFile": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "toolAction": "\"Adding flashbackRef target\"",
+  "toolSummary": "\"Add flashbackRef to StudentAvatarDashboard\""
+}

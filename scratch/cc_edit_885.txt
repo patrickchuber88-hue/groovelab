@@ -1,0 +1,12 @@
+{
+  "AllowMultiple": "false",
+  "Description": "\"Add the missing outer closing div tag for Student Briefing board container.\"",
+  "EndLine": "592",
+  "Instruction": "\"Add an extra closing div tag at line 590 to close the outer flex container.\"",
+  "ReplacementContent": "\"          </div>\\n        </div>\\n      )}\"",
+  "StartLine": "588",
+  "TargetContent": "\"          </div>\\n        )}\"",
+  "TargetFile": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "toolAction": "\"Fixing missing closing div tag in StudentAvatarDashboard.tsx\"",
+  "toolSummary": "\"Fix tag closing typo in StudentAvatarDashboard.tsx\""
+}

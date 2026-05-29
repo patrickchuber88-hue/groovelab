@@ -1,0 +1,31 @@
+Created At: 2026-05-28T06:14:56Z
+Completed At: 2026-05-28T06:14:56Z
+File Path: `file:///Users/patrickhuber/.gemini/antigravity/brain/a35d1631-2a78-4c89-9cf4-79faa61296a1/implementation_plan.md`
+Total Lines: 23
+Total Bytes: 1669
+Showing lines 1 to 23
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+1: # Locked: Student Campus Dashboard
+2: 
+3: The student campus dashboard design and student card layout are officially finalized and locked. 
+4: 
+5: ## Strict Design Freeze
+6: 
+7: > [!IMPORTANT]
+8: > All visual styles, color systems (emerald green/gold), component layouts (Timeline-style schedules, Mastered progress matrix, Digital ID badge), and the general user experience of the Student Campus Dashboard are locked.
+9: >
+10: > Any future adjustments or new features in the student campus area require the user's explicit written approval before execution.
+11: 
+12: ## Core Visual System (Locked)
+13: 
+14: - **Color Theme**: Emerald Green (`#34a853` / `#137333`) and White, with gold crest highlights (`#fbbf24` / `#d97706`).
+15: - **Student Profile**: Double border avatar (white inside, emerald outside) and custom academy membership status indicators.
+16: - **Academic ID Card**: Metallic details, digital chip graphic, gold foil headers, high-contrast barcode/QR elements, and deep forest gradient (`linear-gradient(135deg, #064e3b 0%, #022c22 100%)`).
+17: - **Schedules Timeline**: White card layout with emerald drop shadow, clock icon badges, and clean metadata grids.
+18: - **Meisterwerk Matrix**: Multi-state visual progress bars (25% Introduced / 60% Practicing / 100% Mastered) using unified color gradients.
+19: 
+20: ## Verification of Locks
+21: 
+22: - Any modification to [StudentDetailModal.tsx](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx) or [AdminDashboard.tsx](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/AdminDashboard.tsx) affecting the `'campus'` platform context is frozen.
+23: 
+The above content shows the entire, complete file contents of the requested file.

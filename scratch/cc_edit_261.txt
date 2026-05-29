@@ -1,0 +1,12 @@
+{
+  "AllowMultiple": "false",
+  "Description": "\"Define type for prev parameter in setStats state modifier\"",
+  "EndLine": "265",
+  "Instruction": "\"Add type annotation to prev parameter in setStats callback\"",
+  "ReplacementContent": "\"    // Local update stats state\\n    setStats((prev: any) => prev ? {\"",
+  "StartLine": "261",
+  "TargetContent": "\"    // Local update stats state\\n    setStats(prev => prev ? {\"",
+  "TargetFile": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "toolAction": "\"Fixing setStats parameter type warning\"",
+  "toolSummary": "\"Fix setStats type\""
+}

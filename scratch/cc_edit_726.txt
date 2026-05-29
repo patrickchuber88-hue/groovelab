@@ -1,0 +1,7 @@
+{
+  "AbsolutePath": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "EndLine": "585",
+  "StartLine": "550",
+  "toolAction": "\"Viewing lines around 576 to find shrink style error\"",
+  "toolSummary": "\"View lines 550-585\""
+}

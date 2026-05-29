@@ -1,0 +1,7 @@
+{
+  "AbsolutePath": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "EndLine": "1065",
+  "StartLine": "1030",
+  "toolAction": "\"Viewing end of student dashboard component for style injection\"",
+  "toolSummary": "\"View bottom styles range\""
+}

@@ -1,0 +1,36 @@
+<div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+<label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname *</label>
+<input type="text" required value={inviteFirstName} onChange={e => setInviteFirstName(e.target.value)} placeholder="Max"
+style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }} />
+</div>
+<div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+<label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Nachname</label>
+<input type="text" value={inviteLastName} onChange={e => setInviteLastName(e.target.value)} placeholder="Mustermann"
+style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }} />
+</div>
+</div>
+<div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+<label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>E-Mail (optional)</label>
+<input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeho
+padding: '24px 28px', 
+borderRadius: '20px',
+background: 'rgba(255, 255, 255, 0.8)', 
+backdropFilter: 'blur(20px)',
+WebkitBackdropFilter: 'blur(20px)',
+border: '1px solid rgba(0, 0, 0, 0.05)', 
+boxShadow: '0 10px 30px rgba(0, 0, 0, 0.02)'
+}}>
+<div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '20px' }}>
+<Bell size={16} color="#ef4444" /> INFOS DER VERWALTUNG
+</div>
+
+<div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+{[
+{ id: 'admin1', tag: 'Aktion', title: '⚠️ 2 offene Terminanfragen von Eltern', body: 'Es warten Terminanfragen im Stundenplan auf deine Freigabe.', date: 'Dringend' },
+{ id: 'admin2', tag: 'Termin', title: '📅 Lehrerkonferenz 2026', body: 'Freitag, 29. Mai um 14:00 Uhr in Raum 201 (Thema: Sommerkonzert & Mediathek-Lizenzen).', date: 'Fr, 14:00' },
+{ id: 'admin3', tag: 'Mediathek', title: '📚 Neue E-Gitarren & Playalongs freigeschaltet', body: '5 neue Übestücke stehen ab sofort in der Mediathek für deine Schüler bereit.', date: 'Neu' }
+].map((item, idx, arr) => {
+let tagColor = '#64748b';
+if (item.tag === 'Aktion') tagColor = '#ef4444';
+else if (item.tag === 'Termin') tagColor = '#3b82f6';
+else if (item.tag === 'Mediathek') tagColor = '#10b981';

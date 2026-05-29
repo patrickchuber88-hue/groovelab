@@ -1,0 +1,63 @@
+Created At: 2026-05-28T07:14:26Z
+Completed At: 2026-05-28T07:14:26Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/TeacherDashboard.tsx`
+Total Lines: 5482
+Total Bytes: 273887
+Showing lines 2480 to 2680
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+2480:         )}
+2481: 
+2482:         {/* Tab content switch */}
+2483:         {activeTab === 'briefing' && !hideHeader ? (
+2484:           <div style={{ display: 'grid', gridTemplateColumns: '2.3fr 0.9fr', gap: '32px', alignItems: 'start', width: '100%' }} className="dashboard-main-grid">
+2485:             
+2486:             {/* LEFT COLUMN: HERO, KPIS, AND TAGESPLAN */}
+2487:             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+2488:               {briefingLoading ? (
+2489:                 <div style={{ padding: '60px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Briefing wird geladen...</div>
+2490:               ) : briefingData ? (
+2491:                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+2492:                 
+2493:                   {/* Hero Greeting Card */}
+2494:                   <div style={{
+2495:                     borderRadius: '20px',
+2496:                     padding: '24px 28px',
+2497:                     background: '#ffffff',
+2498:                     border: '1px solid #f1f5f9',
+2499:                     boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+2500:                     display: 'flex',
+2501:                     alignItems: 'center',
+2502:                     gap: '24px'
+2503:                   }}>
+2504:                     <div style={{ flex: 1 }}>
+2505:                       <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', margin: '0 0 10px 0', lineHeight: 1.2, fontFamily: "'Plus Jakart
+<truncated 10857 bytes>
+
+2654:                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+2655:                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#1f2937' }}>
+2656:                           <Clock size={20} color="#0b57d0" />
+2657:                           <strong style={{ fontSize: '1.1rem', fontWeight: 800, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Tagesplan (Unterrichte Heute)</strong>
+2658:                         </div>
+2659:                         <span style={{
+2660:                           fontSize: '0.72rem',
+2661:                           fontWeight: 800,
+2662:                           padding: '4px 12px',
+2663:                           borderRadius: '100px',
+2664:                           background: '#e8f0fe',
+2665:                           color: '#0b57d0',
+2666:                           fontFamily: 'Inter'
+2667:                         }}>
+2668:                           LIVE
+2669:                         </span>
+2670:                       </div>
+2671: 
+2672:                       {/* Timeline content */}
+2673:                       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', position: 'relative' }}>
+2674:                         <div style={{ position: 'absolute', top: '16px', bottom: '16px', left: '11px', width: '2px', background: '#e2e8f0' }} />
+2675:                         
+2676:                         {briefingData.timeline && briefingData.timeline.length > 0 ? (
+2677:                           briefingData.timeline.map((slot: any, idx: number) => {
+2678:                             const dragColor = activeDragScheduleId ? getTrafficLightColor(activeDragScheduleId, slot) : null;
+2679:                             const isOver = dragOverSlotKey === slot.scheduleId;
+2680: 
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

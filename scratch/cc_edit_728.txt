@@ -1,0 +1,12 @@
+{
+  "AllowMultiple": "false",
+  "Description": "\"Fix shrink style property by changing to flexShrink in StudentAvatarDashboard.tsx.\"",
+  "EndLine": "580",
+  "Instruction": "\"Change shrink in style to flexShrink.\"",
+  "ReplacementContent": "\"                      boxShadow: '0 4px 10px rgba(0,0,0,0.08)',\\n                      flexShrink: 0\\n                    }}>\"",
+  "StartLine": "574",
+  "TargetContent": "\"                      boxShadow: '0 4px 10px rgba(0,0,0,0.08)',\\n                      shrink: 0\\n                    }}>\"",
+  "TargetFile": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "toolAction": "\"Fixing style property shrink\"",
+  "toolSummary": "\"Fix shrink style in StudentAvatarDashboard\""
+}

@@ -1,0 +1,18 @@
+{
+  "conv_id": "48320f16-4765-4ef6-b5b3-d672d69331ad",
+  "step_index": 45,
+  "created_at": "2026-05-27T12:30:37Z",
+  "type": "replace_file_content",
+  "args": {
+    "AllowMultiple": "false",
+    "Description": "\"Simplify stats banner: remove the cheap trophy emoji and refine the title prefix to 'Rang:' for a sophisticated, meaningful aesthetic.\"",
+    "EndLine": "403",
+    "Instruction": "\"Remove the trophy emoji from the level title sub-label to keep it clean and minimal.\"",
+    "ReplacementContent": "\"            <p style={{ fontSize: '11px', fontWeight: 800, color: '#a7f3d0', margin: '4px 0 0 0', textTransform: 'uppercase', letterSpacing: '0.08em' }}>\\n              Rang: {getLevelTitle(currentLevel)}\\n            </p>\"",
+    "StartLine": "398",
+    "TargetContent": "\"            <p style={{ fontSize: '11px', fontWeight: 800, color: '#a7f3d0', margin: '4px 0 0 0', textTransform: 'uppercase', letterSpacing: '0.08em' }}>\\n              \ud83c\udfc6 {getLevelTitle(currentLevel)}\\n            </p>\"",
+    "TargetFile": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+    "toolAction": "\"Simplify stats labels\"",
+    "toolSummary": "\"Removing cheap-looking emoji from Level Title label for minimalist aesthetics\""
+  }
+}

@@ -1,0 +1,59 @@
+Created At: 2026-05-28T06:15:42Z
+Completed At: 2026-05-28T06:15:42Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1282
+Total Bytes: 59899
+Showing lines 900 to 950
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+900:                       </div>
+901:                     </div>
+902: 
+903:                     {/* Classic Ticket Dashed Divider Line */}
+904:                     <div style={{ 
+905:                       borderTop: '1px dashed rgba(255, 255, 255, 0.25)', 
+906:                       margin: '12px 0 4px 0', 
+907:                       width: '100%', 
+908:                       zIndex: 1 
+909:                     }} />
+910:                     
+911:                     {/* QR Code Ticket Cutout */}
+912:                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', width: '100%', zIndex: 1, marginTop: 'auto' }}>
+913:                       <div style={{ 
+914:                         background: '#ffffff', 
+915:                         padding: '16px', 
+916:                         borderRadius: '20px', 
+917:                         boxShadow: '0 12px 30px rgba(0,0,0,0.3)', 
+918:                         display: 'flex', 
+919:                         alignItems: 'center', 
+920:                         justifyContent: 'center',
+921:                         border: '1px solid rgba(255, 255, 255, 0.8)'
+922:                       }}>
+923:                         <QRCode value={student.qr_token || student.id || ''} size={120} />
+924:                       </div>
+925:                       <span style={{ 
+926:                         fontSize: '0.58rem', 
+927:                         color: '#fbbf24', 
+928:                         fontWeight: 800, 
+929:                         letterSpacing: '0.15em',
+930:                         textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+931:                       }}>
+932:                         TICKER SCAN TO CHECK IN
+933:                       </span>
+934:                     </div>
+935:                   </div>               </div>
+936:               </aside>
+937:             </div>
+938:           </div>
+939:         ) : (
+940:           // ---------------- GROOVELAB SPECIFIC VIEW (APPLE-LIKE OVERHAUL) ----------------
+941:           <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr', gap: '40px' }}>
+942:             <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+943:               {/* Üben Board */}
+944:               <section>
+945:                 <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1d1d1f', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.02em' }}>
+946:                   <Clock size={16} style={{ color: '#007aff' }} /> Üben Board
+947:                 </h3>
+948:                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+949:                   {practiceBoard.map((s: any) => (
+950:                     <div key={s.id + s.level} style={{ 
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

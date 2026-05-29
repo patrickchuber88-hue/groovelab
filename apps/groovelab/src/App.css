@@ -608,8 +608,8 @@ div:hover > .photo-overlay {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
-  border-radius: 12px;
+  padding: 10px 20px;
+  border-radius: 9999px;
   border: none;
   background: transparent;
   color: #64748b;
@@ -621,14 +621,14 @@ div:hover > .photo-overlay {
 }
 
 .sidebar-item:hover {
-  background: #f1f5f9;
+  background: rgba(0, 0, 0, 0.04);
   color: #1e293b;
 }
 
 .sidebar-item.active {
-  background: #fef3c7;
+  background: rgba(251, 188, 5, 0.12);
   color: #b45309;
-  box-shadow: 0 6px 16px rgba(234, 179, 8, 0.18);
+  box-shadow: none;
 }
 
 .main-wrapper {
@@ -789,5 +789,89 @@ div:hover > .photo-overlay {
 
 .main-wrapper.live-tab-active {
   overflow-y: hidden !important;
+}
+
+/* ==========================================
+   UNIVERSAL SIDEBAR MENUS GLOBAL OVERRIDE
+   ========================================== */
+.google-sidebar-item, .sidebar-item {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  width: 100% !important;
+  padding: 12px 20px !important;
+  border-radius: 9999px !important;
+  border: none !important;
+  font-size: 0.88rem !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  background: transparent !important;
+  color: #64748b !important;
+  text-align: left !important;
+  box-sizing: border-box !important;
+  margin-bottom: 4px !important;
+  position: relative !important;
+}
+
+.google-sidebar-item:hover, .sidebar-item:hover {
+  background: rgba(0, 0, 0, 0.04) !important;
+  color: #1e293b !important;
+}
+
+/* Active states unified flat pill design */
+.google-sidebar-item.active, .sidebar-item.active {
+  box-shadow: none !important;
+}
+
+/* Active background states based on specific sub-platform tags */
+.google-sidebar-item.active.campus, .sidebar-item.active.campus {
+  background: rgba(52, 168, 83, 0.08) !important;
+  color: #137333 !important;
+  font-weight: 700 !important;
+}
+.google-sidebar-item.active.briefing, .sidebar-item.active.briefing {
+  background: rgba(234, 67, 53, 0.08) !important;
+  color: #ea4335 !important;
+  font-weight: 700 !important;
+}
+.google-sidebar-item.active.groovelab, .sidebar-item.active.groovelab {
+  background: rgba(251, 188, 5, 0.12) !important;
+  color: #b45309 !important;
+  font-weight: 700 !important;
+}
+
+/* Inactive circle transparent */
+.sidebar-icon-circle {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  transition: all 0.2s ease !important;
+  background: transparent !important;
+  color: #64748b !important;
+}
+
+.google-sidebar-item:hover .sidebar-icon-circle, .sidebar-item:hover .sidebar-icon-circle {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #1e293b !important;
+}
+
+/* Active inner circles styling */
+.google-sidebar-item.active.campus .sidebar-icon-circle, .sidebar-item.active.campus .sidebar-icon-circle {
+  background: #34a853 !important;
+  color: #ffffff !important;
+}
+.google-sidebar-item.active.briefing .sidebar-icon-circle, .sidebar-item.active.briefing .sidebar-icon-circle {
+  background: #ea4335 !important;
+  color: #ffffff !important;
+}
+.google-sidebar-item.active.groovelab .sidebar-icon-circle, .sidebar-item.active.groovelab .sidebar-icon-circle {
+  background: #fbbc05 !important;
+  color: #ffffff !important;
 }
 

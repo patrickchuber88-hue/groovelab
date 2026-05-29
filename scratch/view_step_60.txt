@@ -1,0 +1,69 @@
+Created At: 2026-05-28T06:08:00Z
+Completed At: 2026-05-28T06:08:00Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1184
+Total Bytes: 54492
+Showing lines 440 to 500
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+440:             <div 
+441:               onClick={() => setShowFullPhoto(true)}
+442:               style={{ 
+443:                 width: '110px', 
+444:                 height: '110px', 
+445:                 borderRadius: '24px', 
+446:                 overflow: 'hidden', 
+447:                 boxShadow: '0 8px 24px rgba(0, 0, 0, 0.04)', 
+448:                 border: '1px solid rgba(0, 0, 0, 0.04)',
+449:                 flexShrink: 0, 
+450:                 cursor: 'pointer', 
+451:                 transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+452:               }}
+453:               className="hover-scale"
+454:             >
+455:               <img src={student.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+456:             </div>
+457:             
+458:             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+459:               <h2 style={{ 
+460:                 fontSize: '2.1rem', 
+461:                 fontWeight: 800, 
+462:                 color: '#1d1d1f', 
+463:                 margin: 0, 
+464:                 lineHeight: 1.1, 
+465:                 letterSpacing: '-0.03em' 
+466:               }}>
+467:                 {student.first_name} {student.last_name}
+468:               </h2>
+469:               
+470:               <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', marginTop: '4px' }}>
+471:                 <span style={{ fontSize: '0.85rem', color: '#86868b', fontWeight: 500 }}>
+472:                   Member seit {memberSince}
+473:                 </span>
+474:                 <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#d2d2d7' }}></span>
+475:                 <span style={{ 
+476:                   background: isPlatformCampus ? 'rgba(52, 168, 83, 0.08)' : 'rgba(0, 122, 255, 0.08)',
+477:                   color: isPlatformCampus ? '#137333' : '#007aff',
+478:                   padding: '4px 10px',
+479:                   borderRadius: '6px',
+480:                   fontSize: '0.75rem',
+481:                   fontWeight: 650,
+482:                   letterSpacing: '-0.01em'
+483:                 }}>
+484:                   {(skills.filter(s => {
+485:                     const isVocal = (s.instrument || '').toLowerCase().includes('vocal') || (s.instrument || '').toLowerCase().includes('gesang');
+486:                     return s.is_stage_ready && !isVocal;
+487:                   }).length + vocalsSongIds.size) * 100} XP
+488:                 </span>
+489:               </div>
+490: 
+491:               {/* iOS System Pill Button for Activation Status */}
+492:               <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+493:                 {isCampusActive && (
+494:                   <div 
+495:                     onClick={() => {
+496:                       setLocalTab('campus');
+497:                     }}
+498:                     style={{ 
+499:                       background: 'rgba(52, 168, 83, 0.08)', 
+500:                       padding: '4px 12px', 
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

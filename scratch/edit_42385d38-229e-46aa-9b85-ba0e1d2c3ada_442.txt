@@ -1,0 +1,1 @@
+"                <div style={{ width: '100%', background: '#f1f5f9', height: '10px', borderRadius: '100px', overflow: 'hidden' }}>"

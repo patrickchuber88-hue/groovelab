@@ -1,0 +1,8 @@
+{
+  "AbsolutePath": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "EndLine": "485",
+  "IsSkillFile": "false",
+  "StartLine": "460",
+  "toolAction": "\"Viewing next mission card in StudentAvatarDashboard.tsx\"",
+  "toolSummary": "\"Check next mission card in StudentAvatarDashboard.tsx\""
+}

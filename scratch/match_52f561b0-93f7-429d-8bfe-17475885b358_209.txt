@@ -1,0 +1,64 @@
+Created At: 2026-05-27T14:05:35Z
+Completed At: 2026-05-27T14:05:35Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/scratch/recovered_part.txt`
+Total Lines: 68
+Total Bytes: 4120
+Showing lines 1 to 68
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+1: Created At: 2026-05-27T13:35:48Z
+2: Completed At: 2026-05-27T13:35:48Z
+3: File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentAvatarDashboard.tsx`
+4: Total Lines: 1784
+5: Total Bytes: 82386
+6: Showing lines 500 to 750
+7: The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+8: 500:               <div 
+9: 501:                 style={{ 
+10: 502:                   position: 'relative',
+11: 503:                   overflow: 'hidden',
+12: 504:                   background: '#007bff', 
+13: 505:                   color: 'white',
+14: 506:                   borderRadius: '20px', 
+15: 507:                   boxShadow: '0 8px 24px rgba(0, 123, 255, 0.15)',
+16: 508:                   display: 'flex', 
+17: 509:                   flexDirection: 'column',
+18: 510:                   justifyContent: 'space-between',
+19: 511:                   minHeight: '140px',
+20: 512:                   transition: 'all 0.25s ease'
+21: 513:                 }} 
+22: 514:                 className="hover-scale"
+23: 515:               >
+24: 516:                 {/* Top content */}
+25: 517:                 <div style={{ padding: '24px 24px 12px 24px', position: 'relative', zIndex: 2 }}>
+26: 518:                   <div style={{ fontSize: '2.5rem', fontWeight: 900, lineHeight: 1, fontFamily: "'Plus Jakarta Sans', sans-se
+<truncated 852 bytes>
+, 0) 70%);
+41: 725:                 }
+42: 726:               `}} />
+43: 727: 
+44: 728:               {/* Check if birthday today */}
+45: 729:               {(() => {
+46: 730:                 const today = new Date();
+47: 731:                 const isBirthday = student?.birth_date && (() => {
+48: 732:                   const bday = new Date(student.birth_date);
+49: 733:                   return today.getDate() === bday.getDate() && today.getMonth() === bday.getMonth();
+50: 734:                 })();
+51: 735: 
+52: 736:                 const streakCompleted = isBirthday || allCompleted;
+53: 737: 
+54: 738:                 return (
+55: 739:                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '24px' }}>
+56: 740:                     <div style={{ flex: '1 1 500px' }}>
+57: 741:                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+58: 742:                         <span style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.15em', color: '#64748b', textTransform: 'uppercase', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+59: 743:                           {isBirthday ? '🎁 EHRENTAG' : 'FOKUS DES TAGES'}
+60: 744:                         </span>
+61: 745:                       </div>
+62: 746: 
+63: 747:                       <h2 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0f172a', margin: '0 0 12px 0', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+64: 748:                         {isBirthday 
+65: 749:                           ? `Herzlichen Glückwunsch, ${studentName}! 🎂`
+66: 750:                           : `Schön, dass du da bist, ${studentName}.`
+67: The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.
+68: 
+The above content shows the entire, complete file contents of the requested file.

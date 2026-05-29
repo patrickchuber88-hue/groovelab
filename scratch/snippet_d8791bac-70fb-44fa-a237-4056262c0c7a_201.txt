@@ -1,0 +1,67 @@
+Created At: 2026-05-27T13:35:48Z
+Completed At: 2026-05-27T13:35:48Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentAvatarDashboard.tsx`
+Total Lines: 1784
+Total Bytes: 82386
+Showing lines 500 to 750
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+500:               <div 
+501:                 style={{ 
+502:                   position: 'relative',
+503:                   overflow: 'hidden',
+504:                   background: '#007bff', 
+505:                   color: 'white',
+506:                   borderRadius: '20px', 
+507:                   boxShadow: '0 8px 24px rgba(0, 123, 255, 0.15)',
+508:                   display: 'flex', 
+509:                   flexDirection: 'column',
+510:                   justifyContent: 'space-between',
+511:                   minHeight: '140px',
+512:                   transition: 'all 0.25s ease'
+513:                 }} 
+514:                 className="hover-scale"
+515:               >
+516:                 {/* Top content */}
+517:                 <div style={{ padding: '24px 24px 12px 24px', position: 'relative', zIndex: 2 }}>
+518:                   <div style={{ fontSize: '2.5rem', fontWeight: 900, lineHeight: 1, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+519:                     {xp}
+520:                   </div>
+521:                   <div style={{ fontSize: '0.85rem', fontWeight: 700, marginTop: '6px', opacity: 0.9, letterSpacing: '0.02em' }}>
+522:                     Gesammelte XP
+523:                   </div>
+524:                 </div>
+525:                 {/* Watermark Icon */}
+526:                 <div style={{ position: 'absolute', top: '15px', right: '20px', zIndex: 1, opacity: 0.18, pointerEvents: 'none' }}>
+527:                   <Star size={72} color="white" fill="white" />
+528:                 </div
+<truncated 9131 bytes>
+ulse-glow-circle {
+723:                   animation: subtle-pulse 3s infinite ease-in-out;
+724:                   background: radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, rgba(99, 102, 241, 0) 70%);
+725:                 }
+726:               `}} />
+727: 
+728:               {/* Check if birthday today */}
+729:               {(() => {
+730:                 const today = new Date();
+731:                 const isBirthday = student?.birth_date && (() => {
+732:                   const bday = new Date(student.birth_date);
+733:                   return today.getDate() === bday.getDate() && today.getMonth() === bday.getMonth();
+734:                 })();
+735: 
+736:                 const streakCompleted = isBirthday || allCompleted;
+737: 
+738:                 return (
+739:                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '24px' }}>
+740:                     <div style={{ flex: '1 1 500px' }}>
+741:                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+742:                         <span style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.15em', color: '#64748b', textTransform: 'uppercase', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+743:                           {isBirthday ? '🎁 EHRENTAG' : 'FOKUS DES TAGES'}
+744:                         </span>
+745:                       </div>
+746: 
+747:                       <h2 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0f172a', margin: '0 0 12px 0', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+748:                         {isBirthday 
+749:                           ? `Herzlichen Glückwunsch, ${studentName}! 🎂`
+750:                           : `Schön, dass du da bist, ${studentName}.`
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

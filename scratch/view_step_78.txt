@@ -1,0 +1,31 @@
+Created At: 2026-05-28T06:10:22Z
+Completed At: 2026-05-28T06:10:22Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1184
+Total Bytes: 54452
+Showing lines 710 to 732
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+710:                               {item.teacher_notes}
+711:                             </div>
+712:                           )}
+713:                         </div>
+714:                       );
+715:                     })}
+716:                     {campusProgress.length === 0 && (
+717:                       <div style={{ fontSize: '0.85rem', color: '#86868b', background: '#ffffff', padding: '24px', borderRadius: '24px', border: '1px solid rgba(0, 0, 0, 0.04)', textAlign: 'center' }}>
+718:                         Noch keine Einträge in der Fortschrittsmatrix vorhanden.
+719:                       </div>
+720:                     )}
+721:                   </div>
+722:                 </section>
+723:               </div>
+724: 
+725:               <aside style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+726:                 {/* Module & Einstellungen - iOS Switched Settings Card */}
+727:                 <section style={{ 
+728:                   background: '#ffffff', 
+729:                   borderRadius: '24px', 
+730:                   padding: '24px', 
+731:                   border: '1px solid rgba(0, 0, 0, 0.04)',
+732:                 boxShadow: '0 4px 16px rgba(0, 0, 0, 0.01)'
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

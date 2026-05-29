@@ -1,0 +1,7 @@
+{
+  "AbsolutePath": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "EndLine": "275",
+  "StartLine": "255",
+  "toolAction": "\"Viewing stats update block in StudentAvatarDashboard.tsx\"",
+  "toolSummary": "\"View stats update block\""
+}

@@ -1,0 +1,87 @@
+Created At: 2026-05-27T13:16:04Z
+Completed At: 2026-05-27T13:16:04Z
+The following changes were made by the replace_file_content tool to: /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx. If relevant, proactively run terminal commands to execute this code for the USER. Don't ask for permission.
+[diff_block_start]
+@@ -100,6 +100,7 @@
+ 
+   // Widget 1: Daily Briefing
+   const [nextLesson, setNextLesson] = useState<any>(null);
++  const [upcomingLessons, setUpcomingLessons] = useState<any[]>([]);
+   const [dailyChecklist, setDailyChecklist] = useState<any[]>([
+     { id: 'c1', text: 'Stimme dein Instrument', completed: false },
+     { id: 'c2', text: '10 Min Einspielen (Fokus-Flug)', completed: false },
+@@ -136,6 +136,71 @@
+   // Stripe
+   const [showStripeModal, setShowStripeModal] = useState(false);
+ 
++  // Helper to compute next 6 upcoming lessons chronologically
++  const getNextOccurrences = (schedules: any[]): any[] => {
++    if (!schedules || schedules.length === 0) {
++      const mockLessons = [];
++      const days = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
++      const today = new Date();
++      for (let i = 1; i <= 6; i++) {
++        const nextDate = new Date(today);
++        nextDate.setDate(today.getDate() + i);
++        const dayName = days[nextDate.getDay() === 0 ? 6 : nextDate.getDay() - 1];
++        mockLessons.push({
++          id: `demo-${i}`,
++          schedule_id: `demo-${i}`,
++          dateStr: nextDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }),
++          weekday: dayName,
++          time: '14:15',
++          room: 'Raum 102',
++          teacher: 'Patrick Huber',
++          status: 'scheduled'
++        });
++      }
++      return mockLessons;
++    }
++
++    const occurrences: any[] = [];
++    const today = new Date();
++    
++    for (let dayOffset = 0; dayOffset < 30; dayOffset++) {
++      const targetDate = new Date(today);
++      targetDate.setDate(today.getDate() + dayOffset);
++      const rawDay = targetDate.getDay();
++      const targetWeekday = rawDay === 0 ? 7 : rawDay;
++
++      const matchingSchedules = schedules.filter(s => s.day_of_week === targetWeekday && s.status !== 'canceled_by_student');
++      matchingSchedules.forEach(sched => {
++        if (dayOffset === 0) {
++          const [hour, min] = (sched.time_slot || '00:00').split(':').map(Number);
++          const schedTime = new Date(today);
++          schedTime.setHours(hour, min, 0, 0);
++          if (schedTime.getTime() < today.getTime()) {
++            return;
++          }
++        }
++
++        const weekdayNames = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
++        occurrences.push({
++          id: `${sched.id}-${targetDate.getDate()}`,
++          schedule_id: sched.id,
++          date: new Date(targetDate),
++          dateStr: targetDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }),
++          weekday: weekdayNames[targetWeekday],
++          time: sched.time_slot,
++          room: sched.rooms?.name || 'Raum 102',
++          teacher: sched.teacher ? `${sched.teacher.first_name} ${sched.teacher.last_name}` : 'Lehrkraft',
++          status: sched.status
++        });
++      });
++
++      if (occurrences.length >= 6) break;
++    }
++
++    occurrences.sort((a, b) => a.date.getTime() - b.date.getTime());
++    return occurrences.slice(0, 6);
++  };
++
+   // Fetch all user information and stats
+   const fetchAllData = async () => {
+     try {
+[diff_block_end]
+
+Please note that the above snippet only shows the MODIFIED lines from the last change. It shows up to 3 lines of unchanged lines before and after the modified lines. The actual file contents may have many more lines not shown.

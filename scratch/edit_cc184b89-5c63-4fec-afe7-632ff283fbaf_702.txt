@@ -1,0 +1,1 @@
+"  // Refs for auto-scroll\n  const briefingRef = useRef<HTMLDivElement>(null);\n  const songsRef = useRef<HTMLDivElement>(null);\n  const practiceRef = useRef<HTMLDivElement>(null);\n  const cupRef = useRef<HTMLDivElement>(null);\n  const flashbackRef = useRef<HTMLDivElement>(null);"

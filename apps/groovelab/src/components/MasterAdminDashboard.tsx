@@ -2168,7 +2168,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                    {/* Link 1: Secretary Invitation Link */}
                    <div>
                      <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                       1. Einladungslink für Schule/Sekretariat
+                       1. Einladungslink für Schule/Verwaltung
                      </label>
                      <div style={{ display: 'flex', gap: '10px' }}>
                        <input
@@ -2211,7 +2211,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                        </button>
                      </div>
                      <p style={{ margin: '6px 0 0 0', fontSize: '0.75rem', color: '#64748b', lineHeight: '1.4' }}>
-                       Ermöglicht der Schule, das erste Administrator-Konto für das Sekretariat selbstständig zu registrieren.
+                       Ermöglicht der Schule, das erste Administrator-Konto für die Verwaltung selbstständig zu registrieren.
                      </p>
                    </div>
 

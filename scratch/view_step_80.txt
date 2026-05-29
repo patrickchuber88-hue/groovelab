@@ -1,0 +1,87 @@
+Created At: 2026-05-28T06:10:25Z
+Completed At: 2026-05-28T06:10:25Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1184
+Total Bytes: 54452
+Showing lines 440 to 550
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+440:             <div 
+441:               onClick={() => setShowFullPhoto(true)}
+442:               style={{ 
+443:                 width: '110px', 
+444:                 height: '110px', 
+445:                 borderRadius: '24px', 
+446:                 overflow: 'hidden', 
+447:                 boxShadow: '0 8px 24px rgba(0, 0, 0, 0.04)', 
+448:                 border: '1px solid rgba(0, 0, 0, 0.04)',
+449:                 flexShrink: 0, 
+450:                 cursor: 'pointer', 
+451:                 transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+452:               }}
+453:               className="hover-scale"
+454:             >
+455:               <img src={student.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+456:             </div>
+457:             
+458:             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+459:               <h2 style={{ 
+460:                 fontSize: '2.1rem', 
+461:                 fontWeight: 800, 
+462:                 color: '#1d1d1f', 
+463:                 margin: 0, 
+464:                 lineHeight: 1.1, 
+465:                 letterSpacing: '-0.03em' 
+466:               }}>
+467:                 {student.first_name} {student.last_name}
+468:               </h2>
+469:               
+470:               <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', marginTop: '4px' }}>
+471:                 <span style={{ fontSize: '0.85rem', color: '#86868b', fontWeight: 500 }}>
+472:    
+<truncated 1846 bytes>
+a(52, 168, 83, 0.12)',
+507:                       cursor: 'pointer'
+508:                     }}
+509:                   >
+510:                     🎓 Campus
+511:                   </div>
+512:                 )}
+513:                 {isGroovelabActive && (
+514:                   <div 
+515:                     onClick={() => {
+516:                       setLocalTab('groovelab');
+517:                     }}
+518:                     style={{ 
+519:                       background: 'rgba(0, 122, 255, 0.08)', 
+520:                       padding: '4px 12px', 
+521:                       borderRadius: '99px', 
+522:                       fontSize: '0.72rem', 
+523:                       fontWeight: 600, 
+524:                       color: '#007aff', 
+525:                       letterSpacing: '0.02em',
+526:                       border: '0.5px solid rgba(0, 122, 255, 0.12)',
+527:                       cursor: 'pointer'
+528:                     }}
+529:                   >
+530:                     🎸 GrooveLab
+531:                   </div>
+532:                 )}
+533:               </div>
+534:             </div>
+535:           </div>
+536: 
+537:           {/* Elegant Green Campus Pass on the right (horizontal Apple Wallet style) */}
+538:           {isPlatformCampus && (
+539:             <div className="hover-scale" style={{ 
+540:               background: 'linear-gradient(135deg, #1e7e34 0%, #0d4b1e 100%)', 
+541:               borderRadius: '20px', 
+542:               padding: '18px 22px', 
+543:               color: 'white',
+544:               boxShadow: '0 15px 35px rgba(19, 115, 51, 0.18)',
+545:               border: '1px solid rgba(255, 255, 255, 0.15)',
+546:               display: 'flex',
+547:               alignItems: 'center',
+548:               gap: '20px',
+549:               position: 'relative',
+550:               overflow: 'hidden',
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

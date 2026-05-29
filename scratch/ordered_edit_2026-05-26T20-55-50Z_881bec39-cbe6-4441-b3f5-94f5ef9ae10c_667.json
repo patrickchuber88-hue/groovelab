@@ -1,0 +1,18 @@
+{
+  "conv_id": "881bec39-cbe6-4441-b3f5-94f5ef9ae10c",
+  "step_index": 667,
+  "created_at": "2026-05-26T20:55:50Z",
+  "type": "replace_file_content",
+  "args": {
+    "AllowMultiple": "false",
+    "Description": "\"Update activeTab type and add states for Campus Cup ranking to StudentAvatarDashboard.tsx.\"",
+    "EndLine": "74",
+    "Instruction": "\"Add the campus_cup tab to the activeTab state and create states for rankingData, rankingLoading, rankingError, and monthlyFocusMinutes.\"",
+    "ReplacementContent": "\"  const [activeTab, setActiveTab] = useState<'briefing' | 'hero' | 'songs' | 'practice_board' | 'campus_cup'>('briefing');\\n\\n  // \u00dcbe-Board / Gyro-Detox Engine state\\n  const [sessionActive, setSessionActive] = useState(false);\\n  const [secondsElapsed, setSecondsElapsed] = useState(0);\\n  const [selectedTopic, setSelectedTopic] = useState('');\\n  const [isPhoneFlat, setIsPhoneFlat] = useState(false);\\n\\n  // Campus Cup States\\n  const [rankingData, setRankingData] = useState<any[]>([]);\\n  const [rankingLoading, setRankingLoading] = useState(false);\\n  const [rankingError, setRankingError] = useState<string | null>(null);\\n  const [monthlyFocusMinutes, setMonthlyFocusMinutes] = useState(0);\"",
+    "StartLine": "67",
+    "TargetContent": "\"  const [activeTab, setActiveTab] = useState<'briefing' | 'hero' | 'songs' | 'practice_board'>('briefing');\\n\\n  // \u00dcbe-Board / Gyro-Detox Engine state\\n  const [sessionActive, setSessionActive] = useState(false);\\n  const [secondsElapsed, setSecondsElapsed] = useState(0);\\n  const [selectedTopic, setSelectedTopic] = useState('');\\n  const [isPhoneFlat, setIsPhoneFlat] = useState(false);\"",
+    "TargetFile": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+    "toolAction": "\"Adding Campus Cup state variables to StudentAvatarDashboard.tsx\"",
+    "toolSummary": "\"Add Campus Cup state variables to StudentAvatarDashboard.tsx\""
+  }
+}

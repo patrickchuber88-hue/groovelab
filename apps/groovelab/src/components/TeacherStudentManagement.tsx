@@ -11,6 +11,7 @@ interface Student {
   qr_token: string;
   status: string;
   created_at?: string;
+  lesson_duration?: number;
 }
 
 interface TeacherStudentManagementProps {
@@ -29,6 +30,7 @@ export function TeacherStudentManagement({ teacherId, schoolId, maxStudents }: T
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [instrument, setInstrument] = useState('');
+  const [lessonDuration, setLessonDuration] = useState(45);
   const [isAppUser, setIsAppUser] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   
@@ -45,7 +47,7 @@ export function TeacherStudentManagement({ teacherId, schoolId, maxStudents }: T
       setError(null);
       const { data, error } = await supabase
         .from('users')
-        .select('id, first_name, last_name, instrument, is_app_user, qr_token, status, created_at')
+        .select('id, first_name, last_name, instrument, is_app_user, qr_token, status, created_at, lesson_duration')
         .eq('role', 'student')
         .eq('teacher_id', teacherId)
         .order('created_at', { ascending: false });
@@ -57,6 +59,19 @@ export function TeacherStudentManagement({ teacherId, schoolId, maxStudents }: T
       setError('Fehler beim Laden der Schülerliste.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUpdateStudentDuration = async (studentId: string, duration: number) => {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ lesson_duration: duration })
+        .eq('id', studentId);
+      if (error) throw error;
+      setStudents(prev => prev.map(s => s.id === studentId ? { ...s, lesson_duration: duration } : s));
+    } catch (err) {
+      console.error('Error updating student lesson_duration:', err);
     }
   };
 
@@ -133,13 +148,14 @@ export function TeacherStudentManagement({ teacherId, schoolId, maxStudents }: T
         qr_token: studentQrToken,
         is_campus_active: isAppUser,
         is_groovelab_active: isAppUser,
-        status: isAppUser ? 'active' : 'pending'
+        status: isAppUser ? 'active' : 'pending',
+        lesson_duration: lessonDuration
       };
 
       const { data: insertedStudent, error: insertError } = await supabase
         .from('users')
         .insert(newStudentData)
-        .select('id, first_name, last_name, instrument, is_app_user, qr_token, status')
+        .select('id, first_name, last_name, instrument, is_app_user, qr_token, status, lesson_duration')
         .single();
 
       if (insertError) throw insertError;
@@ -165,6 +181,7 @@ export function TeacherStudentManagement({ teacherId, schoolId, maxStudents }: T
     setFirstName('');
     setLastName('');
     setInstrument('');
+    setLessonDuration(45);
     setIsAppUser(false);
     setShowAddForm(false);
     setError(null);
@@ -242,7 +259,7 @@ export function TeacherStudentManagement({ teacherId, schoolId, maxStudents }: T
             <UserCheck className="text-indigo-600" size={20} /> Neuer Schüler Account
           </h4>
           <form onSubmit={handleCreateStudent} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Vorname</label>
                 <input
@@ -275,6 +292,19 @@ export function TeacherStudentManagement({ teacherId, schoolId, maxStudents }: T
                   onChange={(e) => setInstrument(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 focus:outline-none text-slate-800 font-semibold transition-all"
                 />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Unterrichtsform</label>
+                <select
+                  value={lessonDuration}
+                  onChange={(e) => setLessonDuration(parseInt(e.target.value))}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 focus:outline-none text-slate-800 font-semibold bg-white transition-all"
+                >
+                  <option value={30}>30 Min</option>
+                  <option value={45}>45 Min</option>
+                  <option value={60}>60 Min</option>
+                  <option value={90}>90 Min</option>
+                </select>
               </div>
             </div>
 
@@ -355,6 +385,21 @@ export function TeacherStudentManagement({ teacherId, schoolId, maxStudents }: T
                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-md">
                           🎸 {student.instrument}
                         </span>
+                        
+                        <div className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-100 rounded-md px-2 py-0.5 text-xs font-bold text-slate-400">
+                          ⏱️ 
+                          <select
+                            value={student.lesson_duration || 45}
+                            onChange={(e) => handleUpdateStudentDuration(student.id, parseInt(e.target.value))}
+                            style={{ padding: '0px 4px' }}
+                            className="bg-transparent border-none p-0 pr-1 text-xs font-bold text-slate-655 outline-none cursor-pointer"
+                          >
+                            <option value={30}>30 Min</option>
+                            <option value={45}>45 Min</option>
+                            <option value={60}>60 Min</option>
+                            <option value={90}>90 Min</option>
+                          </select>
+                        </div>
                         
                         {/* Hybrid Badge */}
                         {student.is_app_user ? (

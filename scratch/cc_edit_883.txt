@@ -1,0 +1,8 @@
+{
+  "AbsolutePath": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "EndLine": "595",
+  "IsSkillFile": "false",
+  "StartLine": "585",
+  "toolAction": "\"Checking end of Student Briefing Board\"",
+  "toolSummary": "\"Check end lines of briefing board in StudentAvatarDashboard.tsx\""
+}

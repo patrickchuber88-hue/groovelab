@@ -1,0 +1,48 @@
+Created At: 2026-05-28T17:45:40Z
+Completed At: 2026-05-28T17:45:40Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/TeacherDashboard.tsx`
+Total Lines: 5511
+Total Bytes: 273855
+Showing lines 2301 to 3100
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+2301:                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+2302:                     <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname *</label>
+2303:                     <input type="text" required value={inviteFirstName} onChange={e => setInviteFirstName(e.target.value)} placeholder="Max"
+2304:                       style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }} />
+2305:                   </div>
+2306:                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+2307:                     <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Nachname</label>
+2308:                     <input type="text" value={inviteLastName} onChange={e => setInviteLastName(e.target.value)} placeholder="Mustermann"
+2309:                       style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }} />
+2310:                   </div>
+2311:                 </div>
+2312:                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+2313:                   <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>E-Mail (optional)</label>
+2314:                   <input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeho
+<truncated 45282 bytes>
+sName="google-card" style={{ 
+2998:                 padding: '24px 28px', 
+2999:                 borderRadius: '20px',
+3000:                 background: 'rgba(255, 255, 255, 0.8)', 
+3001:                 backdropFilter: 'blur(20px)',
+3002:                 WebkitBackdropFilter: 'blur(20px)',
+3003:                 border: '1px solid rgba(0, 0, 0, 0.05)', 
+3004:                 boxShadow: '0 10px 30px rgba(0, 0, 0, 0.02)'
+3005:               }}>
+3006:                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '20px' }}>
+3007:                   <Bell size={16} color="#ef4444" /> INFOS DER VERWALTUNG
+3008:                 </div>
+3009:                 
+3010:                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+3011:                   {[
+3012:                     { id: 'admin1', tag: 'Aktion', title: '⚠️ 2 offene Terminanfragen von Eltern', body: 'Es warten Terminanfragen im Stundenplan auf deine Freigabe.', date: 'Dringend' },
+3013:                     { id: 'admin2', tag: 'Termin', title: '📅 Lehrerkonferenz 2026', body: 'Freitag, 29. Mai um 14:00 Uhr in Raum 201 (Thema: Sommerkonzert & Mediathek-Lizenzen).', date: 'Fr, 14:00' },
+3014:                     { id: 'admin3', tag: 'Mediathek', title: '📚 Neue E-Gitarren & Playalongs freigeschaltet', body: '5 neue Übestücke stehen ab sofort in der Mediathek für deine Schüler bereit.', date: 'Neu' }
+3015:                   ].map((item, idx, arr) => {
+3016:                     let tagColor = '#64748b';
+3017:                     if (item.tag === 'Aktion') tagColor = '#ef4444';
+3018:                     else if (item.tag === 'Termin') tagColor = '#3b82f6';
+3019:                     else if (item.tag === 'Mediathek') tagColor = '#10b981';
+<truncated 5132 bytes>
+
+NOTE: The output was truncated because it was too long. Use a more targeted query or a smaller range to get the information you need.

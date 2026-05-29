@@ -57,7 +57,7 @@ export async function calculateScheduleHandler(req: Request, res: Response): Pro
     // 2. Fetch all teachers and students of the school
     const { data: allUsers, error: usersError } = await supabase
       .from('users')
-      .select('id, first_name, last_name, role, teacher_id, is_app_user, instrument')
+      .select('id, first_name, last_name, role, teacher_id, is_app_user, instrument, required_equipment')
       .eq('school_id', schoolId)
       .in('role', ['teacher', 'student']);
 
@@ -119,15 +119,21 @@ export async function calculateScheduleHandler(req: Request, res: Response): Pro
     const getSlotKey = (teacherId: string, day: number, slot: string) => `${teacherId}-${day}-${slot}`;
     const getRoomSlotKey = (roomId: string, day: number, slot: string) => `${roomId}-${day}-${slot}`;
 
-    // Helper to find a room compatible with the student's instrument at a given day/time slot
-    const findCompatibleRoom = (studentInstrument: string, day: number, slot: string): { id: string; name: string } | null => {
+    // Helper to find a room compatible with the student's instrument and teacher's requirements at a given day/time slot
+    const findCompatibleRoom = (studentInstrument: string, teacherId: string, day: number, slot: string): { id: string; name: string } | null => {
       const formattedInstrument = (studentInstrument || '').trim().toLowerCase();
+      const teacher = teachers.find(t => t.id === teacherId);
+      const requiredEquipment = teacher?.required_equipment || [];
       
       for (const room of schoolRooms) {
         const allowed = (room.allowed_instruments || []).map((ins: string) => ins.toLowerCase());
         
-        // If room allows this instrument
-        if (allowed.includes(formattedInstrument)) {
+        // Check if room allows the student instrument
+        const meetsInstrument = allowed.includes(formattedInstrument) || allowed.length === 0;
+        // Check if room has all the equipment required by the teacher
+        const meetsEquipment = requiredEquipment.every((reqEq: string) => allowed.includes(reqEq.toLowerCase()));
+
+        if (meetsInstrument && meetsEquipment) {
           const roomSlotKey = getRoomSlotKey(room.id, day, slot);
           if (!roomAssignedSlots.has(roomSlotKey)) {
             return { id: room.id, name: room.name };
@@ -168,7 +174,7 @@ export async function calculateScheduleHandler(req: Request, res: Response): Pro
           
           if (!assignedSlots.has(slotKey)) {
             // Find a room according to the instrument matrix
-            const compatibleRoom = findCompatibleRoom(studentInstrument, match.day, match.slot);
+            const compatibleRoom = findCompatibleRoom(studentInstrument, teacherId, match.day, match.slot);
             if (compatibleRoom) {
               assignedSlots.add(slotKey);
               roomAssignedSlots.add(getRoomSlotKey(compatibleRoom.id, match.day, match.slot));
@@ -197,7 +203,7 @@ export async function calculateScheduleHandler(req: Request, res: Response): Pro
           for (const ta of teacherAvails) {
             const slotKey = getSlotKey(teacherId, ta.day, ta.slot);
             if (!assignedSlots.has(slotKey)) {
-              const compatibleRoom = findCompatibleRoom(studentInstrument, ta.day, ta.slot);
+              const compatibleRoom = findCompatibleRoom(studentInstrument, teacherId, ta.day, ta.slot);
               if (compatibleRoom) {
                 assignedSlots.add(slotKey);
                 roomAssignedSlots.add(getRoomSlotKey(compatibleRoom.id, ta.day, ta.slot));
@@ -245,7 +251,7 @@ export async function calculateScheduleHandler(req: Request, res: Response): Pro
         for (const ta of teacherAvails) {
           const slotKey = getSlotKey(teacherId, ta.day, ta.slot);
           if (!assignedSlots.has(slotKey)) {
-            const compatibleRoom = findCompatibleRoom(studentInstrument, ta.day, ta.slot);
+            const compatibleRoom = findCompatibleRoom(studentInstrument, teacherId, ta.day, ta.slot);
             if (compatibleRoom) {
               assignedSlots.add(slotKey);
               roomAssignedSlots.add(getRoomSlotKey(compatibleRoom.id, ta.day, ta.slot));
@@ -304,6 +310,79 @@ export async function calculateScheduleHandler(req: Request, res: Response): Pro
 }
 
 /**
+ * Generates future schedule occurrences for a teacher for the next 4 weeks
+ * based on their active weekly schedules.
+ */
+async function generateOccurrencesForTeacher(teacherId: string): Promise<void> {
+  try {
+    const { data: schedules, error: fetchErr } = await supabase
+      .from('schedules')
+      .select('*')
+      .eq('teacher_id', teacherId)
+      .in('status', ['approved', 'ready_for_admin_review', 'draft', 'pending_parent_approval']);
+
+    if (fetchErr || !schedules) {
+      console.error('Failed to fetch schedules for generating occurrences:', fetchErr);
+      return;
+    }
+
+    const occurrences: any[] = [];
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const d = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${y}-${m}-${d}`;
+
+    schedules.forEach((schedule: any) => {
+      const { id: scheduleId, student_id, day_of_week, time_slot, duration } = schedule;
+      if (!student_id || !day_of_week || !time_slot) return;
+
+      for (let i = 0; i < 4; i++) {
+        const targetDate = new Date();
+        const currentDay = today.getDay() || 7; // 1 = Monday, 7 = Sunday
+        const diff = day_of_week - currentDay + (i * 7);
+        targetDate.setDate(today.getDate() + diff);
+
+        const ty = targetDate.getFullYear();
+        const tm = String(targetDate.getMonth() + 1).padStart(2, '0');
+        const td = String(targetDate.getDate()).padStart(2, '0');
+        const dateStr = `${ty}-${tm}-${td}`;
+        if (dateStr < todayStr) continue;
+
+        occurrences.push({
+          schedule_id: scheduleId,
+          student_id,
+          teacher_id: teacherId,
+          date: dateStr,
+          start_time: time_slot.includes(':') && time_slot.split(':').length === 2 ? time_slot + ':00' : time_slot,
+          duration: duration || 45,
+          status: 'scheduled'
+        });
+      }
+    });
+    await supabase
+      .from('schedule_occurrences')
+      .delete()
+      .eq('teacher_id', teacherId)
+      .gte('date', todayStr);
+
+    if (occurrences.length > 0) {
+      const { error: insertErr } = await supabase
+        .from('schedule_occurrences')
+        .insert(occurrences);
+
+      if (insertErr) {
+        console.error('Failed to insert schedule occurrences:', insertErr);
+      } else {
+        console.log(`Successfully generated ${occurrences.length} occurrences for teacher ${teacherId}`);
+      }
+    }
+  } catch (err) {
+    console.error('Error generating schedule occurrences:', err);
+  }
+}
+
+/**
  * Controller 2: LEHRER-FINETUNING & REVIEW-STATUS (submit-schedule-by-teacher)
  * POST-Endpunkt: /api/schedule/submit
  * Schaltet den Stundenplan-Status auf 'ready_for_admin_review' und triggert einen Alert.
@@ -357,6 +436,9 @@ export async function submitScheduleByTeacherHandler(req: Request, res: Response
       return;
     }
 
+    // Generate actual occurrences so that appointments immediately appear in the student campus profile
+    await generateOccurrencesForTeacher(teacherProfile.id);
+
     // 3. Create a review request alert for the secretary (Ebene 2)
     const alertMessage = `Stundenplan-Review: Lehrkraft ${teacherProfile.first_name} ${teacherProfile.last_name} (ID: ${teacherProfile.id}) hat die 80/20 Match-Korrekturen abgeschlossen und den Stundenplan zur Überprüfung freigegeben.`;
     
@@ -396,29 +478,57 @@ export async function submitScheduleByTeacherHandler(req: Request, res: Response
  */
 export async function cancelScheduleByStudentHandler(req: Request, res: Response): Promise<void> {
   try {
-    const { scheduleId, studentId } = req.body;
-    if (!scheduleId || !studentId) {
-      res.status(400).json({ error: 'scheduleId and studentId are required.' });
+    const { scheduleId, studentId, date } = req.body;
+    if (!scheduleId || !studentId || !date) {
+      res.status(400).json({ error: 'scheduleId, studentId, and date are required.' });
       return;
     }
 
-    // Update schedule state
-    const { data, error } = await supabase
+    // 1. Fetch schedule to verify and get teacher info
+    const { data: schedule, error: fetchError } = await supabase
       .from('schedules')
-      .update({ status: 'canceled_by_student' })
+      .select('id, teacher_id, school_id, student:users!schedules_student_id_fkey(first_name, last_name)')
       .eq('id', scheduleId)
       .eq('student_id', studentId)
-      .select('*');
+      .single();
 
-    if (error) {
-      res.status(500).json({ error: 'Failed to cancel schedule.', details: error.message });
+    if (fetchError || !schedule) {
+      res.status(404).json({ error: 'Schedule not found or not owned by student.' });
       return;
     }
+
+    // 2. Insert into schedule_exceptions
+    const { error: exceptionError } = await supabase
+      .from('schedule_exceptions')
+      .upsert({ 
+        schedule_id: scheduleId, 
+        exception_date: date, 
+        status: 'canceled_by_student' 
+      }, { onConflict: 'schedule_id, exception_date' });
+
+    if (exceptionError) {
+      res.status(500).json({ error: 'Failed to insert schedule exception.', details: exceptionError.message });
+      return;
+    }
+
+    // 3. Notify Teacher
+    const studentName = schedule.student ? `${(schedule.student as any).first_name} ${(schedule.student as any).last_name}` : 'Ein Schüler';
+    const alertMessage = `Absage: ${studentName} hat den Unterricht am ${new Date(date).toLocaleDateString('de-DE')} abgesagt. Der Slot ist nun als Freislot verfügbar.`;
+
+    await supabase
+      .from('system_alerts')
+      .insert({
+        school_id: schedule.school_id,
+        teacher_id: schedule.teacher_id,
+        type: 'Student Cancellation',
+        message: alertMessage,
+        resolved: false
+      });
 
     res.status(200).json({
       success: true,
       message: 'Unterricht wurde erfolgreich abgesagt. Der Slot ist nun als Freislot freigegeben.',
-      schedule: data
+      schedule: schedule
     });
   } catch (err: any) {
     console.error('Error in cancelScheduleByStudentHandler:', err);
@@ -556,6 +666,9 @@ export async function swapScheduleHandler(req: Request, res: Response): Promise<
         return;
       }
 
+      // Regenerate occurrences for the teacher
+      await generateOccurrencesForTeacher(schedule.teacher_id);
+
       res.status(200).json({
         success: true,
         color: 'GREEN',
@@ -578,6 +691,9 @@ export async function swapScheduleHandler(req: Request, res: Response): Promise<
         res.status(500).json({ error: 'Failed to update schedule to pending.', details: updateError.message });
         return;
       }
+
+      // Regenerate occurrences for the teacher
+      await generateOccurrencesForTeacher(schedule.teacher_id);
 
       // In production, trigger push notifications to parents.
       // Mocked here by returning the status.

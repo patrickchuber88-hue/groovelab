@@ -1,0 +1,1 @@
+"interface StudentAvatarDashboardProps {\n  studentId: string;\n  parentActiveTab?: string;\n  onTabChange?: (tab: string) => void;\n}"

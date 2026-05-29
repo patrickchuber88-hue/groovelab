@@ -1,0 +1,1 @@
+"                      boxShadow: '0 4px 10px rgba(0,0,0,0.08)',\n                      flexShrink: 0\n                    }}>"

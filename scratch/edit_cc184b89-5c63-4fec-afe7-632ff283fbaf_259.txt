@@ -1,0 +1,1 @@
+"      // Local fallback mock\n      setNextLesson((prev: any) => prev ? { ...prev, status: 'canceled_by_student' } : null);"

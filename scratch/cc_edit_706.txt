@@ -1,0 +1,12 @@
+{
+  "AllowMultiple": "false",
+  "Description": "\"Add useEffect to synchronize parent sidebar active tab clicks with dashboard smooth scroll segments.\"",
+  "EndLine": "204",
+  "Instruction": "\"Add sync hook for parent active tabs.\"",
+  "ReplacementContent": "\"  useEffect(() => {\\n    fetchAllData();\\n  }, [studentId]);\\n\\n  // Sync parent sidebar tab changes with dashboard scroll views\\n  useEffect(() => {\\n    if (parentActiveTab) {\\n      if (parentActiveTab === 'briefing' && briefingRef.current) {\\n        briefingRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });\\n        setActiveTab('briefing');\\n      } else if (parentActiveTab === 'songs' && songsRef.current) {\\n        songsRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });\\n        setActiveTab('songs');\\n      } else if (parentActiveTab === 'practice_board' && practiceRef.current) {\\n        practiceRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });\\n        setActiveTab('practice_board');\\n      } else if (parentActiveTab === 'campus_cup' && cupRef.current) {\\n        cupRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });\\n        setActiveTab('campus_cup');\\n      } else if (parentActiveTab === 'flashback' && flashbackRef.current) {\\n        flashbackRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });\\n      }\\n    }\\n  }, [parentActiveTab]);\"",
+  "StartLine": "201",
+  "TargetContent": "\"  useEffect(() => {\\n    fetchAllData();\\n  }, [studentId]);\"",
+  "TargetFile": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "toolAction": "\"Adding parent tab sync effect\"",
+  "toolSummary": "\"Sync parent active tab scroll\""
+}

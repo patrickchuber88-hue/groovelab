@@ -1,0 +1,82 @@
+Created At: 2026-05-28T06:23:16Z
+Completed At: 2026-05-28T06:23:16Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1285
+Total Bytes: 59614
+Showing lines 400 to 520
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+400:                   cursor: 'pointer',
+401:                   boxShadow: isPlatformCampus ? '0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06)' : 'none',
+402:                   transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+403:                   display: 'flex',
+404:                   alignItems: 'center',
+405:                   gap: '6px'
+406:                 }}
+407:               >
+408:                 <GraduationCap size={15} />
+409:                 <span>Campus</span>
+410:               </button>
+411:               <button
+412:                 onClick={() => {
+413:                   setLocalTab('groovelab');
+414:                 }}
+415:                 style={{
+416:                   background: !isPlatformCampus ? '#ffffff' : 'transparent',
+417:                   color: !isPlatformCampus ? '#000000' : '#3c3c43',
+418:                   border: 'none',
+419:                   padding: '6px 20px',
+420:                   borderRadius: '99px',
+421:                   fontWeight: 650,
+422:                   fontSize: '0.82rem',
+423:                   cursor: 'pointer',
+424:                   boxShadow: !isPlatformCampus ? '0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06)' : 'none',
+425:                   transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+426:                   display: 'flex',
+427:                   alignItems: 'center',
+428:                   gap: '6px'
+429:                 }}
+430:               >
+431:                 <Music size={15} />
+432:                 <span>GrooveL
+<truncated 2452 bytes>
+481:                   fontSize: '0.75rem',
+482:                   fontWeight: 650,
+483:                   letterSpacing: '-0.01em'
+484:                 }}>
+485:                   {(skills.filter(s => {
+486:                     const isVocal = (s.instrument || '').toLowerCase().includes('vocal') || (s.instrument || '').toLowerCase().includes('gesang');
+487:                     return s.is_stage_ready && !isVocal;
+488:                   }).length + vocalsSongIds.size) * 100} XP
+489:                 </span>
+490:               </div>
+491: 
+492:               {/* iOS System Pill Button for Activation Status */}
+493:               <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+494:                 {isCampusActive && (
+495:                   <div 
+496:                     onClick={() => {
+497:                       setLocalTab('campus');
+498:                     }}
+499:                     style={{ 
+500:                       background: 'rgba(52, 168, 83, 0.08)', 
+501:                       padding: '4px 12px', 
+502:                       borderRadius: '99px', 
+503:                       fontSize: '0.72rem', 
+504:                       fontWeight: 600, 
+505:                       color: '#137333', 
+506:                       letterSpacing: '0.02em',
+507:                       border: '0.5px solid rgba(52, 168, 83, 0.12)',
+508:                       cursor: 'pointer'
+509:                     }}
+510:                   >
+511:                     🎓 Campus
+512:                   </div>
+513:                 )}
+514:                 {isGroovelabActive && (
+515:                   <div 
+516:                     onClick={() => {
+517:                       setLocalTab('groovelab');
+518:                     }}
+519:                     style={{ 
+520:                       background: 'rgba(0, 122, 255, 0.08)', 
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

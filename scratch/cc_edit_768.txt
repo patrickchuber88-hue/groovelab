@@ -1,0 +1,7 @@
+{
+  "AbsolutePath": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "EndLine": "1000",
+  "StartLine": "990",
+  "toolAction": "\"Viewing lines around nav element for class edit\"",
+  "toolSummary": "\"View nav markup range\""
+}

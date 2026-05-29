@@ -1,0 +1,44 @@
+Created At: 2026-05-28T06:14:15Z
+Completed At: 2026-05-28T06:14:15Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1220
+Total Bytes: 56064
+Showing lines 830 to 865
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+830:                     </div>
+831:                     <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.55)', textTransform: 'uppercase', letterSpacing: '0.15em', marginTop: '10px' }}>
+832:                       Backstage Access
+833:                     </div>
+834:                   </div>
+835: 
+836:                   {/* Large High-Fidelity QR Code Block */}
+837:                   <div style={{ 
+838:                     background: '#ffffff', 
+839:                     padding: '16px', 
+840:                     borderRadius: '20px', 
+841:                     boxShadow: '0 12px 30px rgba(0,0,0,0.25)', 
+842:                     display: 'flex', 
+843:                     alignItems: 'center', 
+844:                     justifyContent: 'center',
+845:                     border: '3px solid rgba(255, 255, 255, 0.1)'
+846:                   }}>
+847:                     <QRCode value={student.qr_token || student.id || ''} size={130} />
+848:                   </div>
+849: 
+850:                   {/* Musician details */}
+851:                   <div style={{ textAlign: 'center', width: '100%', zIndex: 1 }}>
+852:                     <div style={{ fontSize: '1.45rem', fontWeight: 900, letterSpacing: '-0.02em', color: '#ffffff', lineHeight: '1.15' }}>
+853:                       {student.first_name} {student.last_name}
+854:                     </div>
+855:                     <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'rgba(255, 255, 255, 0.5)', marginTop: '4px', fontFamily: 'monospace', letterSpacing: '0.05em' }}>
+856:                       ID: {student.ausweis_nummer || student.id.substring(0, 8).toUpperCase()}
+857:                     </div>
+858:                   </div>
+859: 
+860:                   {/* Pass Footer */}
+861:                   <div style={{ 
+862:                     width: '100%', 
+863:                     borderTop: '0.5px solid rgba(255,255,255,0.18)', 
+864:                     paddingTop: '16px', 
+865:                     textAlign: 'center',
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

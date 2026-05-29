@@ -1,0 +1,89 @@
+Created At: 2026-05-28T06:10:40Z
+Completed At: 2026-05-28T06:10:40Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1184
+Total Bytes: 54452
+Showing lines 320 to 438
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+320:     ? (localTab === 'campus') 
+321:     : isCampusActive;
+322: 
+323:   return (
+324:     <div style={{ 
+325:       position: 'fixed', 
+326:       inset: 0, 
+327:       zIndex: 3000, 
+328:       background: 'rgba(242, 242, 247, 0.65)', 
+329:       backdropFilter: 'blur(25px)', 
+330:       WebkitBackdropFilter: 'blur(25px)',
+331:       display: 'flex', 
+332:       alignItems: 'center', 
+333:       justifyContent: 'center', 
+334:       padding: '24px',
+335:       fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif'
+336:     }}>
+337:       <div className="glass-panel animation-slide-up" style={{ 
+338:         background: 'rgba(255, 255, 255, 0.95)', 
+339:         backdropFilter: 'blur(50px) saturate(2.1)',
+340:         WebkitBackdropFilter: 'blur(50px) saturate(2.1)',
+341:         padding: '36px', 
+342:         borderRadius: '32px', 
+343:         maxWidth: '980px', 
+344:         width: '100%', 
+345:         maxHeight: '88vh', 
+346:         overflowY: 'auto', 
+347:         position: 'relative',
+348:         border: '1px solid rgba(255, 255, 255, 0.8)',
+349:         boxShadow: '0 30px 70px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.9)'
+350:       }}>
+351:         {/* Apple Style Close Button */}
+352:         <button onClick={onClose} style={{ 
+353:           position: 'absolute', 
+354:           top: 24, 
+355:           right: 24, 
+356:           background: 'rgba(0, 0, 0, 0.05)', 
+357:           border: 'none', 
+358:           borderRadius: '50
+<truncated 1821 bytes>
+82rem',
+399:                   cursor: 'pointer',
+400:                   boxShadow: isPlatformCampus ? '0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06)' : 'none',
+401:                   transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+402:                   display: 'flex',
+403:                   alignItems: 'center',
+404:                   gap: '6px'
+405:                 }}
+406:               >
+407:                 <GraduationCap size={15} />
+408:                 <span>Campus</span>
+409:               </button>
+410:               <button
+411:                 onClick={() => {
+412:                   setLocalTab('groovelab');
+413:                 }}
+414:                 style={{
+415:                   background: !isPlatformCampus ? '#ffffff' : 'transparent',
+416:                   color: !isPlatformCampus ? '#000000' : '#3c3c43',
+417:                   border: 'none',
+418:                   padding: '6px 20px',
+419:                   borderRadius: '99px',
+420:                   fontWeight: 650,
+421:                   fontSize: '0.82rem',
+422:                   cursor: 'pointer',
+423:                   boxShadow: !isPlatformCampus ? '0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06)' : 'none',
+424:                   transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+425:                   display: 'flex',
+426:                   alignItems: 'center',
+427:                   gap: '6px'
+428:                 }}
+429:               >
+430:                 <Music size={15} />
+431:                 <span>GrooveLab</span>
+432:               </button>
+433:             </div>
+434:           </div>
+435:         )}
+436: 
+437:         {/* Profile Card Header - Spacious & Clean iOS Widget Look */}
+438:         <div style={{ display: 'flex', gap: '32px', marginBottom: '40px', alignItems: 'center', width: '100%', flexWrap: 'wrap' }}>
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

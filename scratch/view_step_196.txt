@@ -1,0 +1,39 @@
+Created At: 2026-05-28T06:15:40Z
+Completed At: 2026-05-28T06:15:40Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1282
+Total Bytes: 59899
+Showing lines 830 to 860
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+830:                         width: '40px', 
+831:                         height: '28px', 
+832:                         background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', 
+833:                         borderRadius: '6px',
+834:                         boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+835:                         border: '0.5px solid rgba(255,255,255,0.4)',
+836:                         position: 'relative',
+837:                         overflow: 'hidden'
+838:                       }}>
+839:                         {/* Chip contact lines */}
+840:                         <div style={{ position: 'absolute', top: 0, bottom: 0, left: '33%', width: '1px', background: 'rgba(0,0,0,0.15)' }} />
+841:                         <div style={{ position: 'absolute', top: 0, bottom: 0, left: '66%', width: '1px', background: 'rgba(0,0,0,0.15)' }} />
+842:                         <div style={{ position: 'absolute', left: 0, right: 0, top: '50%', height: '1px', background: 'rgba(0,0,0,0.15)' }} />
+843:                       </div>
+844:                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+845:                         <span style={{ fontSize: '0.82rem' }}>🎓</span>
+846:                         <span style={{ 
+847:                           fontSize: '0.65rem', 
+848:                           fontWeight: 800, 
+849:                           color: '#fbbf24', 
+850:                           textTransform: 'uppercase', 
+851:                           letterSpacing: '0.12em' 
+852:                         }}>
+853:                           CAMPUS PASS
+854:                         </span>
+855:                       </div>
+856:                     </div>
+857: 
+858:                     {/* Primary Info Grid (Apple Pass Fields) */}
+859:                     <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '16px 12px', zIndex: 1, marginTop: '8px' }}>
+860:                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

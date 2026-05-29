@@ -1,0 +1,1 @@
+"      // 1. Fetch student user profile\n      const { data: user, error: userErr } = await supabase\n        .from('users')\n        .select('id, is_app_user, first_name, school_id')\n        .eq('id', studentId)"

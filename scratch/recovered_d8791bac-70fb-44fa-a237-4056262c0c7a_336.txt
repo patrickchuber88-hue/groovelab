@@ -1,0 +1,42 @@
+Created At: 2026-05-27T14:07:45Z
+Completed At: 2026-05-27T14:07:45Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/scratch/recover.py`
+Total Lines: 34
+Total Bytes: 1726
+Showing lines 1 to 34
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+1: import json
+2: import os
+3: 
+4: transcript_path = "/Users/patrickhuber/.gemini/antigravity/brain/d8791bac-70fb-44fa-a237-4056262c0c7a/.system_generated/logs/transcript.jsonl"
+5: 
+6: if os.path.exists(transcript_path):
+7:     print("Found transcript!")
+8:     with open(transcript_path, "r", encoding="utf-8") as f:
+9:         for line in f:
+10:             try:
+11:                 obj = json.loads(line)
+12:                 # Check if it contains the viewed file contents
+13:                 if "StudentAvatarDashboard.tsx" in line and "EHRENTAG" in line:
+14:                     tool_calls = obj.get("tool_calls", [])
+15:                     for tc in tool_calls:
+16:                         # Check if it was a view_file or write_to_file
+17:                         args = tc.get("args", {})
+18:                         # In the output of tool or in the content of the step
+19:                         pass
+20:                     
+21:                     # If this step has content (like VIEW_FILE output)
+22:                     content = obj.get("content", "")
+23:                     if "EHRENTAG" in content:
+24:                         print(f"Found step: {obj.get('step_index')}, type: {obj.get('type')}, length: {len(content)}")
+25:                         # The content contains the viewed file lines, let's see if we can extract it or if it is the whole file
+26:                         # Let's save it to a file
+27:                         with open("/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/scratch/recovered_part.txt", "w", encoding="utf-8") as out:
+28:                             out.write(content)
+29:                         print("Saved to scratch/recovered_part.txt")
+30:             except Exception as e:
+31:                 pass
+32: else:
+33:     print("Transcript not found at", transcript_path)
+34: 
+The above content shows the entire, complete file contents of the requested file.

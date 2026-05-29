@@ -1,0 +1,18 @@
+{
+  "conv_id": "896ad61f-7250-49dc-b537-5e9699abba56",
+  "step_index": 37,
+  "created_at": "2026-05-27T13:42:43Z",
+  "type": "replace_file_content",
+  "args": {
+    "AllowMultiple": "false",
+    "Description": "\"Add 'Alle anzeigen' button next to N\u00c4CHSTE TERMINE header in sidebar\"",
+    "EndLine": "1484",
+    "Instruction": "\"Replace the header with a flex container containing title and the Alle anzeigen button\"",
+    "ReplacementContent": "\"              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '8px' }}>\\n                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em' }}>\\n                  <Calendar size={16} color=\\\"#6366f1\\\" /> N\u00c4CHSTE TERMINE\\n                </div>\\n                {allSchoolLessons.length > 5 && (\\n                  <button \\n                    onClick={() => setShowAllLessonsModal(true)}\\n                    style={{\\n                      background: 'rgba(99, 102, 241, 0.08)',\\n                      border: 'none',\\n                      color: '#4f46e5',\\n                      fontWeight: 800,\\n                      fontSize: '11px',\\n                      padding: '4px 10px',\\n                      borderRadius: '8px',\\n                      cursor: 'pointer',\\n                      transition: 'all 0.2s'\\n                    }}\\n                    onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(99, 102, 241, 0.15)'; }}\\n                    onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(99, 102, 241, 0.08)'; }}\\n                  >\\n                    Alle anzeigen\\n                  </button>\\n                )}\\n              </div>\"",
+    "StartLine": "1480",
+    "TargetContent": "\"              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '20px' }}>\\n                <Calendar size={16} color=\\\"#6366f1\\\" /> N\u00c4CHSTE TERMINE\\n              </div>\"",
+    "TargetFile": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+    "toolAction": "\"Updating upcoming lessons header in StudentAvatarDashboard\"",
+    "toolSummary": "\"Update sidebar header\""
+  }
+}

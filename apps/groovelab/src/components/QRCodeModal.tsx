@@ -1,6 +1,5 @@
 import QRCode from 'react-qr-code';
 import { X, Download } from 'lucide-react';
-import { toJpeg } from 'html-to-image';
 import { useRef, useState, useEffect } from 'react';
 
 interface QRCodeModalProps {
@@ -10,18 +9,77 @@ interface QRCodeModalProps {
     role: string;
     qr_token: string;
     photo_url?: string;
+    instrument?: string;
   };
+  activePlatform?: string;
   onClose: () => void;
 }
 
-export function QRCodeModal({ user, onClose }: QRCodeModalProps) {
+const getInstrumentAvatarUrl = (instrument: string | null | undefined): string => {
+  if (!instrument) return '/avatars/guitar_avatar.png';
+  const inst = instrument.toLowerCase().trim();
+  if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/guitar_avatar.png';
+  if (inst.includes('bass')) return '/avatars/bass_avatar.png';
+  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/drums_avatar.png';
+  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/piano_avatar.png';
+  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/vocals_avatar.png';
+  if (inst.includes('trompete') || inst.includes('trumpet')) return '/avatars/trumpet_avatar.png';
+  if (inst.includes('posaune') || inst.includes('trombone')) return '/avatars/trombone_avatar.png';
+  if (inst.includes('horn')) return '/avatars/horn_avatar.png';
+  if (inst.includes('cello')) return '/avatars/cello_avatar.png';
+  if (inst.includes('geige') || inst.includes('violin') || inst.includes('violine')) return '/avatars/violin_avatar.png';
+  if (inst.includes('klarinette') || inst.includes('clarinet')) return '/avatars/clarinet_avatar.png';
+  if (inst.includes('querflöte') || inst.includes('flute')) return '/avatars/flute_avatar.png';
+  if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return '/avatars/saxophone_avatar.png';
+  return '/avatars/guitar_avatar.png';
+};
+
+const getDefaultMusicianAvatarUrl = (instrument: string | null | undefined, role: string | null | undefined): string => {
+  const isTeacher = (role || '').toLowerCase() === 'teacher' || (role || '').toLowerCase() === 'admin';
+  if (isTeacher) return '/avatar_teacher_male.jpg';
+  
+  if (!instrument) return '/avatars/student_eguitar_1.png';
+  const inst = instrument.toLowerCase().trim();
+  if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/student_boy_black_guitar.png';
+  if (inst.includes('bass')) return '/avatars/student_boy_black_bass.png';
+  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/student_boy_black_drums.png';
+  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/student_boy_black_piano.png';
+  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/student_boy_red_vocals.png';
+  return '/avatars/student_eguitar_1.png';
+};
+
+export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps) {
   const brandColor = 'var(--primary-color)';
   const cardRef = useRef<HTMLDivElement>(null);
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    const originalUrl = user.photo_url || '/avatar_ghost.jpg';
+    
+    let originalUrl = user.photo_url || '/avatar_ghost.jpg';
+    if (activePlatform === 'campus') {
+      originalUrl = getInstrumentAvatarUrl(user.instrument);
+    } else {
+      const isInstrumentAvatar = user.photo_url && (
+        user.photo_url.includes('avatar.png') || 
+        user.photo_url.includes('guitar_avatar') || 
+        user.photo_url.includes('bass_avatar') || 
+        user.photo_url.includes('drums_avatar') || 
+        user.photo_url.includes('piano_avatar') || 
+        user.photo_url.includes('vocals_avatar') || 
+        user.photo_url.includes('trumpet_avatar') || 
+        user.photo_url.includes('trombone_avatar') || 
+        user.photo_url.includes('horn_avatar') || 
+        user.photo_url.includes('cello_avatar') || 
+        user.photo_url.includes('violin_avatar') || 
+        user.photo_url.includes('clarinet_avatar') || 
+        user.photo_url.includes('flute_avatar') || 
+        user.photo_url.includes('saxophone_avatar')
+      );
+      if (!user.photo_url || isInstrumentAvatar || user.photo_url === '/avatar_ghost.jpg') {
+        originalUrl = getDefaultMusicianAvatarUrl(user.instrument, user.role);
+      }
+    }
     
     if (originalUrl.startsWith('data:') || originalUrl.startsWith('blob:')) {
       setAvatarDataUrl(originalUrl);
@@ -85,6 +143,7 @@ export function QRCodeModal({ user, onClose }: QRCodeModalProps) {
   const downloadImage = async () => {
     if (cardRef.current === null) return;
     try {
+      const { toJpeg } = await import('html-to-image');
       const dataUrl = await toJpeg(cardRef.current, { 
         quality: 0.95,
         backgroundColor: '#ffffff',

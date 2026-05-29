@@ -83,3 +83,85 @@ export async function createTeacherLinkHandler(req: Request, res: Response): Pro
     res.status(500).json({ error: 'Internal Server Error', details: err.message });
   }
 }
+
+/**
+ * Endpoint /api/admin/toggle-premium-manual
+ * Inverts the value in premium_status.is_premium_active (True/False).
+ * Sets stripe_customer_id to "MANUAL_PILOT_PHASE".
+ */
+export async function togglePremiumManualHandler(req: Request, res: Response): Promise<void> {
+  try {
+    // 1. Authenticate user and verify they are a secretary or admin
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      res.status(401).json({ error: 'Authorization header is missing.' });
+      return;
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      res.status(401).json({ error: 'Unauthorized or invalid token.' });
+      return;
+    }
+
+    // Verify admin/secretary role
+    const { data: userProfile, error: profileError } = await supabase
+      .from('users')
+      .select('school_id, role')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !userProfile || (userProfile.role !== 'admin' && userProfile.role !== 'secretary')) {
+      res.status(403).json({ error: 'Access forbidden. Only admins or secretaries can toggle premium.' });
+      return;
+    }
+
+    const { student_id } = req.body;
+    if (!student_id) {
+      res.status(400).json({ error: 'student_id is required.' });
+      return;
+    }
+
+    // 2. Fetch current premium status
+    const { data: currentStatus } = await supabase
+      .from('premium_status')
+      .select('is_premium_active')
+      .eq('student_id', student_id)
+      .maybeSingle();
+
+    const nextVal = currentStatus ? !currentStatus.is_premium_active : true;
+
+    // 3. Upsert premium status
+    const { error: upsertError } = await supabase
+      .from('premium_status')
+      .upsert({
+        student_id: student_id,
+        is_premium_active: nextVal,
+        stripe_customer_id: 'MANUAL_PILOT_PHASE',
+        updated_at: new Date().toISOString()
+      });
+
+    if (upsertError) {
+      res.status(500).json({ error: 'Failed to update premium status.', details: upsertError.message });
+      return;
+    }
+
+    // 4. Update users table field is_premium_user
+    await supabase
+      .from('users')
+      .update({ is_premium_user: nextVal })
+      .eq('id', student_id);
+
+    res.status(200).json({
+      success: true,
+      is_premium_active: nextVal,
+      message: `Premium-Status erfolgreich ${nextVal ? 'aktiviert' : 'deaktiviert'}.`
+    });
+
+  } catch (err: any) {
+    res.status(500).json({ error: 'Internal Server Error', details: err.message });
+  }
+}
+

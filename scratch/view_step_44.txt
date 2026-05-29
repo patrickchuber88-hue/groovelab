@@ -1,0 +1,88 @@
+Created At: 2026-05-28T05:47:57Z
+Completed At: 2026-05-28T05:47:57Z
+File Path: `file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/StudentDetailModal.tsx`
+Total Lines: 1202
+Total Bytes: 55160
+Showing lines 350 to 560
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+350:       }}>
+351:         {/* Apple Style Close Button */}
+352:         <button onClick={onClose} style={{ 
+353:           position: 'absolute', 
+354:           top: 24, 
+355:           right: 24, 
+356:           background: 'rgba(0, 0, 0, 0.05)', 
+357:           border: 'none', 
+358:           borderRadius: '50%', 
+359:           width: '30px', 
+360:           height: '30px', 
+361:           display: 'flex', 
+362:           alignItems: 'center', 
+363:           justifyContent: 'center', 
+364:           cursor: 'pointer', 
+365:           color: '#3c3c43',
+366:           opacity: 0.6,
+367:           transition: 'all 0.2s ease',
+368:           outline: 'none'
+369:         }}
+370:           onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.background = 'rgba(0,0,0,0.08)'; }}
+371:           onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6'; e.currentTarget.style.background = 'rgba(0,0,0,0.05)'; }}
+372:         >
+373:           <X size={15} strokeWidth={2.5} />
+374:         </button>
+375: 
+376:         {/* Apple Segmented Control Style Tab Bar - only visible if BOTH active */}
+377:         {showTabSwitch && (
+378:           <div style={{ marginBottom: '32px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+379:             <div style={{ 
+380:               background: 'rgba(120, 120, 128, 0.12)', 
+381:               padding: '4px', 
+382:               borderRadius: '99px', 
+383:               display: 'inline-flex',
+384:               gap: '2px',
+<truncated 6369 bytes>
+r: '#137333', 
+518:                       letterSpacing: '0.02em',
+519:                       border: '0.5px solid rgba(52, 168, 83, 0.12)',
+520:                       cursor: 'pointer'
+521:                     }}
+522:                   >
+523:                     🎓 Campus
+524:                   </div>
+525:                 )}
+526:                 {isGroovelabActive && (
+527:                   <div 
+528:                     onClick={() => {
+529:                       if (onSwitchPlatform) {
+530:                         onSwitchPlatform('groovelab');
+531:                         onClose();
+532:                       } else {
+533:                         setLocalTab('groovelab');
+534:                       }
+535:                     }}
+536:                     style={{ 
+537:                       background: 'rgba(0, 122, 255, 0.08)', 
+538:                       padding: '4px 12px', 
+539:                       borderRadius: '99px', 
+540:                       fontSize: '0.72rem', 
+541:                       fontWeight: 600, 
+542:                       color: '#007aff', 
+543:                       letterSpacing: '0.02em',
+544:                       border: '0.5px solid rgba(0, 122, 255, 0.12)',
+545:                       cursor: 'pointer'
+546:                     }}
+547:                   >
+548:                     🎸 GrooveLab
+549:                   </div>
+550:                 )}
+551:               </div>
+552:             </div>
+553:           </div>
+554:         </div>
+555: 
+556:         {/* ---------------- CAMPUS SPECIFIC VIEW ---------------- */}
+557:         {isPlatformCampus ? (
+558:           <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+559:             {/* Premium Digital Campus ID Card Badge - APPLE WALLET STYLE (featuring the single, large centered QR code) */}
+560:             <div style={{ 
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

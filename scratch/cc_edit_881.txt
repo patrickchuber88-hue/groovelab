@@ -1,0 +1,8 @@
+{
+  "AbsolutePath": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+  "EndLine": "600",
+  "IsSkillFile": "false",
+  "StartLine": "520",
+  "toolAction": "\"Viewing StudentAvatarDashboard.tsx around line 550\"",
+  "toolSummary": "\"Check lines 520 to 600 in StudentAvatarDashboard.tsx\""
+}

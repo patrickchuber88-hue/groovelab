@@ -1,0 +1,16 @@
+{
+  "conv_id": "2aa7af44-99e0-4539-99ca-6e524359ed15",
+  "step_index": 390,
+  "created_at": "2026-05-27T03:48:49Z",
+  "type": "write_to_file",
+  "args": {
+    "ArtifactMetadata": "{\"ArtifactType\":\"other\",\"Summary\":\"Redesigned StudentAvatarDashboard with a premium full-screen layout, modern card widgets, gradient headers, clean timeline next lesson display, interactive song grids, neon glow digital detox timer, and polished leaderboard/wrapped layouts.\"}",
+    "CodeContent": "\"import React, { useState, useEffect, useRef, useMemo } from 'react';\\nimport { supabase } from '../lib/supabase';\\nimport { \\n  Award, \\n  Lock, \\n  Smartphone, \\n  Trophy, \\n  Sparkles, \\n  Star, \\n  ChevronRight, \\n  Clock, \\n  Flame, \\n  BookOpen, \\n  Share2, \\n  Play, \\n  Pause, \\n  RotateCcw, \\n  X, \\n  Zap, \\n  Music, \\n  Heart,\\n  QrCode,\\n  Calendar,\\n  MapPin,\\n  User\\n} from 'lucide-react';\\nimport QRCode from 'react-qr-code';\\n\\ninterface StudentAvatarDashboardProps {\\n  studentId: string;\\n  parentActiveTab?: string;\\n  onTabChange?: (tab: string) => void;\\n}\\n\\nexport function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange }: StudentAvatarDashboardProps) {\\n  // Active Navigation Tab: briefing, songs, practice_board, campus_cup, flashback\\n  const [activeTab, setActiveTab] = useState<'briefing' | 'songs' | 'practice_board' | 'campus_cup' | 'flashback'>('briefing');\\n\\n  // Student State\\n  const [student, setStudent] = useState<any>(null);\\n  const [isPremiumActive, setIsPremiumActive] = useState(false);\\n  const [stats, setStats] = useState<any>(null);\\n  const [avatar, setAvatar] = useState<any>(null);\\n  const [loading, setLoading] = useState(true);\\n\\n  // Board 1: Daily Briefing\\n  const [nextLesson, setNextLesson] = useState<any>(null);\\n\\n  // Board 2: Songs & Material\\n  const [progressItems, setProgressItems] = useState<any[]>([]);\\n\\n  // Board 3: \u00dcbe-Board & Gyro Detox Engine\\n  const [detoxMinutes, setDetoxMinutes] = useState(15);\\n  const [secondsLeft, setSecondsLeft] = useState(15 * 60);\\n  const [timerRunning, setTimerRunning] = useState(false);\\n  const [isFaceDown, setIsFaceDown] = useState(false);\\n  const [completedMin, setCompletedMin] = useState<number | null>(null);\\n  const [practiceTopic, setPracticeTopic] = useState('Allgemeines \u00dcben');\\n  const timerRef = useRef<any>(null);\\n\\n  // Board 4: Campus Cup\\n  const [localSchoolName, setLocalSchoolName] = useState('Meine Musikschule');\\n  const [topSchools, setTopSchools] = useState<any[]>([]);\\n\\n  // Board 5\n<truncated 46592 bytes>",
+    "Description": "\"Redesign StudentAvatarDashboard.tsx to remove the narrow mobile frame constraint and render beautiful responsive layouts with premium cards, icons, and structures.\"",
+    "IsArtifact": "false",
+    "Overwrite": "true",
+    "TargetFile": "\"/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx\"",
+    "toolAction": "\"Redesign StudentAvatarDashboard boards and layout\"",
+    "toolSummary": "\"Write file\""
+  }
+}
