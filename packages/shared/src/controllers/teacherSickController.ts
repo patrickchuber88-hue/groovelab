@@ -9,23 +9,43 @@ const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 /**
  * POST /api/teacher/report-sick
  * body: { teacherId, sickUntilDate }
+ * If sickUntilDate is null or empty, it ends the sickness.
  */
 export async function reportSickHandler(req: Request, res: Response): Promise<void> {
   try {
     const { teacherId, sickUntilDate } = req.body;
 
-    if (!teacherId || !sickUntilDate) {
-      res.status(400).json({ error: 'teacherId and sickUntilDate are required.' });
+    if (!teacherId) {
+      res.status(400).json({ error: 'teacherId is required.' });
       return;
     }
 
-    const sickUntil = new Date(sickUntilDate);
-    if (isNaN(sickUntil.getTime())) {
-      res.status(400).json({ error: 'Invalid sickUntilDate format.' });
+    // 1. Fetch teacher details to see previous sick_until status
+    const { data: teacher, error: teacherError } = await supabase
+      .from('users')
+      .select('id, first_name, last_name, school_id, sick_until')
+      .eq('id', teacherId)
+      .single();
+
+    if (teacherError || !teacher) {
+      res.status(404).json({ error: 'Teacher not found.' });
       return;
     }
 
-    // 1. Fetch teacher's schedules
+    const prevSickUntilStr = teacher.sick_until;
+    
+    // Update teacher's sick_until column
+    const { error: userUpdateError } = await supabase
+      .from('users')
+      .update({ sick_until: sickUntilDate || null })
+      .eq('id', teacherId);
+
+    if (userUpdateError) {
+      res.status(500).json({ error: 'Failed to update user profile.', details: userUpdateError.message });
+      return;
+    }
+
+    // 2. Fetch all teacher's schedules
     const { data: schedules, error: schedError } = await supabase
       .from('schedules')
       .select('*')
@@ -36,25 +56,34 @@ export async function reportSickHandler(req: Request, res: Response): Promise<vo
       return;
     }
 
-    if (!schedules || schedules.length === 0) {
-      res.status(200).json({ success: true, message: 'No slots found for this teacher.', notificationsCreated: 0 });
-      return;
-    }
-
     const now = new Date();
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+
+    const sickUntil = sickUntilDate ? new Date(sickUntilDate) : null;
+    const prevSickUntil = prevSickUntilStr ? new Date(prevSickUntilStr) : null;
+
+    // Define the date range to check/revert: up to 30 days into the future
+    const maxDate = new Date(now);
+    maxDate.setDate(maxDate.getDate() + 30);
+
+    const currentDate = new Date(todayStart);
     const notificationsToInsert: any[] = [];
-    const scheduleIdsToUpdate = new Set<string>();
+    const scheduleIdsToCancel = new Set<string>();
+    const scheduleIdsToRestore = new Set<string>();
+    const datesToDeleteNotifs: string[] = [];
 
-    // Iterate through dates from now until sickUntilDate (inclusive)
-    const currentDate = new Date(now);
-    currentDate.setHours(0, 0, 0, 0); // Start of day for iteration loop
+    // Fetch existing crisis notifications in this range to avoid duplicates
+    const { data: existingNotifs } = await supabase
+      .from('crisis_notifications')
+      .select('slot_start_datetime, student_id')
+      .eq('teacher_id', teacherId);
 
-    const endDate = new Date(sickUntil);
-    endDate.setHours(23, 59, 59, 999);
+    const existingNotifsSet = new Set(
+      (existingNotifs || []).map(n => `${new Date(n.slot_start_datetime).toISOString()}-${n.student_id}`)
+    );
 
-    while (currentDate <= endDate) {
-      // getDay() is 0 for Sunday, 1 for Monday, etc.
-      // day_of_week is 1 for Monday, 7 for Sunday
+    while (currentDate <= maxDate) {
       const rawDay = currentDate.getDay();
       const currentDayOfWeek = rawDay === 0 ? 7 : rawDay;
 
@@ -62,67 +91,98 @@ export async function reportSickHandler(req: Request, res: Response): Promise<vo
       const daySchedules = schedules.filter(s => s.day_of_week === currentDayOfWeek);
 
       daySchedules.forEach(sched => {
-        // Calculate slot_start_datetime: date + time_slot (e.g. "14:00")
         const [hours, minutes] = (sched.time_slot || '00:00').split(':').map(Number);
         const startDateTime = new Date(currentDate);
         startDateTime.setHours(hours, minutes, 0, 0);
 
-        // Process only future slots
         if (startDateTime >= now) {
-          scheduleIdsToUpdate.add(sched.id);
-          notificationsToInsert.push({
-            teacher_id: teacherId,
-            student_id: sched.student_id,
-            slot_start_datetime: startDateTime.toISOString(),
-            status: 'UNREAD'
-          });
+          const isCurrentlySick = sickUntil && startDateTime <= new Date(sickUntil.getTime() + 24 * 60 * 60 * 1000 - 1);
+          
+          if (isCurrentlySick) {
+            scheduleIdsToCancel.add(sched.id);
+            
+            const notifKey = `${startDateTime.toISOString()}-${sched.student_id}`;
+            if (!existingNotifsSet.has(notifKey)) {
+              notificationsToInsert.push({
+                teacher_id: teacherId,
+                student_id: sched.student_id,
+                slot_start_datetime: startDateTime.toISOString(),
+                status: 'UNREAD'
+              });
+            }
+          } else {
+            // Restore schedules that are no longer in the sick window (or if sick leave was ended/shortened)
+            scheduleIdsToRestore.add(sched.id);
+            datesToDeleteNotifs.push(startDateTime.toISOString());
+          }
         }
       });
 
       currentDate.setDate(currentDate.getDate() + 1);
     }
 
-    // 2. Perform DB Updates
-    if (scheduleIdsToUpdate.size > 0) {
-      // Set schedule status to canceled_by_teacher_sick
-      const { error: updateError } = await supabase
+    // Apply Sickness Cancellations
+    if (scheduleIdsToCancel.size > 0) {
+      await supabase
         .from('schedules')
         .update({ status: 'canceled_by_teacher_sick' })
-        .in('id', Array.from(scheduleIdsToUpdate));
-
-      if (updateError) {
-        res.status(500).json({ error: 'Failed to update schedule status.', details: updateError.message });
-        return;
-      }
+        .in('id', Array.from(scheduleIdsToCancel));
     }
 
+    // Apply Restores back to approved
+    if (scheduleIdsToRestore.size > 0) {
+      await supabase
+        .from('schedules')
+        .update({ status: 'approved' })
+        .in('id', Array.from(scheduleIdsToRestore))
+        .eq('status', 'canceled_by_teacher_sick');
+    }
+
+    // Insert new crisis notifications
     if (notificationsToInsert.length > 0) {
-      // Insert into crisis_notifications
-      const { error: insertError } = await supabase
+      await supabase
         .from('crisis_notifications')
         .insert(notificationsToInsert);
-
-      if (insertError) {
-        res.status(500).json({ error: 'Failed to create crisis notifications.', details: insertError.message });
-        return;
-      }
-
-      // Simulate Email & WebSocket Dispatching
-      notificationsToInsert.forEach(notif => {
-        const token = Math.random().toString(36).substring(2, 15);
-        const link = `${supabaseUrl}/api/student/confirm-crisis-notification?id=${notif.id || 'token'}&token=${token}`;
-        console.log(`[Sick Leave Cascade] Dispatched push notification to student ${notif.student_id}`);
-        console.log(`[Sick Leave Cascade] E-mail sent to parents of student ${notif.student_id}. Confirm link: ${link}`);
-      });
     }
+
+    // Delete future crisis notifications if sickness shortened or ended
+    if (datesToDeleteNotifs.length > 0) {
+      await supabase
+        .from('crisis_notifications')
+        .delete()
+        .eq('teacher_id', teacherId)
+        .in('slot_start_datetime', datesToDeleteNotifs);
+    }
+
+    // Insert alert for Secretary Cockpit (Krisen-Dashboard)
+    let alertMessage = '';
+    if (!sickUntilDate) {
+      alertMessage = `🟢 GESUNDMELDUNG: Lehrkraft ${teacher.first_name} ${teacher.last_name} hat sich wieder gesundgemeldet. Alle zukünftigen Ausfälle wurden storniert.`;
+    } else if (prevSickUntilStr && sickUntilDate !== prevSickUntilStr.substring(0, 10)) {
+      alertMessage = `🚨 KRANKHEITS-ANPASSUNG: Lehrkraft ${teacher.first_name} ${teacher.last_name} hat den Krankmeldungszeitraum auf den ${new Date(sickUntilDate).toLocaleDateString('de-DE')} geändert.`;
+    } else {
+      alertMessage = `🚨 NEUE KRANKMELDUNG: Lehrkraft ${teacher.first_name} ${teacher.last_name} hat sich bis zum ${new Date(sickUntilDate).toLocaleDateString('de-DE')} krankgemeldet.`;
+    }
+
+    await supabase
+      .from('system_alerts')
+      .insert({
+        school_id: teacher.school_id,
+        teacher_id: teacherId,
+        type: 'Teacher Illness Alert',
+        message: alertMessage,
+        resolved: false
+      });
 
     res.status(200).json({
       success: true,
-      message: `Teacher sick reported. ${notificationsToInsert.length} slots canceled/notified.`,
+      message: 'Sickness status successfully updated and synchronized.',
+      sickUntil: sickUntilDate || null,
       notificationsCreated: notificationsToInsert.length
     });
 
   } catch (err: any) {
+    console.error('Error in reportSickHandler:', err);
     res.status(500).json({ error: 'Internal Server Error', details: err.message });
   }
 }
@@ -160,3 +220,4 @@ export async function confirmCrisisNotificationHandler(req: Request, res: Respon
     res.status(500).json({ error: 'Internal Server Error', details: err.message });
   }
 }
+

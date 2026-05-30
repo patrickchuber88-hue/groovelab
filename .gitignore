@@ -29,3 +29,6 @@ dist-ssr
 *.zip
 *.zip
 *.zip
+dist.tar.gz
+*.tar.gz
+

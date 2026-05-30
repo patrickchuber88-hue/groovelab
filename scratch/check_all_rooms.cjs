@@ -1,7 +1,13 @@
 const { createClient } = require('@supabase/supabase-js');
 
-const supabaseUrl = 'https://supabase.178.105.10.2.sslip.io';
-const serviceRoleKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3Nzk1NTM4NDMsImV4cCI6MTkzNzIzMzg0M30.0QQXccgKPJcDdKpSjAPeYfBXxH4-ZwJHcxCQNJcJLTI';
+const supabaseUrl = process.env.SUPABASE_URL || 'https://supabase.178.105.10.2.sslip.io';
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!serviceRoleKey) {
+  console.error('Error: SUPABASE_SERVICE_ROLE_KEY environment variable is not set.');
+  process.exit(1);
+}
+
 const supabase = createClient(supabaseUrl, serviceRoleKey);
 
 async function run() {

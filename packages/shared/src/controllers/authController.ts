@@ -4,7 +4,7 @@ import * as jwt from 'jsonwebtoken';
 import * as crypto from 'crypto';
 
 // Initialize Supabase Client
-const supabaseUrl = process.env.SUPABASE_URL || 'http://supabase.178.105.10.2.sslip.io';
+const supabaseUrl = process.env.SUPABASE_URL || 'https://supabase.178.105.10.2.sslip.io';
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 

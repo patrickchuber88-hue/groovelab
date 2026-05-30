@@ -725,14 +725,14 @@ export function TeacherDashboard({
   };
 
   const handleReportIllness = async () => {
-    const pin = prompt('Bitte gebe deinen 4-stelligen Lehrer-PIN (z.B. GL-1234) zur Verifizierung ein:');
-    if (!pin) return;
+    if (!confirm('Möchtest du dich wirklich für heute krankmelden? Alle heutigen Stunden werden storniert und die Verwaltung benachrichtigt.')) return;
 
     try {
-      const resp = await fetch('/api/teacher/sick', {
+      const todayStr = new Date().toISOString().substring(0, 10);
+      const resp = await fetch('/api/teacher/report-sick', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teacherId: userId, pin })
+        body: JSON.stringify({ teacherId: userId, sickUntilDate: todayStr })
       });
 
       if (resp.ok) {
@@ -744,27 +744,48 @@ export function TeacherDashboard({
       // Fallback direct Supabase update
       const { data: teacherProfile } = await supabase
         .from('users')
-        .select('ausweis_nummer, school_id, first_name, last_name')
+        .select('school_id, first_name, last_name')
         .eq('id', userId)
         .single();
 
-      if (!teacherProfile || teacherProfile.ausweis_nummer !== pin) {
-        alert('Fehler: PIN falsch oder Verifizierung fehlgeschlagen.');
-        return;
-      }
+      if (!teacherProfile) throw new Error("Profile not found");
 
       const rawDay = new Date().getDay();
       const todayWeekday = rawDay === 0 ? 7 : rawDay;
 
+      // Update today's schedules to canceled_by_teacher_sick
       const { error: scheduleError } = await supabase
         .from('schedules')
-        .update({ status: 'teacher_sick' })
+        .update({ status: 'canceled_by_teacher_sick' })
         .eq('teacher_id', userId)
         .eq('day_of_week', todayWeekday);
 
       if (scheduleError) throw scheduleError;
 
-      const alertMessage = `Lehrkraft ${teacherProfile.first_name} ${teacherProfile.last_name} (ID: ${userId}) hat sich krankgemeldet. Alle betroffenen Unterrichtseinheiten für heute entfallen.`;
+      // Insert crisis notification for today's slots
+      const { data: slots } = await supabase
+        .from('schedules')
+        .select('*')
+        .eq('teacher_id', userId)
+        .eq('day_of_week', todayWeekday);
+
+      if (slots && slots.length > 0) {
+        const notifs = slots.map(s => {
+          const [hours, minutes] = (s.time_slot || '00:00').split(':').map(Number);
+          const startDateTime = new Date();
+          startDateTime.setHours(hours, minutes, 0, 0);
+          return {
+            teacher_id: userId,
+            student_id: s.student_id,
+            slot_start_datetime: startDateTime.toISOString(),
+            status: 'UNREAD'
+          };
+        });
+
+        await supabase.from('crisis_notifications').insert(notifs);
+      }
+
+      const alertMessage = `🚨 LEHRER-KRANKHEIT: Lehrkraft ${teacherProfile.first_name} ${teacherProfile.last_name} hat sich für heute krankgemeldet.`;
       await supabase.from('system_alerts').insert({
         school_id: teacherProfile.school_id,
         teacher_id: userId,

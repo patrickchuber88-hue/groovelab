@@ -3,7 +3,8 @@ import { supabase } from '../lib/supabase';
 import { 
   Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, 
   ChevronRight, Coffee, Clock, Flame, BookOpen, Share2, Play, 
-  Pause, RotateCcw, Volume2, Moon, QrCode, X, EyeOff, Zap, Music, Library, Calendar, Check, Target, MessageSquare, Send
+  Pause, RotateCcw, Volume2, Moon, QrCode, X, EyeOff, Zap, Music, Library, Calendar, Check, Target, MessageSquare, Send,
+  Pencil, User, Mail, Phone, MapPin, Activity, Camera
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 
@@ -15,6 +16,25 @@ interface Avatar {
   asset_path: string;
   streak_flame?: number;
 }
+
+const getInstrumentAvatarUrl = (instrument: string | null | undefined): string => {
+  if (!instrument) return '/avatars/guitar_avatar.png';
+  const inst = instrument.toLowerCase().trim();
+  if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/guitar_avatar.png';
+  if (inst.includes('bass')) return '/avatars/bass_avatar.png';
+  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/drums_avatar.png';
+  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/piano_avatar.png';
+  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/vocals_avatar.png';
+  if (inst.includes('trompete') || inst.includes('trumpet')) return '/avatars/trumpet_avatar.png';
+  if (inst.includes('posaune') || inst.includes('trombone')) return '/avatars/trombone_avatar.png';
+  if (inst.includes('horn')) return '/avatars/horn_avatar.png';
+  if (inst.includes('cello')) return '/avatars/cello_avatar.png';
+  if (inst.includes('geige') || inst.includes('violin') || inst.includes('violine')) return '/avatars/violin_avatar.png';
+  if (inst.includes('klarinette') || inst.includes('clarinet')) return '/avatars/clarinet_avatar.png';
+  if (inst.includes('querflöte') || inst.includes('flute')) return '/avatars/flute_avatar.png';
+  if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return '/avatars/saxophone_avatar.png';
+  return '/avatars/guitar_avatar.png';
+};
 
 interface StudentAvatarDashboardProps {
   studentId: string;
@@ -53,7 +73,20 @@ const HERO_CLASSES = [
   { id: 'vocalist', name: 'Vocal-Star', icon: '🎤', desc: 'Die Bühne mit deiner Stimme erobern' }
 ];
 
-export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange }: StudentAvatarDashboardProps) {
+const toLocalYYYYMMDD = (d: Date) => {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange, onProfileUpdate }: StudentAvatarDashboardProps) {
+  const [studentUser, setStudentUser] = useState<any>(null);
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [editingProfile, setEditingProfile] = useState<any>(null);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [studentSchedules, setStudentSchedules] = useState<any[]>([]);
+
   const [isAppUser, setIsAppUser] = useState(false);
   const [isPremiumUser, setIsPremiumUser] = useState(false);
   const [avatar, setAvatar] = useState<Avatar | null>(null);
@@ -155,7 +188,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         .from('schedule_occurrences')
         .select('*, schedule:schedule_id(*), teacher:users!schedule_occurrences_teacher_id_fkey(first_name, last_name)')
         .eq('student_id', studentId)
-        .gte('date', new Date().toLocaleDateString('sv-SE'))
+        .gte('date', toLocalYYYYMMDD(new Date()))
         .order('date', { ascending: true })
         .order('start_time', { ascending: true });
       
@@ -185,8 +218,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         schoolYearEnd = new Date(currentYear + 1, 6, 31);
       }
 
-      const startStr = schoolYearStart.toLocaleDateString('sv-SE');
-      const endStr = schoolYearEnd.toLocaleDateString('sv-SE');
+      const startStr = toLocalYYYYMMDD(schoolYearStart);
+      const endStr = toLocalYYYYMMDD(schoolYearEnd);
 
       const { data: occurrences, error: occErr } = await supabase
         .from('schedule_occurrences')
@@ -218,7 +251,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             targetDate.setDate(current.getDate() + diff);
 
             if (targetDate >= schoolYearStart && targetDate <= schoolYearEnd) {
-              const dateStr = targetDate.toLocaleDateString('sv-SE');
+              const yyyy = targetDate.getFullYear();
+              const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
+              const dd = String(targetDate.getDate()).padStart(2, '0');
+              const dateStr = `${yyyy}-${mm}-${dd}`;
+
               const actual = occurrences?.find(occ => 
                 (occ.schedule_id === sch.id || occ.student_id === studentId) && 
                 (occ.original_date === dateStr || (!occ.original_date && occ.date === dateStr))
@@ -415,7 +452,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   };
   
   const [activeTab, setActiveTab] = useState<string>(() => {
-    let initial = parentActiveTab === 'profile' ? 'briefing' : parentActiveTab;
+    let initial = parentActiveTab;
     if (initial === 'mediathek') initial = 'songs';
     if (initial === 'termine' || initial === 'all_appointments') initial = 'events';
     return (initial as any) || 'briefing';
@@ -423,10 +460,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
   useEffect(() => {
     if (parentActiveTab) {
-      let mapped = parentActiveTab === 'profile' ? 'briefing' : parentActiveTab;
+      let mapped = parentActiveTab;
       if (mapped === 'mediathek') mapped = 'songs';
       if (mapped === 'termine' || mapped === 'all_appointments') mapped = 'events';
-      if (['briefing', 'hero', 'songs', 'practice_board', 'campus_cup', 'events'].includes(mapped)) {
+      if (['briefing', 'hero', 'songs', 'practice_board', 'campus_cup', 'events', 'profile'].includes(mapped)) {
         setActiveTab(mapped as any);
       }
     }
@@ -477,6 +514,23 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   useEffect(() => {
     fetchStudentAndAvatar();
   }, [studentId]);
+
+  useEffect(() => {
+    if (activeTab === 'profile' && studentId) {
+      const fetchStudentSchedules = async () => {
+        try {
+          const { data } = await supabase
+            .from('schedules')
+            .select('*, teacher:users!schedules_teacher_id_fkey(first_name, last_name), rooms(name)')
+            .eq('student_id', studentId);
+          if (data) setStudentSchedules(data);
+        } catch (err) {
+          console.error('Error fetching student schedules:', err);
+        }
+      };
+      fetchStudentSchedules();
+    }
+  }, [activeTab, studentId]);
 
   // progress matrix state
   const [progressItems, setProgressItems] = useState<any[]>([]);
@@ -796,6 +850,48 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     }
   };
 
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProfile) return;
+    setSavingProfile(true);
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({
+          first_name: editingProfile.first_name,
+          last_name: editingProfile.last_name,
+          email: editingProfile.email,
+          phone: editingProfile.phone,
+          instrument: editingProfile.instrument
+        })
+        .eq('id', studentId);
+      
+      if (error) throw error;
+      
+      // Update local state
+      setStudentUser((prev: any) => prev ? { ...prev, ...editingProfile } : null);
+      
+      // Call parent update if exists
+      if (onProfileUpdate) {
+        onProfileUpdate({
+          first_name: editingProfile.first_name,
+          last_name: editingProfile.last_name,
+          email: editingProfile.email,
+          phone: editingProfile.phone,
+          instrument: editingProfile.instrument
+        });
+      }
+      
+      setShowEditProfile(false);
+      alert('Profil erfolgreich gespeichert!');
+    } catch (err: any) {
+      console.error('Error updating student profile:', err);
+      alert('Fehler beim Speichern: ' + err.message);
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
   // Gyroscope API Hook for Digital Detox (beta angle)
   useEffect(() => {
     if (!isDetoxActive || detoxCompleted) return;
@@ -887,13 +983,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       // 1. Fetch student user profile with premium state
       const { data: user, error: userErr } = await supabase
         .from('users')
-        .select('id, is_app_user, first_name, school_id, is_premium_user')
+        .select('*, schools(*)')
         .eq('id', studentId)
         .single();
 
       if (userErr) throw userErr;
       if (!user) return;
 
+      setStudentUser(user);
       setIsAppUser(user.is_app_user ?? false);
       setIsPremiumUser(user.is_premium_user ?? false);
 
@@ -2116,58 +2213,98 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 </div>
 
                 {/* Filter Toggle Switch */}
-                <div style={{ display: 'flex', background: 'rgba(120, 120, 128, 0.08)', padding: '3px', borderRadius: '9px', width: 'fit-content', gap: '2px', margin: '0 0 8px 0' }}>
+                <div style={{
+                  position: 'relative',
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 110px)',
+                  background: 'rgba(255, 255, 255, 0.45)',
+                  backdropFilter: 'blur(20px) saturate(190%)',
+                  border: '1px solid rgba(255, 255, 255, 0.5)',
+                  padding: '4px',
+                  borderRadius: '16px',
+                  width: 'fit-content',
+                  boxShadow: '0 4px 24px rgba(0, 0, 0, 0.03), inset 0 1px 2px rgba(255, 255, 255, 0.5)',
+                  margin: '0 0 12px 0',
+                  isolation: 'isolate'
+                }}>
+                  {/* Sliding liquid glass indicator pill */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '4px',
+                    bottom: '4px',
+                    left: appointmentFilter === 'upcoming' ? '4px' : appointmentFilter === 'past' ? '118px' : '232px',
+                    width: '110px',
+                    background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.75) 100%)',
+                    border: '0.5px solid rgba(0, 0, 0, 0.05)',
+                    borderRadius: '12px',
+                    boxShadow: '0 3px 10px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
+                    transition: 'left 0.38s cubic-bezier(0.25, 1, 0.5, 1)',
+                    zIndex: 1
+                  }} />
+
                   <button
                     onClick={() => setAppointmentFilter('upcoming')}
                     style={{
+                      position: 'relative',
                       border: 'none',
-                      background: appointmentFilter === 'upcoming' ? 'white' : 'transparent',
-                      color: appointmentFilter === 'upcoming' ? '#1d1d1f' : '#86868b',
-                      padding: '5px 12px',
-                      borderRadius: '7px',
-                      fontWeight: 600,
-                      fontSize: '0.74rem',
+                      background: 'transparent',
+                      color: appointmentFilter === 'upcoming' ? '#1d1d1f' : '#475569',
+                      padding: '8px 0',
+                      borderRadius: '12px',
+                      fontWeight: 800,
+                      fontSize: '0.78rem',
                       cursor: 'pointer',
-                      boxShadow: appointmentFilter === 'upcoming' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                      transition: 'all 0.2s',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+                      transition: 'color 0.25s ease, transform 0.1s ease',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+                      zIndex: 2,
+                      textAlign: 'center'
                     }}
+                    onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.96)'; }}
+                    onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
                   >
                     Kommende
                   </button>
                   <button
                     onClick={() => setAppointmentFilter('past')}
                     style={{
+                      position: 'relative',
                       border: 'none',
-                      background: appointmentFilter === 'past' ? 'white' : 'transparent',
-                      color: appointmentFilter === 'past' ? '#1d1d1f' : '#86868b',
-                      padding: '5px 12px',
-                      borderRadius: '7px',
-                      fontWeight: 600,
-                      fontSize: '0.74rem',
+                      background: 'transparent',
+                      color: appointmentFilter === 'past' ? '#1d1d1f' : '#475569',
+                      padding: '8px 0',
+                      borderRadius: '12px',
+                      fontWeight: 800,
+                      fontSize: '0.78rem',
                       cursor: 'pointer',
-                      boxShadow: appointmentFilter === 'past' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                      transition: 'all 0.2s',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+                      transition: 'color 0.25s ease, transform 0.1s ease',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+                      zIndex: 2,
+                      textAlign: 'center'
                     }}
+                    onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.96)'; }}
+                    onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
                   >
                     Vergangene
                   </button>
                   <button
                     onClick={() => setAppointmentFilter('all')}
                     style={{
+                      position: 'relative',
                       border: 'none',
-                      background: appointmentFilter === 'all' ? 'white' : 'transparent',
-                      color: appointmentFilter === 'all' ? '#1d1d1f' : '#86868b',
-                      padding: '5px 12px',
-                      borderRadius: '7px',
-                      fontWeight: 600,
-                      fontSize: '0.74rem',
+                      background: 'transparent',
+                      color: appointmentFilter === 'all' ? '#1d1d1f' : '#475569',
+                      padding: '8px 0',
+                      borderRadius: '12px',
+                      fontWeight: 800,
+                      fontSize: '0.78rem',
                       cursor: 'pointer',
-                      boxShadow: appointmentFilter === 'all' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                      transition: 'all 0.2s',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+                      transition: 'color 0.25s ease, transform 0.1s ease',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+                      zIndex: 2,
+                      textAlign: 'center'
                     }}
+                    onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.96)'; }}
+                    onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
                   >
                     Alle
                   </button>
@@ -2183,7 +2320,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 (() => {
                   const filteredOccurrences = schoolYearOccurrences.filter(occ => {
                     const isPast = (() => {
-                      const todayStr = new Date().toLocaleDateString('sv-SE');
+                      const todayStr = toLocalYYYYMMDD(new Date());
                       if (occ.date < todayStr) return true;
                       if (occ.date > todayStr) return false;
                       const nowTimeStr = new Date().toTimeString().substring(0, 8);
@@ -2237,17 +2374,21 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     return (
                       <div key={monthKey} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         <h3 style={{ 
-                          fontSize: '0.95rem', 
-                          fontWeight: 855, 
-                          color: '#0b57d0', 
-                          margin: '16px 0 4px 0', 
-                          borderBottom: '2px solid rgba(11, 87, 208, 0.08)', 
-                          paddingBottom: '6px',
+                          fontSize: '0.8rem', 
+                          fontWeight: 800, 
+                          color: '#1d1d1f', 
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.06em',
+                          margin: '20px 0 6px 0', 
+                          borderBottom: '1px solid rgba(0, 0, 0, 0.08)', 
+                          paddingBottom: '8px',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '6px'
+                          gap: '8px',
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
                         }}>
-                          <span>📅</span> {monthName}
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#0071e3', display: 'inline-block' }} />
+                          {monthName}
                         </h3>
                         
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -2255,7 +2396,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             const d = new Date(occ.date);
                             const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'teacher_sick' || occ.status === 'cancelled';
                             const isPast = (() => {
-                              const todayStr = new Date().toLocaleDateString('sv-SE');
+                              const todayStr = toLocalYYYYMMDD(new Date());
                               if (occ.date < todayStr) return true;
                               if (occ.date > todayStr) return false;
                               const nowTimeStr = new Date().toTimeString().substring(0, 8);
@@ -2315,9 +2456,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                   <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
-                                    <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>
-                                      • {occ.is_virtual ? 'Regulär' : 'Spezifisch'}
-                                    </span>
+                                    {!occ.is_virtual && (
+                                      <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>
+                                        • Spezifisch
+                                      </span>
+                                    )}
                                   </div>
                                   <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
                                     <span>⏱️ {occ.start_time?.substring(0,5)} Uhr</span>
@@ -2998,6 +3141,397 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {activeTab === 'profile' && studentUser && (
+        <div className="animation-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '28px', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
+          {/* Header Card with Premium Glassmorphism */}
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.45) 100%)',
+            backdropFilter: 'blur(24px) saturate(1.8)',
+            WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
+            border: '1px solid rgba(255, 255, 255, 0.5)',
+            borderRadius: '32px',
+            boxShadow: '0 12px 40px rgba(52, 168, 83, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+            display: 'flex',
+            overflow: 'visible',
+            position: 'relative',
+            minHeight: '240px',
+            alignItems: 'center',
+            padding: '32px 48px',
+            gap: '32px',
+            flexWrap: 'wrap'
+          }}>
+            {/* Floating Shielded Avatar Frame */}
+            <div style={{
+              width: '128px',
+              height: '128px',
+              borderRadius: '50%',
+              border: '5px solid #ffffff',
+              boxShadow: '0 12px 32px rgba(52, 168, 83, 0.12)',
+              background: '#ffffff',
+              flexShrink: 0,
+              overflow: 'hidden',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'relative',
+              zIndex: 2,
+              transform: 'translateY(-10px)'
+            }}>
+              <img 
+                src={getInstrumentAvatarUrl(studentUser.instrument)} 
+                alt="" 
+                style={{ width: '95%', height: '95%', objectFit: 'contain' }} 
+              />
+            </div>
+
+            {/* Profile Identity Details */}
+            <div style={{ flex: 1, minWidth: '280px' }}>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
+                <span style={{
+                  background: 'linear-gradient(135deg, #34a853 0%, #1b8035 100%)',
+                  color: 'white', 
+                  padding: '4px 14px', 
+                  borderRadius: '10px',
+                  fontSize: '0.7rem', 
+                  fontWeight: 900, 
+                  textTransform: 'uppercase', 
+                  letterSpacing: '0.08em',
+                  boxShadow: '0 4px 10px rgba(52, 168, 83, 0.2)'
+                }}>
+                  Campus Schüler
+                </span>
+                <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 750 }}>
+                  🏢 {studentUser.schools?.name || 'Groovelab Campus'}
+                </span>
+                <span style={{ color: '#94a3b8', fontSize: '0.85rem', fontWeight: 500 }}>
+                  • Mitglied seit {new Date(studentUser.created_at).toLocaleDateString('de-DE')}
+                </span>
+              </div>
+
+              <h1 style={{ fontSize: '2.8rem', fontWeight: 950, color: '#0f172a', margin: '0 0 12px 0', letterSpacing: '-0.03em', fontFamily: "'Urbanist', sans-serif" }}>
+                {studentUser.first_name} {studentUser.last_name || ''}
+              </h1>
+
+              {/* Active Instruments Badge List */}
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {(studentUser.instrument || '').split(',').map((inst: string) => inst.trim()).filter(Boolean).map((inst: string) => (
+                  <div key={inst} style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: 'rgba(52, 168, 83, 0.05)',
+                    border: '1px solid rgba(52, 168, 83, 0.12)',
+                    color: '#34a853',
+                    padding: '4px 12px',
+                    borderRadius: '12px',
+                    fontSize: '0.78rem',
+                    fontWeight: 800
+                  }}>
+                    <span>🎸</span>
+                    <span>{inst}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Profile Edit Action Button */}
+            <button 
+              onClick={() => {
+                setEditingProfile({ ...studentUser });
+                setShowEditProfile(true);
+              }} 
+              style={{ 
+                background: '#ffffff', 
+                border: '1px solid rgba(0,0,0,0.06)', 
+                boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+                color: '#0f172a', 
+                fontSize: '0.85rem', 
+                fontWeight: 800, 
+                cursor: 'pointer', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px', 
+                padding: '12px 20px',
+                borderRadius: '16px',
+                transition: 'all 0.2s',
+                marginLeft: 'auto'
+              }}
+              onMouseOver={(e) => { e.currentTarget.style.transform = 'scale(1.03)'; e.currentTarget.style.background = '#f8fafc'; }}
+              onMouseOut={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#ffffff'; }}
+            >
+              <span>Profil bearbeiten</span>
+              <Pencil size={15} />
+            </button>
+          </div>
+
+          {/* Metrics Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
+            {/* Metric 1: XP */}
+            <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.01)' }}>
+              <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: 'rgba(52, 168, 83, 0.08)', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Star size={22} fill="#34a853" />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>Erfahrung (XP)</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Urbanist', sans-serif" }}>
+                  {avatar?.xp || 0} XP
+                </div>
+              </div>
+            </div>
+
+            {/* Metric 2: Übe-Streak */}
+            <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.01)' }}>
+              <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: 'rgba(239, 68, 68, 0.08)', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Flame size={22} fill="#ef4444" color="#ef4444" />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>Übe-Streak</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Urbanist', sans-serif" }}>
+                  {avatar?.streak_flame || 0} Tage
+                </div>
+              </div>
+            </div>
+
+            {/* Metric 3: Focus Month */}
+            <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.01)' }}>
+              <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: 'rgba(16, 185, 129, 0.08)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Clock size={22} />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>Fokus Diesen Monat</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Urbanist', sans-serif" }}>
+                  {monthlyFocusMinutes} Min.
+                </div>
+              </div>
+            </div>
+
+            {/* Metric 4: Weekly Lessons */}
+            <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.01)' }}>
+              <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: 'rgba(59, 130, 246, 0.08)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Calendar size={22} />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>Wochenstunden</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Urbanist', sans-serif" }}>
+                  {studentSchedules.length} {studentSchedules.length === 1 ? 'Fach' : 'Fächer'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Split layout: schedules list & contact info card */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px', alignItems: 'start' }}>
+            {/* Weekly recurring schedules */}
+            <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '32px', padding: '32px', boxShadow: '0 8px 30px rgba(0,0,0,0.01)' }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: '0 0 20px 0', fontFamily: "'Urbanist', sans-serif", display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Calendar size={20} style={{ color: '#34a853' }} />
+                Wöchentlicher Unterrichtsplan
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {studentSchedules.length > 0 ? (
+                  studentSchedules.map((sch) => {
+                    const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+                    return (
+                      <div key={sch.id} style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between', 
+                        padding: '16px 20px', 
+                        background: '#f8fafc', 
+                        borderRadius: '16px', 
+                        border: '1px solid #f1f5f9' 
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ height: '42px', width: '42px', borderRadius: '12px', background: '#ffffff', border: '1px solid rgba(0,0,0,0.04)', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>
+                            {getInstrumentAvatarUrl(sch.instrument).includes('piano') ? '🎹' : getInstrumentAvatarUrl(sch.instrument).includes('drums') ? '🥁' : getInstrumentAvatarUrl(sch.instrument).includes('vocals') ? '🎤' : '🎸'}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 850, color: '#0f172a', fontSize: '0.9rem' }}>
+                              {DAYS_DE[sch.day_of_week]}s, {sch.time_slot} Uhr
+                            </div>
+                            <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                              {sch.teacher ? `Coach: ${sch.teacher.first_name} ${sch.teacher.last_name}` : 'Patrick Huber'} • {sch.rooms?.name || 'Raum 1'} ({sch.duration || 45} Min)
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', border: '2px dashed #cbd5e1', borderRadius: '24px' }}>
+                    Keine wöchentlichen Termine hinterlegt.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* General details and contacts */}
+            <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '32px', padding: '32px', boxShadow: '0 8px 30px rgba(0,0,0,0.01)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: '0 0 4px 0', fontFamily: "'Urbanist', sans-serif" }}>
+                Kontaktdaten & Adresse
+              </h3>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <Mail size={16} color="#64748b" />
+                  <div>
+                    <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>E-Mail-Adresse</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>{studentUser.email || 'Nicht hinterlegt'}</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <Phone size={16} color="#64748b" />
+                  <div>
+                    <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Telefonnummer</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>{studentUser.phone || 'Nicht hinterlegt'}</div>
+                  </div>
+                </div>
+
+                {studentUser.parent_email && (
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <User size={16} color="#64748b" />
+                    <div>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Eltern E-Mail</div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>{studentUser.parent_email}</div>
+                    </div>
+                  </div>
+                )}
+
+                {(studentUser.street || studentUser.city) && (
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <MapPin size={16} color="#64748b" />
+                    <div>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Adresse</div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>
+                        {studentUser.street ? `${studentUser.street}, ` : ''}{studentUser.zip_code || ''} {studentUser.city || ''}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Profile Edit Overlay Modal */}
+          {showEditProfile && editingProfile && (
+            <div style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(15, 23, 42, 0.3)',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              zIndex: 11000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '20px'
+            }}>
+              <form onSubmit={handleSaveProfile} style={{
+                background: 'white',
+                border: '1px solid rgba(255,255,255,0.8)',
+                borderRadius: '32px',
+                boxShadow: '0 20px 50px rgba(15, 23, 42, 0.15)',
+                width: '100%',
+                maxWidth: '540px',
+                padding: '36px',
+                boxSizing: 'border-box',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '20px',
+                position: 'relative'
+              }}>
+                <button 
+                  type="button"
+                  onClick={() => setShowEditProfile(false)}
+                  style={{ position: 'absolute', top: '24px', right: '24px', background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}
+                >
+                  <X size={16} />
+                </button>
+
+                <h3 style={{ fontSize: '1.5rem', fontWeight: 950, color: '#0f172a', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
+                  Profil bearbeiten
+                </h3>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Vorname</label>
+                      <input 
+                        type="text" 
+                        required
+                        value={editingProfile.first_name || ''} 
+                        onChange={(e) => setEditingProfile((prev: any) => ({ ...prev, first_name: e.target.value }))}
+                        style={{ width: '100%', padding: '12px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '0.88rem', outline: 'none', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Nachname</label>
+                      <input 
+                        type="text" 
+                        required
+                        value={editingProfile.last_name || ''} 
+                        onChange={(e) => setEditingProfile((prev: any) => ({ ...prev, last_name: e.target.value }))}
+                        style={{ width: '100%', padding: '12px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '0.88rem', outline: 'none', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>E-Mail-Adresse</label>
+                    <input 
+                      type="email" 
+                      required
+                      value={editingProfile.email || ''} 
+                      onChange={(e) => setEditingProfile((prev: any) => ({ ...prev, email: e.target.value }))}
+                      style={{ width: '100%', padding: '12px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '0.88rem', outline: 'none', boxSizing: 'border-box' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Telefonnummer</label>
+                    <input 
+                      type="text" 
+                      value={editingProfile.phone || ''} 
+                      onChange={(e) => setEditingProfile((prev: any) => ({ ...prev, phone: e.target.value }))}
+                      style={{ width: '100%', padding: '12px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '0.88rem', outline: 'none', boxSizing: 'border-box' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Instrumente (durch Komma getrennt)</label>
+                    <input 
+                      type="text" 
+                      value={editingProfile.instrument || ''} 
+                      onChange={(e) => setEditingProfile((prev: any) => ({ ...prev, instrument: e.target.value }))}
+                      placeholder="z.B. Gitarre, Schlagzeug"
+                      style={{ width: '100%', padding: '12px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '0.88rem', outline: 'none', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+                  <button 
+                    type="button" 
+                    onClick={() => setShowEditProfile(false)}
+                    style={{ flex: 1, padding: '14px', borderRadius: '16px', border: '1px solid #e2e8f0', background: 'white', color: '#0f172a', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer' }}
+                  >
+                    Abbrechen
+                  </button>
+                  <button 
+                    type="submit" 
+                    disabled={savingProfile}
+                    style={{ flex: 2, padding: '14px', borderRadius: '16px', border: 'none', background: 'linear-gradient(135deg, #34a853 0%, #1b8035 100%)', color: 'white', fontWeight: 900, fontSize: '0.85rem', cursor: 'pointer', boxShadow: '0 8px 24px rgba(52, 168, 83, 0.15)' }}
+                  >
+                    {savingProfile ? 'Wird gespeichert...' : 'Änderungen speichern'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
         </div>
       )}
 

@@ -431,6 +431,8 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
               date: change.date,
               start_time: change.start_time,
               status: change.status,
+              original_date: change.original_date,
+              original_start_time: change.original_start_time,
               student_acknowledged: false
             })
             .eq('id', change.id);

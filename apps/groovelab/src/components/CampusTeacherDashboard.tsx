@@ -140,6 +140,11 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
         setSchool(tData.schools);
         setStartAnchor(tData.start_anchor || '13:00');
         setBreakTimes(tData.break_times || []);
+        if (tData.sick_until) {
+          setSickUntilDate(tData.sick_until.substring(0, 10));
+        } else {
+          setSickUntilDate('');
+        }
 
         // Load Setup and dependent lists
         await refreshAllData(tData.school_id, tData.id);
@@ -522,56 +527,172 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
       alert('Bitte wähle ein Datum aus.');
       return;
     }
-    const pin = prompt('Gebe deinen 4-stelligen Lehrer-PIN (ausweis_nummer) ein:');
-    if (!pin) return;
+
+    const confirmMsg = teacher?.sick_until
+      ? `Möchtest du deine Krankmeldung wirklich auf den ${new Date(sickUntilDate).toLocaleDateString('de-DE')} anpassen?`
+      : `Möchtest du dich wirklich bis zum ${new Date(sickUntilDate).toLocaleDateString('de-DE')} krankmelden?`;
+
+    if (!confirm(confirmMsg)) return;
 
     try {
       setReportingSick(true);
-      const resp = await fetch('/api/teacher/sick', {
+
+      // Try calling API first
+      const resp = await fetch('/api/teacher/report-sick', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teacherId: userId, pin, sickUntilDate })
+        body: JSON.stringify({ teacherId: userId, sickUntilDate })
       });
 
       if (resp.ok) {
-        alert('Krankheitsmeldung erfolgreich registriert. Verwaltungsalarm wurde ausgelöst.');
-        await refreshAllData(teacher.school_id, teacher.id);
+        alert('Krankheitsmeldung erfolgreich aktualisiert.');
       } else {
-        // Fallback updates
-        const { data: profile } = await supabase
+        // Direct Client-Side Supabase fallback
+        const { data: profile, error: profileErr } = await supabase
           .from('users')
-          .select('ausweis_nummer, school_id')
+          .select('school_id, first_name, last_name, sick_until')
           .eq('id', userId)
           .single();
 
-        if (!profile || profile.ausweis_nummer !== pin) {
-          alert('Ungültiger PIN.');
-          return;
+        if (profileErr || !profile) {
+          throw new Error('Teacher profile not found.');
         }
 
-        const rawDay = new Date().getDay();
-        const todayWeekday = rawDay === 0 ? 7 : rawDay;
+        const prevSickUntilStr = profile.sick_until;
 
-        // Set schedules to sick
-        await supabase
+        // 1. Update user table
+        const { error: userErr } = await supabase
+          .from('users')
+          .update({ sick_until: sickUntilDate })
+          .eq('id', userId);
+
+        if (userErr) throw userErr;
+
+        // 2. Fetch weekly schedules
+        const { data: schedules, error: schedError } = await supabase
           .from('schedules')
-          .update({ status: 'teacher_sick' })
-          .eq('teacher_id', userId)
-          .eq('day_of_week', todayWeekday);
+          .select('*')
+          .eq('teacher_id', userId);
 
-        // Notify secretary
+        if (schedError) throw schedError;
+
+        const now = new Date();
+        const todayStart = new Date(now);
+        todayStart.setHours(0, 0, 0, 0);
+
+        const sickUntil = new Date(sickUntilDate);
+        const maxDate = new Date(now);
+        maxDate.setDate(maxDate.getDate() + 30); // 30 days window
+
+        const currentDate = new Date(todayStart);
+        const notificationsToInsert: any[] = [];
+        const scheduleIdsToCancel = new Set<string>();
+        const scheduleIdsToRestore = new Set<string>();
+        const datesToDeleteNotifs: string[] = [];
+
+        // Fetch existing crisis notifications
+        const { data: existingNotifs } = await supabase
+          .from('crisis_notifications')
+          .select('slot_start_datetime, student_id')
+          .eq('teacher_id', userId);
+
+        const existingNotifsSet = new Set(
+          (existingNotifs || []).map(n => `${new Date(n.slot_start_datetime).toISOString()}-${n.student_id}`)
+        );
+
+        while (currentDate <= maxDate) {
+          const rawDay = currentDate.getDay();
+          const currentDayOfWeek = rawDay === 0 ? 7 : rawDay;
+          const daySchedules = (schedules || []).filter(s => s.day_of_week === currentDayOfWeek);
+
+          daySchedules.forEach(sched => {
+            const [hours, minutes] = (sched.time_slot || '00:00').split(':').map(Number);
+            const startDateTime = new Date(currentDate);
+            startDateTime.setHours(hours, minutes, 0, 0);
+
+            if (startDateTime >= now) {
+              const isCurrentlySick = startDateTime <= new Date(sickUntil.getTime() + 24 * 60 * 60 * 1000 - 1);
+              
+              if (isCurrentlySick) {
+                scheduleIdsToCancel.add(sched.id);
+                const notifKey = `${startDateTime.toISOString()}-${sched.student_id}`;
+                if (!existingNotifsSet.has(notifKey)) {
+                  notificationsToInsert.push({
+                    teacher_id: userId,
+                    student_id: sched.student_id,
+                    slot_start_datetime: startDateTime.toISOString(),
+                    status: 'UNREAD'
+                  });
+                }
+              } else {
+                scheduleIdsToRestore.add(sched.id);
+                datesToDeleteNotifs.push(startDateTime.toISOString());
+              }
+            }
+          });
+
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        // Apply schedule cancellations
+        if (scheduleIdsToCancel.size > 0) {
+          await supabase
+            .from('schedules')
+            .update({ status: 'canceled_by_teacher_sick' })
+            .in('id', Array.from(scheduleIdsToCancel));
+        }
+
+        // Restore active schedules
+        if (scheduleIdsToRestore.size > 0) {
+          await supabase
+            .from('schedules')
+            .update({ status: 'approved' })
+            .in('id', Array.from(scheduleIdsToRestore))
+            .eq('status', 'canceled_by_teacher_sick');
+        }
+
+        // Insert new crisis notifications
+        if (notificationsToInsert.length > 0) {
+          await supabase
+            .from('crisis_notifications')
+            .insert(notificationsToInsert);
+        }
+
+        // Delete future crisis notifications
+        if (datesToDeleteNotifs.length > 0) {
+          await supabase
+            .from('crisis_notifications')
+            .delete()
+            .eq('teacher_id', userId)
+            .in('slot_start_datetime', datesToDeleteNotifs);
+        }
+
+        // Add Secretary alarm ticket
+        const alertMessage = prevSickUntilStr
+          ? `🚨 KRANKHEITS-ANPASSUNG: Lehrkraft ${profile.first_name} ${profile.last_name} hat den Krankmeldungszeitraum auf den ${new Date(sickUntilDate).toLocaleDateString('de-DE')} geändert.`
+          : `🚨 NEUE KRANKMELDUNG: Lehrkraft ${profile.first_name} ${profile.last_name} hat sich bis zum ${new Date(sickUntilDate).toLocaleDateString('de-DE')} krankgemeldet.`;
+
         await supabase
           .from('system_alerts')
           .insert({
             school_id: profile.school_id,
             teacher_id: userId,
             type: 'Teacher Illness Alert',
-            message: `Krankheitsmeldung: Lehrer Patrick (${teacher.first_name}) hat sich bis zum ${sickUntilDate} krankgemeldet.`
+            message: alertMessage,
+            resolved: false
           });
 
-        alert('Krankheitsmeldung registriert! Stunden storniert.');
-        await refreshAllData(teacher.school_id, teacher.id);
+        alert('Krankheitsmeldung registriert! Stundenplandaten wurden angepasst und Krisenmodus-Meldung wurde gesendet.');
       }
+
+      // Reload teacher profile and refresh data
+      const { data: updatedTeacher } = await supabase
+        .from('users')
+        .select('*, schools(*)')
+        .eq('id', userId)
+        .single();
+      setTeacher(updatedTeacher);
+      await refreshAllData(updatedTeacher.school_id, updatedTeacher.id);
     } catch (err) {
       console.error(err);
       alert('Fehler bei der Krankheitsmeldung.');
@@ -579,6 +700,132 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
       setReportingSick(false);
     }
   };
+
+  const handleEndSick = async () => {
+    if (!confirm('Möchtest du dich wirklich wieder gesundmelden? Alle zukünftigen Krankheitsausfälle werden wieder aktiviert.')) return;
+
+    try {
+      setReportingSick(true);
+
+      // Try calling API first with empty date to end sickness
+      const resp = await fetch('/api/teacher/report-sick', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teacherId: userId, sickUntilDate: null })
+      });
+
+      if (resp.ok) {
+        alert('Gesundmeldung erfolgreich registriert.');
+      } else {
+        // Direct Client-Side Supabase fallback
+        const { data: profile, error: profileErr } = await supabase
+          .from('users')
+          .select('school_id, first_name, last_name')
+          .eq('id', userId)
+          .single();
+
+        if (profileErr || !profile) {
+          throw new Error('Teacher profile not found.');
+        }
+
+        // 1. Clear user sick_until column
+        const { error: userErr } = await supabase
+          .from('users')
+          .update({ sick_until: null })
+          .eq('id', userId);
+
+        if (userErr) throw userErr;
+
+        // 2. Fetch weekly schedules
+        const { data: schedules, error: schedError } = await supabase
+          .from('schedules')
+          .select('*')
+          .eq('teacher_id', userId);
+
+        if (schedError) throw schedError;
+
+        const now = new Date();
+        const todayStart = new Date(now);
+        todayStart.setHours(0, 0, 0, 0);
+
+        const maxDate = new Date(now);
+        maxDate.setDate(maxDate.getDate() + 30); // 30 days window
+
+        const currentDate = new Date(todayStart);
+        const scheduleIdsToRestore = new Set<string>();
+        const datesToDeleteNotifs: string[] = [];
+
+        while (currentDate <= maxDate) {
+          const rawDay = currentDate.getDay();
+          const currentDayOfWeek = rawDay === 0 ? 7 : rawDay;
+          const daySchedules = (schedules || []).filter(s => s.day_of_week === currentDayOfWeek);
+
+          daySchedules.forEach(sched => {
+            const [hours, minutes] = (sched.time_slot || '00:00').split(':').map(Number);
+            const startDateTime = new Date(currentDate);
+            startDateTime.setHours(hours, minutes, 0, 0);
+
+            if (startDateTime >= now) {
+              scheduleIdsToRestore.add(sched.id);
+              datesToDeleteNotifs.push(startDateTime.toISOString());
+            }
+          });
+
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        // Restore active schedules
+        if (scheduleIdsToRestore.size > 0) {
+          await supabase
+            .from('schedules')
+            .update({ status: 'approved' })
+            .in('id', Array.from(scheduleIdsToRestore))
+            .eq('status', 'canceled_by_teacher_sick');
+        }
+
+        // Delete future crisis notifications
+        if (datesToDeleteNotifs.length > 0) {
+          await supabase
+            .from('crisis_notifications')
+            .delete()
+            .eq('teacher_id', userId)
+            .in('slot_start_datetime', datesToDeleteNotifs);
+        }
+
+        // Add Secretary alarm ticket
+        const alertMessage = `🟢 GESUNDMELDUNG: Lehrkraft ${profile.first_name} ${profile.last_name} hat sich wieder gesundgemeldet. Alle zukünftigen Ausfälle wurden storniert.`;
+
+        await supabase
+          .from('system_alerts')
+          .insert({
+            school_id: profile.school_id,
+            teacher_id: userId,
+            type: 'Teacher Illness Alert',
+            message: alertMessage,
+            resolved: false
+          });
+
+        alert('Erfolgreich gesundgemeldet! Zukünftige Stunden wurden wieder aktiviert.');
+      }
+
+      setSickUntilDate('');
+
+      // Reload teacher profile and refresh data
+      const { data: updatedTeacher } = await supabase
+        .from('users')
+        .select('*, schools(*)')
+        .eq('id', userId)
+        .single();
+      setTeacher(updatedTeacher);
+      await refreshAllData(updatedTeacher.school_id, updatedTeacher.id);
+    } catch (err) {
+      console.error(err);
+      alert('Fehler bei der Gesundmeldung.');
+    } finally {
+      setReportingSick(false);
+    }
+  };
+
 
   // Board 5: Save Setup
   const handleSaveSetup = async () => {
@@ -1244,20 +1491,45 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
           <div className="p-8 max-w-lg w-full mx-auto space-y-6">
             <div className="bg-red-950/10 border border-red-900/35 rounded-3xl p-8 space-y-6">
               <div className="flex items-center gap-4 text-red-400">
-                <AlertTriangle size={36} />
+                <AlertTriangle size={36} className={teacher?.sick_until ? 'animate-pulse' : ''} />
                 <div>
                   <h1 className="text-2xl font-black text-white">Krankheits-Bypass</h1>
                   <p className="text-xs font-bold uppercase tracking-wider text-red-400/90 mt-0.5">Notfall-Bypass-Schalter</p>
                 </div>
               </div>
 
-              <p className="text-sm text-slate-300 font-medium leading-relaxed">
-                Falls du dich krankmelden musst, wähle bitte das voraussichtliche Enddatum aus. Alle heute betroffenen Stundenplandaten werden automatisch storniert und als Krankheitsausfall rot markiert. Zudem wird ein Alarmticket an das Krisen-Dashboard der Verwaltung gesendet.
-              </p>
+              {teacher?.sick_until ? (
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1.5px solid #ef4444',
+                  borderRadius: '16px',
+                  padding: '16px',
+                  color: '#fca5a5',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#f87171', fontWeight: 800, textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.1em' }}>
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></span> status: AKTIV KRANKGEMELDET
+                  </div>
+                  Du bist aktuell krankgemeldet bis einschließlich:
+                  <strong className="text-white text-lg font-bold">
+                    {new Date(teacher.sick_until).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
+                  </strong>
+                </div>
+              ) : (
+                <p className="text-sm text-slate-300 font-medium leading-relaxed">
+                  Falls du dich krankmelden musst, wähle bitte das voraussichtliche Enddatum aus. Alle heute betroffenen Stundenplandaten werden automatisch storniert und als Krankheitsausfall rot markiert. Zudem wird ein Alarmticket an das Krisen-Dashboard der Verwaltung gesendet.
+                </p>
+              )}
 
               <div className="space-y-4 pt-2">
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400">Krank bis einschließlich:</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                    {teacher?.sick_until ? 'Krankmeldung anpassen (bis einschließlich):' : 'Krank bis einschließlich:'}
+                  </label>
                   <input
                     type="date"
                     value={sickUntilDate}
@@ -1266,13 +1538,25 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                   />
                 </div>
 
-                <button
-                  onClick={handleReportSick}
-                  disabled={reportingSick}
-                  className="w-full py-4 bg-red-600 hover:bg-red-500 disabled:bg-red-800 text-white font-black text-sm uppercase tracking-widest rounded-xl transition duration-200 shadow-lg shadow-red-900/35"
-                >
-                  {reportingSick ? 'Melde Krank...' : 'Krankheit offiziell melden'}
-                </button>
+                <div className="flex flex-col gap-3">
+                  <button
+                    onClick={handleReportSick}
+                    disabled={reportingSick}
+                    className="w-full py-4 bg-red-600 hover:bg-red-500 disabled:bg-red-800 text-white font-black text-sm uppercase tracking-widest rounded-xl transition duration-200 shadow-lg shadow-red-900/35"
+                  >
+                    {reportingSick ? 'Aktualisiere...' : teacher?.sick_until ? 'Krankmeldungszeitraum anpassen' : 'Krankheit offiziell melden'}
+                  </button>
+
+                  {teacher?.sick_until && (
+                    <button
+                      onClick={handleEndSick}
+                      disabled={reportingSick}
+                      className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 text-white font-black text-sm uppercase tracking-widest rounded-xl transition duration-200 shadow-lg shadow-emerald-900/20"
+                    >
+                      {reportingSick ? 'Gesundmelden...' : 'Krankmeldung beenden (Wieder gesund)'}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>

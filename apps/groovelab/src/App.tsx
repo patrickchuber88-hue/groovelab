@@ -1639,7 +1639,7 @@ function App() {
     return (localStorage.getItem('groovelab_active_band_subtab') as 'meine' | 'alle') || 'meine';
   });
   
-  const [campusTeacherStats, setCampusTeacherStats] = useState<{ studentCount: number, totalMinutes: number, teachingDays: string[], primaryRoom: string } | null>(null);
+  const [campusTeacherStats, setCampusTeacherStats] = useState<{ studentCount: number, totalMinutes: number, teachingDays: string[], primaryRoom: string, schedules: any[] } | null>(null);
 
   useEffect(() => {
     if (activeStudentTab === 'profile' && activePlatform === 'campus' && user && (user.role === 'teacher' || user.role === 'admin')) {
@@ -1680,7 +1680,8 @@ function App() {
               studentCount: uniqueStudents.size,
               totalMinutes: totalMins,
               teachingDays: uniqueDays,
-              primaryRoom: primary
+              primaryRoom: primary,
+              schedules: scheds
             });
           }
         } catch (err) {
@@ -6201,8 +6202,10 @@ function App() {
                     </div>
                     <div>
                       <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>Präsenztage</div>
-                      <div style={{ fontSize: '1.15rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Urbanist', sans-serif", textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '160px' }}>
-                        {campusTeacherStats && campusTeacherStats.teachingDays.length > 0 ? campusTeacherStats.teachingDays.join(', ') : 'Keine Tage'}
+                      <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Urbanist', sans-serif" }}>
+                        {campusTeacherStats && campusTeacherStats.teachingDays.length > 0 
+                          ? `${campusTeacherStats.teachingDays.length} ${campusTeacherStats.teachingDays.length === 1 ? 'Tag' : 'Tage'}` 
+                          : '0 Tage'}
                       </div>
                     </div>
                   </div>
@@ -6253,7 +6256,41 @@ function App() {
                                     {DAYS_DE[board.dayOfWeek]}s
                                   </div>
                                   <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>
-                                    Geplanter Beginn: {board.startAnchor} Uhr
+                                    {(() => {
+                                    const timeToMinutes = (timeStr: string) => {
+                                      const [h, m] = timeStr.split(':').map(Number);
+                                      return h * 60 + m;
+                                    };
+                                    const minutesToTime = (mins: number) => {
+                                      const h = Math.floor(mins / 60);
+                                      const m = mins % 60;
+                                      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                                    };
+                                    
+                                    const daySchedules = (campusTeacherStats?.schedules || []).filter(s => s.day_of_week === board.dayOfWeek);
+                                    let startStr = board.startAnchor || '14:00';
+                                    let endStr = '';
+
+                                    if (daySchedules.length > 0) {
+                                      let minStart = Infinity;
+                                      let maxEnd = -Infinity;
+                                      daySchedules.forEach(s => {
+                                        if (s.time_slot) {
+                                          const startMins = timeToMinutes(s.time_slot);
+                                          const endMins = startMins + (s.duration || 30);
+                                          if (startMins < minStart) minStart = startMins;
+                                          if (endMins > maxEnd) maxEnd = endMins;
+                                        }
+                                      });
+                                      if (minStart !== Infinity) startStr = minutesToTime(minStart);
+                                      if (maxEnd !== -Infinity) endStr = minutesToTime(maxEnd);
+                                    } else {
+                                      const startMins = timeToMinutes(startStr);
+                                      endStr = minutesToTime(startMins + 180);
+                                    }
+
+                                    return <>Geplanter Unterricht: {startStr} bis {endStr} Uhr</>;
+                                  })()}
                                   </div>
                                 </div>
                               </div>
@@ -6317,7 +6354,7 @@ function App() {
                     <span style={{ opacity: 0.5 }}>•</span>
                     <span onClick={() => setShowImpressum(true)} style={{ cursor: 'pointer' }}>Impressum</span>
                   </div>
-                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>GrooveLab App © {new Date().getFullYear()}</span>
+                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>Campus App © {new Date().getFullYear()}</span>
                 </div>
               </div>
             ) : (
@@ -7322,7 +7359,7 @@ function App() {
                         <span style={{ opacity: 0.5 }}>•</span>
                         <span onClick={() => setShowImpressum(true)} style={{ cursor: 'pointer' }}>Impressum</span>
                       </div>
-                      <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>GrooveLab App © {new Date().getFullYear()}</span>
+                      <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>{activePlatform === 'campus' ? 'Campus App' : 'GrooveLab App'} © {new Date().getFullYear()}</span>
                     </div>
                   </div>
                 </>
