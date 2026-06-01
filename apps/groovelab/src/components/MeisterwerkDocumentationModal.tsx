@@ -1427,15 +1427,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         padding: useNotebookLayout ? '6px' : '0',
         position: 'relative'
       }} className="animation-slide-up">
-        {/* Header - Apple-style Translucent/White Header (Flat Sand Design in Notebook Layout) */}
+        {/* Header - Apple-style Translucent/White Header (Flat Sage Green Design in Notebook Layout) */}
         <div style={{
           padding: '18px 24px',
           background: useNotebookLayout 
-            ? '#dfd5c6' 
+            ? '#cbd5c6' 
             : 'rgba(255, 255, 255, 0.72)',
           backdropFilter: useNotebookLayout ? 'none' : 'blur(20px) saturate(190%)',
           borderBottom: useNotebookLayout 
-            ? '2px solid #bdae9c' 
+            ? '2px solid #a3b2a2' 
             : '1px solid rgba(0, 0, 0, 0.06)',
           borderRadius: useNotebookLayout ? '24px 24px 0 0' : '0',
           display: 'flex',
@@ -1465,7 +1465,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ 
                   fontSize: '0.62rem', 
-                  color: useNotebookLayout ? '#786e64' : '#8e8e93', 
+                  color: useNotebookLayout ? '#5f6d5e' : '#8e8e93', 
                   fontWeight: 700, 
                   textTransform: 'uppercase', 
                   letterSpacing: '0.08em' 
@@ -1483,7 +1483,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               }}>
                 Schüler-Protokoll
               </h2>
-              <p style={{ fontSize: '0.78rem', color: useNotebookLayout ? '#786e64' : '#86868b', margin: '1px 0 0 0', fontWeight: 500 }}>
+              <p style={{ fontSize: '0.78rem', color: useNotebookLayout ? '#5f6d5e' : '#86868b', margin: '1px 0 0 0', fontWeight: 500 }}>
                 Aktive Begleitung für: <strong style={{ color: useNotebookLayout ? '#1c1c1e' : '#1d1d1f', fontWeight: 600 }}>{student.first_name} {student.last_name}</strong>
               </p>
             </div>
@@ -1508,7 +1508,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   border: 'none',
                   color: activeModalTab === 'document' 
                     ? (useNotebookLayout ? '#1c1c1e' : '#1d1d1f') 
-                    : (useNotebookLayout ? '#786e64' : '#86868b'),
+                    : (useNotebookLayout ? '#5f6d5e' : '#86868b'),
                   padding: '6px 14px',
                   borderRadius: '17px',
                   fontSize: '0.76rem',
@@ -1536,7 +1536,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   border: 'none',
                   color: activeModalTab === 'logbook' 
                     ? (useNotebookLayout ? '#1c1c1e' : '#1d1d1f') 
-                    : (useNotebookLayout ? '#786e64' : '#86868b'),
+                    : (useNotebookLayout ? '#5f6d5e' : '#86868b'),
                   padding: '6px 14px',
                   borderRadius: '17px',
                   fontSize: '0.76rem',
@@ -1633,7 +1633,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              color: useNotebookLayout ? '#786e64' : '#86868b',
+              color: useNotebookLayout ? '#5f6d5e' : '#86868b',
               transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
             onMouseEnter={(e) => {
@@ -1642,7 +1642,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.background = useNotebookLayout ? 'rgba(0, 0, 0, 0.06)' : 'rgba(120, 120, 128, 0.08)';
-              e.currentTarget.style.color = useNotebookLayout ? '#786e64' : '#86868b';
+              e.currentTarget.style.color = useNotebookLayout ? '#5f6d5e' : '#86868b';
             }}
             className="hover-scale"
           >
