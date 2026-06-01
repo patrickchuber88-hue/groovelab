@@ -3026,48 +3026,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               )}
             </form>
 
-            {/* Separator to clean visual space */}
-            {(lastHomework || progressItems.filter(item => item.is_current_homework).length > 0 || sessionLogs.length > 0) && (
-              <div style={{ borderTop: '1px solid #e4e4e7', margin: '8px 0' }} />
-            )}
-
-            {/* REFERENCE & HISTORY GROUP (At the bottom, simple, clean, and extremely compact) */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              
-              {/* 1. Vorwochen-Hausaufgabe (Only rendered if exists, extremely compact) */}
-              {lastHomework && (
-                <div style={{
-                  background: '#fffbeb',
-                  border: '1px solid #fef3c7',
-                  padding: '10px 12px',
-                  borderRadius: '12px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '2px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.66rem', color: '#b45309', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      🏠 Letzte Hausaufgabe ({lastHomework.topic_name})
-                    </span>
-                    <span style={{ fontSize: '0.6rem', color: '#d97706', fontWeight: 600 }}>
-                      {lastHomework.updated_at ? new Date(lastHomework.updated_at).toLocaleDateString('de-DE', { day: 'numeric', month: 'short' }) : ''}
-                    </span>
-                  </div>
-                  <div style={{ 
-                    fontSize: '0.74rem', 
-                    color: '#78350f', 
-                    fontWeight: 650, 
-                    fontStyle: 'italic', 
-                    lineHeight: '1.25',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }} title={lastHomework.homework_notes}>
-                    "{lastHomework.homework_notes}"
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         </>
       ) : (
