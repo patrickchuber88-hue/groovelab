@@ -170,6 +170,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [sessionLogs, setSessionLogs] = useState<string[]>([]);
   const [lessonDay, setLessonDay] = useState<number>(1); // Default to Monday = 1
   const [activeModalTab, setActiveModalTab] = useState<'document' | 'logbook'>('document');
+  const [useNotebookLayout, setUseNotebookLayout] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('meisterwerk_notebook_layout');
+      return saved === 'true';
+    }
+    return false;
+  });
+  const [pageUndoStack, setPageUndoStack] = useState<{ lehrwerkId: string, pageNum: number, prevStatus: any }[]>([]);
 
   const getISOWeek = (dateInput?: string | Date): string => {
     return getISOWeekRaw(dateInput, lessonDay);
@@ -327,6 +335,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         item.homework_notes.trim() !== '' && 
         item.updated_at && 
         getISOWeek(item.updated_at) === currentWeek
+      ) || (data || []).find(item => 
+        item.is_current_homework && 
+        item.homework_notes && 
+        item.homework_notes.trim() !== ''
       );
       if (currentWeekHomework) {
         const rawNotes = currentWeekHomework.homework_notes;
@@ -548,21 +560,33 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       setHomeworkNotes('');
 
       const currentWeek = getISOWeek();
+      const combinedHomeworkNotes = JSON.stringify(updatedList);
+
+      // Try to find an active homework row or current week items to update
+      const currentHomeworkItem = progressItems.find(item => item.is_current_homework);
       const currentWeekItems = progressItems.filter(item => 
         item.updated_at && getISOWeek(item.updated_at) === currentWeek
       );
 
-      const combinedHomeworkNotes = JSON.stringify(updatedList);
-
-      if (currentWeekItems.length > 0) {
+      if (currentHomeworkItem) {
+        const { error } = await supabase
+          .from('progress_matrix')
+          .update({ 
+            homework_notes: combinedHomeworkNotes,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', currentHomeworkItem.id);
+        if (error) throw error;
+      } else if (currentWeekItems.length > 0) {
         const itemIds = currentWeekItems.map(item => item.id).filter(Boolean);
-        if (itemIds.length > 0) {
-          const { error } = await supabase
-            .from('progress_matrix')
-            .update({ homework_notes: combinedHomeworkNotes })
-            .in('id', itemIds);
-          if (error) throw error;
-        }
+        const { error } = await supabase
+          .from('progress_matrix')
+          .update({ 
+            homework_notes: combinedHomeworkNotes,
+            updated_at: new Date().toISOString()
+          })
+          .in('id', itemIds);
+        if (error) throw error;
       } else {
         const activeTId = await getCurrentTeacherId();
         const row = {
@@ -590,6 +614,63 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   const handleStatusChange = (newStatus: 'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED') => {
     setStatus(newStatus);
+  };
+
+  const handleRemoveLehrwerk = (lehrwerkId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!confirm("Lehrwerk wirklich entfernen?")) return;
+    try {
+      const stored = localStorage.getItem('student_lehrwerke_progress');
+      const parsed = stored ? JSON.parse(stored) : [];
+      const updated = parsed.filter((item: any) => !(item.studentId === student.id && item.lehrwerkId === lehrwerkId));
+      localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
+      loadLehrwerke();
+      if (activeLehrwerkId === lehrwerkId) {
+        setActiveLehrwerkId(null);
+        setActivePageNumber(null);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleRemoveSong = async (skillId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!confirm("Song wirklich aus den aktiven Projekten entfernen?")) return;
+    try {
+      const { error } = await supabase
+        .from('user_song_skills')
+        .delete()
+        .eq('id', skillId);
+      if (error) throw error;
+      await loadActiveSongSkills();
+      if (selectedActiveSongId === skillId) {
+        setSelectedActiveSongId('');
+      }
+    } catch (err) {
+      console.error('Error removing song skill:', err);
+      setError('Fehler beim Entfernen des Songs.');
+    }
+  };
+
+  const handleUndo = async () => {
+    if (pageUndoStack.length === 0) return;
+    const lastChange = pageUndoStack[pageUndoStack.length - 1];
+    setPageUndoStack(prev => prev.slice(0, -1));
+
+    let targetStatus: 'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED' = 'IN_PROGRESS';
+    let targetHomework = false;
+    
+    if (lastChange.prevStatus.status === 'mastered') {
+      targetStatus = 'MASTERED';
+    } else if (lastChange.prevStatus.status === 'purple') {
+      targetStatus = 'THEORY_DONE';
+    } else if (lastChange.prevStatus.status === 'homework') {
+      targetStatus = 'IN_PROGRESS';
+      targetHomework = true;
+    }
+    
+    await triggerDirectSave(lastChange.lehrwerkId, lastChange.pageNum, targetStatus, targetHomework, true);
   };
 
   // Assign textbook to student inside the modal
@@ -704,7 +785,19 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     });
   }, [progressItems]);
 
-  const triggerDirectSave = async (lehrwerkId: string, pageNum: number, targetStatus: 'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED', targetHomework: boolean) => {
+  const triggerDirectSave = async (
+    lehrwerkId: string, 
+    pageNum: number, 
+    targetStatus: 'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED', 
+    targetHomework: boolean,
+    isUndo = false
+  ) => {
+    if (!isUndo) {
+      const assignedBook = assignedLehrwerke.find(a => a.lehrwerkId === lehrwerkId);
+      const prevPageState = assignedBook?.pageStates?.[pageNum] || { status: 'locked' };
+      setPageUndoStack(prev => [...prev, { lehrwerkId, pageNum, prevStatus: prevPageState }]);
+    }
+
     let pageStatus: 'locked' | 'homework' | 'mastered' | 'purple' = 'locked';
     if (targetStatus === 'MASTERED') {
       pageStatus = 'mastered';
@@ -895,8 +988,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
   };
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     const currentWeekNum = getISOWeek().split('-W')[1] || '';
     const defaultTitle = `Hausaufgabe KW ${currentWeekNum}`;
     const finalTopicName = topicName.trim() || defaultTitle;
@@ -1320,22 +1413,25 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
 
       <div style={{
-        background: '#f3f3f6', // Zurich neutral gray background canvas
+        background: useNotebookLayout ? 'radial-gradient(circle, #3a3a44 0%, #1a1a22 100%)' : '#f3f3f6', // Zurich neutral gray background canvas or tactile book cover
         borderRadius: '32px',
         width: '100%',
         maxWidth: '1360px',
         height: '92vh',
-        boxShadow: '0 30px 60px -15px rgba(0, 0, 0, 0.25)',
+        boxShadow: useNotebookLayout ? '0 30px 80px rgba(0, 0, 0, 0.6), inset 0 0 40px rgba(0, 0, 0, 0.4)' : '0 30px 60px -15px rgba(0, 0, 0, 0.25)',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        border: '1px solid rgba(0, 0, 0, 0.05)'
+        border: useNotebookLayout ? '1px solid #2e2e38' : '1px solid rgba(0, 0, 0, 0.05)',
+        padding: useNotebookLayout ? '6px' : '0',
+        position: 'relative'
       }} className="animation-slide-up">
         {/* Header - Premium Zurich Card Style Header */}
         <div style={{
           padding: '20px 32px',
-          background: 'white',
-          borderBottom: '1px solid #e8e8ed',
+          background: useNotebookLayout ? '#f5efe0' : 'white',
+          borderBottom: useNotebookLayout ? '2px solid #e5e0d4' : '1px solid #e8e8ed',
+          borderRadius: useNotebookLayout ? '20px 20px 0 0' : '0',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center'
@@ -1370,57 +1466,87 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             </div>
           </div>
 
-          {/* Swiss Modernist Segmented Tab Control */}
-          <div style={{
-            display: 'inline-flex',
-            background: '#f3f3f6',
-            padding: '4px',
-            borderRadius: '24px',
-            border: '1px solid #e2e8f0'
-          }}>
+          {/* Swiss Modernist Tab & Toggle Control Group */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              display: 'inline-flex',
+              background: '#f3f3f6',
+              padding: '4px',
+              borderRadius: '24px',
+              border: '1px solid #e2e8f0'
+            }}>
+              <button
+                type="button"
+                onClick={() => setActiveModalTab('document')}
+                style={{
+                  background: activeModalTab === 'document' ? 'white' : 'transparent',
+                  border: 'none',
+                  color: activeModalTab === 'document' ? '#000' : '#4b5563',
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  fontSize: '0.78rem',
+                  fontWeight: activeModalTab === 'document' ? 800 : 600,
+                  cursor: 'pointer',
+                  boxShadow: activeModalTab === 'document' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <span>📝</span>
+                <span>Unterricht dokumentieren</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveModalTab('logbook')}
+                style={{
+                  background: activeModalTab === 'logbook' ? 'white' : 'transparent',
+                  border: 'none',
+                  color: activeModalTab === 'logbook' ? '#000' : '#4b5563',
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  fontSize: '0.78rem',
+                  fontWeight: activeModalTab === 'logbook' ? 800 : 600,
+                  cursor: 'pointer',
+                  boxShadow: activeModalTab === 'logbook' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <span>🏆</span>
+                <span>Meisterwerk-Logbuch</span>
+              </button>
+            </div>
+
+            {/* Premium Notebook / Modern Design Toggle Button */}
             <button
               type="button"
-              onClick={() => setActiveModalTab('document')}
+              onClick={() => {
+                const nextVal = !useNotebookLayout;
+                setUseNotebookLayout(nextVal);
+                localStorage.setItem('meisterwerk_notebook_layout', String(nextVal));
+              }}
               style={{
-                background: activeModalTab === 'document' ? 'white' : 'transparent',
-                border: 'none',
-                color: activeModalTab === 'document' ? '#000' : '#4b5563',
+                background: useNotebookLayout ? '#e5e0d4' : '#f3f3f6',
+                border: useNotebookLayout ? '1.5px solid #dcd7ca' : '1px solid #e2e8f0',
+                color: '#000',
                 padding: '8px 16px',
                 borderRadius: '20px',
                 fontSize: '0.78rem',
-                fontWeight: activeModalTab === 'document' ? 800 : 600,
+                fontWeight: 800,
                 cursor: 'pointer',
-                boxShadow: activeModalTab === 'document' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
                 transition: 'all 0.2s',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px'
               }}
             >
-              <span>📝</span>
-              <span>Unterricht dokumentieren</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveModalTab('logbook')}
-              style={{
-                background: activeModalTab === 'logbook' ? 'white' : 'transparent',
-                border: 'none',
-                color: activeModalTab === 'logbook' ? '#000' : '#4b5563',
-                padding: '8px 16px',
-                borderRadius: '20px',
-                fontSize: '0.78rem',
-                fontWeight: activeModalTab === 'logbook' ? 800 : 600,
-                cursor: 'pointer',
-                boxShadow: activeModalTab === 'logbook' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
-                transition: 'all 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-            >
-              <span>🏆</span>
-              <span>Meisterwerk-Logbuch</span>
+              <span>📓</span>
+              <span>{useNotebookLayout ? 'Modernes Design' : 'Notizbuch-Design'}</span>
             </button>
           </div>
 
@@ -1446,7 +1572,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         </div>
 
         {/* Modal Content - Side-by-side Columns or Logbook */}
-        <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }} className="flex-col lg:flex-row">
+        <div style={{
+          display: 'flex',
+          flex: 1,
+          overflow: 'hidden',
+          minHeight: 0,
+          background: useNotebookLayout ? 'radial-gradient(circle, #3a3a44 0%, #1a1a22 100%)' : 'transparent',
+          padding: useNotebookLayout ? '0 10px 10px 10px' : '0',
+          position: 'relative'
+        }} className="flex-col lg:flex-row">
           {activeModalTab === 'document' ? (
             <>
           
@@ -1469,83 +1603,58 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             }
           `}} />
           <div style={{
-            flex: '1.4 1 0%',
-            borderRight: '1px solid #e8e8ed',
+            flex: '1 1 0%',
             padding: '24px',
             overflowY: 'auto',
             display: 'flex',
             flexDirection: 'column',
             gap: '20px',
-            background: 'white'
+            background: useNotebookLayout ? '#faf8f2' : 'white',
+            borderRadius: useNotebookLayout ? '0 0 0 20px' : '0',
+            boxShadow: useNotebookLayout ? '-10px 10px 20px rgba(0,0,0,0.15)' : 'none',
+            borderRight: useNotebookLayout ? '1px dashed #e5e0d4' : '1px solid #e8e8ed',
+            position: 'relative'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#000', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Lehrwerke & Übungen
-                </span>
+            {useNotebookLayout && (
+              <div style={{
+                position: 'absolute',
+                top: '20px',
+                bottom: '20px',
+                right: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-around',
+                zIndex: 25
+              }}>
+                {Array.from({ length: 6 }).map((_, idx) => (
+                  <div key={idx} style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: '#121214',
+                    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)'
+                  }} />
+                ))}
               </div>
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                {/* Ultra-compact Apple-style Pinsel-Bar */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  background: '#f3f3f6',
-                  padding: '3px 6px',
-                  borderRadius: '16px',
-                  border: '1px solid rgba(0, 0, 0, 0.05)'
-                }}>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#4b5563', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                    <span>🖌️</span> Pinsel:
-                  </span>
-                  <div style={{ display: 'flex', gap: '2px' }}>
-                    {[
-                      { mode: 'NONE', label: 'Aus', color: '#7d7d82' },
-                      { mode: 'LOCKED', label: '🔴', color: '#ef4444' },
-                      { mode: 'HOMEWORK', label: '🟡', color: '#eab308' },
-                      { mode: 'MASTERED', label: '🟢', color: '#10b981' },
-                      { mode: 'THEORY', label: '🟣', color: '#af52de' }
-                    ].map(b => {
-                      const isActive = activeBrush === b.mode;
-                      return (
-                        <button
-                          key={b.mode}
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); setActiveBrush(b.mode as any); }}
-                          style={{
-                            border: 'none',
-                            background: isActive ? b.color : 'transparent',
-                            color: isActive ? 'white' : b.color,
-                            padding: '3px 6px',
-                            borderRadius: '8px',
-                            fontSize: '0.62rem',
-                            fontWeight: 900,
-                            cursor: 'pointer',
-                            transition: 'all 0.15s',
-                            boxShadow: isActive ? `0 2px 4px ${b.color}40` : 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}
-                        >
-                          {b.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+            )}
 
-                <div style={{ position: 'relative' }}>
+            {/* Clean Apple-style Header Row */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#000', letterSpacing: '-0.02em', textTransform: 'uppercase' }}>
+                Lehrwerke & Übungen
+              </h3>
+              
+              <div style={{ position: 'relative' }}>
                 <button
+                  type="button"
                   onClick={() => setShowAssignDropdown(!showAssignDropdown)}
                   style={{
                     background: '#000',
                     color: 'white',
                     border: 'none',
-                    padding: '6px 12px',
+                    padding: '8px 16px',
                     borderRadius: '20px',
-                    fontSize: '0.72rem',
+                    fontSize: '0.78rem',
                     fontWeight: 800,
                     cursor: 'pointer',
                     display: 'flex',
@@ -1555,19 +1664,19 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   }}
                   className="hover-scale"
                 >
-                  <Plus size={12} /> Zuweisen
+                  <Plus size={14} /> Zuweisen
                 </button>
                 
                 {showAssignDropdown && (
                   <div style={{
                     position: 'absolute',
                     right: 0,
-                    top: '32px',
+                    top: '36px',
                     background: 'white',
                     border: '1px solid #e8e8ed',
                     borderRadius: '16px',
                     boxShadow: '0 12px 30px rgba(0,0,0,0.12)',
-                    zIndex: 10,
+                    zIndex: 40,
                     minWidth: '220px',
                     padding: '6px',
                     display: 'flex',
@@ -1579,6 +1688,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       .map(g => (
                         <button
                           key={g.id}
+                          type="button"
                           onClick={() => handleAssignLehrwerk(g.id)}
                           style={{
                             border: 'none',
@@ -1611,6 +1721,100 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Apple Markup-style Drawing & Brushes Panel */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              background: 'white',
+              borderRadius: '18px',
+              padding: '12px 16px',
+              border: '1px solid rgba(0, 0, 0, 0.08)',
+              boxShadow: '0 4px 15px rgba(0,0,0,0.02)',
+              marginBottom: '10px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#4b5563', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>🖌️</span> Pinsel:
+                  </span>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {[
+                      { mode: 'LOCKED', label: '🔴', color: '#ef4444' },
+                      { mode: 'HOMEWORK', label: '🟡', color: '#eab308' },
+                      { mode: 'MASTERED', label: '🟢', color: '#10b981' },
+                      { mode: 'THEORY', label: '🟣', color: '#af52de' }
+                    ].map(b => {
+                      const isActive = activeBrush === b.mode;
+                      const btnSize = '38px';
+                      return (
+                        <button
+                          key={b.mode}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveBrush(prev => prev === b.mode ? 'NONE' : b.mode as any);
+                          }}
+                          style={{
+                            border: 'none',
+                            background: isActive ? b.color : 'transparent',
+                            borderRadius: '50%',
+                            width: btnSize,
+                            height: btnSize,
+                            fontSize: '1.1rem',
+                            fontWeight: 900,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s',
+                            boxShadow: isActive ? `0 4px 10px ${b.color}40` : 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transform: isActive ? 'scale(1.15)' : 'scale(1)'
+                          }}
+                          className="hover-scale"
+                        >
+                          {b.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Undo Button */}
+                {pageUndoStack.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleUndo}
+                    style={{
+                      background: '#fee2e2',
+                      border: '1.5px solid #fca5a5',
+                      color: '#991b1b',
+                      padding: '6px 12px',
+                      borderRadius: '20px',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    className="hover-scale"
+                  >
+                    <span>↩️</span> Rückgängig ({pageUndoStack.length})
+                  </button>
+                )}
+              </div>
+
+              {/* Apple-style thin split border and horizontal legend */}
+              <div style={{ borderTop: '1px solid rgba(0, 0, 0, 0.05)', paddingTop: '8px', display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ color: '#ef4444' }}>●</span> rot = unbearbeitet</span>
+                <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ color: '#eab308' }}>●</span> gelb = Hausaufgabe</span>
+                <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ color: '#10b981' }}>●</span> erledigt</span>
+                <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ color: '#af52de' }}>●</span> lila = Theorie</span>
               </div>
             </div>
 
@@ -1634,7 +1838,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     <div key={assigned.lehrwerkId} style={{
                       border: '1px solid #e8e8ed',
                       borderRadius: '24px',
-                      background: '#f8f8fa',
+                      background: 'white',
                       overflow: 'hidden',
                       transition: 'all 0.25s'
                     }} className={isSelected ? 'pulse-glow-emerald-subtle' : ''}>
@@ -1646,7 +1850,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         }}
                         style={{
                           padding: '14px 18px',
-                          background: isSelected ? 'white' : '#f8f8fa',
+                          background: 'white',
                           borderBottom: '1px solid #e8e8ed',
                           display: 'flex',
                           alignItems: 'center',
@@ -1704,7 +1908,31 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             );
                           })()}
                         </div>
-                        <ChevronRight size={16} style={{ color: '#7d7d82', transform: isSelected ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={(e) => handleRemoveLehrwerk(assigned.lehrwerkId, e)}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#ef4444',
+                              cursor: 'pointer',
+                              padding: '6px',
+                              borderRadius: '50%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'background 0.2s',
+                              zIndex: 10
+                            }}
+                            onMouseEnter={(el) => el.currentTarget.style.background = '#fef2f2'}
+                            onMouseLeave={(el) => el.currentTarget.style.background = 'transparent'}
+                            title="Lehrwerk entfernen"
+                          >
+                            <X size={16} strokeWidth={2.5} />
+                          </button>
+                          <ChevronRight size={16} style={{ color: '#7d7d82', transform: isSelected ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
+                        </div>
                       </div>
 
                       {/* Pages Grid - Always expanded for active Lehrwerk */}
@@ -1980,7 +2208,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       onClick={() => selectActiveSong(skill)}
                       style={{
                         padding: '14px 18px',
-                        background: isSelected ? '#f8f8fa' : 'white',
+                        background: 'white',
                         borderRadius: '20px',
                         border: `2.5px solid ${isSelected ? '#000' : '#e8e8ed'}`,
                         cursor: 'pointer',
@@ -2001,17 +2229,41 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           </p>
                         </div>
                         
-                        <span style={{
-                          background: skill.is_stage_ready ? '#d1fae5' : '#f3f3f6',
-                          color: skill.is_stage_ready ? '#065f46' : '#000',
-                          padding: '3px 8px',
-                          borderRadius: '6px',
-                          fontSize: '0.65rem',
-                          fontWeight: 900,
-                          textTransform: 'uppercase'
-                        }}>
-                          {skill.is_stage_ready ? 'Bühnenreif' : `${progress}%`}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={(e) => handleRemoveSong(skill.id, e)}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#ef4444',
+                              cursor: 'pointer',
+                              padding: '4px',
+                              borderRadius: '50%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'background 0.2s',
+                              zIndex: 10
+                            }}
+                            onMouseEnter={(el) => el.currentTarget.style.background = '#fef2f2'}
+                            onMouseLeave={(el) => el.currentTarget.style.background = 'transparent'}
+                            title="Song entfernen"
+                          >
+                            <X size={14} strokeWidth={2.5} />
+                          </button>
+                          <span style={{
+                            background: skill.is_stage_ready ? '#d1fae5' : '#f3f3f6',
+                            color: skill.is_stage_ready ? '#065f46' : '#000',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            fontSize: '0.65rem',
+                            fontWeight: 900,
+                            textTransform: 'uppercase'
+                          }}>
+                            {skill.is_stage_ready ? 'Bühnenreif' : `${progress}%`}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Progress Bar */}
@@ -2270,17 +2522,81 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             </div>
           </div>
 
+          {useNotebookLayout && (
+            <div style={{
+              width: '6px',
+              background: '#18181b',
+              position: 'relative',
+              zIndex: 30,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-around',
+              alignItems: 'center',
+              padding: '20px 0',
+              alignSelf: 'stretch'
+            }}>
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <div key={idx} style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}>
+                  <div style={{
+                    width: '24px',
+                    height: '2px',
+                    borderRadius: '1px',
+                    background: '#71717a',
+                    zIndex: 35
+                  }} />
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* COLUMN 3: ✍️ DOKUMENTATION & HAUSAUFGABE (32%) */}
           <div style={{
-            flex: '1.1 1 0%',
-            padding: '24px',
+            flex: '1 1 0%',
+            padding: useNotebookLayout ? '24px 24px 24px 60px' : '24px',
             overflowY: 'auto',
             display: 'flex',
             flexDirection: 'column',
             gap: '20px',
-            background: '#f8fafc',
-            borderLeft: '1px solid #e4e4e7'
+            background: useNotebookLayout ? 'white' : '#f8fafc',
+            backgroundImage: useNotebookLayout ? 'repeating-linear-gradient(white, white 27px, #e5e0d4 27px, #e5e0d4 28px)' : 'none',
+            borderLeft: useNotebookLayout ? 'none' : '1px solid #e4e4e7',
+            borderRadius: useNotebookLayout ? '0 0 20px 0' : '0',
+            boxShadow: useNotebookLayout ? '10px 10px 20px rgba(0,0,0,0.15)' : 'none',
+            position: 'relative'
           }}>
+            {useNotebookLayout && (
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                bottom: 0,
+                left: '42px',
+                width: '2px',
+                background: '#fca5a5',
+                zIndex: 10
+              }} />
+            )}
+            {useNotebookLayout && (
+              <div style={{
+                position: 'absolute',
+                top: '20px',
+                bottom: '20px',
+                left: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-around',
+                zIndex: 25
+              }}>
+                {Array.from({ length: 6 }).map((_, idx) => (
+                  <div key={idx} style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: '#121214',
+                    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)'
+                  }} />
+                ))}
+              </div>
+            )}
             <div>
               <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                 ✍️ Eintrag & Hausaufgabe
@@ -2304,8 +2620,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               }}>
                 {/* Combined Hausaufgaben-Fahrplan Widget */}
                 <div style={{
-                  background: '#ffffff',
-                  border: '1px solid rgba(0, 0, 0, 0.08)',
+                  background: '#fffbeb',
+                  border: '1px solid #fef08a',
                   borderRadius: '16px',
                   padding: '14px 16px',
                   display: 'flex',
@@ -2769,13 +3085,50 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         /* COLUMN 4: 🏆 MEISTERWERKE & LOGBUCH (Full Width in Swiss Modernist Style) */
         <div style={{
           flex: 1,
-          padding: '32px',
+          padding: useNotebookLayout ? '32px 32px 32px 60px' : '32px',
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
           gap: '24px',
-          background: '#f8fafc'
+          background: useNotebookLayout ? '#faf8f2' : '#f8fafc',
+          backgroundImage: useNotebookLayout ? 'repeating-linear-gradient(#faf8f2, #faf8f2 27px, #e5e0d4 27px, #e5e0d4 28px)' : 'none',
+          borderRadius: useNotebookLayout ? '0 0 20px 20px' : '0',
+          boxShadow: useNotebookLayout ? '0 10px 30px rgba(0,0,0,0.15)' : 'none',
+          position: 'relative'
         }}>
+          {useNotebookLayout && (
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              left: '42px',
+              width: '2px',
+              background: '#fca5a5',
+              zIndex: 10
+            }} />
+          )}
+          {useNotebookLayout && (
+            <div style={{
+              position: 'absolute',
+              top: '20px',
+              bottom: '20px',
+              left: '8px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-around',
+              zIndex: 25
+            }}>
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <div key={idx} style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  background: '#121214',
+                  boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)'
+                }} />
+              ))}
+            </div>
+          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
             <span style={{ fontSize: '1.25rem' }}>🏆</span>
             <span style={{
