@@ -1427,15 +1427,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         padding: useNotebookLayout ? '6px' : '0',
         position: 'relative'
       }} className="animation-slide-up">
-        {/* Header - Apple-style Translucent/White Header (Flat Sage Green Design in Notebook Layout) */}
+        {/* Header - Apple-style Translucent/White Header (Hybrid Forest-Sage Green Design in Notebook Layout) */}
         <div style={{
           padding: '18px 24px',
           background: useNotebookLayout 
-            ? '#cbd5c6' 
+            ? '#5a826e' 
             : 'rgba(255, 255, 255, 0.72)',
           backdropFilter: useNotebookLayout ? 'none' : 'blur(20px) saturate(190%)',
           borderBottom: useNotebookLayout 
-            ? '2px solid #a3b2a2' 
+            ? '2px solid #476a58' 
             : '1px solid rgba(0, 0, 0, 0.06)',
           borderRadius: useNotebookLayout ? '24px 24px 0 0' : '0',
           display: 'flex',
@@ -1443,7 +1443,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           alignItems: 'center',
           zIndex: 50,
           boxShadow: useNotebookLayout 
-            ? '0 4px 12px rgba(0,0,0,0.06)' 
+            ? '0 4px 12px rgba(0,0,0,0.1)' 
             : '0 1px 2px rgba(0, 0, 0, 0.01)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -1453,7 +1453,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               borderRadius: '12px',
               overflow: 'hidden',
               boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-              border: useNotebookLayout ? '1.5px solid rgba(0, 0, 0, 0.1)' : '1px solid rgba(0, 0, 0, 0.05)'
+              border: useNotebookLayout ? '1.5px solid rgba(255, 213, 79, 0.25)' : '1px solid rgba(0, 0, 0, 0.05)'
             }}>
               <img
                 src={getInstrumentAvatarUrl(studentInstrument)}
@@ -1465,7 +1465,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ 
                   fontSize: '0.62rem', 
-                  color: useNotebookLayout ? '#5f6d5e' : '#8e8e93', 
+                  color: useNotebookLayout ? '#d1e3d9' : '#8e8e93', 
                   fontWeight: 700, 
                   textTransform: 'uppercase', 
                   letterSpacing: '0.08em' 
@@ -1476,15 +1476,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               <h2 className="swiss-h2" style={{ 
                 margin: 0, 
                 fontSize: '1.2rem', 
-                color: useNotebookLayout ? '#1c1c1e' : '#1d1d1f', 
+                color: useNotebookLayout ? '#ffffff' : '#1d1d1f', 
                 fontWeight: 800, 
                 letterSpacing: '-0.025em', 
                 lineHeight: 1.15
               }}>
                 Schüler-Protokoll
               </h2>
-              <p style={{ fontSize: '0.78rem', color: useNotebookLayout ? '#5f6d5e' : '#86868b', margin: '1px 0 0 0', fontWeight: 500 }}>
-                Aktive Begleitung für: <strong style={{ color: useNotebookLayout ? '#1c1c1e' : '#1d1d1f', fontWeight: 600 }}>{student.first_name} {student.last_name}</strong>
+              <p style={{ fontSize: '0.78rem', color: useNotebookLayout ? '#d1e3d9' : '#86868b', margin: '1px 0 0 0', fontWeight: 500 }}>
+                Aktive Begleitung für: <strong style={{ color: useNotebookLayout ? '#ffffff' : '#1d1d1f', fontWeight: 600 }}>{student.first_name} {student.last_name}</strong>
               </p>
             </div>
           </div>
@@ -1493,10 +1493,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
               display: 'inline-flex',
-              background: useNotebookLayout ? 'rgba(0, 0, 0, 0.06)' : 'rgba(120, 120, 128, 0.08)',
+              background: useNotebookLayout ? 'rgba(0, 0, 0, 0.15)' : 'rgba(120, 120, 128, 0.08)',
               padding: '2.5px',
               borderRadius: '20px',
-              border: useNotebookLayout ? '1px solid rgba(0, 0, 0, 0.05)' : 'none'
+              border: useNotebookLayout ? '1px solid rgba(255, 255, 255, 0.08)' : 'none'
             }}>
               <button
                 type="button"
@@ -1508,14 +1508,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   border: 'none',
                   color: activeModalTab === 'document' 
                     ? (useNotebookLayout ? '#1c1c1e' : '#1d1d1f') 
-                    : (useNotebookLayout ? '#5f6d5e' : '#86868b'),
+                    : (useNotebookLayout ? '#d1e3d9' : '#86868b'),
                   padding: '6px 14px',
                   borderRadius: '17px',
                   fontSize: '0.76rem',
                   fontWeight: 650,
                   cursor: 'pointer',
                   boxShadow: activeModalTab === 'document' 
-                    ? '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)' 
+                    ? (useNotebookLayout ? '0 1px 3px rgba(0,0,0,0.06)' : '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)') 
                     : 'none',
                   transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                   display: 'flex',
@@ -1536,14 +1536,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   border: 'none',
                   color: activeModalTab === 'logbook' 
                     ? (useNotebookLayout ? '#1c1c1e' : '#1d1d1f') 
-                    : (useNotebookLayout ? '#5f6d5e' : '#86868b'),
+                    : (useNotebookLayout ? '#d1e3d9' : '#86868b'),
                   padding: '6px 14px',
                   borderRadius: '17px',
                   fontSize: '0.76rem',
                   fontWeight: 650,
                   cursor: 'pointer',
                   boxShadow: activeModalTab === 'logbook' 
-                    ? '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)' 
+                    ? (useNotebookLayout ? '0 1px 3px rgba(0,0,0,0.06)' : '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)') 
                     : 'none',
                   transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                   display: 'flex',
@@ -1565,9 +1565,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 localStorage.setItem('meisterwerk_notebook_layout', String(nextVal));
               }}
               style={{
-                background: useNotebookLayout ? 'rgba(0, 0, 0, 0.06)' : 'rgba(120, 120, 128, 0.08)',
-                border: useNotebookLayout ? '1px solid rgba(0, 0, 0, 0.05)' : 'none',
-                color: useNotebookLayout ? '#1c1c1e' : '#1d1d1f',
+                background: useNotebookLayout ? 'rgba(0, 0, 0, 0.15)' : 'rgba(120, 120, 128, 0.08)',
+                border: useNotebookLayout ? '1px solid rgba(255, 255, 255, 0.08)' : 'none',
+                color: useNotebookLayout ? '#ffffff' : '#1d1d1f',
                 padding: '6px 14px',
                 borderRadius: '17px',
                 fontSize: '0.76rem',
@@ -1579,10 +1579,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 gap: '5px'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = useNotebookLayout ? 'rgba(0, 0, 0, 0.12)' : 'rgba(120, 120, 128, 0.14)';
+                e.currentTarget.style.background = useNotebookLayout ? 'rgba(0, 0, 0, 0.25)' : 'rgba(120, 120, 128, 0.14)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = useNotebookLayout ? 'rgba(0, 0, 0, 0.06)' : 'rgba(120, 120, 128, 0.08)';
+                e.currentTarget.style.background = useNotebookLayout ? 'rgba(0, 0, 0, 0.15)' : 'rgba(120, 120, 128, 0.08)';
               }}
             >
               <Book size={13} style={{ opacity: 0.8 }} />
@@ -1596,8 +1596,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 onClick={() => handleSave()}
                 disabled={saving}
                 style={{
-                  background: useNotebookLayout ? '#1c1c1e' : '#007aff',
-                  color: 'white',
+                  background: useNotebookLayout ? '#ffd54f' : '#007aff',
+                  color: useNotebookLayout ? '#17110d' : 'white',
                   border: 'none',
                   padding: '6px 16px',
                   borderRadius: '17px',
@@ -1605,7 +1605,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   fontWeight: 800,
                   cursor: 'pointer',
                   boxShadow: useNotebookLayout 
-                    ? '0 2px 10px rgba(0,0,0,0.15)' 
+                    ? '0 2px 10px rgba(255,213,79,0.35)' 
                     : '0 2px 10px rgba(0,122,255,0.3)',
                   transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                   display: 'flex',
@@ -1624,8 +1624,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           <button
             onClick={onClose}
             style={{
-              background: useNotebookLayout ? 'rgba(0, 0, 0, 0.06)' : 'rgba(120, 120, 128, 0.08)',
-              border: useNotebookLayout ? '1px solid rgba(0, 0, 0, 0.05)' : 'none',
+              background: useNotebookLayout ? 'rgba(0, 0, 0, 0.15)' : 'rgba(120, 120, 128, 0.08)',
+              border: useNotebookLayout ? '1px solid rgba(255, 255, 255, 0.08)' : 'none',
               borderRadius: '50%',
               width: '32px',
               height: '32px',
@@ -1633,16 +1633,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              color: useNotebookLayout ? '#5f6d5e' : '#86868b',
+              color: useNotebookLayout ? '#d1e3d9' : '#86868b',
               transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = useNotebookLayout ? 'rgba(0, 0, 0, 0.12)' : 'rgba(120, 120, 128, 0.16)';
-              e.currentTarget.style.color = useNotebookLayout ? '#1c1c1e' : '#1d1d1f';
+              e.currentTarget.style.background = useNotebookLayout ? 'rgba(0, 0, 0, 0.25)' : 'rgba(120, 120, 128, 0.16)';
+              e.currentTarget.style.color = useNotebookLayout ? '#ffd54f' : '#1d1d1f';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = useNotebookLayout ? 'rgba(0, 0, 0, 0.06)' : 'rgba(120, 120, 128, 0.08)';
-              e.currentTarget.style.color = useNotebookLayout ? '#5f6d5e' : '#86868b';
+              e.currentTarget.style.background = useNotebookLayout ? 'rgba(0, 0, 0, 0.15)' : 'rgba(120, 120, 128, 0.08)';
+              e.currentTarget.style.color = useNotebookLayout ? '#d1e3d9' : '#86868b';
             }}
             className="hover-scale"
           >
