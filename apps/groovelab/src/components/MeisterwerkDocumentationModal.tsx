@@ -2633,7 +2633,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           <div style={{
             flex: '1 1 0%',
             padding: useNotebookLayout ? '24px 24px 24px 60px' : '24px',
-            overflowY: 'auto',
+            overflowY: 'hidden',
             display: 'flex',
             flexDirection: 'column',
             gap: '20px',
@@ -2642,7 +2642,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             borderLeft: useNotebookLayout ? 'none' : '1px solid #e4e4e7',
             borderRadius: useNotebookLayout ? '0 0 20px 0' : '0',
             boxShadow: useNotebookLayout ? '10px 10px 20px rgba(0,0,0,0.15)' : 'none',
-            position: 'relative'
+            position: 'relative',
+            height: '100%'
           }}>
             {useNotebookLayout && (
               <div style={{
@@ -2687,17 +2688,25 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             </div>
 
             {/* The Main Input Form Card */}
-            <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', gap: '16px' }}>
               <div style={{
-                background: 'white',
-                border: '1px solid #e4e4e7',
-                borderRadius: '24px',
-                padding: '20px',
+                flex: 1,
+                overflowY: 'auto',
+                paddingRight: '6px',
+                paddingBottom: '8px',
                 display: 'flex',
-                flexDirection: 'column',
-                gap: '16px',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.02)'
+                flexDirection: 'column'
               }}>
+                <div style={{
+                  background: 'white',
+                  border: '1px solid #e4e4e7',
+                  borderRadius: '24px',
+                  padding: '20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.02)'
+                }}>
                 {/* Combined Hausaufgaben-Fahrplan Widget */}
                 <div style={{
                   background: '#fffbeb',
@@ -3056,8 +3065,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   />
                 </div>
               </div>
+            </div>
 
-              {/* Action Buttons */}
+            {/* Action Buttons */}
               <div style={{ display: 'flex', gap: '12px', marginTop: '2px' }}>
                 {(activeItem || activePageNumber !== null || selectedActiveSongId) && (
                   <button
