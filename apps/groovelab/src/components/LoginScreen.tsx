@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key } from 'lucide-react';
+import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, RotateCw } from 'lucide-react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { getDistanceFromLatLonInM } from '../utils/geo';
 import jsQR from 'jsqr';
@@ -45,6 +45,7 @@ const cleanRoomName = (name: string | null | undefined): string => {
 
 export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [loading, setLoading] = useState(false);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [error, setError] = useState<string | null>(null);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showImpressum, setShowImpressum] = useState(false);
@@ -1637,7 +1638,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           boxShadow: '0 0 0 4px rgba(0,0,0,0.02)'
         }}>
           <Scanner
-            key="groovelab-final-scanner"
+            key={`groovelab-scanner-${facingMode}`}
             onScan={(result) => {
               const val = result?.[0]?.rawValue;
               if (val) handleScan(val);
@@ -1648,8 +1649,40 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               container: { width: '100%', height: '100%' },
               video: { width: '100%', height: '100%', objectFit: 'cover' }
             }}
-            constraints={{ facingMode: 'user' }}
+            constraints={{ facingMode }}
           />
+
+          {/* Switch Camera Button */}
+          <button
+            onClick={() => setFacingMode(prev => prev === 'user' ? 'environment' : 'user')}
+            style={{
+              position: 'absolute',
+              top: '16px',
+              right: '16px',
+              zIndex: 15,
+              width: '44px',
+              height: '44px',
+              borderRadius: '50%',
+              background: 'rgba(255, 255, 255, 0.25)',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: 'white',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              transition: 'all 0.2s ease',
+              outline: 'none'
+            }}
+            onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.35)'; }}
+            onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)'; }}
+            title="Kamera wechseln"
+          >
+            <RotateCw size={20} />
+          </button>
+
           {loading && (
             <div style={{
               position: 'absolute',
