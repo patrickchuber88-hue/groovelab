@@ -165,14 +165,7 @@ export async function getProgressHandler(req: Request, res: Response): Promise<v
       return;
     }
 
-    // 1. Fetch student premium status
-    const { data: premiumInfo } = await supabase
-      .from('premium_status')
-      .select('is_premium_active')
-      .eq('student_id', userId)
-      .maybeSingle();
-
-    const isPremium = premiumInfo?.is_premium_active ?? false;
+    const isPremium = true;
 
     // 2. Fetch progress items
     const { data: progressItems, error: fetchError } = await supabase
@@ -188,23 +181,7 @@ export async function getProgressHandler(req: Request, res: Response): Promise<v
 
     // 3. Process and sanitize based on premium status
     const sanitizedProgress = (progressItems || []).map(item => {
-      if (isPremium) {
-        // Premium: unzensiert
-        return item;
-      } else {
-        // Basis-Modus: Blockiere 'status', zensiere 'teacher_notes'
-        return {
-          id: item.id,
-          student_id: item.student_id,
-          teacher_id: item.teacher_id,
-          topic_name: item.topic_name,
-          is_current_homework: item.is_current_homework,
-          updated_at: item.updated_at,
-          status: undefined, // Block status
-          teacher_notes: 'Inhalte in der Premium-Version freischalten', // Censored notes placeholder
-          homework_notes: item.homework_notes
-        };
-      }
+      return item;
     });
 
     res.status(200).json({

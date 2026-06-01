@@ -610,6 +610,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
   const fetchStudentProgress = async () => {
     setProgressLoading(true);
+    let success = false;
     try {
       // Try to call backend API
       const resp = await fetch(`/api/student/get-progress?studentId=${studentId}`, {
@@ -617,49 +618,37 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           'Authorization': `Bearer ${sessionStorage.getItem('sb-access-token') || ''}`
         }
       });
-      if (resp.ok) {
+      if (resp.ok && resp.headers.get('content-type')?.includes('application/json')) {
         const data = await resp.json();
-        
         setProgressItems(data.progress || []);
-        setProgressLoading(false);
-        return;
+        success = true;
       }
-
-      // Direct Supabase query fallback
-      const { data: premiumInfo } = await supabase
-        .from('premium_status')
-        .select('is_premium_active')
-        .eq('student_id', studentId)
-        .maybeSingle();
-
-      const premium = premiumInfo?.is_premium_active ?? false;
-      
-
-      const { data: matrixItems } = await supabase
-        .from('progress_matrix')
-        .select('*')
-        .eq('student_id', studentId)
-        .order('updated_at', { ascending: false });
-
-      // Apply asymmetric logic locally as fallback
-      const sanitized = (matrixItems || []).map((item: any) => {
-        if (premium) {
-          return item;
-        } else {
-          return {
-            ...item,
-            status: undefined,
-            teacher_notes: 'Inhalte in der Premium-Version freischalten'
-          };
-        }
-      });
-
-      setProgressItems(sanitized);
     } catch (err) {
-      console.error('Error fetching progress matrix:', err);
-    } finally {
-      setProgressLoading(false);
+      console.warn('API fetch failed, falling back to direct Supabase query:', err);
     }
+
+    if (!success) {
+      try {
+        // Direct Supabase query fallback
+        const premium = true;
+
+        const { data: matrixItems } = await supabase
+          .from('progress_matrix')
+          .select('*')
+          .eq('student_id', studentId)
+          .order('updated_at', { ascending: false });
+
+        // Apply asymmetric logic locally as fallback
+        const sanitized = (matrixItems || []).map((item: any) => {
+          return item;
+        });
+
+        setProgressItems(sanitized);
+      } catch (err) {
+        console.error('Error fetching progress matrix via fallback:', err);
+      }
+    }
+    setProgressLoading(false);
   };
 
   const handleUpgrade = async () => {
@@ -2922,6 +2911,38 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       );
                     }
 
+                    // Local helper to format page ranges
+                    const formatPageNumbers = (pages: number[]): string => {
+                      if (pages.length === 0) return '';
+                      const sorted = [...pages].sort((a, b) => a - b);
+                      const ranges: string[] = [];
+                      let start = sorted[0];
+                      let end = start;
+                      
+                      for (let i = 1; i < sorted.length; i++) {
+                        if (sorted[i] === end + 1) {
+                          end = sorted[i];
+                        } else {
+                          if (start === end) {
+                            ranges.push(`${start}`);
+                          } else {
+                            ranges.push(`${start}–${end}`);
+                          }
+                          start = sorted[i];
+                          end = start;
+                        }
+                      }
+                      if (start === end) {
+                        ranges.push(`${start}`);
+                      } else {
+                        ranges.push(`${start}–${end}`);
+                      }
+                      
+                      if (ranges.length === 1) return `S. ${ranges[0]}`;
+                      const last = ranges.pop();
+                      return `S. ${ranges.join(', ')} & ${last}`;
+                    };
+
                     // Group textbook pages by book title
                     const groupedLehrwerke: Record<string, { pages: { num: number; notes: string; status: string; id: string }[] }> = {};
                     const otherHWs: any[] = [];
@@ -2961,25 +2982,47 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                           {/* Textbook Groups */}
-                          {Object.entries(groupedLehrwerke).map(([title, info]) => (
-                            <div key={title} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                              <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                📖 {title}
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                {info.pages.map(page => (
-                                  <div key={page.num} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '8px 12px', borderRadius: '8px' }}>
-                                    <span style={{ fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>
-                                      <strong>S. {page.num}</strong> {page.notes ? ` ${page.notes}` : ' Inhalt der Seite üben und meistern! 📖'}
-                                    </span>
-                                    <div style={{ background: '#dcfce7', color: '#16a34a', borderRadius: '4px', padding: '2px 4px' }}>
-                                      <Check size={14} strokeWidth={3} />
+                          {Object.entries(groupedLehrwerke).map(([title, info]) => {
+                            const pageNums = info.pages.map(p => p.num);
+                            const formattedPages = formatPageNumbers(pageNums);
+                            
+                            // Combine any individual notes
+                            const combinedNotes = info.pages
+                              .map(p => p.notes)
+                              .filter(Boolean)
+                              .filter(n => n !== 'Inhalte in der Premium-Version freischalten')
+                              .join('; ');
+
+                            return (
+                              <div key={title} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <div style={{ 
+                                  display: 'flex', 
+                                  justifyContent: 'space-between', 
+                                  alignItems: 'center', 
+                                  background: '#f8fafc', 
+                                  padding: '12px 16px', 
+                                  borderRadius: '16px',
+                                  border: '1px solid #e2e8f0'
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <span style={{ fontSize: '1.2rem' }}>📖</span>
+                                    <div>
+                                      <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>
+                                        {title}
+                                      </div>
+                                      <div style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 650, marginTop: '2px' }}>
+                                        <strong>{formattedPages}</strong>
+                                        {combinedNotes ? ` • ${combinedNotes}` : ''}
+                                      </div>
                                     </div>
                                   </div>
-                                ))}
+                                  <div style={{ background: '#dcfce7', color: '#16a34a', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                    <Check size={16} strokeWidth={3} />
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
 
                           {/* Songs and other topics */}
                           {otherHWs.length > 0 && (
