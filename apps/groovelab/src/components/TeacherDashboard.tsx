@@ -3927,17 +3927,50 @@ export function TeacherDashboard({
                               </>
                             );
                           })() : (() => {
-                            // Seeded Quotes & Musician Jokes of the day
-                            const materials = [
-                              { type: 'quote', text: "Die Musik drückt das aus, was nicht gesagt werden kann und worüber zu schweigen unmöglich ist.", author: "Victor Hugo" },
-                              { type: 'joke', text: "Was ist der Unterschied zwischen einer Geige und einer Bratsche? Die Bratsche brennt länger.", author: "Musiker-Witz" },
-                              { type: 'quote', text: "Ohne Musik wäre das Leben ein Irrtum.", author: "Friedrich Nietzsche" },
-                              { type: 'joke', text: "Wie nennt man jemanden, der gerne mit Musikern abhängt? Einen Schlagzeuger.", author: "Musiker-Witz" },
-                              { type: 'quote', text: "Musik ist die gemeinsame Sprache der Menschheit.", author: "Henry Wadsworth Longfellow" },
-                              { type: 'joke', text: "Warum sind Dirigenten-Partituren immer so groß? Damit sie sich dahinter verstecken können.", author: "Musiker-Witz" }
+                            // 10 Seeded Feierabend wishes
+                            const wishes = [
+                              "Du hast heute Großartiges geleistet. Entspanne dich, tanke neue Energie und lass den Tag gemütlich ausklingen!",
+                              "Der produktive Teil des Tages ist geschafft! Mach es dir bequem, leg die Füße hoch und genieße deinen wohlverdienten Abend.",
+                              "Zeit, die Instrumente ruhen zu lassen. Wir wünschen dir einen entspannten Feierabend voller Ruhe und Gelassenheit!",
+                              "Ein erfolgreicher Unterrichtstag geht zu Ende. Geh raus, atme durch und genieße deine freie Zeit in vollen Zügen!",
+                              "Musik im Kopf und Entspannung im Herzen. Hab einen wundervollen, erholsamen Feierabend!",
+                              "Die Notenblätter sind sortiert, die Tasten ruhen. Jetzt ist Zeit für dich! Schönen Feierabend!",
+                              "Kopf aus, Entspannung an! Genieße die wohlverdiente Ruhe nach einem fantastischen Unterrichtstag.",
+                              "Ein toller Tag voller Rhythmus und Melodie liegt hinter dir. Lass den Abend nun ganz in deinem eigenen Tempo ausklingen.",
+                              "Feierabend! Lass den Alltagsstress hinter dir und mach heute Abend genau das, was dir am meisten Freude bringt.",
+                              "Schönen Feierabend! Zeit für frische Luft, gutes Essen und eine wohlverdiente Auszeit vom Schulalltag."
                             ];
-                            const daySeed = new Date().getDate() % materials.length;
-                            const item = materials[daySeed];
+
+                            // 10 Seeded Quotes and 10 Musician Jokes
+                            const materials = [
+                              // Quotes (10)
+                              { type: 'quote', text: "Die Musik drückt das aus, was nicht gesagt werden kann und worüber zu schweigen unmöglich ist.", author: "Victor Hugo" },
+                              { type: 'quote', text: "Ohne Musik wäre das Leben ein Irrtum.", author: "Friedrich Nietzsche" },
+                              { type: 'quote', text: "Musik ist die gemeinsame Sprache der Menschheit.", author: "Henry Wadsworth Longfellow" },
+                              { type: 'quote', text: "Wo die Sprache aufhört, fängt die Musik an.", author: "E.T.A. Hoffmann" },
+                              { type: 'quote', text: "Musik wäscht den Staub des Alltags von der Seele.", author: "Berthold Auerbach" },
+                              { type: 'quote', text: "Musik ist die beste Medizin, die es gibt.", author: "Unbekannt" },
+                              { type: 'quote', text: "Im Wesen der Musik liegt es, Freude zu bereiten.", author: "Aristoteles" },
+                              { type: 'quote', text: "Musik sagt mehr als tausend Worte.", author: "Sprichwort" },
+                              { type: 'quote', text: "Wo man singt, da lass dich ruhig nieder, böse Menschen haben keine Lieder.", author: "Johann Gottfried Seume" },
+                              { type: 'quote', text: "Die Musik ist die Sprache der Leidenschaft.", author: "Richard Wagner" },
+                              
+                              // Jokes (10)
+                              { type: 'joke', text: "Was ist der Unterschied zwischen einer Geige und einer Bratsche? Die Bratsche brennt länger.", author: "Bratschisten-Witz" },
+                              { type: 'joke', text: "Wie nennt man jemanden, der gerne mit Musikern abhängt? Einen Schlagzeuger.", author: "Schlagzeuger-Witz" },
+                              { type: 'joke', text: "Warum sind Dirigenten-Partituren immer so groß? Damit sie sich dahinter verstecken können.", author: "Dirigenten-Witz" },
+                              { type: 'joke', text: "Wie bringt man einen Gitarristen dazu, leiser zu spielen? Leg ihm ein Notenblatt vor.", author: "Gitarristen-Witz" },
+                              { type: 'joke', text: "Wie viele Tenöre braucht man, um eine Glühbirne einzuschrauben? Fünf. Einer schraubt, und vier sagen, dass sie es höher gekonnt hätten.", author: "Sänger-Witz" },
+                              { type: 'joke', text: "Was ist das Erste, was ein Bassist lernt? Wie man das Instrument wieder einpackt.", author: "Bassisten-Witz" },
+                              { type: 'joke', text: "Warum spielt ein Keyboarder so gerne Klavier? Weil er da keine Kabel suchen muss.", author: "Keyboarder-Witz" },
+                              { type: 'joke', text: "Wie nennt man eine wunderschöne Frau am Arm eines Posaunisten? Ein Tattoo.", author: "Posaunisten-Witz" },
+                              { type: 'joke', text: "Was haben ein Triangelspieler und ein Blitz gemeinsam? Beide treffen selten zweimal dieselbe Stelle.", author: "Orchester-Witz" },
+                              { type: 'joke', text: "Warum klopft der Schlagzeuger immer an die Tür? Weil er nicht weiß, wann er einsetzen soll.", author: "Schlagzeuger-Witz" }
+                            ];
+
+                            // Dynamic random selection
+                            const randomWish = wishes[Math.floor(Math.random() * wishes.length)];
+                            const randomItem = materials[Math.floor(Math.random() * materials.length)];
 
                             return (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -3962,7 +3995,7 @@ export function TeacherDashboard({
                                 }}>
                                   <div style={{ fontSize: '1.2rem', fontWeight: 900, marginBottom: '4px' }}>✨ Schönen Feierabend! ✨</div>
                                   <div style={{ fontSize: '0.82rem', fontWeight: 600, opacity: 0.9 }}>
-                                    Du hast heute Großartiges geleistet. Entspanne dich, tanke neue Energie und lass den Tag gemütlich ausklingen!
+                                    {randomWish}
                                   </div>
                                 </div>
 
@@ -3979,9 +4012,9 @@ export function TeacherDashboard({
                                   textAlign: 'center'
                                 }}>
                                   <span style={{ fontSize: '1.5rem', color: '#cbd5e1', height: '10px', display: 'block', textIndent: '-6px' }}>“</span>
-                                  <span>{item.text}</span>
+                                  <span>{randomItem.text}</span>
                                   <strong style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, fontStyle: 'normal', marginTop: '4px' }}>
-                                    — {item.author} ({item.type === 'joke' ? 'Witz' : 'Zitat'})
+                                    — {randomItem.author} ({randomItem.type === 'joke' ? 'Witz' : 'Zitat'})
                                   </strong>
                                 </div>
                               </div>
