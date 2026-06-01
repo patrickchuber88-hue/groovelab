@@ -1598,37 +1598,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               <Book size={13} style={{ opacity: 0.8 }} />
               <span>{useNotebookLayout ? 'Modernes Design' : 'Leder-Design'}</span>
             </button>
-
-            {/* Apple-style prominent Save Button in Header (appears only on changes) */}
-            {hasChanges && (
-              <button
-                type="button"
-                onClick={() => handleSave()}
-                disabled={saving}
-                style={{
-                  background: useNotebookLayout ? '#ffd54f' : '#007aff',
-                  color: useNotebookLayout ? '#0d1e16' : 'white',
-                  border: 'none',
-                  padding: '6px 16px',
-                  borderRadius: '17px',
-                  fontSize: '0.76rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  boxShadow: useNotebookLayout 
-                    ? '0 2px 10px rgba(255,213,79,0.35)' 
-                    : '0 2px 10px rgba(0,122,255,0.3)',
-                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  animation: 'pulse 2s infinite'
-                }}
-                className="hover-scale"
-              >
-                <Check size={13} strokeWidth={3} />
-                <span>{saving ? 'Speichert...' : 'Speichern'}</span>
-              </button>
-            )}
           </div>
 
           <button
@@ -2971,7 +2940,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       padding: '10px 14px',
                       borderRadius: '12px',
                       border: 'none',
-                      background: homeworkNotes.trim() ? '#10b981' : '#e4e4e7',
+                      background: homeworkNotes.trim() 
+                        ? (useNotebookLayout ? '#456355' : '#007aff') 
+                        : '#e4e4e7',
                       color: homeworkNotes.trim() ? '#ffffff' : '#a1a1aa',
                       fontWeight: 800,
                       cursor: homeworkNotes.trim() ? 'pointer' : 'default',
@@ -2980,7 +2951,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '6px',
-                      transition: 'all 0.15s ease'
+                      transition: 'all 0.15s ease',
+                      boxShadow: homeworkNotes.trim() 
+                        ? (useNotebookLayout ? '0 2px 6px rgba(69,99,85,0.2)' : '0 2px 6px rgba(0,122,255,0.2)') 
+                        : 'none'
                     }}
                     className={homeworkNotes.trim() ? "hover-scale" : ""}
                   >
@@ -3578,52 +3552,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           </div>
         );
       })()}
-      {hasChanges && (
-        <div style={{
-          position: 'absolute',
-          bottom: '24px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          background: 'rgba(255, 255, 255, 0.96)',
-          backdropFilter: 'blur(20px)',
-          border: '1.5px solid #cbd5e1',
-          padding: '12px 24px',
-          borderRadius: '24px',
-          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.18)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '16px',
-          zIndex: 100,
-          animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards'
-        }}>
-          <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ color: '#eab308' }}>⚠️</span> Ungespeicherte Änderungen vorhanden
-          </span>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleSave();
-            }}
-            disabled={saving}
-            style={{
-              background: '#10b981',
-              color: 'white',
-              border: 'none',
-              padding: '8px 20px',
-              borderRadius: '16px',
-              fontSize: '0.78rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              boxShadow: '0 4px 10px rgba(16,185,129,0.2)',
-              transition: 'all 0.2s'
-            }}
-            className="hover-scale"
-          >
-            {saving ? 'Wird gespeichert...' : 'Eintrag speichern'}
-          </button>
-        </div>
-      )}
       </div>
       </div>
     </div>
