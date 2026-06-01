@@ -178,6 +178,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     return false;
   });
   const [pageUndoStack, setPageUndoStack] = useState<{ lehrwerkId: string, pageNum: number, prevStatus: any }[]>([]);
+  const [hasChanges, setHasChanges] = useState<boolean>(false);
 
   const getISOWeek = (dateInput?: string | Date): string => {
     return getISOWeekRaw(dateInput, lessonDay);
@@ -2835,7 +2836,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     ref={homeworkTextareaRef}
                     placeholder="Schreibe dem Schüler auf, was er bis zum nächsten Mal üben soll..."
                     value={homeworkNotes}
-                    onChange={(e) => setHomeworkNotes(e.target.value)}
+                    onChange={(e) => {
+                      setHomeworkNotes(e.target.value);
+                      setHasChanges(true);
+                    }}
                     style={{
                       width: '100%',
                       height: '110px',
@@ -2940,7 +2944,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   <textarea
                     placeholder="Verhaltensauffälligkeiten, Fortschritte oder Notizen..."
                     value={teacherNotes}
-                    onChange={(e) => setTeacherNotes(e.target.value)}
+                    onChange={(e) => {
+                      setTeacherNotes(e.target.value);
+                      setHasChanges(true);
+                    }}
                     style={{
                       width: '100%',
                       height: '65px',
@@ -2973,7 +2980,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 {(activeItem || activePageNumber !== null || selectedActiveSongId) && (
                   <button
                     type="button"
-                    onClick={handleCreateNew}
+                    onClick={() => {
+                      handleCreateNew();
+                      setHasChanges(false);
+                    }}
                     style={{
                       flex: 1,
                       padding: '14px',
@@ -2994,28 +3004,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     Zurücksetzen
                   </button>
                 )}
-                <button
-                  type="submit"
-                  disabled={saving}
-                  style={{
-                    flex: 2,
-                    padding: '14px',
-                    borderRadius: '14px',
-                    border: 'none',
-                    background: '#09090b',
-                    color: '#ffffff',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    fontSize: '0.82rem',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
-                    transition: 'all 0.15s ease'
-                  }}
-                  className="hover-scale"
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#18181b'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = '#09090b'}
-                >
-                  {saving ? 'Wird gespeichert...' : 'Eintrag speichern'}
-                </button>
               </div>
 
               {error && (
@@ -3437,6 +3425,52 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           </div>
         );
       })()}
+      {hasChanges && (
+        <div style={{
+          position: 'absolute',
+          bottom: '24px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(255, 255, 255, 0.96)',
+          backdropFilter: 'blur(20px)',
+          border: '1.5px solid #cbd5e1',
+          padding: '12px 24px',
+          borderRadius: '24px',
+          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.18)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '16px',
+          zIndex: 100,
+          animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+        }}>
+          <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ color: '#eab308' }}>⚠️</span> Ungespeicherte Änderungen vorhanden
+          </span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleSave();
+            }}
+            disabled={saving}
+            style={{
+              background: '#10b981',
+              color: 'white',
+              border: 'none',
+              padding: '8px 20px',
+              borderRadius: '16px',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: '0 4px 10px rgba(16,185,129,0.2)',
+              transition: 'all 0.2s'
+            }}
+            className="hover-scale"
+          >
+            {saving ? 'Wird gespeichert...' : 'Eintrag speichern'}
+          </button>
+        </div>
+      )}
       </div>
       </div>
     </div>
