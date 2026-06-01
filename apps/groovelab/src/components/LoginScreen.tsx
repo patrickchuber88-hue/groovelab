@@ -574,6 +574,49 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     async function loadSchoolInfo() {
       try {
         setLoadingSchool(true);
+
+        // Subdomain resolution logic
+        const getSubdomain = () => {
+          const host = window.location.hostname;
+          const parts = host.split('.');
+          if (parts.length >= 3) {
+            const first = parts[0];
+            if (first !== 'www' && first !== 'admin' && first !== 'campus-groovelab') {
+              return first;
+            }
+          } else if (parts.length === 2 && parts[1] === 'localhost') {
+            return parts[0];
+          }
+          return null;
+        };
+
+        const subdomain = getSubdomain();
+
+        if (subdomain) {
+          const { data: allSchools, error: allSchoolsErr } = await supabase.from('schools').select('*');
+          if (!allSchoolsErr && allSchools) {
+            const slugify = (name: string) => {
+              return name
+                .toLowerCase()
+                .trim()
+                .replace(/[äöüß]/g, (match) => {
+                  const mapping: Record<string, string> = { 'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss' };
+                  return mapping[match] || match;
+                })
+                .replace(/[^a-z0-9]/g, '-')
+                .replace(/-+/g, '-')
+                .replace(/^-+|-+$/g, '');
+            };
+
+            const matchedSchool = allSchools.find(s => slugify(s.name) === subdomain);
+            if (matchedSchool) {
+              setSchoolName(matchedSchool.name);
+              setSchoolData(matchedSchool);
+              return; // Successfully resolved school via subdomain
+            }
+          }
+        }
+
         if (inviteSchoolId) {
           const { data, error } = await supabase.from('schools').select('*').eq('id', inviteSchoolId).maybeSingle();
           if (!error && data) {
@@ -1408,12 +1451,28 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               const newQrToken = crypto.randomUUID();
               const newUserId = crypto.randomUUID();
               
+              let finalRole = inviteRole;
+              if (isSecretary) {
+                // If it is the first secretary/admin registering, set them as 'admin' automatically!
+                const { count, error: checkErr } = await supabase
+                  .from('users')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('school_id', inviteSchoolId)
+                  .in('role', ['admin', 'secretary']);
+                  
+                if (!checkErr && (count === null || count === 0)) {
+                  finalRole = 'admin';
+                } else {
+                  finalRole = 'secretary';
+                }
+              }
+              
               const { data, error } = await supabase
                 .from('users')
                 .insert({
                   id: newUserId,
                   school_id: inviteSchoolId,
-                  role: inviteRole, // Sets the role to 'secretary' dynamically!
+                  role: finalRole,
                   first_name: firstName.trim(),
                   last_name: lastName.trim(),
                   qr_token: newQrToken

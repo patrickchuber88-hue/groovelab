@@ -4393,183 +4393,385 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     </div>
   )}
 
-      {activeTab === 'briefing' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          
-          {/* CRISIS ALERT BANNERS */}
-          {crisisAlerts.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {crisisAlerts.map(alert => {
-                const teacherName = alert.teacher ? `${alert.teacher.first_name} ${alert.teacher.last_name}` : 'Deine Lehrkraft';
-                const slotDate = new Date(alert.slot_start_datetime);
-                const formattedDate = slotDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit' });
-                const formattedTime = slotDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-                return (
-                  <div key={alert.id} style={{
-                    background: 'rgba(239, 68, 68, 0.04)',
-                    backdropFilter: 'blur(10px)',
-                    WebkitBackdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(239, 68, 68, 0.2)',
-                    borderLeft: '4px solid #ef4444',
-                    borderRadius: '16px',
-                    padding: '16px 20px',
+      {activeTab === 'briefing' && (() => {
+        const streakDays = avatar?.streak_flame || 0;
+        
+        const todayStr = new Date().toDateString();
+        const yesterdayStr = new Date(Date.now() - 86400000).toDateString();
+        const twoDaysAgoStr = new Date(Date.now() - 2 * 86400000).toDateString();
+        
+        const practicedToday = focusLogs.some(log => new Date(log.created_at).toDateString() === todayStr);
+        const practicedYesterday = focusLogs.some(log => new Date(log.created_at).toDateString() === yesterdayStr);
+        const practicedTwoDaysAgo = focusLogs.some(log => new Date(log.created_at).toDateString() === twoDaysAgoStr);
+
+        let flameState = {
+          stage: 1,
+          name: 'Klein',
+          label: 'Kleine Flamme',
+          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+          color: '#ffffff',
+          boxShadow: '0 4px 15px rgba(245, 158, 11, 0.2)',
+          icon: '🔥',
+          desc: 'Gut gestartet! Deine kleine Flamme leuchtet wacker.',
+          isFlickering: false
+        };
+
+        if (streakDays === 0) {
+          flameState = {
+            stage: 0,
+            name: 'Erloschen',
+            label: 'Keine Flamme',
+            background: 'linear-gradient(135deg, #64748b 0%, #475569 100%)',
+            color: '#ffffff',
+            boxShadow: '0 4px 15px rgba(71, 85, 105, 0.1)',
+            icon: '⚪',
+            desc: 'Noch nicht entfacht. Übe heute, um deine Serie zu starten!',
+            isFlickering: false
+          };
+        } else if (!practicedToday && !practicedYesterday && practicedTwoDaysAgo) {
+          flameState = {
+            stage: 1,
+            name: 'Flackernd',
+            label: 'Flackernd',
+            background: 'linear-gradient(135deg, #ca8a04 0%, #a16207 100%)',
+            color: '#ffffff',
+            boxShadow: '0 4px 15px rgba(202, 138, 4, 0.15)',
+            icon: '⚠️ 🔥',
+            desc: 'Achtung! Deine Flamme flackert. Übe heute, um deine Serie zu retten!',
+            isFlickering: true
+          };
+        } else if (!practicedToday && !practicedYesterday && !practicedTwoDaysAgo) {
+          flameState = {
+            stage: 0,
+            name: 'Erloschen',
+            label: 'Erloschen',
+            background: 'linear-gradient(135deg, #64748b 0%, #475569 100%)',
+            color: '#ffffff',
+            boxShadow: '0 4px 15px rgba(71, 85, 105, 0.1)',
+            icon: '💨',
+            desc: 'Erloschen! Übe heute, um ein neues Feuer zu entfachen!',
+            isFlickering: false
+          };
+        } else if (streakDays >= 7) {
+          flameState = {
+            stage: 3,
+            name: 'Groß',
+            label: 'Große Flamme',
+            background: 'linear-gradient(135deg, #dc2626 0%, #f97316 100%)',
+            color: '#ffffff',
+            boxShadow: '0 8px 25px rgba(220, 38, 38, 0.35)',
+            icon: '🔥 🔥 🔥',
+            desc: 'Brillanter Rhythmus! Deine große Flamme lodert mit maximaler Energie.',
+            isFlickering: false
+          };
+        } else if (streakDays >= 4) {
+          flameState = {
+            stage: 2,
+            name: 'Mittel',
+            label: 'Mittlere Flamme',
+            background: 'linear-gradient(135deg, #ea580c 0%, #f97316 100%)',
+            color: '#ffffff',
+            boxShadow: '0 6px 20px rgba(234, 88, 12, 0.25)',
+            icon: '🔥 🔥',
+            desc: 'Klasse Streak! Deine Flamme brennt kräftig und konstant.',
+            isFlickering: false
+          };
+        }
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <style>{`
+              @keyframes flicker-pulse {
+                0%, 100% { opacity: 0.95; transform: scale(1); filter: brightness(1.05); }
+                50% { opacity: 0.55; transform: scale(0.97); filter: brightness(0.85); }
+              }
+            `}</style>
+
+            {/* CRISIS ALERT BANNERS */}
+            {crisisAlerts.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {crisisAlerts.map(alert => {
+                  const teacherName = alert.teacher ? `${alert.teacher.first_name} ${alert.teacher.last_name}` : 'Deine Lehrkraft';
+                  const slotDate = new Date(alert.slot_start_datetime);
+                  const formattedDate = slotDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit' });
+                  const formattedTime = slotDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                  return (
+                    <div key={alert.id} style={{
+                      background: 'rgba(239, 68, 68, 0.04)',
+                      backdropFilter: 'blur(10px)',
+                      WebkitBackdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(239, 68, 68, 0.2)',
+                      borderLeft: '4px solid #ef4444',
+                      borderRadius: '16px',
+                      padding: '16px 20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '16px',
+                      boxShadow: '0 4px 16px rgba(239, 68, 68, 0.04)',
+                      transition: 'all 0.3s ease'
+                    }} className="hover-scale">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                        <div style={{ background: '#ef4444', color: '#ffffff', borderRadius: '12px', width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <AlertTriangle size={20} />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <span style={{ fontSize: '9px', fontWeight: 800, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🔴 Wichtige Mitteilung</span>
+                          <p style={{ margin: 0, fontSize: '0.82rem', color: '#1e293b', fontWeight: 650, lineHeight: 1.3 }}>
+                            Dein Unterricht bei <strong style={{ color: '#0b57d0' }}>{teacherName}</strong> am {formattedDate} um {formattedTime} Uhr fällt krankheitsbedingt aus.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleConfirmCrisis(alert.id)}
+                        style={{
+                          background: '#10b981',
+                          color: '#ffffff',
+                          border: 'none',
+                          padding: '10px 18px',
+                          borderRadius: '12px',
+                          fontWeight: 800,
+                          fontSize: '0.76rem',
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)',
+                          transition: 'all 0.2s',
+                          whiteSpace: 'nowrap',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                        className="hover-scale"
+                      >
+                        <Check size={14} strokeWidth={3} />
+                        Gelesen & Bestätigen
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* TOP 4 KPIs ROW */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '16px' }}>
+              
+              {/* KPI 1: XP */}
+              <div style={{ 
+                background: 'linear-gradient(135deg, #0b57d0 0%, #3b82f6 100%)', 
+                borderRadius: '16px', 
+                color: 'white', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '12px', 
+                padding: '12px 16px', 
+                position: 'relative', 
+                overflow: 'hidden', 
+                boxShadow: '0 4px 15px rgba(11, 87, 208, 0.1)' 
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.18)', borderRadius: '10px', width: '32px', height: '32px', flexShrink: 0 }}>
+                  <Star size={16} fill="currentColor" />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Urbanist', sans-serif" }}>{currentXp || 0} XP</span>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 750, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>XP gesammelt</span>
+                </div>
+              </div>
+
+              {/* KPI 2: Songs */}
+              <div style={{ 
+                background: 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)', 
+                borderRadius: '16px', 
+                color: 'white', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '12px', 
+                padding: '12px 16px', 
+                position: 'relative', 
+                overflow: 'hidden', 
+                boxShadow: '0 4px 15px rgba(22, 163, 74, 0.1)' 
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.18)', borderRadius: '10px', width: '32px', height: '32px', flexShrink: 0 }}>
+                  <Award size={16} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Urbanist', sans-serif" }}>{wrappedData?.monthlyFlashback?.masteredSongsCount || 0} / 3</span>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 750, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>Songs verifiziert</span>
+                </div>
+              </div>
+
+              {/* KPI 3: Fokus */}
+              <div style={{ 
+                background: 'linear-gradient(135deg, #eab308 0%, #facc15 100%)', 
+                borderRadius: '16px', 
+                color: '#1f2937', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '12px', 
+                padding: '12px 16px', 
+                position: 'relative', 
+                overflow: 'hidden', 
+                boxShadow: '0 4px 15px rgba(234, 179, 8, 0.1)' 
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.06)', borderRadius: '10px', width: '32px', height: '32px', flexShrink: 0 }}>
+                  <Clock size={16} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Urbanist', sans-serif" }}>{wrappedData?.monthlyFlashback?.focusMinutes || 0} Min</span>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 750, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>Fokus-Übezeit</span>
+                </div>
+              </div>
+
+              {/* KPI 4: Streak */}
+              <div style={{ 
+                background: flameState.background, 
+                borderRadius: '16px', 
+                color: flameState.color, 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '12px', 
+                padding: '12px 16px', 
+                position: 'relative', 
+                overflow: 'hidden', 
+                boxShadow: flameState.boxShadow,
+                animation: flameState.isFlickering ? 'flicker-pulse 1.2s infinite ease-in-out' : 'none'
+              }}
+              title={flameState.desc}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.18)', borderRadius: '10px', width: '32px', height: '32px', flexShrink: 0 }}>
+                  <Flame size={16} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Urbanist', sans-serif" }}>
+                    {streakDays} Tage {flameState.icon}
+                  </span>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 750, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+                    {flameState.label}
+                  </span>
+                </div>
+              </div>
+
+            </div>
+
+            {/* MAIN 2-COLUMN LAYOUT */}
+            <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '24px', alignItems: 'start', width: '100%' }}>
+              
+              {/* LEFT COLUMN */}
+              <div style={{ flex: '1 1 500px', display: 'flex', flexDirection: 'column', gap: '24px', minWidth: '280px' }}>
+                
+                {/* Welcome Block */}
+                <div style={{ background: '#ffffff', borderRadius: '24px', padding: '18px 24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', position: 'relative', overflow: 'hidden' }}>
+                  <h2 style={{ fontSize: '1.5rem', fontWeight: 900, margin: '0 0 10px 0', color: '#1e293b', fontFamily: "'Urbanist', sans-serif" }}>
+                    Hallo. <span style={{ color: '#0b57d0' }}>{studentUser?.first_name || 'Schüler'} 👋</span>
+                  </h2>
+                  <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                    <p style={{ fontSize: '0.9rem', color: '#475569', lineHeight: 1.5, margin: 0, flex: 1, fontWeight: 500 }}>
+                      Ein neuer Moment für Musik. Nimm dir heute ein paar Minuten für deine Übungsziele und sichere dir deine tägliche Serie!
+                    </p>
+                    <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Music size={30} color="#0b57d0" strokeWidth={1.5} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Premium Flame System Widget */}
+                <div style={{ 
+                  background: '#ffffff', 
+                  borderRadius: '24px', 
+                  padding: '24px', 
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+                  border: '1.5px solid #cbd5e1',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <Flame size={22} style={{ color: '#ea580c' }} />
+                      <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', fontFamily: "'Urbanist', sans-serif" }}>
+                        Dein 3-KPI Flammen-Status
+                      </h3>
+                    </div>
+                    <span style={{ 
+                      fontSize: '0.72rem', 
+                      fontWeight: 800, 
+                      padding: '4px 10px', 
+                      borderRadius: '20px', 
+                      background: flameState.background,
+                      color: '#ffffff',
+                      boxShadow: flameState.boxShadow,
+                      animation: flameState.isFlickering ? 'flicker-pulse 1.2s infinite ease-in-out' : 'none'
+                    }}>
+                      {flameState.label} {flameState.icon}
+                    </span>
+                  </div>
+
+                  <div style={{ 
+                    background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', 
+                    borderRadius: '16px', 
+                    padding: '16px', 
+                    border: '1px solid #e2e8f0',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '16px',
-                    boxShadow: '0 4px 16px rgba(239, 68, 68, 0.04)',
-                    transition: 'all 0.3s ease'
-                  }} className="hover-scale">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                      <div style={{ background: '#ef4444', color: '#ffffff', borderRadius: '12px', width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <AlertTriangle size={20} />
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <span style={{ fontSize: '9px', fontWeight: 800, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🔴 Wichtige Mitteilung</span>
-                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#1e293b', fontWeight: 650, lineHeight: 1.3 }}>
-                          Dein Unterricht bei <strong style={{ color: '#0b57d0' }}>{teacherName}</strong> am {formattedDate} um {formattedTime} Uhr fällt krankheitsbedingt aus.
-                        </p>
-                      </div>
+                    gap: '16px'
+                  }}>
+                    <div style={{ 
+                      fontSize: '2.5rem', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      animation: flameState.isFlickering ? 'flicker-pulse 1.2s infinite ease-in-out' : 'none'
+                    }}>
+                      {flameState.stage === 3 ? '🔥' : (flameState.stage === 2 ? '🔥' : (flameState.stage === 1 ? '🔥' : '💨'))}
                     </div>
-                    <button
-                      onClick={() => handleConfirmCrisis(alert.id)}
-                      style={{
-                        background: '#10b981',
-                        color: '#ffffff',
-                        border: 'none',
-                        padding: '10px 18px',
-                        borderRadius: '12px',
-                        fontWeight: 800,
-                        fontSize: '0.76rem',
-                        cursor: 'pointer',
-                        boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)',
-                        transition: 'all 0.2s',
-                        whiteSpace: 'nowrap',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}
-                      className="hover-scale"
-                    >
-                      <Check size={14} strokeWidth={3} />
-                      Gelesen & Bestätigen
-                    </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <strong style={{ fontSize: '0.85rem', color: '#1e293b' }}>
+                        {flameState.label} ({streakDays} Tage aktiv)
+                      </strong>
+                      <span style={{ fontSize: '0.75rem', color: '#475569', lineHeight: 1.4 }}>
+                        {flameState.desc}
+                      </span>
+                    </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
 
-          {/* TOP 4 KPIs ROW */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '16px' }}>
-            
-            {/* KPI 1: XP */}
-            <div style={{ 
-              background: 'linear-gradient(135deg, #0b57d0 0%, #3b82f6 100%)', 
-              borderRadius: '16px', 
-              color: 'white', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '12px', 
-              padding: '12px 16px', 
-              position: 'relative', 
-              overflow: 'hidden', 
-              boxShadow: '0 4px 15px rgba(11, 87, 208, 0.1)' 
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.18)', borderRadius: '10px', width: '32px', height: '32px', flexShrink: 0 }}>
-                <Star size={16} fill="currentColor" />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Urbanist', sans-serif" }}>{currentXp || 0} XP</span>
-                <span style={{ fontSize: '0.65rem', fontWeight: 750, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>XP gesammelt</span>
-              </div>
-            </div>
+                  {/* Progress bar or info dots */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>Nächste Stufe erreichen:</span>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#0f172a' }}>
+                        {streakDays >= 9 ? 'Maximum erreicht!' : `${3 - (streakDays % 3)} Tage Üben verbleibend`}
+                      </span>
+                    </div>
+                    <div style={{ height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', display: 'flex' }}>
+                      <div style={{ 
+                        width: `${Math.min(100, (streakDays / 9) * 100)}%`, 
+                        background: flameState.background, 
+                        borderRadius: '4px',
+                        transition: 'width 0.4s ease-out'
+                      }} />
+                    </div>
+                  </div>
 
-            {/* KPI 2: Songs */}
-            <div style={{ 
-              background: 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)', 
-              borderRadius: '16px', 
-              color: 'white', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '12px', 
-              padding: '12px 16px', 
-              position: 'relative', 
-              overflow: 'hidden', 
-              boxShadow: '0 4px 15px rgba(22, 163, 74, 0.1)' 
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.18)', borderRadius: '10px', width: '32px', height: '32px', flexShrink: 0 }}>
-                <Award size={16} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Urbanist', sans-serif" }}>{wrappedData?.monthlyFlashback?.masteredSongsCount || 0} / 3</span>
-                <span style={{ fontSize: '0.65rem', fontWeight: 750, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>Songs verifiziert</span>
-              </div>
-            </div>
-
-            {/* KPI 3: Fokus */}
-            <div style={{ 
-              background: 'linear-gradient(135deg, #eab308 0%, #facc15 100%)', 
-              borderRadius: '16px', 
-              color: '#1f2937', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '12px', 
-              padding: '12px 16px', 
-              position: 'relative', 
-              overflow: 'hidden', 
-              boxShadow: '0 4px 15px rgba(234, 179, 8, 0.1)' 
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.06)', borderRadius: '10px', width: '32px', height: '32px', flexShrink: 0 }}>
-                <Clock size={16} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Urbanist', sans-serif" }}>{wrappedData?.monthlyFlashback?.focusMinutes || 0} Min</span>
-                <span style={{ fontSize: '0.65rem', fontWeight: 750, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>Fokus-Übezeit</span>
-              </div>
-            </div>
-
-            {/* KPI 4: Streak */}
-            <div style={{ 
-              background: 'linear-gradient(135deg, #ea580c 0%, #f97316 100%)', 
-              borderRadius: '16px', 
-              color: 'white', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '12px', 
-              padding: '12px 16px', 
-              position: 'relative', 
-              overflow: 'hidden', 
-              boxShadow: '0 4px 15px rgba(234, 88, 12, 0.1)' 
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.18)', borderRadius: '10px', width: '32px', height: '32px', flexShrink: 0 }}>
-                <Flame size={16} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Urbanist', sans-serif" }}>{avatar?.streak_flame || 0} Tage</span>
-                <span style={{ fontSize: '0.65rem', fontWeight: 750, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>Serie am Laufen</span>
-              </div>
-            </div>
-
-          </div>
-
-          {/* MAIN 2-COLUMN LAYOUT */}
-          <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '24px', alignItems: 'start', width: '100%' }}>
-            
-            {/* LEFT COLUMN */}
-            <div style={{ flex: '1 1 500px', display: 'flex', flexDirection: 'column', gap: '24px', minWidth: '280px' }}>
-              
-              {/* Welcome Block */}
-              <div style={{ background: '#ffffff', borderRadius: '24px', padding: '18px 24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', position: 'relative', overflow: 'hidden' }}>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 900, margin: '0 0 10px 0', color: '#1e293b', fontFamily: "'Urbanist', sans-serif" }}>
-                  Hallo. <span style={{ color: '#0b57d0' }}>{studentUser?.first_name || 'Schüler'} 👋</span>
-                </h2>
-                <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-                  <p style={{ fontSize: '0.9rem', color: '#475569', lineHeight: 1.5, margin: 0, flex: 1, fontWeight: 500 }}>
-                    Ein neuer Moment für Musik. Nimm dir heute ein paar Minuten für deine Übungsziele und sichere dir deine tägliche Serie!
-                  </p>
-                  <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Music size={30} color="#0b57d0" strokeWidth={1.5} />
+                  {/* Quick explanation tooltip box */}
+                  <div style={{ 
+                    background: '#f8fafc', 
+                    borderRadius: '12px', 
+                    padding: '12px', 
+                    border: '1px solid #e2e8f0',
+                    fontSize: '0.7rem',
+                    color: '#64748b',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px'
+                  }}>
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                      <span>💡</span>
+                      <strong>Wie funktioniert das 3-KPI-Flammen-System?</strong>
+                    </div>
+                    <ul style={{ margin: 0, paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '4px', textAlign: 'left' }}>
+                      <li><strong>Wochen-Welle:</strong> Übe an mindestens 3 Tagen pro Kalenderwoche.</li>
+                      <li><strong>Progressive Stufen:</strong> Nach jeweils 3 Tagen konstantem Üben steigt deine Flammenstufe (Kleine -&gt; Mittlere -&gt; Große Flamme).</li>
+                      <li><strong>Fehltage:</strong> 1 Fehltag lässt deine Flamme flackern ⚠️. 2 Fehltage in Folge stufen dich um eine Stufe zurück.</li>
+                      <li><strong>Joker:</strong> 1 Joker pro Woche fängt einen Fehltag automatisch ab. Am Geburtstag brennt deine Flamme automatisch weiter!</li>
+                    </ul>
                   </div>
                 </div>
                 
@@ -5102,8 +5304,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             </div>
 
           </div>
-        </div>
-      )}
+        );
+      })()}
       
       {activeTab === 'hero' && (
         <div style={{

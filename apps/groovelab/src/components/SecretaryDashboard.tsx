@@ -6720,21 +6720,65 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   </h3>
                   <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 550 }}>{rooms.length} Räume · Ausstattung & Belegung im Blick</p>
                 </div>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  {(['overview', 'plan', 'settings'] as const).map(v => (
-                    <button
-                      key={v}
-                      onClick={() => { setRoomsSubView(v); if (v !== 'settings') setEditingRoom(null); }}
-                      style={{ padding: '8px 16px', borderRadius: '10px', border: '1.5px solid', borderColor: roomsSubView === v ? '#0b57d0' : '#e2e8f0', background: roomsSubView === v ? '#eff6ff' : 'white', color: roomsSubView === v ? '#0b57d0' : '#475569', fontWeight: 800, fontSize: '0.75rem', cursor: 'pointer', transition: 'all 0.2s' }}
-                    >
-                      {v === 'overview' ? '🏫 Übersicht' : v === 'plan' ? '📅 Belegungsplan' : '⚙️ Raum anlegen / bearbeiten'}
-                    </button>
-                  ))}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  {/* Segmented Control */}
+                  <div style={{ background: '#f1f5f9', borderRadius: '12px', padding: '3px', display: 'flex', gap: '2px', border: '1px solid rgba(0,0,0,0.02)' }}>
+                    {(['overview', 'plan'] as const).map(v => {
+                      const isActive = roomsSubView === v || (v === 'overview' && roomsSubView === 'settings');
+                      return (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => { setRoomsSubView(v); setEditingRoom(null); }}
+                          style={{
+                            padding: '7px 16px',
+                            borderRadius: '9px',
+                            border: 'none',
+                            background: isActive ? '#ffffff' : 'transparent',
+                            color: isActive ? '#0f172a' : '#64748b',
+                            fontWeight: isActive ? 800 : 600,
+                            fontSize: '0.75rem',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                            boxShadow: isActive ? '0 1px 3px rgba(15,23,42,0.08), 0 1px 1px rgba(15,23,42,0.04)' : 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          {v === 'overview' ? <Sliders size={13} /> : <Calendar size={13} />}
+                          {v === 'overview' ? 'Übersicht' : 'Belegungsplan'}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => openRoomEditor()}
+                    style={{
+                      background: 'linear-gradient(135deg, #0b57d0 0%, #1a73e8 100%)',
+                      color: 'white',
+                      border: 'none',
+                      padding: '9px 16px',
+                      borderRadius: '12px',
+                      fontWeight: 800,
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 2px 8px rgba(11,87,208,0.2)',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <Plus size={14} strokeWidth={2.5} />
+                    Raum anlegen
+                  </button>
                 </div>
               </div>
 
               {/* ── VIEW 1: Übersicht ── */}
-              {roomsSubView === 'overview' && (
+              {(roomsSubView === 'overview' || roomsSubView === 'settings') && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {rooms.length === 0 ? (
                     <div style={{ background: 'white', borderRadius: '20px', padding: '48px 24px', textAlign: 'center', color: '#94a3b8', border: '2px dashed #e2e8f0' }}>
@@ -6759,10 +6803,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                               <div>
                                 <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>{room.name}</h4>
-                                <div style={{ display: 'flex', gap: '8px', marginTop: '2px', fontSize: '0.65rem', color: '#94a3b8', fontWeight: 700 }}>
-                                  <span>👤 Max. {room.max_teachers || 1} Lehrkraft</span>
-                                  <span>👥 Max. {room.max_students || 1} Schüler</span>
-                                  <span>📏 {room.qm || 0} qm</span>
+                                <div style={{ display: 'flex', gap: '8px', marginTop: '4px', fontSize: '0.65rem', color: '#94a3b8', fontWeight: 700, alignItems: 'center' }}>
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <User size={12} color="#94a3b8" /> Max. {room.max_teachers || 1}
+                                  </span>
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <Users size={12} color="#94a3b8" /> Max. {room.max_students || 1}
+                                  </span>
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <Sliders size={12} color="#94a3b8" /> {room.qm || 0} qm
+                                  </span>
                                 </div>
                               </div>
                               <span style={{ fontSize: '0.65rem', fontWeight: 900, padding: '3px 9px', borderRadius: '8px', background: status.bg, color: status.color, border: `1px solid ${status.border}` }}>
@@ -6790,37 +6840,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   <div key={d} style={{ flex: 1, height: '6px', borderRadius: '3px', background: occupied.includes(d) ? status.color : '#e2e8f0', transition: 'background 0.2s' }} title={['','Mo','Di','Mi','Do','Fr'][d]} />
                                 ))}
                               </div>
-                              <div style={{ display: 'flex', gap: '3px', marginTop: '3px' }}>
-                                {[1,2,3,4,5].map(d => (
-                                  <div key={d} style={{ flex: 1, fontSize: '0.5rem', textAlign: 'center', color: '#94a3b8', fontWeight: 700 }}>
-                                    {['','Mo','Di','Mi','Do','Fr'][d]}
-                                  </div>
-                                ))}
-                              </div>
                             </div>
-                            {/* Assigned teachers for this room */}
-                            {matrixAllocations.filter(p => p.roomId === room.id).length > 0 && (
-                              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                {matrixAllocations.filter(p => p.roomId === room.id).map(plan => (
-                                  <div key={plan.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem', background: '#f8fafc', borderRadius: '7px', padding: '5px 8px' }}>
-                                    <span style={{ fontWeight: 800, color: '#0f172a' }}>{plan.teacherName}</span>
-                                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                      <span style={{ color: '#94a3b8', fontWeight: 700 }}>{['','Mo','Di','Mi','Do','Fr'][plan.dayOfWeek]}</span>
-                                      <span style={{ fontFamily: 'monospace', fontWeight: 900, color: '#059669', fontSize: '0.65rem' }}>{plan.startTime}–{plan.endTime}</span>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
                             {/* Actions */}
                             <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
-                              <button onClick={() => { setRoomsSubView('plan'); }} style={{ flex: 1, padding: '7px', borderRadius: '9px', border: '1px solid #e2e8f0', background: 'white', color: '#475569', fontWeight: 700, fontSize: '0.7rem', cursor: 'pointer' }}>
-                                📅 Belegung
+                              <button onClick={() => { setRoomsSubView('plan'); }} style={{ flex: 1, padding: '7px', borderRadius: '9px', border: '1px solid #e2e8f0', background: 'white', color: '#475569', fontWeight: 700, fontSize: '0.7rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                                <Calendar size={12} /> Belegung
                               </button>
-                              <button onClick={() => openRoomEditor(room)} style={{ flex: 1, padding: '7px', borderRadius: '9px', border: '1px solid #e2e8f0', background: 'white', color: '#0b57d0', fontWeight: 700, fontSize: '0.7rem', cursor: 'pointer' }}>
-                                ✏️ Bearbeiten
+                              <button onClick={() => openRoomEditor(room)} style={{ flex: 1, padding: '7px', borderRadius: '9px', border: '1px solid #e2e8f0', background: 'white', color: '#0b57d0', fontWeight: 700, fontSize: '0.7rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                                <Edit3 size={12} /> Bearbeiten
                               </button>
-                              <button onClick={() => handleDeleteRoom(room.id)} style={{ padding: '7px 10px', borderRadius: '9px', border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.04)', color: '#ef4444', fontWeight: 700, fontSize: '0.7rem', cursor: 'pointer' }}>
+                              <button onClick={() => handleDeleteRoom(room.id)} style={{ padding: '7px 10px', borderRadius: '9px', border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.04)', color: '#ef4444', fontWeight: 700, fontSize: '0.7rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <Trash2 size={12} />
                               </button>
                             </div>
@@ -6921,124 +6950,186 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
               {/* ── VIEW 3: Einstellungen / Editor ── */}
               {roomsSubView === 'settings' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '20px', alignItems: 'start' }}>
-                  {/* Form */}
-                  <div style={{ background: 'white', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', padding: '28px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Edit3 size={16} color="#0b57d0" /> {editingRoom ? `„${editingRoom.name}" bearbeiten` : 'Neuen Raum anlegen'}
-                    </h4>
-
-                    {/* Name */}
-                    <div>
-                      <label style={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Raumname *</label>
-                      <input
-                        value={roomFormName}
-                        onChange={e => setRoomFormName(e.target.value)}
-                        placeholder='z.B. „Raum 1 – Schlagzeug" oder „Studio Nord"'
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc', transition: 'border-color 0.2s' }}
-                      />
+                <div style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'rgba(15, 23, 42, 0.3)',
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 2000,
+                  animation: 'fadeIn 0.2s ease-out'
+                }}>
+                  <div style={{
+                    background: 'white',
+                    borderRadius: '24px',
+                    width: '480px',
+                    maxHeight: '90vh',
+                    boxShadow: '0 24px 60px -15px rgba(15,23,42,0.25)',
+                    border: '1px solid rgba(15,23,42,0.08)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                    overflow: 'hidden'
+                  }}>
+                    {/* Modal Header */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '24px 28px', borderBottom: '1px solid #f1f5f9' }}>
+                      <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <DoorOpen size={18} color="#0b57d0" /> {editingRoom ? `„${editingRoom.name}“ bearbeiten` : 'Neuen Raum anlegen'}
+                      </h4>
+                      <button
+                        onClick={() => { setRoomsSubView('overview'); setEditingRoom(null); }}
+                        style={{ background: '#f1f5f9', border: 'none', color: '#64748b', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <X size={15} />
+                      </button>
                     </div>
 
-                    {/* Max students & QM */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    {/* Modal Body / Scrollable Content */}
+                    <div style={{ padding: '28px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                      {/* Name */}
                       <div>
-                        <label style={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Max. Anzahl Schüler</label>
+                        <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Raumname *</label>
                         <input
-                          type="number"
-                          value={roomFormMaxStudents}
-                          onChange={e => setRoomFormMaxStudents(parseInt(e.target.value) || 1)}
-                          min="1"
-                          style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc', transition: 'border-color 0.2s' }}
+                          value={roomFormName}
+                          onChange={e => setRoomFormName(e.target.value)}
+                          placeholder='z.B. „Raum 1 – Schlagzeug“ oder „Studio Nord“'
+                          style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc', transition: 'border-color 0.2s' }}
                         />
                       </div>
+
+                      {/* Max students & QM */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <div>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Max. Schüler</label>
+                          <input
+                            type="number"
+                            value={roomFormMaxStudents}
+                            onChange={e => setRoomFormMaxStudents(parseInt(e.target.value) || 1)}
+                            min="1"
+                            style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Größe in qm</label>
+                          <input
+                            type="number"
+                            value={roomFormQm}
+                            onChange={e => setRoomFormQm(parseFloat(e.target.value) || 0)}
+                            min="0"
+                            style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc' }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Max teachers */}
                       <div>
-                        <label style={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Größe in qm</label>
-                        <input
-                          type="number"
-                          value={roomFormQm}
-                          onChange={e => setRoomFormQm(parseFloat(e.target.value) || 0)}
-                          min="0"
-                          style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc', transition: 'border-color 0.2s' }}
-                        />
+                        <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Max. Lehrkräfte gleichzeitig</label>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          {[1, 2, 3].map(n => (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => setRoomFormMaxTeachers(n)}
+                              style={{
+                                flex: 1,
+                                padding: '10px',
+                                borderRadius: '10px',
+                                border: '1.5px solid',
+                                borderColor: roomFormMaxTeachers === n ? '#0b57d0' : '#cbd5e1',
+                                background: roomFormMaxTeachers === n ? '#eff6ff' : 'white',
+                                color: roomFormMaxTeachers === n ? '#0b57d0' : '#475569',
+                                fontWeight: 800,
+                                fontSize: '0.82rem',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              {n}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Instrument tags */}
+                      <div>
+                        <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>Ausstattung / Instrumente</label>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                          {(() => {
+                            const availableEquipment = schoolEquipment.length > 0 ? schoolEquipment.map(e => e.name) : INSTRUMENT_TAGS;
+                            return availableEquipment.map(tag => {
+                              const active = roomFormEquipment.includes(tag);
+                              const color = INSTRUMENT_COLOR[tag] || '#64748b';
+                              return (
+                                <button
+                                  key={tag}
+                                  type="button"
+                                  onClick={() => setRoomFormEquipment(prev => active ? prev.filter(t => t !== tag) : [...prev, tag])}
+                                  style={{
+                                    padding: '6px 12px',
+                                    borderRadius: '20px',
+                                    border: `1.5px solid ${active ? color : '#cbd5e1'}`,
+                                    background: active ? `${color}10` : 'white',
+                                    color: active ? color : '#64748b',
+                                    fontWeight: 800,
+                                    fontSize: '0.72rem',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s'
+                                  }}
+                                >
+                                  {tag}
+                                </button>
+                              );
+                            });
+                          })()}
+                        </div>
                       </div>
                     </div>
 
-                    {/* Max teachers */}
-                    <div>
-                      <label style={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Max. Lehrkräfte gleichzeitig</label>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        {[1,2,3].map(n => (
-                          <button key={n} onClick={() => setRoomFormMaxTeachers(n)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1.5px solid', borderColor: roomFormMaxTeachers === n ? '#0b57d0' : '#e2e8f0', background: roomFormMaxTeachers === n ? '#eff6ff' : 'white', color: roomFormMaxTeachers === n ? '#0b57d0' : '#475569', fontWeight: 900, fontSize: '0.88rem', cursor: 'pointer', transition: 'all 0.2s' }}>
-                            {n}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Instrument tags */}
-                    <div>
-                      <label style={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>Ausstattung / Instrumente</label>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
-                        {(() => {
-                          const availableEquipment = schoolEquipment.length > 0 ? schoolEquipment.map(e => e.name) : INSTRUMENT_TAGS;
-                          return availableEquipment.map(tag => {
-                            const active = roomFormEquipment.includes(tag);
-                            const color = INSTRUMENT_COLOR[tag] || '#64748b';
-                            return (
-                              <button
-                                key={tag}
-                                onClick={() => setRoomFormEquipment(prev => active ? prev.filter(t => t !== tag) : [...prev, tag])}
-                                style={{ padding: '6px 13px', borderRadius: '20px', border: `1.5px solid ${active ? color : '#e2e8f0'}`, background: active ? `${color}15` : 'white', color: active ? color : '#64748b', fontWeight: 800, fontSize: '0.72rem', cursor: 'pointer', transition: 'all 0.2s' }}
-                              >
-                                {tag}
-                              </button>
-                            );
-                          });
-                        })()}
-                      </div>
-                      {roomFormEquipment.length > 0 && (
-                        <p style={{ margin: '8px 0 0 0', fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>
-                          ✓ {roomFormEquipment.join(' · ')} ausgewählt — der CSP-Solver kann Lehrkräfte instrument-konform zuweisen.
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Save / Cancel */}
-                    <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                    {/* Modal Footer */}
+                    <div style={{ padding: '20px 28px', borderTop: '1px solid #f1f5f9', display: 'flex', gap: '10px', background: '#f8fafc' }}>
                       <button
                         onClick={handleSaveRoom}
                         disabled={roomSaving || !roomFormName.trim()}
-                        style={{ flex: 1, background: 'linear-gradient(135deg, #0b57d0 0%, #1a73e8 100%)', color: 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 900, fontSize: '0.82rem', cursor: 'pointer', opacity: roomSaving || !roomFormName.trim() ? 0.6 : 1, transition: 'all 0.2s' }}
+                        style={{
+                          flex: 1,
+                          background: 'linear-gradient(135deg, #0b57d0 0%, #1a73e8 100%)',
+                          color: 'white',
+                          border: 'none',
+                          padding: '12px',
+                          borderRadius: '12px',
+                          fontWeight: 800,
+                          fontSize: '0.82rem',
+                          cursor: 'pointer',
+                          opacity: roomSaving || !roomFormName.trim() ? 0.6 : 1,
+                          boxShadow: '0 4px 12px rgba(11,87,208,0.15)',
+                          transition: 'all 0.2s'
+                        }}
                       >
-                        {roomSaving ? 'Speichert…' : editingRoom ? '💾 Änderungen speichern' : '+ Raum anlegen'}
+                        {roomSaving ? 'Speichert…' : editingRoom ? 'Änderungen speichern' : 'Raum anlegen'}
                       </button>
-                      <button onClick={() => { setRoomsSubView('overview'); setEditingRoom(null); }} style={{ padding: '12px 18px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: 'white', color: '#64748b', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer' }}>
+                      <button
+                        type="button"
+                        onClick={() => { setRoomsSubView('overview'); setEditingRoom(null); }}
+                        style={{
+                          padding: '12px 20px',
+                          borderRadius: '12px',
+                          border: '1.5px solid #cbd5e1',
+                          background: 'white',
+                          color: '#64748b',
+                          fontWeight: 800,
+                          fontSize: '0.82rem',
+                          cursor: 'pointer'
+                        }}
+                      >
                         Abbrechen
                       </button>
                     </div>
-                  </div>
-
-                  {/* Existing rooms list (quick edit) */}
-                  <div style={{ background: 'white', borderRadius: '20px', border: '1px solid rgba(0,0,0,0.05)', padding: '20px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                      <h5 style={{ margin: 0, fontSize: '0.78rem', fontWeight: 900, color: '#0f172a' }}>Alle Räume ({rooms.length})</h5>
-                      <button onClick={() => openRoomEditor()} style={{ background: '#0b57d0', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '8px', fontWeight: 800, fontSize: '0.65rem', cursor: 'pointer' }}>
-                        + Neu
-                      </button>
-                    </div>
-                    {rooms.map(room => {
-                      const occupied = getOccupiedDays(room.id);
-                      return (
-                        <div key={room.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', borderRadius: '10px', border: editingRoom?.id === room.id ? '1.5px solid #0b57d0' : '1px solid #f1f5f9', background: editingRoom?.id === room.id ? '#eff6ff' : '#f8fafc', cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => openRoomEditor(room)}>
-                          <div>
-                            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>{room.name}</span>
-                            <span style={{ display: 'block', fontSize: '0.6rem', color: '#94a3b8', fontWeight: 600 }}>{occupied.length}/5 Tage belegt</span>
-                          </div>
-                          <Edit3 size={13} color="#94a3b8" />
-                        </div>
-                      );
-                    })}
-                    {rooms.length === 0 && <p style={{ textAlign: 'center', color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 700, padding: '16px 0' }}>Noch keine Räume</p>}
                   </div>
                 </div>
               )}

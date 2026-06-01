@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   Shield, Plus, Copy, Check, Trash2, Users, Monitor, 
-  MapPin, LogOut, RefreshCw, Layers, Award, Clock, Music,
+  MapPin, LogOut, RefreshCw, Layers, Award, Clock, Music, GraduationCap,
   Edit2, Settings, Sliders, Search
 } from 'lucide-react';
 
@@ -101,7 +101,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
     totalStudents: 0,
     totalSessions: 0
   });
-  const [schoolStats, setSchoolStats] = useState<Record<string, { teachers: number, students: number, songs: number, bands: number }>>({});
+  const [schoolStats, setSchoolStats] = useState<Record<string, any>>({});
   
   // Selected School Modal State
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
@@ -250,7 +250,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
         { data: bands },
         { count: sessionCount }
       ] = await Promise.all([
-        supabase.from('users').select('role, school_id'),
+        supabase.from('users').select('role, school_id, is_campus_active, is_groovelab_active'),
         supabase.from('songs').select('school_id'),
         supabase.from('bands').select('school_id, name'),
         supabase.from('sessions').select('*', { count: 'exact', head: true })
@@ -266,11 +266,16 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
         totalSessions: sessionCount || 0
       });
 
-      const sStats: Record<string, { teachers: number, students: number, songs: number, bands: number }> = {};
+      const sStats: Record<string, any> = {};
       schoolData?.forEach(school => {
+        const schoolUsers = users?.filter(u => u.school_id === school.id) || [];
         sStats[school.id] = {
-          teachers: users?.filter(u => u.school_id === school.id && (u.role === 'teacher' || u.role === 'admin')).length || 0,
-          students: users?.filter(u => u.school_id === school.id && u.role === 'student').length || 0,
+          teachers: schoolUsers.filter(u => u.role === 'teacher' || u.role === 'admin').length,
+          students: schoolUsers.filter(u => u.role === 'student').length,
+          teachersCampus: schoolUsers.filter(u => (u.role === 'teacher' || u.role === 'admin') && u.is_campus_active).length,
+          teachersGroovelab: schoolUsers.filter(u => (u.role === 'teacher' || u.role === 'admin') && u.is_groovelab_active).length,
+          studentsCampus: schoolUsers.filter(u => u.role === 'student' && u.is_campus_active).length,
+          studentsGroovelab: schoolUsers.filter(u => u.role === 'student' && u.is_groovelab_active).length,
           songs: songs?.filter(s => s.school_id === school.id).length || 0,
           bands: bands?.filter(b => b.school_id === school.id && b.name !== '__SYSTEM_ANNOUNCEMENTS__').length || 0
         };
@@ -357,8 +362,8 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
   };
 
 
-  const copyInviteLink = (schoolId: string, token?: string | null) => {
-    const inviteUrl = `${window.location.origin}?invite_school_id=${schoolId}&role=secretary&token=${token || ''}`;
+  const copyInviteLink = (schoolId: string, schoolName: string, token?: string | null) => {
+    const inviteUrl = `${getSubdomainOrigin(schoolName)}/?invite_school_id=${schoolId}&role=secretary&token=${token || ''}`;
     navigator.clipboard.writeText(inviteUrl);
     setCopiedId(schoolId);
     setTimeout(() => setCopiedId(null), 2000);
@@ -655,7 +660,11 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                 return (
                   <div 
                     key={school.id} 
-                    onClick={() => {
+                    onClick={(e) => {
+                      const target = e.target as HTMLElement;
+                      if (target.closest('button') || target.closest('input') || target.closest('a')) {
+                        return;
+                      }
                       setSelectedSchool(school);
                       setEditName(school.name);
                       setEditColor(school.primary_color || '#3b82f6');
@@ -794,7 +803,10 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                       {/* iOS Style Toggle Pause */}
                       <button
                         type="button"
-                        onClick={() => handleToggleSchoolPause(school.id, school.is_paused)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleSchoolPause(school.id, school.is_paused);
+                        }}
                         style={{
                           position: 'relative',
                           width: '42px',
@@ -824,7 +836,10 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
 
                       {/* Pill Invite Button */}
                       <button
-                        onClick={() => copyInviteLink(school.id, school.secretary_onboarding_token)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          copyInviteLink(school.id, school.name, school.secretary_onboarding_token);
+                        }}
                         style={{
                           padding: '8px 16px',
                           borderRadius: '100px',
@@ -855,7 +870,10 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
 
                       {/* Trash Delete Button */}
                       <button
-                        onClick={() => handleDeleteSchool(school.id, school.name)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteSchool(school.id, school.name);
+                        }}
                         style={{
                           padding: '8px',
                           borderRadius: '50%',
@@ -1524,19 +1542,25 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                 </h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   {[
-                    { label: 'Lehrer', value: schoolStats[selectedSchool.id]?.teachers || 0, color: '#3b82f6' },
-                    { label: 'Schüler', value: schoolStats[selectedSchool.id]?.students || 0, color: '#22c55e' },
-                    { label: 'Bands', value: schoolStats[selectedSchool.id]?.bands || 0, color: '#a855f7' },
-                    { label: 'Songs', value: schoolStats[selectedSchool.id]?.songs || 0, color: '#eab308' }
+                    { label: 'Lehrer (Campus)', value: schoolStats[selectedSchool.id]?.teachersCampus || 0, color: '#22c55e', icon: <GraduationCap size={14} /> },
+                    { label: 'Lehrer (GrooveLab)', value: schoolStats[selectedSchool.id]?.teachersGroovelab || 0, color: '#eab308', icon: <Music size={14} /> },
+                    { label: 'Schüler (Campus)', value: schoolStats[selectedSchool.id]?.studentsCampus || 0, color: '#22c55e', icon: <GraduationCap size={14} /> },
+                    { label: 'Schüler (GrooveLab)', value: schoolStats[selectedSchool.id]?.studentsGroovelab || 0, color: '#eab308', icon: <Music size={14} /> }
                   ].map((stat, i) => (
                     <div key={i} style={{
                       background: '#f8fafc',
-                      border: '1px solid #e2e8f0',
+                      border: '1.5px solid #e2e8f0',
+                      borderLeft: `4px solid ${stat.color}`,
                       borderRadius: '14px',
                       padding: '12px 16px'
                     }}>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', display: 'block' }}>{stat.label}</span>
-                      <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', marginTop: '4px', display: 'block' }}>{stat.value}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ color: stat.color, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                          {stat.icon}
+                        </span>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>{stat.label}</span>
+                      </div>
+                      <span style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a', marginTop: '4px', display: 'block' }}>{stat.value}</span>
                     </div>
                   ))}
                 </div>
@@ -2055,127 +2079,6 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                   )}
                 </div>
 
-                {/* Box 4: Limits & Kontingente */}
-                <div style={{
-                  background: '#ffffff',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '24px',
-                  padding: '32px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '20px',
-                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <Sliders size={20} color="#a855f7" /> Kontingente (Limits)
-                    </h3>
-                    <button
-                      type="button"
-                      onClick={() => setEditLimitsEnabled(!editLimitsEnabled)}
-                      style={{
-                        position: 'relative',
-                        width: '42px',
-                        height: '24px',
-                        borderRadius: '12px',
-                        background: editLimitsEnabled ? '#a855f7' : '#cbd5e1',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: '0',
-                        transition: 'all 0.2s',
-                        display: 'flex',
-                        alignItems: 'center'
-                      }}
-                    >
-                      <div style={{
-                        width: '18px',
-                        height: '18px',
-                        borderRadius: '50%',
-                        background: '#ffffff',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
-                        transition: 'transform 0.2s',
-                        transform: editLimitsEnabled ? 'translateX(22px)' : 'translateX(2px)'
-                      }} />
-                    </button>
-                  </div>
-
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(3, 1fr)',
-                    gap: '16px',
-                    opacity: editLimitsEnabled ? 1 : 0.4,
-                    pointerEvents: editLimitsEnabled ? 'auto' : 'none',
-                    transition: 'all 0.25s ease'
-                  }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Max Lehrer</label>
-                      <input 
-                        type="number" 
-                        min="0" 
-                        disabled={!editLimitsEnabled} 
-                        value={editMaxTeachers} 
-                        onChange={(e) => setEditMaxTeachers(parseInt(e.target.value) || 0)} 
-                        style={{
-                          width: '100%',
-                          boxSizing: 'border-box',
-                          padding: '12px 14px',
-                          borderRadius: '10px',
-                          border: '1.5px solid #cbd5e1',
-                          fontSize: '0.95rem',
-                          fontWeight: 600,
-                          outline: 'none',
-                          color: '#0f172a',
-                          background: '#ffffff'
-                        }} 
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Max Schüler</label>
-                      <input 
-                        type="number" 
-                        min="0" 
-                        disabled={!editLimitsEnabled} 
-                        value={editMaxStudents} 
-                        onChange={(e) => setEditMaxStudents(parseInt(e.target.value) || 0)} 
-                        style={{
-                          width: '100%',
-                          boxSizing: 'border-box',
-                          padding: '12px 14px',
-                          borderRadius: '10px',
-                          border: '1.5px solid #cbd5e1',
-                          fontSize: '0.95rem',
-                          fontWeight: 600,
-                          outline: 'none',
-                          color: '#0f172a',
-                          background: '#ffffff'
-                        }} 
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Max Songs</label>
-                      <input 
-                        type="number" 
-                        min="0" 
-                        disabled={!editLimitsEnabled} 
-                        value={editMaxSongs} 
-                        onChange={(e) => setEditMaxSongs(parseInt(e.target.value) || 0)} 
-                        style={{
-                          width: '100%',
-                          boxSizing: 'border-box',
-                          padding: '12px 14px',
-                          borderRadius: '10px',
-                          border: '1.5px solid #cbd5e1',
-                          fontSize: '0.95rem',
-                          fontWeight: 600,
-                          outline: 'none',
-                          color: '#0f172a',
-                          background: '#ffffff'
-                        }} 
-                      />
-                    </div>
-                  </div>
-                </div>
-
               </div>
 
               {/* QR Code & Share Links */}
@@ -2201,7 +2104,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                      <div style={{ display: 'flex', gap: '10px' }}>
                        <input
                          readOnly
-                         value={`${window.location.origin}?invite_school_id=${selectedSchool.id}&role=secretary`}
+                         value={`${getSubdomainOrigin(selectedSchool.name)}/?invite_school_id=${selectedSchool.id}&role=secretary&token=${selectedSchool.secretary_onboarding_token || ''}`}
                          style={{
                            flex: 1,
                            padding: '12px 14px',
@@ -2218,7 +2121,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                        <button
                          type="button"
                          onClick={() => {
-                           navigator.clipboard.writeText(`${window.location.origin}?invite_school_id=${selectedSchool.id}&role=secretary`);
+                           navigator.clipboard.writeText(`${getSubdomainOrigin(selectedSchool.name)}/?invite_school_id=${selectedSchool.id}&role=secretary&token=${selectedSchool.secretary_onboarding_token || ''}`);
                            alert('Einladungslink kopiert!');
                          }}
                          style={{
