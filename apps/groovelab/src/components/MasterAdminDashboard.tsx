@@ -47,17 +47,16 @@ function getSubdomainOrigin(schoolName: string): string {
 
   const host = window.location.host;
   const protocol = window.location.protocol;
-  const parts = host.split('.');
 
-  if (parts.includes('localhost') || host.includes('localhost') || host.includes('127.0.0.1')) {
+  if (host.includes('localhost') || host.includes('127.0.0.1')) {
     const port = host.split(':')[1] || '5173';
-    return `${protocol}//${subdomain}.localhost:${port}`;
+    return `${protocol}//localhost:${port}?school=${subdomain}`;
   } else {
-    let domainParts = [...parts];
-    if (domainParts.length >= 3 && (domainParts[0] === 'admin' || domainParts[0] === 'campus-groovelab' || domainParts[0] === 'www')) {
-      domainParts.shift();
+    let cleanHost = host;
+    if (cleanHost.startsWith('www.')) {
+      cleanHost = cleanHost.substring(4);
     }
-    return `${protocol}//${subdomain}.${domainParts.join('.')}`;
+    return `${protocol}//${cleanHost}?school=${subdomain}`;
   }
 }
 
@@ -363,7 +362,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
 
 
   const copyInviteLink = (schoolId: string, schoolName: string, token?: string | null) => {
-    const inviteUrl = `${getSubdomainOrigin(schoolName)}/?invite_school_id=${schoolId}&role=secretary&token=${token || ''}`;
+    const inviteUrl = `${getSubdomainOrigin(schoolName)}&invite_school_id=${schoolId}&role=secretary&token=${token || ''}`;
     navigator.clipboard.writeText(inviteUrl);
     setCopiedId(schoolId);
     setTimeout(() => setCopiedId(null), 2000);
@@ -2104,7 +2103,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                      <div style={{ display: 'flex', gap: '10px' }}>
                        <input
                          readOnly
-                         value={`${getSubdomainOrigin(selectedSchool.name)}/?invite_school_id=${selectedSchool.id}&role=secretary&token=${selectedSchool.secretary_onboarding_token || ''}`}
+                         value={`${getSubdomainOrigin(selectedSchool.name)}&invite_school_id=${selectedSchool.id}&role=secretary&token=${selectedSchool.secretary_onboarding_token || ''}`}
                          style={{
                            flex: 1,
                            padding: '12px 14px',
@@ -2121,7 +2120,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                        <button
                          type="button"
                          onClick={() => {
-                           navigator.clipboard.writeText(`${getSubdomainOrigin(selectedSchool.name)}/?invite_school_id=${selectedSchool.id}&role=secretary&token=${selectedSchool.secretary_onboarding_token || ''}`);
+                           navigator.clipboard.writeText(`${getSubdomainOrigin(selectedSchool.name)}&invite_school_id=${selectedSchool.id}&role=secretary&token=${selectedSchool.secretary_onboarding_token || ''}`);
                            alert('Einladungslink kopiert!');
                          }}
                          style={{

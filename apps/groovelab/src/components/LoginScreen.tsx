@@ -597,6 +597,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           } else if (parts.length === 2 && parts[1] === 'localhost') {
             return parts[0];
           }
+          
+          // Check query parameters as fallback (useful for local localhost dev bypass)
+          const urlParams = new URLSearchParams(window.location.search);
+          const schoolParam = urlParams.get('school') || urlParams.get('subdomain');
+          if (schoolParam) {
+            return schoolParam;
+          }
           return null;
         };
 

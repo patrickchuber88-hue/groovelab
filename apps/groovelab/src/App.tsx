@@ -2297,6 +2297,19 @@ function App() {
     setActiveStudentTab(firstMenuTab);
     localStorage.setItem(activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab', firstMenuTab);
   }, [activePlatform, user?.role]);
+
+  // Safety Hook: Enforce that students in the Campus module can NEVER see the GrooveLab Live Lab tab.
+  // If a student is on the 'campus' platform but the activeStudentTab is not a valid campus tab (e.g. 'live'),
+  // we immediately redirect/correct them to 'briefing' to keep the modules strictly isolated.
+  useEffect(() => {
+    if (user && user.role?.toLowerCase() === 'student') {
+      if (activePlatform === 'campus' && !['briefing', 'mediathek', 'practice_board', 'campus_cup', 'flashback', 'events', 'profile', 'all_appointments'].includes(activeStudentTab)) {
+        console.log('[Safety Hook] Enforcing student Campus Briefing Board redirect from invalid tab:', activeStudentTab);
+        setActiveStudentTab('briefing');
+        localStorage.setItem('campus_active_tab', 'briefing');
+      }
+    }
+  }, [user, activePlatform, activeStudentTab]);
   const { width, height } = useWindowSize();
 
   const [liveSessionMins, setLiveSessionMins] = useState(0);
@@ -5916,7 +5929,12 @@ function App() {
             )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: windowWidth <= 1024 ? '12px' : '24px' }}>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: windowWidth <= 1024 ? '16px' : '28px',
+            marginLeft: windowWidth <= 1024 ? '24px' : '48px'
+          }}>
             {/* Status Pills */}
             <div style={{ display: 'flex', alignItems: 'center', gap: windowWidth <= 768 ? '4px' : '8px' }}>
               {activePlatform === 'campus' ? (
@@ -5953,10 +5971,10 @@ function App() {
                           border: '1px solid rgba(59, 130, 246, 0.12)',
                           boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
                         }}>
-                          <School size={14} color="#ef4444" />
                           <span style={{ fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                            <span style={{ color: '#ef4444' }}>
-                              {school?.name || 'Meine Musikschule'}
+                            <span style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <School size={12} color="#ef4444" />
+                              <span>{school?.name || 'Meine Musikschule'}</span>
                             </span>
                             <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
                             <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -5991,12 +6009,14 @@ function App() {
                           border: '1px solid rgba(59, 130, 246, 0.12)',
                           boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
                         }}>
-                          <School size={14} color="#ef4444" />
                           <span style={{ fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                            <span style={{ color: '#ef4444' }}>
-                              {school?.name === 'Testlauf' 
-                                ? 'Testlauf'
-                                : (school?.name || 'Meine Musikschule')}
+                            <span style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <School size={12} color="#ef4444" />
+                              <span>
+                                {school?.name === 'Testlauf' 
+                                  ? 'Testlauf'
+                                  : (school?.name || 'Meine Musikschule')}
+                              </span>
                             </span>
                             <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
                             <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -6020,10 +6040,10 @@ function App() {
                           border: '1px solid rgba(59, 130, 246, 0.12)',
                           boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
                         }}>
-                          <School size={14} color="#ef4444" />
                           <span style={{ fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                            <span style={{ color: '#ef4444' }}>
-                              {school?.name || 'Meine Musikschule'}
+                            <span style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <School size={12} color="#ef4444" />
+                              <span>{school?.name || 'Meine Musikschule'}</span>
                             </span>
                             <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
                             <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '4px' }}>

@@ -511,9 +511,9 @@ function MobileBriefingView({
         </div>
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.7rem', color: '#64748b', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
             <span>👍 Joker bereit</span>
-            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
               <select style={{ border: '1px solid #e2e8f0', borderRadius: '4px', padding: '2px 4px', fontSize: '0.65rem', background: '#f8fafc' }}><option>Tag 0</option></select>
               <select style={{ border: '1px solid #e2e8f0', borderRadius: '4px', padding: '2px 4px', fontSize: '0.65rem', background: '#f8fafc' }}><option>0 Fehl</option></select>
               <button style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '2px 6px', fontSize: '0.65rem', fontWeight: 600 }}>Real Geübt</button>
@@ -713,11 +713,11 @@ function MobileBriefingView({
 
 export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange, onProfileUpdate }: StudentAvatarDashboardProps) {
   const [studentUser, setStudentUser] = useState<any>(null);
-  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
+      setIsMobile(window.innerWidth < 1024);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
