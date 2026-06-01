@@ -3171,13 +3171,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             </span>
           </div>
 
-          {/* List of mastered items inside logbook */}
           {(() => {
             const masteredBooksList: any[] = [];
             assignedLehrwerke.forEach(assigned => {
               const book = globalLehrwerke.find(g => g.id === assigned.lehrwerkId);
               if (book) {
-                const total = book.totalPages || 50;
                 const masteredPages: number[] = [];
                 Object.entries(assigned.pageStates || {}).forEach(([pStr, state]: [string, any]) => {
                   if (state.status === 'mastered') {
@@ -3185,12 +3183,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     if (!isNaN(pNum)) masteredPages.push(pNum);
                   }
                 });
-                const pct = Math.min(100, Math.round((masteredPages.length / total) * 100));
-                if (pct === 100 && masteredPages.length > 0) {
+                if (masteredPages.length > 0) {
                   masteredBooksList.push({
                     title: book.title,
                     emoji: book.emoji,
-                    pages: masteredPages
+                    pages: masteredPages.sort((a, b) => a - b)
                   });
                 }
               }
@@ -3205,12 +3202,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 <div style={{
                   padding: '80px 24px',
                   textAlign: 'center',
-                  border: '2px dashed #cbd5e1',
+                  border: useNotebookLayout ? '2px dashed #32483e' : '2px dashed #cbd5e1',
                   borderRadius: '24px',
-                  color: '#475569',
+                  color: useNotebookLayout ? '#8fa399' : '#475569',
                   fontSize: '0.9rem',
                   fontWeight: 600,
-                  background: 'white',
+                  background: useNotebookLayout ? 'rgba(0,0,0,0.1)' : 'white',
                   maxWidth: '600px',
                   margin: '40px auto 0 auto'
                 }}>
@@ -3222,81 +3219,151 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             return (
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                gap: '20px'
+                gridTemplateColumns: '1fr 1fr',
+                gap: '24px',
+                width: '100%',
+                marginTop: '16px'
               }}>
-                {/* Mastered Lehrwerke */}
-                {masteredBooksList.map((item, idx) => (
-                  <div key={`m-lw-${idx}`} style={{
-                    background: 'white',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '20px',
-                    padding: '16px 20px',
+                {/* Spalte 1: Songs */}
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px'
+                }}>
+                  <h3 style={{
+                    fontSize: '1rem',
+                    fontWeight: 800,
+                    color: useNotebookLayout ? '#456355' : '#475569',
+                    borderBottom: useNotebookLayout ? '2px solid #32483e' : '2px solid #e2e8f0',
+                    paddingBottom: '8px',
+                    margin: 0,
                     display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                    alignItems: 'center',
+                    gap: '8px'
                   }}>
+                    <span>🎵</span> Songs
+                  </h3>
+                  
+                  {masteredSongs.length === 0 ? (
                     <div style={{
-                      fontSize: '0.86rem',
-                      color: '#0f172a',
-                      fontWeight: 900,
-                      letterSpacing: '-0.03em',
-                      fontFamily: '"Helvetica Neue", Helvetica, Inter, Arial, sans-serif'
+                      padding: '30px 16px',
+                      textAlign: 'center',
+                      border: useNotebookLayout ? '1px dashed #32483e' : '1px dashed #cbd5e1',
+                      borderRadius: '16px',
+                      color: useNotebookLayout ? '#8fa399' : '#64748b',
+                      fontSize: '0.82rem',
+                      background: useNotebookLayout ? 'rgba(0,0,0,0.1)' : '#f8fafc'
                     }}>
-                      {item.emoji} {item.title}
+                      Noch keine Meisterwerk-Songs vorhanden.
                     </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                      {item.pages.map((p: number) => (
-                        <div key={p} style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          background: '#f1f5f9',
-                          color: '#334155',
-                          padding: '4px 10px',
-                          borderRadius: '8px',
-                          fontSize: '0.74rem',
-                          fontWeight: 800,
-                          border: '1px solid #e2e8f0'
-                        }}>
-                          S. {p}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-
-                {/* Mastered Songs */}
-                {masteredSongs.map((skill, idx) => (
-                  <div key={`m-song-${idx}`} style={{
-                    background: 'white',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '20px',
-                    padding: '16px 20px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '6px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{
-                        fontSize: '0.86rem',
-                        color: '#0f172a',
-                        fontWeight: 900,
-                        letterSpacing: '-0.03em',
-                        fontFamily: '"Helvetica Neue", Helvetica, Inter, Arial, sans-serif'
+                  ) : (
+                    masteredSongs.map((skill, idx) => (
+                      <div key={`m-song-${idx}`} style={{
+                        background: 'white',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '20px',
+                        padding: '16px 20px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
                       }}>
-                        🎤 {skill.songs?.title}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{
+                            fontSize: '0.86rem',
+                            color: '#0f172a',
+                            fontWeight: 900,
+                            letterSpacing: '-0.03em',
+                            fontFamily: '"Helvetica Neue", Helvetica, Inter, Arial, sans-serif'
+                          }}>
+                            🎤 {skill.songs?.title}
+                          </div>
+                          <span style={{ fontSize: '0.72rem', background: '#f1f5f9', color: '#334155', padding: '3px 8px', borderRadius: '8px', fontWeight: 800, border: '1px solid #e2e8f0' }}>
+                            {skill.instrument}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 700 }}>
+                          {skill.songs?.artist}
+                        </div>
                       </div>
-                      <span style={{ fontSize: '0.72rem', background: '#f1f5f9', color: '#334155', padding: '3px 8px', borderRadius: '8px', fontWeight: 800, border: '1px solid #e2e8f0' }}>
-                        {skill.instrument}
-                      </span>
+                    ))
+                  )}
+                </div>
+
+                {/* Spalte 2: Lehrwerke */}
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px'
+                }}>
+                  <h3 style={{
+                    fontSize: '1rem',
+                    fontWeight: 800,
+                    color: useNotebookLayout ? '#456355' : '#475569',
+                    borderBottom: useNotebookLayout ? '2px solid #32483e' : '2px solid #e2e8f0',
+                    paddingBottom: '8px',
+                    margin: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <span>📖</span> Lehrwerke
+                  </h3>
+
+                  {masteredBooksList.length === 0 ? (
+                    <div style={{
+                      padding: '30px 16px',
+                      textAlign: 'center',
+                      border: useNotebookLayout ? '1px dashed #32483e' : '1px dashed #cbd5e1',
+                      borderRadius: '16px',
+                      color: useNotebookLayout ? '#8fa399' : '#64748b',
+                      fontSize: '0.82rem',
+                      background: useNotebookLayout ? 'rgba(0,0,0,0.1)' : '#f8fafc'
+                    }}>
+                      Noch keine Meisterwerk-Lehrwerke vorhanden.
                     </div>
-                    <div style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 700 }}>
-                      {skill.songs?.artist}
-                    </div>
-                  </div>
-                ))}
+                  ) : (
+                    masteredBooksList.map((item, idx) => (
+                      <div key={`m-lw-${idx}`} style={{
+                        background: 'white',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '20px',
+                        padding: '16px 20px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                      }}>
+                        <div style={{
+                          fontSize: '0.86rem',
+                          color: '#0f172a',
+                          fontWeight: 900,
+                          letterSpacing: '-0.03em',
+                          fontFamily: '"Helvetica Neue", Helvetica, Inter, Arial, sans-serif'
+                        }}>
+                          {item.emoji} {item.title}
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                          {item.pages.map((p: number) => (
+                            <div key={p} style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              background: '#f1f5f9',
+                              color: '#334155',
+                              padding: '4px 10px',
+                              borderRadius: '8px',
+                              fontSize: '0.74rem',
+                              fontWeight: 800,
+                              border: '1px solid #e2e8f0'
+                            }}>
+                              S. {p}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             );
           })()}
