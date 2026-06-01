@@ -38,7 +38,7 @@ export async function saveProgressHandler(req: Request, res: Response): Promise<
       return;
     }
 
-    const { id, studentId, topicName, status, isCurrentHomework, teacherNotes } = req.body;
+    const { id, studentId, topicName, status, isCurrentHomework, teacherNotes, homeworkNotes } = req.body;
 
     if (!studentId || !topicName || !status) {
       res.status(400).json({ error: 'studentId, topicName and status are required.' });
@@ -62,6 +62,7 @@ export async function saveProgressHandler(req: Request, res: Response): Promise<
           status,
           is_current_homework: !!isCurrentHomework,
           teacher_notes: teacherNotes || '',
+          homework_notes: homeworkNotes || '',
           updated_at: new Date().toISOString()
         })
         .eq('id', id)
@@ -87,6 +88,7 @@ export async function saveProgressHandler(req: Request, res: Response): Promise<
             status,
             is_current_homework: !!isCurrentHomework,
             teacher_notes: teacherNotes || '',
+            homework_notes: homeworkNotes || '',
             updated_at: new Date().toISOString()
           })
           .eq('id', existing.id)
@@ -105,7 +107,8 @@ export async function saveProgressHandler(req: Request, res: Response): Promise<
             topic_name: topicName,
             status,
             is_current_homework: !!isCurrentHomework,
-            teacher_notes: teacherNotes || ''
+            teacher_notes: teacherNotes || '',
+            homework_notes: homeworkNotes || ''
           })
           .select('*')
           .single();
@@ -140,7 +143,20 @@ export async function getProgressHandler(req: Request, res: Response): Promise<v
       const token = authHeader.replace('Bearer ', '');
       const { data: { user } } = await supabase.auth.getUser(token);
       if (user) {
-        userId = user.id;
+        // Retrieve logged in user's role to distinguish between student and teacher/admin
+        const { data: loggedInUser } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+
+        if (loggedInUser?.role === 'student') {
+          // Students are locked to viewing their own progress only
+          userId = user.id;
+        } else if (!userId) {
+          // Teachers / admins default to their own if no studentId is queried
+          userId = user.id;
+        }
       }
     }
 
@@ -185,7 +201,8 @@ export async function getProgressHandler(req: Request, res: Response): Promise<v
           is_current_homework: item.is_current_homework,
           updated_at: item.updated_at,
           status: undefined, // Block status
-          teacher_notes: 'Inhalte in der Premium-Version freischalten' // Censored notes placeholder
+          teacher_notes: 'Inhalte in der Premium-Version freischalten', // Censored notes placeholder
+          homework_notes: item.homework_notes
         };
       }
     });

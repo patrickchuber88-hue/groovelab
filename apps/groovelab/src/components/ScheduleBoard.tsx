@@ -931,16 +931,16 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', maxWidth: '100%', margin: '0', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
       
       {/* Tabs */}
-      <div style={{ display: 'flex', background: 'rgba(255, 255, 255, 0.4)', padding: '4px', borderRadius: '12px', width: 'fit-content', border: '1px solid rgba(0,0,0,0.05)', alignSelf: 'center', marginBottom: '8px' }}>
+      <div className="app-segmented-switch" style={{ alignSelf: 'flex-start', marginBottom: '8px' }}>
         <button 
           onClick={() => setActiveTab('calendar')}
-          style={{ padding: '8px 24px', borderRadius: '8px', border: 'none', background: activeTab === 'calendar' ? 'white' : 'transparent', fontWeight: activeTab === 'calendar' ? 700 : 500, color: activeTab === 'calendar' ? '#1d1d1f' : '#64748b', cursor: 'pointer', boxShadow: activeTab === 'calendar' ? '0 2px 8px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s', fontSize: '0.85rem' }}
+          className={`app-segmented-switch-btn ${activeTab === 'calendar' ? 'active' : ''}`}
         >
           Stundenplan
         </button>
         <button 
           onClick={() => setActiveTab('designer')}
-          style={{ padding: '8px 24px', borderRadius: '8px', border: 'none', background: activeTab === 'designer' ? 'white' : 'transparent', fontWeight: activeTab === 'designer' ? 700 : 500, color: activeTab === 'designer' ? '#1d1d1f' : '#64748b', cursor: 'pointer', boxShadow: activeTab === 'designer' ? '0 2px 8px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s', fontSize: '0.85rem' }}
+          className={`app-segmented-switch-btn ${activeTab === 'designer' ? 'active' : ''}`}
         >
           Stundenplan-Designer
         </button>

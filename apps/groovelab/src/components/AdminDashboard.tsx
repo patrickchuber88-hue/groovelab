@@ -298,6 +298,11 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [externalInstrument, setExternalInstrument] = useState('Vocals');
   
   const [showAddStudent, setShowAddStudent] = useState(false);
+  const [showBulkAddStudents, setShowBulkAddStudents] = useState(false);
+  const [bulkInput, setBulkInput] = useState('');
+  const [parsedStudents, setParsedStudents] = useState<{ firstName: string; lastName: string; instrument: string }[]>([]);
+  const [defaultInstrumentForBulk, setDefaultInstrumentForBulk] = useState('Gitarre');
+  const [isBulkSaving, setIsBulkSaving] = useState(false);
   const [newStudent, setNewStudent] = useState({ firstName: '', lastName: '', birthDate: '', photoUrl: '/avatar_ghost.jpg', isExternalVocalist: false, instrument: 'Gitarre' });
   const [vocalistOnlyMode, setVocalistOnlyMode] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'green' | 'yellow' | 'red'>('all');
@@ -470,6 +475,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [studentHomeMins, setStudentHomeMins] = useState(0);
   const [editingStudent, setEditingStudent] = useState<any>(null);
   const [studentSearch, setStudentSearch] = useState('');
+  const [listType, setListType] = useState<'active' | 'archive'>('active');
+  const [instrumentFilter, setInstrumentFilter] = useState<string>('all');
   const [studentSessions, setStudentSessions] = useState<any[]>([]);
   const [studentPlanning, setStudentPlanning] = useState<any[]>([]);
   const [studentRejections, setStudentRejections] = useState<any[]>([]);
@@ -727,8 +734,35 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         else sq = sq.eq('is_groovelab_active', true);
         const { data: studentsData } = await sq.order('first_name');
         if (studentsData) {
-          setStudents(studentsData);
-          const studentIds = studentsData.map(s => s.id);
+          // --- AUTO-CLEANUP DELETED/ARCHIVED STUDENTS ---
+          const expiredStudents = studentsData.filter((s: any) => s.contract_ends_at && new Date(s.contract_ends_at).getTime() < Date.now());
+          const expiredIds = expiredStudents.map((s: any) => s.id);
+          
+          let activeStudentsForState = studentsData;
+
+          if (expiredIds.length > 0) {
+            // Remove all expired users from bands to free the spot
+            await supabase.from('band_members').delete().in('user_id', expiredIds);
+            
+            // Hard delete users who requested deletion
+            const toDelete = expiredStudents.filter((s: any) => s.delete_after_contract === true).map((s: any) => s.id);
+            if (toDelete.length > 0) {
+              await supabase.from('user_song_skills').delete().in('user_id', toDelete);
+              await supabase.from('sessions').delete().in('user_id', toDelete);
+              await supabase.from('band_songs').update({ suggested_by: null }).in('suggested_by', toDelete);
+              await supabase.from('lab_planning').delete().in('user_id', toDelete);
+              await supabase.from('band_shoutbox').delete().in('user_id', toDelete);
+              await supabase.from('band_song_slots').delete().in('user_id', toDelete);
+              await supabase.from('help_requests').delete().in('user_id', toDelete);
+              await supabase.from('avatars').delete().in('user_id', toDelete);
+              await supabase.from('users').delete().in('id', toDelete);
+              
+              activeStudentsForState = studentsData.filter((s: any) => !toDelete.includes(s.id));
+            }
+          }
+
+          setStudents(activeStudentsForState);
+          const studentIds = activeStudentsForState.map((s: any) => s.id);
           
           // Fetch active sessions for school's students
           const { data: sData } = await supabase
@@ -1148,6 +1182,98 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       setStudents([...students, data]); 
       setShowAddStudent(false); 
       setNewStudent({ firstName: '', lastName: '', birthDate: '', photoUrl: '/avatar_ghost.jpg', isExternalVocalist: false, instrument: 'Gitarre' }); 
+    }
+  };
+
+  const parseBulkInput = (text: string, currentInstrument: string) => {
+    if (!text.trim()) {
+      setParsedStudents([]);
+      return;
+    }
+    const lines = text.split('\n');
+    const studentsList = lines
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+      .map(line => {
+        const parts = line.split(' ');
+        const firstName = parts[0] || '';
+        const lastName = parts.slice(1).join(' ') || '';
+        return {
+          firstName,
+          lastName,
+          instrument: currentInstrument
+        };
+      });
+    setParsedStudents(studentsList);
+  };
+
+  const handleBulkAddSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!admin?.school_id || parsedStudents.length === 0) return;
+    setIsBulkSaving(true);
+
+    if (admin?.schools?.limits_enabled) {
+      const maxStudents = admin.schools.max_students ?? 6;
+      if (students.length + parsedStudents.length > maxStudents) {
+        alert(`Limit überschritten! Du kannst nur noch ${maxStudents - students.length} Schüler anlegen.`);
+        setIsBulkSaving(false);
+        return;
+      }
+    }
+
+    const studentsToInsert = parsedStudents.map(student => {
+      const qrToken = crypto.randomUUID();
+      const isVocalist = student.instrument === 'Gesang';
+      const studentInstrument = isVocalist ? 'Vocals' : student.instrument;
+      const studentAvatarUrl = getInstrumentAvatarUrl(studentInstrument);
+      
+      return {
+        school_id: admin.school_id, 
+        role: 'student', 
+        first_name: student.firstName, 
+        last_name: student.lastName.length > 1 ? student.lastName.charAt(0) + '.' : student.lastName, 
+        birth_date: null,
+        photo_url: '/avatar_ghost.jpg',
+        avatar_url: studentAvatarUrl,
+        qr_token: qrToken,
+        is_external_vocalist: isVocalist,
+        instrument: studentInstrument,
+        is_campus_active: activePlatform === 'campus',
+        is_groovelab_active: activePlatform === 'groovelab'
+      };
+    });
+
+    try {
+      const { data, error } = await supabase.from('users').insert(studentsToInsert).select();
+      
+      if (error) {
+        alert('Fehler beim Anlegen: ' + error.message);
+      } else if (data && data.length > 0) {
+        const avatarsToInsert = data.map(dbStudent => {
+          const studentInstrument = dbStudent.instrument || 'Gitarre';
+          const studentAvatarUrl = getInstrumentAvatarUrl(studentInstrument);
+          return {
+            user_id: dbStudent.id,
+            avatar_style: 'Premium_Hero',
+            instrument_type: getInstrumentTypeKey(studentInstrument),
+            evolution_level: 1,
+            xp: 0,
+            asset_path: studentAvatarUrl,
+            streak_flame: 0
+          };
+        });
+        
+        await supabase.from('avatars').upsert(avatarsToInsert);
+        
+        setStudents([...students, ...data]);
+        setShowBulkAddStudents(false);
+        setBulkInput('');
+        setParsedStudents([]);
+      }
+    } catch (err: any) {
+      alert('Fehler: ' + err.message);
+    } finally {
+      setIsBulkSaving(false);
     }
   };
 
@@ -2622,74 +2748,133 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   };
 
 
-  const renderStudentsTab = () => (
-    <div style={{ marginTop: '24px' }}>
+  const handleDeleteAllStudents = async () => {
+    const confirmDelete = window.confirm("Möchtest du WIRKLICH ALLE Schüler löschen? Dies kann nicht rückgängig gemacht werden!");
+    if (!confirmDelete) return;
+
+    try {
+      const studentIds = students.map(s => s.id);
+      if (studentIds.length === 0) return;
+
+      await supabase.from('band_members').delete().in('user_id', studentIds);
+      await supabase.from('user_song_skills').delete().in('user_id', studentIds);
+      await supabase.from('sessions').delete().in('user_id', studentIds);
+      await supabase.from('band_songs').update({ suggested_by: null }).in('suggested_by', studentIds);
+      await supabase.from('lab_planning').delete().in('user_id', studentIds);
+      await supabase.from('band_shoutbox').delete().in('user_id', studentIds);
+      await supabase.from('band_song_slots').delete().in('user_id', studentIds);
+      await supabase.from('help_requests').delete().in('user_id', studentIds);
+      await supabase.from('avatars').delete().in('user_id', studentIds);
+      await supabase.from('users').delete().in('id', studentIds);
+
+      setStudents([]);
+      alert("Alle Schüler wurden erfolgreich gelöscht.");
+    } catch (err: any) {
+      console.error("Fehler beim Löschen aller Schüler:", err);
+      alert("Ein Fehler ist aufgetreten.");
+    }
+  };
+
+  const renderStudentsTab = () => {
+    const brandColor = '#16a34a';
+    return (
+      <div style={{ marginTop: '0px' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 950, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '14px', margin: 0 }}>
-            <div style={{ background: `${brandColor}15`, color: brandColor, padding: '10px', borderRadius: '14px', display: 'flex', alignItems: 'center' }}>
-              <Users size={24} />
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 950, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
+            <div style={{ background: `${brandColor}15`, color: brandColor, padding: '6px', borderRadius: '10px', display: 'flex', alignItems: 'center' }}>
+              <Users size={18} />
             </div>
             Schülerverwaltung
           </h2>
-          <div style={{ display: 'flex', gap: '12px' }}>
-            {/* Filter Switch */}
-            <div style={{ background: '#f1f5f9', padding: '4px', borderRadius: '16px', display: 'flex', gap: '4px', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)' }}>
-              <button 
-                onClick={() => setVocalistOnlyMode(false)}
-                style={{ 
-                  padding: '8px 20px', 
-                  borderRadius: '12px', 
-                  border: 'none', 
-                  background: !vocalistOnlyMode ? 'white' : 'transparent',
-                  color: !vocalistOnlyMode ? '#1e293b' : '#94a3b8',
-                  fontWeight: 900,
-                  fontSize: '0.8rem',
-                  cursor: 'pointer',
-                  boxShadow: !vocalistOnlyMode ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
-                  transition: 'all 0.2s'
+          <div style={{ display: 'flex', gap: '10px' }}>
+            {/* Apple-like Segmented Switch for Active / Archive */}
+            <div style={{
+              display: 'flex',
+              background: 'rgba(241, 245, 249, 0.8)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              padding: '4px',
+              borderRadius: '16px',
+              border: '1px solid rgba(226, 232, 240, 0.8)',
+              position: 'relative'
+            }}>
+              <button
+                onClick={() => setListType('active')}
+                style={{
+                  flex: 1, padding: '8px 16px', borderRadius: '12px', border: 'none',
+                  background: listType === 'active' ? 'white' : 'transparent',
+                  color: listType === 'active' ? brandColor : '#64748b',
+                  fontWeight: listType === 'active' ? 800 : 600, fontSize: '0.85rem',
+                  boxShadow: listType === 'active' ? '0 4px 12px rgba(0,0,0,0.06)' : 'none',
+                  cursor: 'pointer', transition: 'all 0.3s', display: 'flex', alignItems: 'center', gap: '6px'
                 }}
               >
-                Musiker
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: listType === 'active' ? '#22c55e' : 'transparent' }} />
+                Aktive Schüler
               </button>
-              <button 
-                onClick={() => setVocalistOnlyMode(true)}
-                style={{ 
-                  padding: '8px 20px', 
-                  borderRadius: '12px', 
-                  border: 'none', 
-                  background: vocalistOnlyMode ? 'white' : 'transparent',
-                  color: vocalistOnlyMode ? '#1e293b' : '#94a3b8',
-                  fontWeight: 900,
-                  fontSize: '0.8rem',
-                  cursor: 'pointer',
-                  boxShadow: vocalistOnlyMode ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
-                  transition: 'all 0.2s'
+              <button
+                onClick={() => setListType('archive')}
+                style={{
+                  flex: 1, padding: '8px 16px', borderRadius: '12px', border: 'none',
+                  background: listType === 'archive' ? 'white' : 'transparent',
+                  color: listType === 'archive' ? '#16a34a' : '#64748b',
+                  fontWeight: listType === 'archive' ? 800 : 600, fontSize: '0.85rem',
+                  boxShadow: listType === 'archive' ? '0 4px 12px rgba(0,0,0,0.06)' : 'none',
+                  cursor: 'pointer', transition: 'all 0.3s', display: 'flex', alignItems: 'center', gap: '6px'
                 }}
               >
-                Gesangsschüler
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: listType === 'archive' ? '#16a34a' : 'transparent' }} />
+                Archiv
               </button>
             </div>
 
+
             <button 
-              onClick={() => setShowAddStudent(!showAddStudent)} 
-              style={{ 
-                background: `linear-gradient(135deg, ${brandColor}, ${brandColor}ee)`, 
-                color: 'white', 
-                border: 'none', 
-                padding: '12px 24px', 
-                borderRadius: '16px', 
-                cursor: 'pointer', 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '10px', 
-                fontSize: '0.9rem', 
+              onClick={() => {
+                setShowBulkAddStudents(!showBulkAddStudents);
+                setShowAddStudent(false);
+              }}
+              style={{
+                background: showBulkAddStudents ? '#cbd5e1' : `linear-gradient(135deg, #0284c7, #0369a1)`,
+                color: showBulkAddStudents ? '#475569' : 'white',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '0.85rem',
                 fontWeight: 900,
-                boxShadow: `0 8px 20px -6px ${brandColor}60`,
+                boxShadow: showBulkAddStudents ? 'none' : `0 6px 16px -6px rgba(2,132,199,0.4)`,
                 transition: 'all 0.2s ease'
               }}
             >
-              <Plus size={20} strokeWidth={3} /> Neu anlegen
+              <Users size={16} /> Schnell anlegen
+            </button>
+            <button 
+              onClick={() => {
+                setShowAddStudent(!showAddStudent);
+                setShowBulkAddStudents(false);
+              }} 
+              style={{ 
+                background: showAddStudent ? '#cbd5e1' : `linear-gradient(135deg, ${brandColor}, ${brandColor}ee)`, 
+                color: showAddStudent ? '#475569' : 'white', 
+                border: 'none', 
+                padding: '8px 16px', 
+                borderRadius: '12px', 
+                cursor: 'pointer', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px', 
+                fontSize: '0.85rem', 
+                fontWeight: 900,
+                boxShadow: showAddStudent ? 'none' : `0 6px 16px -6px ${brandColor}60`,
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <Plus size={16} strokeWidth={3} /> Neu anlegen
             </button>
           </div>
         </div>
@@ -2760,9 +2945,144 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           </form>
         )}
 
+        {showBulkAddStudents && (
+          <form onSubmit={handleBulkAddSubmit} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px', background: 'white', borderRadius: '20px', border: `1px solid ${brandColor}20` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Users size={20} color={brandColor} /> Mehrere Schüler schnell anlegen
+              </h3>
+              <button 
+                type="button" 
+                onClick={() => {
+                  setShowBulkAddStudents(false);
+                  setBulkInput('');
+                  setParsedStudents([]);
+                }}
+                style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Clickable Instrument Avatars */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Klasse wählen (Instrument)</label>
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', padding: '4px 0' }}>
+                {[
+                  { name: 'Gitarre', label: 'Gitarre' },
+                  { name: 'Bass', label: 'Bass' },
+                  { name: 'Drums', label: 'Drums' },
+                  { name: 'Piano / Keys', label: 'Piano' },
+                  { name: 'Gesang', label: 'Gesang' },
+                  { name: 'Trompete', label: 'Trompete' },
+                  { name: 'Posaune', label: 'Posaune' },
+                  { name: 'Horn', label: 'Horn' },
+                  { name: 'Cello', label: 'Cello' },
+                  { name: 'Geige', label: 'Geige' },
+                  { name: 'Klarinette', label: 'Klarinette' },
+                  { name: 'Querflöte', label: 'Querflöte' },
+                  { name: 'Saxofon', label: 'Saxofon' }
+                ].map(inst => {
+                  const isActive = defaultInstrumentForBulk === inst.name;
+                  return (
+                    <button
+                      key={inst.name}
+                      type="button"
+                      onClick={() => {
+                        setDefaultInstrumentForBulk(inst.name);
+                        parseBulkInput(bulkInput, inst.name);
+                      }}
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: '14px',
+                        border: isActive ? `2px solid ${brandColor}` : '2px solid #e2e8f0',
+                        background: isActive ? `${brandColor}0d` : 'white',
+                        color: isActive ? brandColor : '#475569',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        fontSize: '0.85rem',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        boxShadow: isActive ? '0 4px 12px rgba(0,0,0,0.05)' : 'none'
+                      }}
+                    >
+                      <img 
+                        src={getInstrumentAvatarUrl(inst.name)} 
+                        style={{ width: '24px', height: '24px', borderRadius: '6px', objectFit: 'cover' }} 
+                      />
+                      {inst.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Schülerliste (Namen)</label>
+              <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>
+                Füge einen Schülernamen pro Zeile ein. Alle Schüler werden der oben ausgewählten Klasse zugewiesen.
+              </div>
+              <textarea 
+                placeholder="Beispiel:&#10;Lukas Müller&#10;Marie Schmidt&#10;Felix Becker"
+                value={bulkInput}
+                onChange={e => {
+                  setBulkInput(e.target.value);
+                  parseBulkInput(e.target.value, defaultInstrumentForBulk);
+                }}
+                style={{ 
+                  padding: '14px', 
+                  borderRadius: '12px', 
+                  border: '1px solid #e2e8f0', 
+                  background: '#f8fafc', 
+                  fontWeight: 600,
+                  minHeight: '140px',
+                  fontFamily: 'monospace',
+                  fontSize: '0.9rem',
+                  lineHeight: '1.4',
+                  outline: 'none',
+                  resize: 'vertical'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button 
+                type="submit" 
+                disabled={isBulkSaving || parsedStudents.length === 0}
+                style={{ 
+                  flex: 1, 
+                  background: parsedStudents.length === 0 ? '#cbd5e1' : brandColor, 
+                  color: 'white', 
+                  border: 'none', 
+                  padding: '14px', 
+                  borderRadius: '12px', 
+                  fontWeight: 800, 
+                  cursor: parsedStudents.length === 0 || isBulkSaving ? 'not-allowed' : 'pointer',
+                  opacity: isBulkSaving ? 0.7 : 1
+                }}
+              >
+                {isBulkSaving ? 'Speichern...' : `Alle ${parsedStudents.length} Schüler anlegen`}
+              </button>
+              <button 
+                type="button" 
+                onClick={() => {
+                  setShowBulkAddStudents(false);
+                  setBulkInput('');
+                  setParsedStudents([]);
+                }} 
+                style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 700, cursor: 'pointer' }}
+              >
+                Abbrechen
+              </button>
+            </div>
+          </form>
+        )}
+
         {editingStudent && (
-          <form onSubmit={handleUpdateStudent} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: '#fffbeb', border: `1px solid #fde68a`, borderRadius: '20px' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#b45309' }}>Schüler bearbeiten</h3>
+          <form onSubmit={handleUpdateStudent} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: '#f0fdf4', border: `1px solid #bbf7d0`, borderRadius: '20px' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#15803d' }}>Schüler bearbeiten</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <input required placeholder="Vorname" value={editingStudent.first_name || ''} onChange={e => setEditingStudent({...editingStudent, first_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
               <input required placeholder="Nachname" value={editingStudent.last_name || ''} onChange={e => setEditingStudent({...editingStudent, last_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
@@ -2860,211 +3180,91 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           />
         </div>
 
-        {/* Status Filters */}
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
-          <button
-            onClick={() => setStatusFilter('all')}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '12px',
-              border: statusFilter === 'all' ? `1.5px solid ${brandColor}` : '1.5px solid #e2e8f0',
-              background: statusFilter === 'all' ? `${brandColor}0a` : 'white',
-              color: statusFilter === 'all' ? brandColor : '#64748b',
-              fontWeight: 800,
-              fontSize: '0.8rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.2s',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
-            }}
-            className="hover-scale"
-          >
-            Alle
-          </button>
-          <button
-            onClick={() => setStatusFilter('green')}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '12px',
-              border: statusFilter === 'green' ? '1.5px solid #10b981' : '1.5px solid #e2e8f0',
-              background: statusFilter === 'green' ? '#10b98110' : 'white',
-              color: statusFilter === 'green' ? '#059669' : '#64748b',
-              fontWeight: 800,
-              fontSize: '0.8rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              transition: 'all 0.2s',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
-            }}
-            className="hover-scale"
-          >
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }}></span>
-            Live Lab
-          </button>
-          <button
-            onClick={() => setStatusFilter('yellow')}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '12px',
-              border: statusFilter === 'yellow' ? '1.5px solid #fbbf24' : '1.5px solid #e2e8f0',
-              background: statusFilter === 'yellow' ? '#fbbf2415' : 'white',
-              color: statusFilter === 'yellow' ? '#d97706' : '#64748b',
-              fontWeight: 800,
-              fontSize: '0.8rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              transition: 'all 0.2s',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
-            }}
-            className="hover-scale"
-          >
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#fbbf24' }}></span>
-            Home Modus
-          </button>
-          <button
-            onClick={() => setStatusFilter('red')}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '12px',
-              border: statusFilter === 'red' ? '1.5px solid #ef4444' : '1.5px solid #e2e8f0',
-              background: statusFilter === 'red' ? '#ef444410' : 'white',
-              color: statusFilter === 'red' ? '#dc2626' : '#64748b',
-              fontWeight: 800,
-              fontSize: '0.8rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              transition: 'all 0.2s',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
-            }}
-            className="hover-scale"
-          >
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444' }}></span>
-            Offline
-          </button>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', gap: '14px' }}>
           {students.filter(s => {
+            const isArchived = s.contract_ends_at && new Date(s.contract_ends_at).getTime() < Date.now();
+            if (listType === 'active' && isArchived) return false;
+            if (listType === 'archive' && !isArchived) return false;
+
+            const inst = s.instrument?.toLowerCase() || 'gitarre';
+            let normInst = s.instrument || 'Gitarre';
+            if (inst.includes('guitar') || inst.includes('gitarre')) normInst = 'Gitarre';
+            else if (inst.includes('bass')) normInst = 'Bass';
+            else if (inst.includes('drum') || inst.includes('schlagzeug')) normInst = 'Drums';
+            else if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier')) normInst = 'Piano';
+            else if (inst.includes('vocal') || inst.includes('gesang')) normInst = 'Vocals';
+
+            if (instrumentFilter !== 'all' && normInst !== instrumentFilter) return false;
+
             const fullName = `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase();
-            const matchesSearch = fullName.includes(studentSearch.toLowerCase());
-            const matchesType = vocalistOnlyMode ? s.is_external_vocalist : !s.is_external_vocalist;
-            
-            let matchesStatus = true;
-            if (statusFilter !== 'all') {
-              const statusColor = getStatusColor(s.id, s.last_seen, s.created_at);
-              if (statusFilter === 'green' && statusColor !== '#10b981') matchesStatus = false;
-              if (statusFilter === 'yellow' && statusColor !== '#fbbf24') matchesStatus = false;
-              if (statusFilter === 'red' && statusColor !== '#ef4444') matchesStatus = false;
-            }
-            
-            return matchesSearch && matchesType && matchesStatus;
+            return fullName.includes(studentSearch.toLowerCase());
           }).map(s => {
-            const statusColor = getStatusColor(s.id, s.last_seen, s.created_at);
-            const statusText = statusColor === '#10b981' 
-              ? 'Im Live Lab eingecheckt' 
-              : (statusColor === '#fbbf24' ? 'Im Home Modus eingecheckt' : 'Nicht eingeloggt');
+            const avatarSrc = getInstrumentAvatarUrl(s.instrument);
+
             return (
               <div 
                 key={s.id} 
                 className="glass-panel" 
                 style={{ 
-                  padding: '20px', 
+                  padding: '14px 18px', 
                   background: 'white', 
                   display: 'flex', 
                   justifyContent: 'space-between', 
                   alignItems: 'center', 
                   borderRadius: '24px', 
                   border: '1px solid #e2e8f0', 
-                  borderLeft: `8px solid ${brandColor}`, 
-                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.02), 0 8px 10px -6px rgba(0, 0, 0, 0.02)',
+                  borderLeft: `5px solid ${brandColor}`, 
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
                   transition: 'transform 0.2s, box-shadow 0.2s', 
                   cursor: 'default' 
                 }} 
-                 
-                
               >
                 <div 
                   onClick={() => fetchStudentProfile(s)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', flex: 1 }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', flex: 1 }}
                 >
                   <div style={{ position: 'relative' }}>
                     <div style={{ 
-                      width: '64px', 
-                      height: '64px', 
-                      borderRadius: '20px', 
+                      width: '48px', 
+                      height: '48px', 
+                      borderRadius: '12px', 
                       background: `${brandColor}15`,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       overflow: 'hidden',
                       border: '2px solid white',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
                       position: 'relative'
                     }}>
-                      <span style={{ fontSize: '1.25rem', fontWeight: 900, color: brandColor, position: 'absolute', zIndex: 0 }}>{s.first_name?.[0]}</span>
+                      <span style={{ fontSize: '1rem', fontWeight: 900, color: brandColor, position: 'absolute', zIndex: 0 }}>{s.first_name?.[0]}</span>
                       <img 
-                        src={s.photo_url || '/avatar_ghost.jpg'} 
+                        src={avatarSrc} 
                         style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'relative', zIndex: 1 }}
                         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                       />
                     </div>
-                    <div style={{
-                      position: 'absolute',
-                      bottom: '-2px',
-                      right: '-2px',
-                      width: '20px',
-                      height: '20px',
-                      borderRadius: '50%',
-                      backgroundColor: statusColor,
-                      border: '3px solid white',
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-                      zIndex: 10
-                    }} title={statusText} />
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '1.15rem', letterSpacing: '-0.02em' }}>{s.first_name} {s.last_name}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontFamily: 'monospace', fontWeight: 600 }}>ID: {s.id.split('-')[0].toUpperCase()}</div>
+                    <div style={{ fontWeight: 900, color: '#000000', fontSize: '1rem', letterSpacing: '-0.01em', lineHeight: '1.2' }}>{s.first_name} {s.last_name}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div style={{ fontSize: '0.72rem', color: '#7d7d82', fontFamily: 'monospace', fontWeight: 600 }}>ID: {s.id.split('-')[0].toUpperCase()}</div>
                       {s.is_trial && (
-                        <div style={{ padding: '2px 6px', background: '#fef2f2', color: '#ef4444', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 800 }}>
-                          ⏳ IN PROBEZEIT
+                        <div style={{ padding: '1px 5px', background: '#fef2f2', color: '#ef4444', borderRadius: '5px', fontSize: '0.6rem', fontWeight: 900 }}>
+                          ⏳ PROBE
                         </div>
                       )}
                     </div>
-                    <div style={{ 
-                      display: 'inline-flex', 
-                      alignItems: 'center', 
-                      gap: '6px', 
-                      background: '#fef3c7', 
-                      color: '#d97706', 
-                      padding: '4px 10px', 
-                      borderRadius: '8px', 
-                      fontSize: '0.75rem', 
-                      fontWeight: 800, 
-                      marginTop: '6px',
-                      width: 'fit-content'
-                    }}>
-                      <Star size={12} fill="#d97706" color="#d97706" />
-                      <span>{studentsXP[s.id] || 0} XP</span>
-                    </div>
                   </div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginLeft: '12px' }}>
+                <div style={{ display: 'flex', gap: '6px', marginLeft: '8px' }}>
                   <button 
                     onClick={(e) => { e.stopPropagation(); setEditingStudent(s); }} 
                     style={{ 
-                      background: "#f1f5f9", 
-                      border: "none", 
-                      padding: "10px", 
-                      borderRadius: "12px", 
+                      background: "#ffffff", 
+                      border: "1px solid #cbd5e1", 
+                      padding: "8px", 
+                      borderRadius: "10px", 
                       cursor: "pointer", 
                       color: "#475569", 
                       transition: 'all 0.2s',
@@ -3072,19 +3272,18 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                       alignItems: 'center',
                       justifyContent: 'center'
                     }} 
-                     
-                     
+                    className="hover-scale-mini"
                     title="Bearbeiten"
                   >
-                    <Pencil size={18} />
+                    <Pencil size={16} />
                   </button>
                   <button 
                     onClick={(e) => { e.stopPropagation(); setSelectedQRUser(s); }} 
                     style={{ 
-                      background: "#f1f5f9", 
-                      border: "none", 
-                      padding: "10px", 
-                      borderRadius: "12px", 
+                      background: "#ffffff", 
+                      border: "1px solid #cbd5e1", 
+                      padding: "8px", 
+                      borderRadius: "10px", 
                       cursor: "pointer", 
                       color: "#475569", 
                       transition: 'all 0.2s',
@@ -3092,31 +3291,10 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                       alignItems: 'center',
                       justifyContent: 'center'
                     }} 
-                     
-                     
+                    className="hover-scale-mini"
                     title="QR Code"
                   >
-                    <QrCode size={18} />
-                  </button>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); handleDeleteStudent(s.id); }} 
-                    style={{ 
-                      background: "#f1f5f9", 
-                      border: "none", 
-                      padding: "10px", 
-                      borderRadius: "12px", 
-                      cursor: "pointer", 
-                      color: "#ef4444", 
-                      transition: 'all 0.2s',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }} 
-                     
-                     
-                    title="Löschen"
-                  >
-                    <Trash2 size={18} />
+                    <QrCode size={16} />
                   </button>
                 </div>
               </div>
@@ -3124,8 +3302,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           })}
         </div>
       </div>
-    </div>
-  );
+      </div>
+    );
+  };
 
   const renderTeachersTab = () => (
     <div style={{ marginTop: '24px' }}>
@@ -5649,14 +5828,16 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     }}>
       {activeTab !== 'live' && (
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', marginTop: '16px', gap: '20px', flexWrap: 'wrap' }}>
-          <div>
-            <h1 style={{ fontSize: '2rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.03em', margin: 0 }}>
-              {sidebarItems.find(i => i.id === activeTab)?.label}
-            </h1>
-            <p style={{ color: '#94a3b8', fontSize: '0.9rem', fontWeight: 500, marginTop: '2px' }}>
-              {(admin as any)?.schools?.name} • Management Dashboard
-            </p>
-          </div>
+          {activeTab !== 'students' && (
+            <div>
+              <h1 style={{ fontSize: '2rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.03em', margin: 0 }}>
+                {sidebarItems.find(i => i.id === activeTab)?.label}
+              </h1>
+              <p style={{ color: '#94a3b8', fontSize: '0.9rem', fontWeight: 500, marginTop: '2px' }}>
+                {(admin as any)?.schools?.name} • Management Dashboard
+              </p>
+            </div>
+          )}
 
           {/* Quota Progress Indicators */}
           {(admin as any)?.schools?.limits_enabled && (

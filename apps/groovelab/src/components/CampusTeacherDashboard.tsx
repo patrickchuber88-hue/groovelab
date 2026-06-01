@@ -113,6 +113,59 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
   }, [userId]);
 
   useEffect(() => {
+    if (!userId || !teacher) return;
+
+    const channelSchedules = supabase
+      .channel(`realtime_teacher_schedules_${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'schedules'
+        },
+        (payload) => {
+          const newRec = payload.new as any;
+          const oldRec = payload.old as any;
+          if (
+            (newRec && newRec.teacher_id === userId) ||
+            (oldRec && oldRec.teacher_id === userId)
+          ) {
+            refreshAllData(teacher.school_id, userId);
+          }
+        }
+      )
+      .subscribe();
+
+    const channelOccurrences = supabase
+      .channel(`realtime_teacher_occurrences_${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'schedule_occurrences'
+        },
+        (payload) => {
+          const newRec = payload.new as any;
+          const oldRec = payload.old as any;
+          if (
+            (newRec && newRec.teacher_id === userId) ||
+            (oldRec && oldRec.teacher_id === userId)
+          ) {
+            refreshAllData(teacher.school_id, userId);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channelSchedules);
+      supabase.removeChannel(channelOccurrences);
+    };
+  }, [userId, teacher]);
+
+  useEffect(() => {
     const timer = setInterval(() => {
       const now = new Date();
       setCurrentTimeStr(now.toTimeString().substring(0, 5));
@@ -386,7 +439,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
   };
 
   // Board 3: Tausch-Engine & Traffic Light Logic
-  const getTrafficLight = (draggedId: string, timeSlot: string, dayOfWeek: number, roomId: string) => {
+  const getTrafficLight = (draggedId: string, timeSlot: string, dayOfWeek: number, roomId: string): 'GREEN' | 'YELLOW' | 'RED' => {
     // 1. Find schedule structure
     const sched = weekSchedules.find(s => s.id === draggedId);
     if (!sched || !sched.student) return 'RED';
@@ -428,11 +481,11 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
       if (targetAvail.prio === 'PRIO_HIGH') {
         return 'GREEN';
       }
-      return 'YELLOW';
+      return 'GREEN';
     }
 
-    // Default outside of availabilities is YELLOW (parent consent flow)
-    return 'YELLOW';
+    // Default outside of availabilities is GREEN
+    return 'GREEN';
   };
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
@@ -1169,7 +1222,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                           isSick 
                             ? 'bg-red-950/20 border-red-900/35 hover:bg-red-950/30' 
                             : sched.status === 'pending_reschedule'
-                              ? 'bg-yellow-950/15 border-yellow-500/50 hover:border-yellow-500 shadow-md shadow-yellow-500/5'
+                              ? 'bg-emerald-950/15 border-emerald-500/50 hover:border-emerald-500 shadow-md shadow-emerald-500/5'
                               : isActive 
                                 ? 'bg-emerald-950/10 border-emerald-500/50 shadow-md shadow-emerald-500/5 hover:border-emerald-500' 
                                 : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
@@ -1207,7 +1260,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                               </span>
                             ) : sched.status === 'pending_reschedule' ? (
                               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
-                                <span className="px-2.5 py-1 text-[10px] font-black uppercase bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 rounded-md">
+                                <span className="px-2.5 py-1 text-[10px] font-black uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-md">
                                   Verschiebung erbeten
                                 </span>
                                 <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
@@ -1349,7 +1402,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                           histItem.status === 'MASTERED' 
                             ? 'bg-emerald-500' 
                             : histItem.status === 'THEORY_DONE' 
-                              ? 'bg-yellow-500' 
+                              ? 'bg-emerald-500' 
                               : 'bg-slate-600'
                         }`}></div>
                         <div className="flex-1">
@@ -1361,7 +1414,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                             <p className="text-xs text-slate-400 mt-1 font-medium">{histItem.teacher_notes}</p>
                           )}
                           {histItem.is_current_homework && (
-                            <span className="mt-2 inline-block px-2 py-0.5 text-[9px] font-black uppercase bg-yellow-500/10 text-yellow-400 rounded border border-yellow-500/20">
+                            <span className="mt-2 inline-block px-2 py-0.5 text-[9px] font-black uppercase bg-emerald-500/10 text-emerald-400 rounded border border-emerald-500/20">
                               Hausaufgabe
                             </span>
                           )}
@@ -1380,9 +1433,6 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
           <div className="p-8 max-w-full w-full mx-auto space-y-6">
             <div>
               <h1 className="text-3xl font-black tracking-tight text-white">Wochen-Stundenplan</h1>
-              <p className="text-slate-400 text-sm mt-1">
-                Drag-and-Drop 80/20 Tausch-Engine mit Ampel-Kollisions-Schutz.
-              </p>
             </div>
 
             {/* Calendar Table Grid */}
@@ -1433,7 +1483,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                                       : sched.status === 'teacher_sick' || sched.status === 'canceled_by_teacher_sick'
                                         ? 'bg-red-950/30 border-red-900/60 text-red-300'
                                         : sched.status === 'pending_parent_approval'
-                                          ? 'bg-yellow-950/20 border-yellow-700/50 text-yellow-300'
+                                          ? 'bg-emerald-950/20 border-emerald-700/50 text-emerald-300'
                                           : 'bg-slate-900 border-slate-800 text-white'
                                   }`}
                                 >
@@ -1717,7 +1767,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                       onClick={() => setNewDocStatus('THEORY_DONE')}
                       className={`p-3.5 rounded-xl border text-center font-bold text-xs uppercase transition duration-150 ${
                         newDocStatus === 'THEORY_DONE'
-                          ? 'bg-yellow-500/10 border-yellow-500 text-yellow-400'
+                          ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
                           : 'bg-slate-900/60 border-slate-850 text-slate-400 hover:text-slate-200'
                       }`}
                     >
@@ -1790,7 +1840,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                             hist.status === 'MASTERED'
                               ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                               : hist.status === 'THEORY_DONE'
-                                ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                                 : 'bg-slate-800 text-slate-400 border border-slate-700'
                           }`}>
                             {hist.status}

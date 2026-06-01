@@ -33,6 +33,34 @@ interface School {
   secretary_onboarding_token?: string | null;
 }
 
+function getSubdomainOrigin(schoolName: string): string {
+  const subdomain = schoolName
+    .toLowerCase()
+    .trim()
+    .replace(/[äöüß]/g, (match) => {
+      const mapping: Record<string, string> = { 'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss' };
+      return mapping[match] || match;
+    })
+    .replace(/[^a-z0-9]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  const host = window.location.host;
+  const protocol = window.location.protocol;
+  const parts = host.split('.');
+
+  if (parts.includes('localhost') || host.includes('localhost') || host.includes('127.0.0.1')) {
+    const port = host.split(':')[1] || '5173';
+    return `${protocol}//${subdomain}.localhost:${port}`;
+  } else {
+    let domainParts = [...parts];
+    if (domainParts.length >= 3 && (domainParts[0] === 'admin' || domainParts[0] === 'campus-groovelab' || domainParts[0] === 'www')) {
+      domainParts.shift();
+    }
+    return `${protocol}//${subdomain}.${domainParts.join('.')}`;
+  }
+}
+
 interface MasterAdminDashboardProps {
   onLogout: () => void;
 }
@@ -2164,7 +2192,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                 <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px' }}>
                   🔗 Schule einbinden & Direkt-Login
                 </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '24px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
                    {/* Link 1: Secretary Invitation Link */}
                    <div>
                      <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -2215,15 +2243,15 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                      </p>
                    </div>
 
-                   {/* Link 2: Campus QR Link (No Kiosk) */}
+                   {/* Link 2: Combined Subdomain QR Scanner Link */}
                    <div>
                      <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                       2. Campus Link zum QR-Scanner (ohne Kiosk)
+                       2. Campus & GrooveLab Direkt-Link (QR-Scanner & Direkt-Login)
                      </label>
                      <div style={{ display: 'flex', gap: '10px' }}>
                        <input
                          readOnly
-                         value={`${window.location.origin}/?school_id=${selectedSchool.id}`}
+                         value={getSubdomainOrigin(selectedSchool.name)}
                          style={{
                            flex: 1,
                            padding: '12px 14px',
@@ -2240,8 +2268,8 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                        <button
                          type="button"
                          onClick={() => {
-                           navigator.clipboard.writeText(`${window.location.origin}/?school_id=${selectedSchool.id}`);
-                           alert('Campus QR-Scanner Link kopiert!');
+                           navigator.clipboard.writeText(getSubdomainOrigin(selectedSchool.name));
+                           alert('Direkt-Login Link kopiert!');
                          }}
                          style={{
                            background: '#f1f5f9',
@@ -2261,57 +2289,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                        </button>
                      </div>
                      <p style={{ margin: '6px 0 0 0', fontSize: '0.75rem', color: '#64748b', lineHeight: '1.4' }}>
-                       Öffnet den Login-Scanner im Standard-Modus für Schüler und Lehrer (z.B. auf privaten Geräten).
-                     </p>
-                   </div>
-
-                   {/* Link 3: Groovelab Kiosk Link */}
-                   <div>
-                     <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                       3. GrooveLab Link zum QR-Scanner (mit Kiosk)
-                     </label>
-                     <div style={{ display: 'flex', gap: '10px' }}>
-                       <input
-                         readOnly
-                         value={`${window.location.origin}/?kiosk_token=${selectedSchool.groovelab_kiosk_token || ''}`}
-                         style={{
-                           flex: 1,
-                           padding: '12px 14px',
-                           borderRadius: '10px',
-                           border: '1px solid #cbd5e1',
-                           background: '#f8fafc',
-                           fontSize: '0.8rem',
-                           fontFamily: 'monospace',
-                           color: '#334155',
-                           outline: 'none'
-                         }}
-                         onClick={(e) => (e.target as HTMLInputElement).select()}
-                       />
-                       <button
-                         type="button"
-                         onClick={() => {
-                           navigator.clipboard.writeText(`${window.location.origin}/?kiosk_token=${selectedSchool.groovelab_kiosk_token || ''}`);
-                           alert('Kiosk QR-Scanner Link kopiert!');
-                         }}
-                         style={{
-                           background: '#f1f5f9',
-                           color: '#334155',
-                           border: '1px solid #cbd5e1',
-                           borderRadius: '10px',
-                           padding: '12px 16px',
-                           fontSize: '0.82rem',
-                           fontWeight: 800,
-                           cursor: 'pointer',
-                           transition: 'all 0.2s'
-                         }}
-                         onMouseOver={(e) => e.currentTarget.style.background = '#e2e8f0'}
-                         onMouseOut={(e) => e.currentTarget.style.background = '#f1f5f9'}
-                       >
-                         Kopieren
-                       </button>
-                     </div>
-                     <p style={{ margin: '6px 0 0 0', fontSize: '0.75rem', color: '#64748b', lineHeight: '1.4' }}>
-                       Öffnet den Login-Scanner im Kiosk-Modus für fest installierte Proberaum-Terminals.
+                       Öffnet den Login-Scanner direkt über die individuelle Subdomain der Schule (sowohl für reguläre Geräte als auch für Kiosk-Terminals).
                      </p>
                    </div>
                  </div>

@@ -1,0 +1,26 @@
+const { createClient } = require('@supabase/supabase-js');
+
+const supabaseUrl = 'https://supabase.178.105.10.2.sslip.io';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzc5NTUzODQzLCJleHAiOjE5MzcyMzM4NDN9.NPFKhuj3WiiJ7pqG7w91QAEy1V696kfTcEunScUAAoI';
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+async function main() {
+  console.log('Querying progress_matrix...');
+  const { data, error } = await supabase
+    .from('progress_matrix')
+    .select('*')
+    .order('updated_at', { ascending: false });
+
+  if (error) {
+    console.error('Error:', error);
+    return;
+  }
+
+  console.log(`Found ${data.length} records in progress_matrix:`);
+  data.forEach((row, i) => {
+    console.log(`[${i}] student_id: ${row.student_id}, topic: "${row.topic_name}", status: ${row.status}, is_current_homework: ${row.is_current_homework}, homework_notes: "${row.homework_notes}"`);
+  });
+}
+
+main();

@@ -1,36 +1,54 @@
-import { createClient } from '@supabase/supabase-js'
-import fs from 'fs'
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+dotenv.config({ path: 'apps/groovelab/.env.local' });
 
-const env = fs.readFileSync('/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/.env.local', 'utf-8');
-const url = env.match(/VITE_SUPABASE_URL=(.*)/)[1].trim();
-const key = env.match(/VITE_SUPABASE_ANON_KEY=(.*)/)[1].trim();
-const supabase = createClient(url, key);
+const supabase = createClient(
+  process.env.VITE_SUPABASE_URL!,
+  process.env.VITE_SUPABASE_ANON_KEY!
+);
 
-async function testInsert() {
-  const schoolId = '11111111-1111-1111-1111-111111111111';
+async function run() {
+  const pin = 'GL-' + Math.floor(1000 + Math.random() * 9000);
+  const qrToken = 't_' + Math.random().toString(36).substring(2, 12);
   
-  const { data, error } = await supabase.from('users').insert({
-    school_id: schoolId,
-    role: 'teacher',
-    first_name: 'Test',
-    last_name: 'Teacher',
-    email: 'test@teacher.com',
-    instrument: 'Guitar',
-    max_students: 10,
-    ausweis_nummer: 'GL-9999',
-    teacher_qr_token: 't_testtoken',
-    is_active: false,
-    is_app_user: false
-  }).select();
+  // Let's get the first school id from DB
+  const { data: schools } = await supabase.from('schools').select('id').limit(1);
+  const schoolId = schools?.[0]?.id;
   
+  if (!schoolId) {
+    console.error("No school found in database.");
+    return;
+  }
+
+  console.log("Attempting to insert teacher with school ID:", schoolId);
+
+  const { data, error } = await supabase
+    .from('users')
+    .insert({
+      school_id: schoolId,
+      role: 'teacher',
+      first_name: 'Test',
+      last_name: 'Teacher',
+      email: 'test.teacher@musaek.de',
+      instrument: 'Klavier',
+      max_students: 10,
+      ausweis_nummer: pin,
+      teacher_qr_token: qrToken,
+      is_active: false,
+      is_app_user: false,
+      is_campus_active: true,
+      is_groovelab_active: false,
+      contract_ends_at: null
+    })
+    .select();
+
   if (error) {
-    console.error("INSERT ERROR:", error.message, error.details);
+    console.error('Error inserting teacher:', error);
   } else {
-    console.log("INSERT SUCCESS:", JSON.stringify(data, null, 2));
-    
-    // Clean up
+    console.log('Successfully inserted teacher:', data);
+    // clean up
     await supabase.from('users').delete().eq('id', data[0].id);
+    console.log('Cleaned up successfully');
   }
 }
-
-testInsert();
+run();

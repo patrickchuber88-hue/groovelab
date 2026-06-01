@@ -22,6 +22,7 @@ interface ScheduleOccurrence {
   status: 'scheduled' | 'pending_reschedule' | 'rescheduled_confirmed' | 'cancelled';
   original_date?: string;
   original_start_time?: string;
+  student_acknowledged?: boolean;
   student?: {
     first_name: string;
     last_name: string;
@@ -138,14 +139,17 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
   // Helper für Mutations
   const updateOccurrence = (id: string, updates: Partial<ScheduleOccurrence>) => {
     setPendingChanges(prev => {
-      const existing = prev[id] || baseOccurrences.find(o => o.id === id);
+      const baseOcc = baseOccurrences.find(o => o.id === id);
+      const existing = prev[id] || baseOcc;
       if (!existing) return prev;
       
       const newOcc = { ...existing, ...updates };
-      // Tracking der Ursprungsdaten
-      if (!newOcc.original_date) {
-        newOcc.original_date = existing.date;
-        newOcc.original_start_time = existing.start_time;
+      // Tracking der Ursprungsdaten – immer auf Basis der originalen DB-Werte (baseOcc)
+      if (baseOcc && !newOcc.original_date) {
+        newOcc.original_date = baseOcc.date;
+      }
+      if (baseOcc && !newOcc.original_start_time) {
+        newOcc.original_start_time = baseOcc.start_time;
       }
       return { ...prev, [id]: newOcc };
     });
@@ -246,6 +250,36 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
     loadOccurrences();
   }, [weekStart.getTime(), userId, JSON.stringify(boards)]);
 
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`realtime_teacher_calendar_${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'schedule_occurrences'
+        },
+        (payload) => {
+          const newRec = payload.new as any;
+          const oldRec = payload.old as any;
+          if (
+            (newRec && newRec.teacher_id === userId) ||
+            (oldRec && oldRec.teacher_id === userId)
+          ) {
+            loadOccurrences();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
+
   const loadOccurrences = async () => {
     setLoading(true);
     setSwapLinks([]); 
@@ -274,8 +308,49 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
         console.warn('DB fetch failed', err);
       }
 
-      if (fetchedData.length === 0 && boards && boards.length > 0) {
-        const projectedData: ScheduleOccurrence[] = [];
+      // Dynamically detect rescheduling by comparing database records with template boards
+      if (boards && boards.length > 0) {
+        fetchedData = fetchedData.map(occ => {
+          if (!occ.student_id) return occ;
+          
+          let templateDayOfWeek: number | null = null;
+          let templateTime = '';
+          
+          boards.forEach(board => {
+            const found = board.students?.find((s: any) => s.id === occ.student_id);
+            if (found) {
+              templateDayOfWeek = board.dayOfWeek;
+              templateTime = found.assignedTime || '';
+            }
+          });
+          
+          if (templateDayOfWeek !== null) {
+            const offset = templateDayOfWeek - 1;
+            const origDayDate = new Date(weekStart);
+            origDayDate.setDate(origDayDate.getDate() + offset);
+            const origDateStr = toLocalYYYYMMDD(origDayDate);
+            const formattedTemplateTime = templateTime.includes(':') && templateTime.split(':').length === 2 ? `${templateTime}:00` : (templateTime || '00:00:00');
+            
+            const hasDateDiff = occ.date !== origDateStr;
+            const hasTimeDiff = occ.start_time.substring(0, 5) !== formattedTemplateTime.substring(0, 5);
+            
+            if (hasDateDiff || hasTimeDiff) {
+              return {
+                ...occ,
+                original_date: occ.original_date || origDateStr,
+                original_start_time: occ.original_start_time || formattedTemplateTime,
+                status: occ.status === 'scheduled' ? 'pending_reschedule' : occ.status
+              };
+            }
+          }
+          return occ;
+        });
+      }
+
+      // Merge projected mock data with database entries so that every slot defined in the designer
+      // template (boards) is always visible in the calendar, even if only one or a few are saved in the DB.
+      const projectedData: ScheduleOccurrence[] = [];
+      if (boards && boards.length > 0) {
         boards.forEach(board => {
           const offset = board.dayOfWeek - 1;
           const dayDate = new Date(weekStart);
@@ -283,26 +358,50 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
           const dateStr = toLocalYYYYMMDD(dayDate);
 
           board.students.forEach((student: any) => {
-            if (!student.isBreak) {
-              projectedData.push({
-                id: `mock-${board.id}-${student.id}`,
-                student_id: student.id,
-                teacher_id: userId,
-                date: dateStr,
-                start_time: student.assignedTime ? `${student.assignedTime}:00` : '00:00:00',
-                duration: student.duration,
-                status: 'scheduled',
-                student: { 
-                  first_name: student.first_name || 'Pause', 
-                  last_name: student.last_name || '', 
-                  instrument: student.instrument || 'Allgemein' 
-                }
-              });
+            const formattedTime = student.assignedTime ? `${student.assignedTime}:00` : '00:00:00';
+            if (student.isBreak) {
+              // Add projected break/pause card if not already in fetchedData
+              const exists = fetchedData.some(o => o.start_time.substring(0, 5) === student.assignedTime.substring(0, 5) && o.date === dateStr && !o.student_id);
+              if (!exists) {
+                projectedData.push({
+                  id: `mock-${board.id}-${student.id}`,
+                  student_id: '',
+                  teacher_id: userId,
+                  date: dateStr,
+                  start_time: formattedTime,
+                  duration: student.duration,
+                  status: 'scheduled',
+                  student: {
+                    first_name: '☕️ Pause',
+                    last_name: '',
+                    instrument: ''
+                  }
+                });
+              }
+            } else {
+              // Check if a saved database record already covers this student in this week range
+              const exists = fetchedData.some(o => o.student_id === student.id);
+              if (!exists) {
+                projectedData.push({
+                  id: `mock-${board.id}-${student.id}`,
+                  student_id: student.id,
+                  teacher_id: userId,
+                  date: dateStr,
+                  start_time: formattedTime,
+                  duration: student.duration,
+                  status: 'scheduled',
+                  student: { 
+                    first_name: student.first_name || 'Pause', 
+                    last_name: student.last_name || '', 
+                    instrument: student.instrument || 'Allgemein' 
+                  }
+                });
+              }
             }
           });
         });
-        fetchedData = projectedData;
       }
+      fetchedData = [...fetchedData, ...projectedData];
 
       setBaseOccurrences(fetchedData);
     } catch (err) {
@@ -334,24 +433,15 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
 
     try {
       setLoading(true);
-      const modifiedOccs = baseOccurrences.filter(occ => 
-        occ.date >= weekStartStr && occ.date <= weekEndStr &&
-        (occ.status === 'cancelled' || occ.status === 'pending_reschedule' || (occ.original_date && (occ.original_date !== occ.date || occ.original_start_time !== occ.start_time)))
-      );
 
-      for (const occ of modifiedOccs) {
-        const { error } = await supabase
-          .from('schedule_occurrences')
-          .update({
-            date: occ.original_date || occ.date,
-            start_time: occ.original_start_time || occ.start_time,
-            status: 'scheduled',
-            student_acknowledged: false
-          })
-          .eq('id', occ.id);
-        
-        if (error) throw error;
-      }
+      const { error } = await supabase
+        .from('schedule_occurrences')
+        .delete()
+        .eq('teacher_id', userId)
+        .gte('date', weekStartStr)
+        .lte('date', weekEndStr);
+      
+      if (error) throw error;
 
       await loadOccurrences();
     } catch (err) {
@@ -408,34 +498,119 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
     }
     setEditOccState(null);
   };
-
-
   const savePendingChanges = async () => {
     setLoading(true);
     try {
       const changes = Object.values(pendingChanges);
+      const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+
       for (const change of changes) {
+        // Find base occurrence to see old/original details
+        const originalOcc = baseOccurrences.find(o => o.id === change.id);
+
         if (change.id.startsWith('mock-')) {
-          const { id, student, ...insertData } = change;
+          const { id, student, original_start_time, ...insertData } = change;
           insertData.original_date = insertData.original_date || change.date;
-          insertData.original_start_time = insertData.original_start_time || change.start_time;
-          // extract schedule_id from mock id if possible, mock-boardId-studentId
-          const parts = id.split('-');
-          if (parts.length >= 3) {
-             insertData.schedule_id = parts[2]; // we can guess it's the student id or schedule id
+          
+          try {
+            const { data: schData } = await supabase
+              .from('schedules')
+              .select('id')
+              .eq('student_id', change.student_id)
+              .eq('teacher_id', userId)
+              .limit(1);
+            
+            if (schData && schData.length > 0) {
+              insertData.schedule_id = schData[0].id;
+            } else {
+              insertData.schedule_id = undefined;
+            }
+          } catch (schErr) {
+            console.warn('Error fetching schedule_id for mock insert:', schErr);
+            insertData.schedule_id = undefined;
           }
-          await supabase.from('schedule_occurrences').insert(insertData);
+          
+          const origDateStr = change.original_date || (originalOcc ? originalOcc.date : change.date);
+          const origTimeStr = change.original_start_time || (originalOcc ? originalOcc.start_time : change.start_time);
+          
+          let finalStatus = change.status;
+          if (change.date === origDateStr && change.start_time.substring(0, 5) === origTimeStr.substring(0, 5)) {
+            finalStatus = 'scheduled';
+          }
+
+          insertData.original_date = origDateStr;
+          insertData.status = finalStatus;
+          
+          const { error } = await supabase.from('schedule_occurrences').insert(insertData);
+          if (error) throw error;
         } else {
-          await supabase.from('schedule_occurrences')
+          const origDateStr = change.original_date || (originalOcc ? originalOcc.date : change.date);
+          const origTimeStr = change.original_start_time || (originalOcc ? originalOcc.start_time : change.start_time);
+          
+          let finalStatus = change.status;
+          if (change.date === origDateStr && change.start_time.substring(0, 5) === origTimeStr.substring(0, 5)) {
+            finalStatus = 'scheduled';
+          }
+
+          const { error } = await supabase.from('schedule_occurrences')
             .update({
               date: change.date,
               start_time: change.start_time,
-              status: change.status,
-              original_date: change.original_date,
-              original_start_time: change.original_start_time,
+              status: finalStatus,
+              original_date: origDateStr,
               student_acknowledged: false
             })
             .eq('id', change.id);
+          
+          if (error) throw error;
+        }
+
+        // Automatic Notification logic via Campus Direct Messages
+        try {
+          if (change.student_id) {
+            let notificationMessage = '';
+            
+            const origDateStr = change.original_date || (originalOcc ? originalOcc.date : change.date);
+            const origTimeStr = change.original_start_time || (originalOcc ? originalOcc.start_time : change.start_time);
+            
+            const origDate = new Date(origDateStr);
+            const origDayLabel = DAYS_DE[origDate.getDay()];
+            const origDateLabel = origDate.toLocaleDateString('de-DE');
+            const origTimeLabel = origTimeStr.substring(0, 5);
+
+            const newDate = new Date(change.date);
+            const newDayLabel = DAYS_DE[newDate.getDay()];
+            const newDateLabel = newDate.toLocaleDateString('de-DE');
+            const newTimeLabel = change.start_time.substring(0, 5);
+
+            // Determine if the time actually changed compared to database/template
+            const oldDbDate = originalOcc ? originalOcc.date : origDateStr;
+            const oldDbTime = originalOcc ? originalOcc.start_time : origTimeStr;
+            const timeActuallyChanged = change.date !== oldDbDate || change.start_time.substring(0, 5) !== oldDbTime.substring(0, 5);
+
+            if (timeActuallyChanged) {
+              if (change.status === 'cancelled') {
+                notificationMessage = `Hallo! Dein Unterrichtstermin am ${origDayLabel}, ${origDateLabel} um ${origTimeLabel} Uhr wurde abgesagt.`;
+              } else {
+                const isReset = change.date === origDateStr && change.start_time.substring(0, 5) === origTimeStr.substring(0, 5);
+                if (isReset) {
+                  notificationMessage = `Hallo! Der verschobene Termin wurde wieder auf deinen ursprünglichen regulären Termin zurückgesetzt: ${newDayLabel}, ${newDateLabel} um ${newTimeLabel} Uhr.`;
+                } else {
+                  notificationMessage = `Hallo! Dein Unterrichtstermin wurde verschoben von: ${origDayLabel}, ${origDateLabel} ${origTimeLabel} Uhr auf den neuen Termin: ${newDayLabel}, ${newDateLabel} ${newTimeLabel} Uhr. Bitte bestätige den neuen Termin kurz bei mir.`;
+                }
+              }
+            }
+
+            if (notificationMessage) {
+              await supabase.from('campus_direct_messages').insert({
+                sender_id: userId,
+                recipient_id: change.student_id,
+                content: notificationMessage
+              });
+            }
+          }
+        } catch (notifErr) {
+          console.error('Error sending reschedule notification to student:', notifErr);
         }
       }
       setPendingChanges({});
@@ -625,31 +800,48 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
                 <div style={{ textAlign: 'center', padding: '20px', color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 500 }}>Keine Termine</div>
               ) : (
                 dayOccurrences.map(occ => {
-                  const colors = getStatusColor(occ.status);
+                  const isBreak = !occ.student_id;
+                  const colors = isBreak ? { bg: '#fffbeb', border: '#f59e0b', text: '#b45309' } : getStatusColor(occ.status);
                   let finalColors = { ...colors };
-                  if (occ.original_date && occ.status === 'pending_reschedule') {
-                    finalColors.bg = '#fef3c7';
-                    finalColors.border = '#f59e0b';
+                  let cardBackground = '';
+
+                  const isRescheduled = !isBreak && (
+                    occ.status === 'pending_reschedule' || 
+                    occ.status === 'rescheduled_confirmed' ||
+                    (occ.original_date && occ.original_date !== occ.date)
+                  );
+
+                  if (isRescheduled) {
+                    const isConfirmed = occ.status === 'rescheduled_confirmed' || occ.student_acknowledged;
+                    if (isConfirmed) {
+                      cardBackground = 'linear-gradient(135deg, #fef3c7 0%, #dcfce7 100%)';
+                      finalColors.border = '#10b981';
+                      finalColors.text = '#065f46';
+                    } else {
+                      finalColors.bg = '#fef3c7';
+                      finalColors.border = '#f59e0b';
+                      finalColors.text = '#92400e';
+                    }
                   }
 
                   return (
                     <div 
                       key={occ.id} 
                       id={`occ-${occ.id}`}
-                      draggable
+                      draggable={!isBreak}
                       onDragStart={(e) => handleDragStart(e, occ.id)}
                       onDragOver={handleDragOver}
                       onDrop={(e) => handleDropOnOccurrence(e, occ.id)}
-                      onClick={() => setEditOccState({ id: occ.id, date: occ.date, start_time: occ.start_time })}
+                      onClick={() => !isBreak && setEditOccState({ id: occ.id, date: occ.date, start_time: occ.start_time })}
                       style={{ 
-                        background: finalColors.bg, 
+                        background: cardBackground || finalColors.bg, 
                         borderLeft: `3px solid ${finalColors.border}`,
                         borderTop: '1px solid rgba(255,255,255,0.4)',
                         borderRight: '1px solid rgba(255,255,255,0.4)',
                         borderBottom: '1px solid rgba(255,255,255,0.4)',
                         borderRadius: '8px', 
                         padding: '8px',
-                        cursor: 'grab',
+                        cursor: isBreak ? 'default' : 'grab',
                         opacity: draggedId === occ.id ? 0.5 : 1,
                         position: 'relative',
                         boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
@@ -659,7 +851,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1d1d1f', background: 'rgba(0,0,0,0.04)', padding: '2px 4px', borderRadius: '4px' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: finalColors.text, background: 'rgba(0,0,0,0.04)', padding: '2px 4px', borderRadius: '4px' }}>
                             {occ.start_time.substring(0, 5)}
                           </span>
                           {occ.status === 'rescheduled_confirmed' && (
@@ -676,17 +868,19 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
                             />
                           )}
                         </div>
-                        <button 
-                          onClick={(e) => handleCancel(e, occ.id)}
-                          title="Termin absagen"
-                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: colors.border, padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', transition: 'all 0.1s' }}
-                          onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
-                          onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-                        >
-                          <X size={14} strokeWidth={2.5} />
-                        </button>
+                        {!isBreak && (
+                          <button 
+                            onClick={(e) => handleCancel(e, occ.id)}
+                            title="Termin absagen"
+                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: colors.border, padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', transition: 'all 0.1s' }}
+                            onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
+                            onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                          >
+                            <X size={14} strokeWidth={2.5} />
+                          </button>
+                        )}
                       </div>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#1d1d1f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {occ.student?.first_name} {occ.student?.last_name}
                       </div>
                     </div>

@@ -1,18 +1,12 @@
-import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-dotenv.config({ path: 'apps/groovelab/.env.local' });
+const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config({ path: 'apps/groovelab/.env.local' });
+const fs = require('fs');
+const path = require('path');
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://supabase.178.105.10.2.sslip.io';
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || '';
 
 const supabase = createClient(supabaseUrl, supabaseKey);
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 async function run() {
   const sqlPath = path.join(__dirname, '../supabase/migrations/72_add_band_shoutbox_is_announcement.sql');

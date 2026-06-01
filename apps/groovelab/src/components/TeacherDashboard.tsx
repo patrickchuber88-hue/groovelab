@@ -107,20 +107,62 @@ const getInstrumentAvatarUrl = (instrument: string | null | undefined): string =
   return '/avatars/guitar_avatar.png';
 };
 
+const getDefaultMusicianAvatarUrl = (instrument: string | null | undefined, role: string | null | undefined): string => {
+  const isTeacher = (role || '').toLowerCase() === 'teacher' || (role || '').toLowerCase() === 'admin';
+  if (isTeacher) return '/avatar_teacher_male.jpg';
+  
+  if (!instrument) return '/avatars/student_eguitar_1.png';
+  const inst = instrument.toLowerCase().trim();
+  if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/student_boy_black_guitar.png';
+  if (inst.includes('bass')) return '/avatars/student_boy_black_bass.png';
+  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/student_boy_black_drums.png';
+  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/student_boy_black_piano.png';
+  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/student_boy_red_vocals.png';
+  return '/avatars/student_eguitar_1.png';
+};
+
 // --- ANTI-FLICKER AVATAR SYSTEM ---
-const AvatarImage = React.memo(({ src, style, className, user, userId, onClick }: { src: string | null, style?: React.CSSProperties, className?: string, user?: any, userId?: string, onClick?: () => void }) => {
+const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, activePlatform }: { src: string | null, style?: React.CSSProperties, className?: string, user?: any, userId?: string, onClick?: () => void, activePlatform?: string }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
 
   const displaySrc = useMemo(() => {
-    // Campus rules: always enforce instrument avatar if available
+    const activePlat = activePlatform || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'groovelab');
     const targetUser = user;
-    if (targetUser && (targetUser.instrument || targetUser.role === 'student' || targetUser.role === 'teacher')) {
-      return getInstrumentAvatarUrl(targetUser.instrument);
+    
+    if (activePlat === 'campus') {
+      if (targetUser && (targetUser.instrument || targetUser.role === 'student' || targetUser.role === 'teacher')) {
+        return getInstrumentAvatarUrl(targetUser.instrument);
+      }
+      if (src && !src.includes('_avatar.png') && !src.includes('avatar_ghost')) {
+        return '/avatars/guitar_avatar.png';
+      }
+    } else {
+      // GrooveLab rules: strictly block instrument avatars and fall back to musician avatars
+      const isInstrumentAvatar = src && (
+        src.includes('avatar.png') || 
+        src.includes('guitar_avatar') || 
+        src.includes('bass_avatar') || 
+        src.includes('drums_avatar') || 
+        src.includes('piano_avatar') || 
+        src.includes('vocals_avatar') || 
+        src.includes('trumpet_avatar') || 
+        src.includes('trombone_avatar') || 
+        src.includes('horn_avatar') || 
+        src.includes('cello_avatar') || 
+        src.includes('violin_avatar') || 
+        src.includes('clarinet_avatar') || 
+        src.includes('flute_avatar') || 
+        src.includes('saxophone_avatar')
+      );
+      if (!src || isInstrumentAvatar || src === '/avatar_ghost.jpg') {
+        // Fall back to student/teacher musician avatar
+        return getDefaultMusicianAvatarUrl(targetUser?.instrument, targetUser?.role);
+      }
     }
     if (hasError || !src) return '/avatar_ghost.jpg';
     return src;
-  }, [src, hasError, user]);
+  }, [src, hasError, user, activePlatform]);
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -301,8 +343,8 @@ const getCompressedRoomCoordinates = (rStations: any[], aspect: number): Compres
   };
 };
 
-const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProfileSelect, onLogout, hasHelpRequest, customName }: { 
-  num: number, color: string, inst: string, sess: any, isMe: boolean, viewMode: string, onProfileSelect: (u: any) => void, onLogout: (id: string) => void, hasHelpRequest?: boolean, customName?: string
+const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProfileSelect, onLogout, hasHelpRequest, customName, activePlatform }: { 
+  num: number, color: string, inst: string, sess: any, isMe: boolean, viewMode: string, onProfileSelect: (u: any) => void, onLogout: (id: string) => void, hasHelpRequest?: boolean, customName?: string, activePlatform?: string
 }) => {
   const stationName = customName || sess?.stations?.name || `iPad ${num}`;
   const isActive = !!sess;
@@ -407,7 +449,7 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
               marginBottom: '4px',
               transition: 'all 0.3s ease'
             }}>
-              <AvatarImage src={sess.users?.photo_url} user={sess.users} />
+              <AvatarImage src={sess.users?.photo_url} user={sess.users} activePlatform={activePlatform} />
             </div>
             <div style={{ textAlign: 'center', minWidth: 0, width: '100%' }}>
               <div style={{ 
@@ -439,7 +481,7 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
   );
 });
 
-const CoachesNode = React.memo(({ coaches, onProfileSelect }: { coaches: any[], onProfileSelect: (u: any) => void }) => {
+const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform }: { coaches: any[], onProfileSelect: (u: any) => void, activePlatform?: string }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
       <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#22c55e', textTransform: 'uppercase', letterSpacing: '0.15em', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -480,7 +522,7 @@ const CoachesNode = React.memo(({ coaches, onProfileSelect }: { coaches: any[], 
               }}
             >
               <div style={{ width: '84px', height: '84px', borderRadius: '50%', border: '4px solid white', boxShadow: '0 8px 20px rgba(0,0,0,0.15)', overflow: 'hidden', flexShrink: 0 }}>
-                <AvatarImage src={c.users?.photo_url} user={c.users} />
+                <AvatarImage src={c.users?.photo_url} user={c.users} activePlatform={activePlatform} />
               </div>
               <div style={{ background: 'white', padding: '5px 12px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', textAlign: 'center', minWidth: '90px' }}>
                 <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '0.8rem' }}>{c.users?.first_name} {c.users?.last_name?.[0]}.</div>
@@ -606,6 +648,20 @@ export function TeacherDashboard({
     }
     setZoomFactor(1.0);
   }, [selectedRoomId, userId]);
+
+  useEffect(() => {
+    (window as any).openTageskompass = (std: any) => {
+      setDocStudent({
+        id: std.id,
+        first_name: std.first_name || std.name?.split(' ')[0],
+        last_name: std.last_name || std.name?.split(' ').slice(1).join(' '),
+        photo_url: std.photo_url || '/avatar_ghost.jpg'
+      });
+    };
+    return () => {
+      delete (window as any).openTageskompass;
+    };
+  }, []);
 
   const handleZoomChange = (value: number) => {
     setZoomFactor(value);
@@ -801,6 +857,296 @@ export function TeacherDashboard({
       alert('Fehler beim Melden der Krankheit.');
     }
   };
+
+  const handleReportSick = async () => {
+    if (!sickUntilDate) {
+      alert('Bitte wähle ein Datum aus.');
+      return;
+    }
+
+    const confirmMsg = teacher?.sick_until
+      ? `Möchtest du deine Krankmeldung wirklich auf den ${new Date(sickUntilDate).toLocaleDateString('de-DE')} anpassen?`
+      : `Möchtest du dich wirklich bis zum ${new Date(sickUntilDate).toLocaleDateString('de-DE')} krankmelden?`;
+
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      setReportingSick(true);
+
+      // Direct Client-Side Supabase logic matching CampusTeacherDashboard
+      const { data: profile, error: profileErr } = await supabase
+        .from('users')
+        .select('school_id, first_name, last_name, sick_until')
+        .eq('id', userId)
+        .single();
+
+      if (profileErr || !profile) {
+        throw new Error('Teacher profile not found.');
+      }
+
+      const prevSickUntilStr = profile.sick_until;
+
+      // 1. Update user table
+      const { error: userErr } = await supabase
+        .from('users')
+        .update({ sick_until: sickUntilDate })
+        .eq('id', userId);
+
+      if (userErr) throw userErr;
+
+      // 2. Fetch weekly schedules
+      const { data: schedules, error: schedError } = await supabase
+        .from('schedules')
+        .select('*')
+        .eq('teacher_id', userId);
+
+      if (schedError) throw schedError;
+
+      const now = new Date();
+      const todayStart = new Date(now);
+      todayStart.setHours(0, 0, 0, 0);
+
+      const sickUntil = new Date(sickUntilDate);
+      const maxDate = new Date(now);
+      maxDate.setDate(maxDate.getDate() + 30); // 30 days window
+
+      const currentDate = new Date(todayStart);
+      const notificationsToInsert: any[] = [];
+      const scheduleIdsToCancel = new Set<string>();
+      const scheduleIdsToRestore = new Set<string>();
+      const datesToDeleteNotifs: string[] = [];
+
+      // Fetch existing crisis notifications
+      const { data: existingNotifs } = await supabase
+        .from('crisis_notifications')
+        .select('slot_start_datetime, student_id')
+        .eq('teacher_id', userId);
+
+      const existingNotifsSet = new Set(
+        (existingNotifs || []).map(n => `${new Date(n.slot_start_datetime).toISOString()}-${n.student_id}`)
+      );
+
+      while (currentDate <= maxDate) {
+        const rawDay = currentDate.getDay();
+        const currentDayOfWeek = rawDay === 0 ? 7 : rawDay;
+        const daySchedules = (schedules || []).filter(s => s.day_of_week === currentDayOfWeek);
+
+        daySchedules.forEach(sched => {
+          const [hours, minutes] = (sched.time_slot || '00:00').split(':').map(Number);
+          const startDateTime = new Date(currentDate);
+          startDateTime.setHours(hours, minutes, 0, 0);
+
+          if (startDateTime >= now) {
+            const isCurrentlySick = startDateTime <= new Date(sickUntil.getTime() + 24 * 60 * 60 * 1000 - 1);
+            
+            if (isCurrentlySick) {
+              scheduleIdsToCancel.add(sched.id);
+              const notifKey = `${startDateTime.toISOString()}-${sched.student_id}`;
+              if (!existingNotifsSet.has(notifKey)) {
+                notificationsToInsert.push({
+                  teacher_id: userId,
+                  student_id: sched.student_id,
+                  slot_start_datetime: startDateTime.toISOString(),
+                  status: 'UNREAD'
+                });
+              }
+            } else {
+              scheduleIdsToRestore.add(sched.id);
+              datesToDeleteNotifs.push(startDateTime.toISOString());
+            }
+          }
+        });
+
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+
+      // Apply schedule cancellations
+      if (scheduleIdsToCancel.size > 0) {
+        await supabase
+          .from('schedules')
+          .update({ status: 'canceled_by_teacher_sick' })
+          .in('id', Array.from(scheduleIdsToCancel));
+      }
+
+      // Restore active schedules
+      if (scheduleIdsToRestore.size > 0) {
+        await supabase
+          .from('schedules')
+          .update({ status: 'approved' })
+          .in('id', Array.from(scheduleIdsToRestore))
+          .eq('status', 'canceled_by_teacher_sick');
+      }
+
+      // Insert new crisis notifications
+      if (notificationsToInsert.length > 0) {
+        await supabase
+          .from('crisis_notifications')
+          .insert(notificationsToInsert);
+      }
+
+      // Delete future crisis notifications
+      if (datesToDeleteNotifs.length > 0) {
+        await supabase
+          .from('crisis_notifications')
+          .delete()
+          .eq('teacher_id', userId)
+          .in('slot_start_datetime', datesToDeleteNotifs);
+      }
+
+      // Add Secretary alarm ticket
+      const alertMessage = prevSickUntilStr
+        ? `🚨 KRANKHEITS-ANPASSUNG: Lehrkraft ${profile.first_name} ${profile.last_name} hat den Krankmeldungszeitraum auf den ${new Date(sickUntilDate).toLocaleDateString('de-DE')} geändert.`
+        : `🚨 NEUE KRANKMELDUNG: Lehrkraft ${profile.first_name} ${profile.last_name} hat sich bis zum ${new Date(sickUntilDate).toLocaleDateString('de-DE')} krankgemeldet.`;
+
+      await supabase
+        .from('system_alerts')
+        .insert({
+          school_id: profile.school_id,
+          teacher_id: userId,
+          type: 'Teacher Illness Alert',
+          message: alertMessage,
+          resolved: false
+        });
+
+      setSickSuccessShown(true);
+      setIsSickWidgetExpanded(false);
+      setTimeout(() => setSickSuccessShown(false), 6000);
+      setTicker(t => t + 1);
+    } catch (err) {
+      console.error(err);
+      alert('Fehler bei der Krankheitsmeldung.');
+    } finally {
+      setReportingSick(false);
+    }
+  };
+
+  const handleEndSick = async () => {
+    if (!confirm('Möchtest du dich wirklich wieder gesundmelden? Alle zukünftigen Krankheitsausfälle werden wieder aktiviert.')) return;
+
+    try {
+      setReportingSick(true);
+
+      const { data: profile, error: profileErr } = await supabase
+        .from('users')
+        .select('school_id, first_name, last_name')
+        .eq('id', userId)
+        .single();
+
+      if (profileErr || !profile) {
+        throw new Error('Teacher profile not found.');
+      }
+
+      // 1. Clear user sick_until column
+      const { error: userErr } = await supabase
+        .from('users')
+        .update({ sick_until: null })
+        .eq('id', userId);
+
+      if (userErr) throw userErr;
+
+      // 2. Fetch weekly schedules
+      const { data: schedules, error: schedError } = await supabase
+        .from('schedules')
+        .select('*')
+        .eq('teacher_id', userId);
+
+      if (schedError) throw schedError;
+
+      const now = new Date();
+      const todayStart = new Date(now);
+      todayStart.setHours(0, 0, 0, 0);
+
+      const maxDate = new Date(now);
+      maxDate.setDate(maxDate.getDate() + 30); // 30 days window
+
+      const currentDate = new Date(todayStart);
+      const scheduleIdsToRestore = new Set<string>();
+      const datesToDeleteNotifs: string[] = [];
+
+      while (currentDate <= maxDate) {
+        const rawDay = currentDate.getDay();
+        const currentDayOfWeek = rawDay === 0 ? 7 : rawDay;
+        const daySchedules = (schedules || []).filter(s => s.day_of_week === currentDayOfWeek);
+
+        daySchedules.forEach(sched => {
+          const [hours, minutes] = (sched.time_slot || '00:00').split(':').map(Number);
+          const startDateTime = new Date(currentDate);
+          startDateTime.setHours(hours, minutes, 0, 0);
+
+          if (startDateTime >= now) {
+            scheduleIdsToRestore.add(sched.id);
+            datesToDeleteNotifs.push(startDateTime.toISOString());
+          }
+        });
+
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+
+      // Restore all future schedules to approved
+      if (scheduleIdsToRestore.size > 0) {
+        await supabase
+          .from('schedules')
+          .update({ status: 'approved' })
+          .in('id', Array.from(scheduleIdsToRestore))
+          .eq('status', 'canceled_by_teacher_sick');
+      }
+
+      // Delete future crisis notifications
+      if (datesToDeleteNotifs.length > 0) {
+        await supabase
+          .from('crisis_notifications')
+          .delete()
+          .eq('teacher_id', userId)
+          .in('slot_start_datetime', datesToDeleteNotifs);
+      }
+
+      // Add healthy notice to system alerts
+      const alertMessage = `🍏 LEHRKRAFT GESUND: Lehrkraft ${profile.first_name} ${profile.last_name} hat sich wieder gesund gemeldet.`;
+      await supabase
+        .from('system_alerts')
+        .insert({
+          school_id: profile.school_id,
+          teacher_id: userId,
+          type: 'Teacher Healthy Alert',
+          message: alertMessage,
+          resolved: false
+        });
+
+      alert('Erfolgreich gesundgemeldet! Zukünftige Stundenplandaten wurden wieder aktiviert.');
+      setTicker(t => t + 1);
+    } catch (err) {
+      console.error(err);
+      alert('Fehler bei der Gesundmeldung.');
+    } finally {
+      setReportingSick(false);
+    }
+  };
+
+  const handleSubmitFeedbackResponse = async (requestId: string) => {
+    if (!responseTextInput.trim()) return;
+    setSubmittingFeedback(true);
+    try {
+      const { error } = await supabase
+        .from('campus_feedback_responses')
+        .insert({
+          request_id: requestId,
+          teacher_id: userId,
+          response_text: responseTextInput.trim()
+        });
+
+      if (error) throw error;
+      
+      setResponseTextInput('');
+      setRespondingToRequestId(null);
+      alert('Rückmeldung erfolgreich übermittelt! Vielen Dank.');
+      setTicker(t => t + 1);
+    } catch (err) {
+      console.error(err);
+      alert('Fehler beim Übermitteln der Rückmeldung.');
+    } finally {
+      setSubmittingFeedback(false);
+    }
+  };
   
   const [lastSeenCounts, setLastSeenCounts] = useState(() => {
     try {
@@ -823,6 +1169,29 @@ export function TeacherDashboard({
   const [briefingData, setBriefingData] = useState<any>(null);
   const [briefingLoading, setBriefingLoading] = useState(true);
 
+  // New Right Sidebar Sickness & Administrative feedback states
+  const [isSickWidgetExpanded, setIsSickWidgetExpanded] = useState(false);
+  const [sickUntilDate, setSickUntilDate] = useState<string>(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().substring(0, 10);
+  });
+  const [reportingSick, setReportingSick] = useState(false);
+  const [sickSuccessShown, setSickSuccessShown] = useState(false);
+  const [adminFeedbackRequests, setAdminFeedbackRequests] = useState<any[]>([]);
+  const [adminFeedbackResponses, setAdminFeedbackResponses] = useState<any[]>([]);
+  const [campusFeedAnnouncements, setCampusFeedAnnouncements] = useState<any[]>([]);
+  const [respondingToRequestId, setRespondingToRequestId] = useState<string | null>(null);
+  const [responseTextInput, setResponseTextInput] = useState<string>('');
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
+  const [adminFeedbackTab, setAdminFeedbackTab] = useState<'open' | 'done'>('open');
+
+  useEffect(() => {
+    if (teacher?.sick_until) {
+      setSickUntilDate(teacher.sick_until.substring(0, 10));
+    }
+  }, [teacher?.sick_until]);
+
   const [currentTimeStr, setCurrentTimeStr] = useState<string>(() => {
     const now = new Date();
     return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -844,8 +1213,7 @@ export function TeacherDashboard({
     // 1. Try to find slot that is currently active by time
     const activeSlot = briefingData.timeline.find((slot: any, idx: number) => {
       const slotStart = slot.timeSlot;
-      const nextSlot = briefingData.timeline[idx + 1];
-      const slotEnd = nextSlot ? nextSlot.timeSlot : (() => {
+      const slotEnd = (() => {
         const [sh, sm] = slotStart.split(':').map(Number);
         const totalMin = sh * 60 + sm + 30;
         return `${String(Math.floor(totalMin / 60) % 24).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')}`;
@@ -955,7 +1323,7 @@ export function TeacherDashboard({
           const rawDay = new Date().getDay();
           const todayWeekday = rawDay === 0 ? 7 : rawDay;
 
-          const { data: slots } = await supabase
+           const { data: slots } = await supabase
             .from('schedules')
             .select(`
               id,
@@ -975,7 +1343,35 @@ export function TeacherDashboard({
             .eq('teacher_id', userId)
             .eq('day_of_week', todayWeekday);
 
-          const timeline = (slots || []).map((slot: any) => {
+          const todayStr = new Date().toISOString().substring(0, 10);
+
+          // Fetch occurrences for today for fallback
+          const { data: occurrences } = await supabase
+            .from('schedule_occurrences')
+            .select(`
+              id,
+              date,
+              original_date,
+              start_time,
+              status,
+              schedule_id,
+              schedules (
+                rooms (id, name)
+              ),
+              student:users!schedule_occurrences_student_id_fkey (
+                id,
+                first_name,
+                last_name,
+                is_app_user,
+                instrument,
+                avatars (avatar_style, evolution_level, xp)
+              )
+            `)
+            .eq('teacher_id', userId)
+            .or(`date.eq.${todayStr},original_date.eq.${todayStr}`);
+
+          // Format regular schedules
+          let timeline = (slots || []).map((slot: any) => {
             const student = slot.student;
             const avatar = student?.avatars?.[0] || null;
             const isAnalogStickerUser = !student?.is_app_user || avatar?.avatar_style === 'Standard_Silhouette';
@@ -994,7 +1390,51 @@ export function TeacherDashboard({
                 isAnalogStickerUser
               } : null
             };
-          }).sort((a: any, b: any) => a.timeSlot.localeCompare(b.timeSlot));
+          });
+
+          // Merge with occurrences for today
+          if (occurrences && occurrences.length > 0) {
+            occurrences.forEach((occ: any) => {
+              const student = occ.student;
+              const avatar = student?.avatars?.[0] || null;
+              const isAnalogStickerUser = !student?.is_app_user || avatar?.avatar_style === 'Standard_Silhouette';
+              const formattedTime = occ.start_time ? occ.start_time.substring(0, 5) : '00:00';
+
+              if (occ.original_date === todayStr && occ.date !== todayStr) {
+                // Rescheduled AWAY from today -> remove from today's timeline
+                timeline = timeline.filter((t: any) => t.student?.id !== occ.student_id);
+              } else if (occ.date === todayStr) {
+                // Rescheduled TO today or updated today -> update or insert into today's timeline
+                const existingIdx = timeline.findIndex((t: any) => t.student?.id === occ.student_id);
+                const mappedItem = {
+                  scheduleId: occ.schedule_id || occ.id,
+                  timeSlot: formattedTime,
+                  status: occ.status === 'rescheduled_confirmed' ? 'approved' : occ.status,
+                  roomId: occ.schedules?.rooms?.id || null,
+                  room: occ.schedules?.rooms?.name || 'Hauptraum',
+                  instrument: student?.instrument || 'Klavier',
+                  student: student ? {
+                    id: student.id,
+                    name: `${student.first_name} ${student.last_name}`,
+                    isAppUser: student.is_app_user ?? false,
+                    isAnalogStickerUser
+                  } : null
+                };
+
+                if (occ.status === 'cancelled') {
+                  mappedItem.status = 'canceled_by_student';
+                }
+
+                if (existingIdx !== -1) {
+                  timeline[existingIdx] = mappedItem;
+                } else {
+                  timeline.push(mappedItem);
+                }
+              }
+            });
+          }
+
+          timeline.sort((a: any, b: any) => a.timeSlot.localeCompare(b.timeSlot));
 
           const now = new Date();
           const currentStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -1119,8 +1559,43 @@ export function TeacherDashboard({
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
+
+    if (!userId) return;
+
+    const channelSessions = supabase
+      .channel('realtime_teacher_sessions')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, () => {
+        fetchData();
+      })
+      .subscribe();
+
+    const channelHelp = supabase
+      .channel('realtime_teacher_help')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'help_requests' }, () => {
+        fetchData();
+      })
+      .subscribe();
+
+    const channelSkills = supabase
+      .channel('realtime_teacher_skills')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_song_skills' }, () => {
+        fetchData();
+      })
+      .subscribe();
+
+    const channelBands = supabase
+      .channel('realtime_teacher_bands')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bands' }, () => {
+        fetchData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channelSessions);
+      supabase.removeChannel(channelHelp);
+      supabase.removeChannel(channelSkills);
+      supabase.removeChannel(channelBands);
+    };
   }, [userId, activePlatform]);
 
   const fetchData = async () => {
@@ -1196,7 +1671,7 @@ export function TeacherDashboard({
               id, song_id, progress_percent, instrument, part_number, difficulty_level, is_stage_ready, user_id, created_at, formation_group,
               profiles:users!user_song_skills_user_id_fkey(first_name, photo_url, school_id)
             )
-          `).eq('school_id', tData.school_id),
+          `).eq('school_id', tData.school_id).eq('is_campus_active', false),
           supabase.from('band_song_slots').select('user_id, band_songs(song_id)')
         ]);
 
@@ -1923,6 +2398,60 @@ export function TeacherDashboard({
             setRehearsalSuggestions(suggestions);
           }
         }
+
+        // 9. Fetch Administrative Feedback Requests & Responses
+        try {
+          const { data: feedbackRequests } = await supabase
+            .from('campus_feedback_requests')
+            .select('*')
+            .eq('school_id', tData.school_id)
+            .order('created_at', { ascending: false });
+
+          if (feedbackRequests && feedbackRequests.length > 0) {
+            setAdminFeedbackRequests(feedbackRequests);
+            
+            const requestIds = feedbackRequests.map(r => r.id);
+            const { data: feedbackResponses } = await supabase
+              .from('campus_feedback_responses')
+              .select('*')
+              .eq('teacher_id', userId)
+              .in('request_id', requestIds);
+            
+            if (feedbackResponses) {
+              setAdminFeedbackResponses(feedbackResponses);
+            }
+          } else {
+            setAdminFeedbackRequests([]);
+            setAdminFeedbackResponses([]);
+          }
+        } catch (fErr) {
+          console.error('Error fetching admin feedback:', fErr);
+        }
+
+        // 10. Fetch Live Campus Feed Announcements from campus_announcements table
+        try {
+          const { data: annData, error: annErr } = await supabase
+            .from('campus_announcements')
+            .select('*, users(first_name, last_name, photo_url)')
+            .eq('school_id', tData.school_id)
+            .order('created_at', { ascending: false });
+
+          if (!annErr && annData) {
+            const parsed = annData.map(ann => ({
+              id: ann.id,
+              title: ann.title,
+              content: ann.message,
+              target_type: ann.target_type || 'all',
+              created_at: ann.created_at,
+              user: ann.users
+            }));
+            setCampusFeedAnnouncements(parsed);
+          } else {
+            setCampusFeedAnnouncements([]);
+          }
+        } catch (aErr) {
+          console.error('Error fetching announcements:', aErr);
+        }
       }
     } catch (err) {
       console.error('[Dashboard] Fetch error:', err);
@@ -2417,12 +2946,22 @@ export function TeacherDashboard({
             setEditingBand(band);
             setSelectedStudentProfile(null);
           }}
+          onOpenTageskompass={(std) => {
+            setDocStudent({
+              id: std.id,
+              first_name: std.first_name,
+              last_name: std.last_name,
+              photo_url: std.photo_url || '/avatar_ghost.jpg'
+            });
+            setSelectedStudentProfile(null);
+          }}
         />
       )}
       {docStudent && (
         <MeisterwerkDocumentationModal 
           student={docStudent} 
           onClose={() => setDocStudent(null)} 
+          teacherId={userId}
         />
       )}
 
@@ -2645,9 +3184,12 @@ export function TeacherDashboard({
           </header>
         )}
         {activeTab === 'briefing' && !hideHeader ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '3fr 0.7fr', gap: '32px', alignItems: 'start', width: '100%' }} className="dashboard-main-grid">
+          <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '32px', alignItems: 'start', width: '100%' }} className="dashboard-main-grid">
             
             <div style={{ 
+              flex: '1 1 600px',
+              minWidth: '320px',
+              maxWidth: '100%',
               display: 'flex', 
               flexDirection: 'column', 
               gap: '16px',
@@ -2818,14 +3360,14 @@ export function TeacherDashboard({
                   </div>
  
                   {/* SCHEDULE & PREP-MIRROR ROW */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '2.1fr 0.9fr', gap: '24px', alignItems: 'start' }}>
+                  <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '24px', alignItems: 'start', width: '100%' }}>
                     
                     {/* TAGESPLAN (timeline schedule) */}
-                    <div className="google-card" style={{ padding: '20px 24px', borderRadius: '20px', border: '1px solid #f1f5f9', boxShadow: '0 2px 12px rgba(0,0,0,0.04)', background: 'white' }}>
+                    <div className="google-card" style={{ flex: '1 1 450px', minWidth: '300px', padding: '20px 24px', borderRadius: '20px', border: '1px solid #f1f5f9', boxShadow: '0 2px 12px rgba(0,0,0,0.04)', background: 'white' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#1f2937' }}>
                           <Clock size={20} color="#0b57d0" />
-                          <strong style={{ fontSize: '1.05rem', fontWeight: 800, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Tagesplan (Unterrichte Heute)</strong>
+                          <strong style={{ fontSize: '1.05rem', fontWeight: 800, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Tagesplan – {new Date().toLocaleDateString('de-DE')} (Unterrichte Heute)</strong>
                         </div>
                         <span style={{
                           fontSize: '0.72rem',
@@ -2842,141 +3384,261 @@ export function TeacherDashboard({
  
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative' }}>
                         <div style={{ position: 'absolute', top: '16px', bottom: '16px', left: '9px', width: '2px', background: '#e2e8f0' }} />
-                        {briefingData.timeline && briefingData.timeline.length > 0 ? (
-                          briefingData.timeline.map((slot: any, idx: number) => {
-                            // Dynamic slot time range check
+                        {briefingData.timeline && briefingData.timeline.length > 0 ? (() => {
+                          // Find prepIndex: first slot that is not canceled and not finished
+                          let prepIndex = -1;
+                          for (let i = 0; i < briefingData.timeline.length; i++) {
+                            const slot = briefingData.timeline[i];
+                            const isCanceled = slot.status === 'canceled_by_student' || slot.status === 'teacher_sick';
+                            if (!isCanceled) {
+                              const slotStart = slot.timeSlot;
+                              const slotEnd = (() => {
+                                const [sh, sm] = slotStart.split(':').map(Number);
+                                const totalMin = sh * 60 + sm + 30;
+                                return `${String(Math.floor(totalMin / 60) % 24).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')}`;
+                              })();
+                              const isFinished = currentTimeStr >= slotEnd;
+                              if (!isFinished) {
+                                prepIndex = i;
+                                break;
+                              }
+                            }
+                          }
+
+                          return briefingData.timeline.map((slot: any, idx: number) => {
                             const slotStart = slot.timeSlot;
-                            const nextSlot = briefingData.timeline[idx + 1];
-                            const slotEnd = nextSlot ? nextSlot.timeSlot : (() => {
+                            const slotEnd = (() => {
                               const [sh, sm] = slotStart.split(':').map(Number);
                               const totalMin = sh * 60 + sm + 30;
                               return `${String(Math.floor(totalMin / 60) % 24).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')}`;
                             })();
-                            const isCurrentSlotActive = currentTimeStr >= slotStart && currentTimeStr < slotEnd;
- 
+
+                            const isCanceled = slot.status === 'canceled_by_student' || slot.status === 'teacher_sick';
+                            const isFinished = currentTimeStr >= slotEnd;
+                            const isRescheduledPending = slot.status === 'rescheduled_pending' || slot.status === 'pending' || slot.status === 'pending_reschedule';
+
                             let slotBg = '#ffffff';
                             let slotBorder = '1.5px solid #e2e8f0';
+                            let slotBorderLeft = 'none';
                             let titleColor = '#1e293b';
- 
-                            if (slot.status === 'canceled_by_student') {
-                              slotBg = '#fef2f2';
-                              slotBorder = '1.5px dashed #ef4444';
+                            let dotComponent = null;
+
+                            if (isCanceled) {
+                              slotBg = '#ffffff';
+                              slotBorder = '1.5px dashed rgba(239, 68, 68, 0.3)';
+                              slotBorderLeft = '5px solid #ef4444';
                               titleColor = '#ef4444';
-                            } else if (slot.status === 'teacher_sick') {
-                              slotBg = '#fee2e2';
-                              slotBorder = '1px solid #fca5a5';
-                              titleColor = '#991b1b';
-                            } else if (isCurrentSlotActive) {
-                              slotBg = '#f0f7ff';
-                              slotBorder = '1.5px solid #bfdbfe';
-                              titleColor = '#1d4ed8';
-                            }
- 
-                            return (
-                              <div 
-                                key={idx}
-                                style={{
+                              dotComponent = (
+                                <div style={{
+                                  width: '12px',
+                                  height: '12px',
+                                  borderRadius: '50%',
+                                  border: '3px solid #ef4444',
+                                  background: '#ef4444',
+                                  boxSizing: 'border-box'
+                                }} />
+                              );
+                            } else if (isFinished) {
+                              slotBg = '#ffffff';
+                              slotBorder = '1.5px solid #e2e8f0';
+                              slotBorderLeft = '5px solid #22c55e';
+                              titleColor = '#1e293b';
+                              dotComponent = (
+                                <div style={{
+                                  width: '12px',
+                                  height: '12px',
+                                  borderRadius: '50%',
+                                  border: '3px solid #22c55e',
+                                  background: '#22c55e',
+                                  boxSizing: 'border-box'
+                                }} />
+                              );
+                            } else if (isRescheduledPending) {
+                              slotBg = '#ffffff';
+                              slotBorder = '1.5px dashed #fed7aa'; // light orange dashed border
+                              slotBorderLeft = '5px solid #ea580c'; // premium orange left accent
+                              titleColor = '#1e293b';
+                              dotComponent = (idx === prepIndex) ? (
+                                <div style={{
+                                  width: '20px',
+                                  height: '20px',
+                                  borderRadius: '50%',
+                                  border: '3px solid #ea580c',
+                                  background: '#ffffff',
                                   display: 'flex',
                                   alignItems: 'center',
-                                  gap: '12px',
-                                  position: 'relative',
-                                  width: '100%'
-                                }}
-                              >
-                                {/* Timeline Dot on the left */}
-                                <div style={{ width: '20px', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2, flexShrink: 0 }}>
-                                  {isCurrentSlotActive ? (
-                                    <div style={{
-                                      width: '20px',
-                                      height: '20px',
-                                      borderRadius: '50%',
-                                      border: '3px solid #0b57d0',
-                                      background: '#ffffff',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      boxSizing: 'border-box'
-                                    }}>
-                                      <div style={{
-                                        width: '8px',
-                                        height: '8px',
-                                        borderRadius: '50%',
-                                        background: '#0b57d0'
-                                      }} />
-                                    </div>
-                                  ) : (
-                                    <div style={{
-                                      width: '12px',
-                                      height: '12px',
-                                      borderRadius: '50%',
-                                      border: '3px solid #cbd5e1',
-                                      background: '#ffffff',
-                                      boxSizing: 'border-box'
-                                    }} />
-                                  )}
+                                  justifyContent: 'center',
+                                  boxSizing: 'border-box'
+                                }}>
+                                  <div style={{
+                                    width: '8px',
+                                    height: '8px',
+                                    borderRadius: '50%',
+                                    background: '#ea580c'
+                                  }} />
                                 </div>
- 
-                                {/* Slot card on the right */}
-                                <div 
-                                  onClick={() => {
-                                    if (slot.student) {
-                                      setDocStudent({
-                                        id: slot.student.id,
-                                        first_name: slot.student.name.split(' ')[0],
-                                        last_name: slot.student.name.split(' ').slice(1).join(' '),
-                                        photo_url: slot.student.photo_url || '/avatar_ghost.jpg'
-                                      });
-                                    }
-                                  }}
-                                  style={{
-                                    flex: 1,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    padding: '8px 16px',
-                                    background: slotBg,
-                                    borderRadius: '12px',
-                                    border: slotBorder,
-                                    cursor: slot.student ? 'pointer' : 'default',
-                                    transition: 'all 0.2s',
-                                    boxShadow: isCurrentSlotActive ? '0 4px 12px rgba(59, 130, 246, 0.08)' : 'none',
-                                    minWidth: 0
-                                  }}
-                                  className="hover-scale"
-                                >
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                              ) : (
+                                <div style={{
+                                  width: '12px',
+                                  height: '12px',
+                                  borderRadius: '50%',
+                                  border: '3px solid #ea580c',
+                                  background: '#ffffff',
+                                  boxSizing: 'border-box'
+                                }} />
+                              );
+                            } else {
+                              slotBg = '#ffffff';
+                              slotBorder = '1.5px solid #e2e8f0';
+                              slotBorderLeft = '5px solid #0b57d0';
+                              titleColor = '#1e293b';
+                              dotComponent = (idx === prepIndex) ? (
+                                <div style={{
+                                  width: '20px',
+                                  height: '20px',
+                                  borderRadius: '50%',
+                                  border: '3px solid #0b57d0',
+                                  background: '#ffffff',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  boxSizing: 'border-box'
+                                }}>
+                                  <div style={{
+                                    width: '8px',
+                                    height: '8px',
+                                    borderRadius: '50%',
+                                    background: '#0b57d0'
+                                  }} />
+                                </div>
+                              ) : (
+                                <div style={{
+                                  width: '12px',
+                                  height: '12px',
+                                  borderRadius: '50%',
+                                  border: '3px solid #0b57d0',
+                                  background: '#ffffff',
+                                  boxSizing: 'border-box'
+                                }} />
+                              );
+                            }
+
+                            return (
+                               <div 
+                                 key={idx}
+                                 style={{
+                                   display: 'flex',
+                                   alignItems: 'center',
+                                   gap: '12px',
+                                   position: 'relative',
+                                   width: '100%'
+                                 }}
+                               >
+                                 {/* Timeline Dot on the left */}
+                                 <div style={{ width: '20px', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2, flexShrink: 0 }}>
+                                   {dotComponent}
+                                 </div>
+
+                                 {/* Slot card on the right containing Uhrzeit inside */}
+                                 <div 
+                                   onClick={() => {
+                                     if (slot.student) {
+                                       setDocStudent({
+                                         id: slot.student.id,
+                                         first_name: slot.student.name.split(' ')[0],
+                                         last_name: slot.student.name.split(' ').slice(1).join(' '),
+                                         photo_url: slot.student.photo_url || '/avatar_ghost.jpg'
+                                       });
+                                     }
+                                   }}
+                                   style={{
+                                     flex: 1,
+                                     display: 'flex',
+                                     alignItems: 'center',
+                                     gap: '12px',
+                                     padding: '12px 16px', // taller padding for a premium card feel
+                                     background: slotBg,
+                                     borderRadius: '12px',
+                                     border: slotBorder,
+                                     borderLeft: slotBorderLeft,
+                                     cursor: slot.student ? 'pointer' : 'default',
+                                     transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                                     boxShadow: (idx === prepIndex) ? (isRescheduledPending ? '0 6px 18px rgba(234, 179, 8, 0.08)' : '0 6px 18px rgba(59, 130, 246, 0.06)') : '0 1.5px 4px rgba(0, 0, 0, 0.01)',
+                                     minWidth: 0,
+                                     opacity: (!slot.student || isCanceled) ? 0.75 : 1
+                                   }}
+                                   className="hover-scale google-timeline-card"
+                                 >
+                                   {/* Uhrzeit (inside card, pure black, borderless, white bg) */}
+                                   <div style={{
+                                     fontSize: '0.8rem',
+                                     fontWeight: 900,
+                                     color: '#0f172a',
+                                     fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                     whiteSpace: 'nowrap',
+                                     flexShrink: 0,
+                                     background: '#ffffff',
+                                     padding: '4px 8px',
+                                     borderRadius: '6px',
+                                     border: 'none',
+                                     boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                                     display: 'inline-flex',
+                                     alignItems: 'center',
+                                     justifyContent: 'center'
+                                   }}>
+                                     {slot.timeSlot} Uhr
+                                   </div>
+
+                                   {/* Vertical separator */}
+                                   <div style={{ width: '1.5px', height: '18px', background: '#e2e8f0', flexShrink: 0 }} />
+
+                                   {/* Student name and instrument details */}
+                                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
                                     <div style={{ minWidth: 0, flex: 1 }}>
                                       <div style={{ fontWeight: 800, color: titleColor, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                         {slot.student ? (
                                           <>
-                                            <span>{slot.student.name}</span>
-                                            <span style={{ color: '#cbd5e1', margin: '0 4px', fontWeight: 500 }}>•</span>
-                                            <span style={{ color: '#64748b', fontWeight: 600, fontSize: '0.8rem' }}>{slot.instrument || 'Musiker'}</span>
-                                            <span style={{ color: '#cbd5e1', margin: '0 4px', fontWeight: 500 }}>•</span>
-                                            <span style={{ color: '#64748b', fontWeight: 600, fontSize: '0.8rem' }}>{slot.room || 'Groovelab'}</span>
+                                            <span style={{ fontWeight: 900, color: isFinished ? '#15803d' : '#0f172a', fontSize: '0.9rem' }}>{slot.student.name}</span>
+                                            <span style={{ color: '#94a3b8', margin: '0 6px', fontWeight: 400 }}>•</span>
+                                            <span style={{ color: '#64748b', fontWeight: 500, fontSize: '0.78rem' }}>{slot.instrument || 'Musiker'}</span>
+                                            <span style={{ color: '#94a3b8', margin: '0 6px', fontWeight: 400 }}>•</span>
+                                            <span style={{ color: '#64748b', fontWeight: 500, fontSize: '0.78rem' }}>{slot.room || 'Groovelab'}</span>
                                           </>
                                         ) : (
-                                          <span>☕️ Pause</span>
+                                          <span style={{ fontWeight: 700, color: '#64748b', fontSize: '0.85rem' }}>☕️ Pause</span>
                                         )}
                                       </div>
                                     </div>
                                   </div>
-                                  <div style={{
-                                    background: slot.status === 'canceled_by_student' ? '#fee2e2' : isCurrentSlotActive ? '#dbeafe' : '#e8f0fe',
-                                    color: slot.status === 'canceled_by_student' ? '#ef4444' : isCurrentSlotActive ? '#1d4ed8' : '#0b57d0',
-                                    padding: '4px 8px',
-                                    borderRadius: '6px',
-                                    fontSize: '0.72rem',
-                                    fontWeight: 800,
-                                    flexShrink: 0
-                                  }}>
-                                    {slot.timeSlot} Uhr
-                                  </div>
+
+                                  {/* Unbestätigt Badge (on the right) */}
+                                  {isRescheduledPending && (
+                                    <span style={{
+                                      background: '#fff7ed',
+                                      color: '#ea580c',
+                                      border: '1px solid #ffedd5',
+                                      padding: '4px 10px',
+                                      borderRadius: '6px',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 800,
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      flexShrink: 0,
+                                      boxShadow: '0 1px 2px rgba(234, 88, 12, 0.04)'
+                                    }}>
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <circle cx="12" cy="12" r="10" strokeDasharray="3 3" />
+                                        <polyline points="12 6 12 12 16 14" />
+                                      </svg>
+                                      Unbestätigt
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             );
-                          })
-                        ) : (
+                          });
+                        })() : (
                           <div style={{
                             background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
                             borderRadius: '16px',
@@ -3011,10 +3673,18 @@ export function TeacherDashboard({
                             </div>
                             <div style={{ position: 'relative', zIndex: 2 }}>
                               <h4 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
-                                Freier Tag!
+                                {(() => {
+                                  const day = new Date().getDay();
+                                  return (day === 0 || day === 6) ? 'Schönes Wochenende! 🎉' : 'Freier Tag!';
+                                })()}
                               </h4>
                               <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#64748b', fontWeight: 600, maxWidth: '250px', lineHeight: 1.5 }}>
-                                Heute stehen keine Unterrichte an. Zeit zum Durchatmen und Energie tanken.
+                                {(() => {
+                                  const day = new Date().getDay();
+                                  return (day === 0 || day === 6)
+                                    ? 'Genieße die unterrichtsfreie Zeit und erhole dich gut.'
+                                    : 'Heute stehen keine Unterrichte an. Zeit zum Durchatmen und Energie tanken.';
+                                })()}
                               </p>
                             </div>
                           </div>
@@ -3033,21 +3703,43 @@ export function TeacherDashboard({
 
                           return (
                             <div style={{
-                              background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                              border: '1.5px solid #bbf7d0',
-                              borderRadius: '16px',
-                              padding: '16px 20px',
-                              marginTop: '12px',
                               display: 'flex',
-                              flexDirection: 'column',
-                              gap: '4px',
-                              boxShadow: '0 4px 14px rgba(34, 197, 94, 0.06)',
-                              textAlign: 'center'
+                              alignItems: 'center',
+                              gap: '12px',
+                              position: 'relative',
+                              width: '100%',
+                              marginTop: '12px'
                             }}>
-                              <h4 style={{ margin: 0, fontWeight: 900, color: '#15803d', fontSize: '0.95rem', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Schönen Feierabend</h4>
-                              <p style={{ margin: 0, fontSize: '0.78rem', color: '#166534', fontWeight: 650, lineHeight: 1.4 }}>
-                                Alle Unterrichtsstunden für heute sind erfolgreich beendet. Hab einen wohlverdienten, erholsamen Feierabend.
-                              </p>
+                              {/* Timeline Dot on the left */}
+                              <div style={{ width: '20px', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2, flexShrink: 0 }}>
+                                <div style={{
+                                  width: '12px',
+                                  height: '12px',
+                                  borderRadius: '50%',
+                                  border: '3px solid #22c55e',
+                                  background: '#22c55e',
+                                  boxSizing: 'border-box'
+                                }} />
+                              </div>
+
+                              {/* Success banner card on the right */}
+                              <div style={{
+                                flex: 1,
+                                background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                                border: '1.5px solid #bbf7d0',
+                                borderRadius: '16px',
+                                padding: '16px 20px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '4px',
+                                boxShadow: '0 4px 14px rgba(34, 197, 94, 0.06)',
+                                textAlign: 'center'
+                              }}>
+                                <h4 style={{ margin: 0, fontWeight: 900, color: '#15803d', fontSize: '0.95rem', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Schönen Feierabend</h4>
+                                <p style={{ margin: 0, fontSize: '0.78rem', color: '#166534', fontWeight: 650, lineHeight: 1.4 }}>
+                                  Alle Unterrichtsstunden für heute sind erfolgreich beendet. Hab einen wohlverdienten, erholsamen Feierabend.
+                                </p>
+                              </div>
                             </div>
                           );
                         })()}
@@ -3056,7 +3748,7 @@ export function TeacherDashboard({
 
                     {/* Next Student Prep Mirror */}
                     {(dynamicPrepMirror || briefingData.prepMirror) && (
-                      <div className="google-card" style={{ borderLeft: '4px solid #10b981', opacity: loadingPrepMirror ? 0.6 : 1, transition: 'opacity 0.2s' }}>
+                      <div className="google-card" style={{ flex: '1 1 280px', minWidth: '280px', borderLeft: '4px solid #10b981', opacity: loadingPrepMirror ? 0.6 : 1, transition: 'opacity 0.2s' }}>
                         {(() => {
                           const prep = dynamicPrepMirror || briefingData.prepMirror;
                           return (
@@ -3161,11 +3853,14 @@ export function TeacherDashboard({
               )}
             </div>
 
-            {/* RESTORED briefing-right-sidebar */}
+            {/* briefing-right-sidebar */}
             <aside style={{ 
+              flex: '1 1 320px',
+              maxWidth: '320px',
+              width: '100%',
               display: 'flex', 
               flexDirection: 'column', 
-              gap: '24px',
+              gap: '20px',
               maxHeight: 'calc(100vh - 80px)',
               overflowY: 'auto',
               paddingRight: '6px',
@@ -3173,154 +3868,437 @@ export function TeacherDashboard({
               boxSizing: 'border-box'
             }} className="briefing-right-sidebar">
               
-              {/* SICKNESS CARD */}
-              <div className="google-card" style={{ 
-                padding: '12px 18px', 
-                borderRadius: '16px',
-                background: '#fef2f2', 
-                border: '1px solid #fee2e2', 
-                boxShadow: '0 4px 12px rgba(220, 53, 69, 0.03)',
+              {/* SICKNESS CARD – always red */}
+              <div style={{ 
+                padding: isSickWidgetExpanded || teacher?.sick_until ? '20px 24px' : '12px 20px', 
+                borderRadius: '24px',
+                background: 'linear-gradient(135deg, #fff1f2 0%, #fff5f5 100%)',
+                boxShadow: '0 4px 20px rgba(239,68,68,0.10)',
+                border: '1.5px solid #fecaca',
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '12px'
+                flexDirection: 'column',
+                gap: '12px',
+                transition: 'all 0.35s ease'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                  <AlertTriangle size={16} color="#b91c1c" style={{ flexShrink: 0 }} />
-                  <span style={{ fontSize: '0.78rem', color: '#7f1d1d', fontWeight: 650, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    Heute krank? Stunden stornieren & Verwaltung benachrichtigen.
-                  </span>
-                </div>
-                <button
-                  onClick={handleReportIllness}
-                  style={{
-                    background: '#b91c1c',
-                    color: '#ffffff',
-                    border: 'none',
-                    padding: '6px 12px',
-                    borderRadius: '10px',
-                    fontWeight: 800,
-                    fontSize: '0.72rem',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    boxShadow: '0 2px 6px rgba(185, 28, 28, 0.1)',
-                    transition: 'all 0.2s',
-                    flexShrink: 0
-                  }}
-                  className="hover-scale"
-                >
-                  🤒 Jetzt krankmelden
-                </button>
+
+                {/* Success / Gute Besserung screen */}
+                {sickSuccessShown ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', padding: '8px 0', textAlign: 'center' }}>
+                    <span style={{ fontSize: '2.2rem', lineHeight: 1 }}>🌡️</span>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#b91c1c' }}>Krankmeldung eingereicht!</div>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#dc2626', lineHeight: 1.4 }}>
+                      Die Verwaltung wurde benachrichtigt &amp; betroffene Stunden storniert.
+                    </div>
+                    <div style={{ marginTop: '6px', fontSize: '1.0rem', fontWeight: 800, color: '#ef4444', background: '#fee2e2', borderRadius: '12px', padding: '8px 18px' }}>
+                      Gute Besserung! 💊
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div 
+                      onClick={() => setIsSickWidgetExpanded(!isSickWidgetExpanded)}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', gap: '8px' }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                        <span style={{ fontSize: '1.1rem', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#b91c1c" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+                            <line x1="12" y1="9" x2="12" y2="13"/>
+                            <line x1="12" y1="17" x2="12.01" y2="17"/>
+                          </svg>
+                        </span>
+                        <h3 style={{ 
+                          fontSize: '1rem', fontWeight: 850, margin: 0,
+                          color: '#7f1d1d',
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                        }}>
+                          Heute kra...
+                        </h3>
+                      </div>
+                      
+                      {!isSickWidgetExpanded && !teacher?.sick_until && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsSickWidgetExpanded(true);
+                          }}
+                          style={{
+                            background: '#b91c1c',
+                            color: '#ffffff',
+                            border: 'none',
+                            padding: '7px 18px',
+                            borderRadius: '24px',
+                            fontWeight: 800,
+                            fontSize: '0.8rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            boxShadow: '0 2px 8px rgba(185,28,28,0.3)',
+                            flexShrink: 0
+                          }}
+                        >
+                          <span>🤒</span>
+                          <span>Jetzt krankmelden</span>
+                        </button>
+                      )}
+
+                      {isSickWidgetExpanded && (
+                        <ChevronDown 
+                          size={16} 
+                          color="#b91c1c"
+                          style={{ 
+                            transform: 'rotate(180deg)', 
+                            transition: 'transform 0.2s ease',
+                            flexShrink: 0
+                          }} 
+                        />
+                      )}
+
+                      {teacher?.sick_until && !isSickWidgetExpanded && (
+                        <ChevronDown 
+                          size={16} 
+                          color="#b91c1c"
+                          style={{ 
+                            transform: 'rotate(0deg)', 
+                            transition: 'transform 0.2s ease',
+                            flexShrink: 0
+                          }} 
+                        />
+                      )}
+                    </div>
+
+                    {teacher?.sick_until && !isSickWidgetExpanded && (
+                      <div style={{ fontSize: '0.78rem', color: '#dc2626', fontWeight: 700, paddingLeft: '30px' }}>
+                        Bis: {new Date(teacher.sick_until).toLocaleDateString('de-DE')}
+                      </div>
+                    )}
+
+                    {(isSickWidgetExpanded || teacher?.sick_until) && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingTop: '8px', borderTop: '1px solid #fecaca' }}>
+                        {teacher?.sick_until ? (
+                          <div style={{ fontSize: '0.78rem', color: '#7f1d1d', fontWeight: 550, lineHeight: 1.4 }}>
+                            Du bist aktuell krankgemeldet bis einschließlich:
+                            <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#b91c1c', marginTop: '4px' }}>
+                              {new Date(teacher.sick_until).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
+                            </div>
+                          </div>
+                        ) : (
+                          <p style={{ margin: 0, fontSize: '0.78rem', color: '#9f1239', lineHeight: 1.4, fontWeight: 500 }}>
+                            Trage dein voraussichtliches Enddatum ein. Stunden werden storniert und die Verwaltung benachrichtigt.
+                          </p>
+                        )}
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            {teacher?.sick_until ? 'Zeitraum anpassen (bis):' : 'Krank bis einschließlich:'}
+                          </label>
+                          <input 
+                            type="date"
+                            value={sickUntilDate}
+                            onChange={(e) => setSickUntilDate(e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              borderRadius: '12px',
+                              border: '1px solid #fca5a5',
+                              background: '#fff',
+                              fontSize: '0.8rem',
+                              fontFamily: 'inherit',
+                              outline: 'none',
+                              color: '#7f1d1d',
+                              boxSizing: 'border-box'
+                            }}
+                          />
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
+                          <button
+                            onClick={handleReportSick}
+                            disabled={reportingSick}
+                            style={{
+                              background: '#dc2626',
+                              color: '#ffffff',
+                              border: 'none',
+                              padding: '10px 14px',
+                              borderRadius: '12px',
+                              fontWeight: 700,
+                              fontSize: '0.78rem',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                              boxShadow: '0 4px 12px rgba(220,38,38,0.25)'
+                            }}
+                            className="hover-scale"
+                          >
+                            <span>🌡️</span>
+                            {reportingSick ? 'Speichert...' : teacher?.sick_until ? 'Zeitraum anpassen' : 'Krankmeldung absenden'}
+                          </button>
+
+                          {teacher?.sick_until && (
+                            <button
+                              onClick={handleEndSick}
+                              disabled={reportingSick}
+                              style={{
+                                background: '#ffffff',
+                                color: '#166534',
+                                border: '1.5px solid #16a34a',
+                                padding: '10px 14px',
+                                borderRadius: '12px',
+                                fontWeight: 700,
+                                fontSize: '0.78rem',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                              className="hover-scale"
+                            >
+                              ✅ Wieder gesund melden
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
 
-              {/* INFOS DER VERWALTUNG (Administration Bulletins) */}
-              <div className="google-card" style={{ 
-                padding: '24px 28px', 
-                borderRadius: '20px',
-                background: 'rgba(255, 255, 255, 0.8)', 
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
-                border: '1px solid rgba(0, 0, 0, 0.05)', 
-                boxShadow: '0 10px 30px rgba(0, 0, 0, 0.02)'
+              {/* INFOS DER VERWALTUNG */}
+              <div style={{ 
+                background: '#ffffff', 
+                borderRadius: '24px', 
+                padding: '24px', 
+                boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '20px' }}>
-                  <Bell size={16} color="#ef4444" /> INFOS DER VERWALTUNG
+                {/* Header row */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Bell size={18} color="#ef4444" />
+                    <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Infos der Verwaltung</h3>
+                  </div>
                 </div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {[
-                    { id: 'admin1', tag: 'Aktion', title: '⚠️ 2 offene Terminanfragen von Eltern', body: 'Es warten Terminanfragen im Stundenplan auf deine Freigabe.', date: 'Dringend' },
-                    { id: 'admin2', tag: 'Termin', title: '📅 Lehrerkonferenz 2026', body: 'Freitag, 29. Mai um 14:00 Uhr in Raum 201 (Thema: Sommerkonzert & Mediathek-Lizenzen).', date: 'Fr, 14:00' },
-                    { id: 'admin3', tag: 'Mediathek', title: '📚 Neue E-Gitarren & Playalongs freigeschaltet', body: '5 neue Übestücke stehen ab sofort in der Mediathek für deine Schüler bereit.', date: 'Neu' }
-                  ].map((item, idx) => {
-                    let tagColor = '#64748b';
-                    if (item.tag === 'Aktion') tagColor = '#ef4444';
-                    else if (item.tag === 'Termin') tagColor = '#3b82f6';
-                    else if (item.tag === 'Mediathek') tagColor = '#10b981';
 
+                {/* Offen / Erledigt Switch */}
+                <div style={{
+                  display: 'inline-flex',
+                  background: '#f1f5f9',
+                  borderRadius: '12px',
+                  padding: '3px',
+                  marginBottom: '16px',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                }}>
+                  {(['open', 'done'] as const).map(tab => {
+                    const isActive = adminFeedbackTab === tab;
+                    const openCount = adminFeedbackRequests.filter(r => !adminFeedbackResponses.find(res => res.request_id === r.id)).length;
+                    const label = tab === 'open' ? `Offen${openCount > 0 ? ` (${openCount})` : ''}` : 'Erledigt';
                     return (
-                      <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', padding: '2px 8px', borderRadius: '6px', background: tagColor + '15', color: tagColor }}>
-                            {item.tag}
-                          </span>
-                          <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 700 }}>
-                            {item.date}
-                          </span>
-                        </div>
-                        <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
-                          {item.title}
-                        </h4>
-                        <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: 1.4, fontWeight: 500 }}>
-                          {item.body}
-                        </p>
-                        {idx < 2 && <div style={{ height: '1px', background: '#f1f5f9', marginTop: '8px' }} />}
-                      </div>
+                      <button
+                        key={tab}
+                        onClick={() => setAdminFeedbackTab(tab)}
+                        style={{
+                          flex: 1,
+                          padding: '7px 0',
+                          borderRadius: '9px',
+                          border: 'none',
+                          fontWeight: 700,
+                          fontSize: '0.76rem',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          background: isActive ? '#ffffff' : 'transparent',
+                          color: isActive ? '#1e293b' : '#64748b',
+                          boxShadow: isActive ? '0 1px 4px rgba(0,0,0,0.10)' : 'none',
+                        }}
+                      >
+                        {label}
+                      </button>
                     );
                   })}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {(() => {
+                    if (adminFeedbackRequests.length === 0) {
+                      return (
+                        <span style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>
+                          Keine aktuellen Mitteilungen oder Anfragen vorhanden.
+                        </span>
+                      );
+                    }
+
+                    if (adminFeedbackTab === 'open') {
+                      const openItems = adminFeedbackRequests.filter(r => !adminFeedbackResponses.find(res => res.request_id === r.id));
+                      if (openItems.length === 0) {
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '12px 0', textAlign: 'center' }}>
+                            <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Alle Anfragen beantwortet!</span>
+                          </div>
+                        );
+                      }
+                      return openItems.map((item, idx) => {
+                        const isResponding = respondingToRequestId === item.id;
+                        return (
+                          <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', padding: '2px 8px', borderRadius: '6px', background: '#fee2e2', color: '#991b1b' }}>
+                                Aktion erforderlich
+                              </span>
+                              <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600 }}>
+                                {new Date(item.created_at).toLocaleDateString('de-DE')}
+                              </span>
+                            </div>
+                            <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>{item.title}</h4>
+                            {item.description && (
+                              <p style={{ margin: 0, fontSize: '0.78rem', color: '#475569', lineHeight: 1.4, fontWeight: 500 }}>{item.description}</p>
+                            )}
+                            <div style={{ marginTop: '4px' }}>
+                              {isResponding ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                  <textarea
+                                    value={responseTextInput}
+                                    onChange={(e) => setResponseTextInput(e.target.value)}
+                                    placeholder="Schreibe deine Antwort an die Verwaltung..."
+                                    rows={2}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 10px',
+                                      borderRadius: '10px',
+                                      border: '1px solid #cbd5e1',
+                                      fontSize: '0.78rem',
+                                      fontFamily: 'inherit',
+                                      outline: 'none',
+                                      resize: 'none',
+                                      boxSizing: 'border-box'
+                                    }}
+                                  />
+                                  <div style={{ display: 'flex', gap: '6px' }}>
+                                    <button
+                                      onClick={() => handleSubmitFeedbackResponse(item.id)}
+                                      disabled={submittingFeedback || !responseTextInput.trim()}
+                                      style={{ flex: 1, background: '#171717', color: '#ffffff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontWeight: 700, fontSize: '0.74rem', cursor: 'pointer' }}
+                                    >
+                                      Senden
+                                    </button>
+                                    <button
+                                      onClick={() => { setRespondingToRequestId(null); setResponseTextInput(''); }}
+                                      style={{ background: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', padding: '7px 12px', borderRadius: '8px', fontWeight: 700, fontSize: '0.74rem', cursor: 'pointer' }}
+                                    >
+                                      Abbrechen
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => { setRespondingToRequestId(item.id); setResponseTextInput(''); }}
+                                  style={{ background: 'transparent', color: '#0b57d0', border: '1px solid #0b57d0', padding: '6px 12px', borderRadius: '8px', fontWeight: 700, fontSize: '0.74rem', cursor: 'pointer', transition: 'all 0.2s' }}
+                                  className="hover-scale"
+                                >
+                                  Rückmeldung geben
+                                </button>
+                              )}
+                            </div>
+                            {idx < openItems.length - 1 && <div style={{ height: '1px', background: '#f1f5f9', marginTop: '10px' }} />}
+                          </div>
+                        );
+                      });
+                    }
+
+                    // Erledigt tab – max 5 most recent
+                    const doneItems = adminFeedbackRequests
+                      .filter(r => adminFeedbackResponses.find(res => res.request_id === r.id))
+                      .slice(0, 5);
+                    if (doneItems.length === 0) {
+                      return (
+                        <span style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>
+                          Noch keine erledigten Rückmeldungen.
+                        </span>
+                      );
+                    }
+                    return doneItems.map((item, idx) => {
+                      const response = adminFeedbackResponses.find(res => res.request_id === item.id);
+                      return (
+                        <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', padding: '2px 8px', borderRadius: '6px', background: '#d1fae5', color: '#065f46' }}>
+                              Erledigt
+                            </span>
+                            <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600 }}>
+                              {new Date(item.created_at).toLocaleDateString('de-DE')}
+                            </span>
+                          </div>
+                          <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>{item.title}</h4>
+                          {response && (
+                            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px 12px', borderRadius: '10px', marginTop: '2px' }}>
+                              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase', marginBottom: '2px' }}>Deine Rückmeldung:</div>
+                              <div style={{ fontSize: '0.78rem', color: '#14532d', fontStyle: 'italic', fontWeight: 500 }}>{response.response_text}</div>
+                            </div>
+                          )}
+                          {idx < doneItems.length - 1 && <div style={{ height: '1px', background: '#f1f5f9', marginTop: '10px' }} />}
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               </div>
 
               {/* LIVE CAMPUS FEED */}
-              <div className="google-card" style={{ 
-                padding: '24px 28px', 
-                borderRadius: '20px',
-                background: 'rgba(255, 255, 255, 0.8)', 
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
-                border: '1px solid rgba(0, 0, 0, 0.05)', 
-                boxShadow: '0 10px 30px rgba(0, 0, 0, 0.02)'
+              <div style={{ 
+                background: '#ffffff', 
+                borderRadius: '24px', 
+                padding: '24px', 
+                boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '20px' }}>
-                  <Sparkles size={16} color="#f59e0b" /> LIVE CAMPUS FEED
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                  <Sparkles size={18} color="#eab308" />
+                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Live Campus Feed</h3>
                 </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {[
-                    { id: 'f1', tag: 'Aktion', title: '🎸 Sommer Rock-Bandcamp 2026', body: 'Melde dich jetzt für unser Band-Camp an! Frist endet in 4 Tagen.', date: 'Heute' },
-                    { id: 'f2', tag: 'Wichtig', title: '🎹 Neue Digitalpianos im Studio 3', body: 'Ab sofort stehen euch 4 neue Yamaha Masterpianos zum Üben bereit!', date: 'Vor 2 Tagen' },
-                    { id: 'f3', tag: 'Erfolg', title: '🚀 Stuttgart knackt die 400 Min.', body: 'Herzlichen Glückwunsch an Stuttgart zum neuen Übe-Meilenstein!', date: 'Vor 3 Tagen' }
-                  ].map((item, idx, arr) => {
-                    let tagColor = '#6366f1';
-                    if (item.tag === 'Aktion') tagColor = '#eab308';
-                    else if (item.tag === 'Erfolg') tagColor = '#10b981';
-                    else if (item.tag === 'Wichtig') tagColor = '#ef4444';
-
-                    return (
-                      <div key={item.id} style={{
-                        paddingBottom: '16px',
-                        borderBottom: idx === arr.length - 1 ? 'none' : '1px solid rgba(0, 0, 0, 0.04)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '6px'
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{
-                            fontSize: '9px',
-                            fontWeight: 900,
-                            color: 'white',
-                            background: tagColor,
-                            padding: '2px 8px',
-                            borderRadius: '100px',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.04em'
-                          }}>
-                            {item.tag}
-                          </span>
-                          <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600 }}>{item.date}</span>
+                  {campusFeedAnnouncements.length === 0 ? (
+                    <span style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>
+                      Keine aktuellen Campus-Mitteilungen vorhanden.
+                    </span>
+                  ) : (
+                    campusFeedAnnouncements.slice(0, 5).map((item, idx, arr) => {
+                      return (
+                        <div key={item.id} style={{
+                          paddingBottom: idx === arr.length - 1 ? '0' : '16px',
+                          borderBottom: idx === arr.length - 1 ? 'none' : '1px solid #f1f5f9',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '6px'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{
+                              fontSize: '9px',
+                              fontWeight: 800,
+                              color: '#475569',
+                              background: '#f1f5f9',
+                              padding: '2px 8px',
+                              borderRadius: '100px',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.04em'
+                            }}>
+                              {item.target_type === 'all' ? 'Alle' : item.target_type === 'teachers' ? 'Lehrer' : 'Mitteilung'}
+                            </span>
+                            <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 650 }}>
+                              {new Date(item.created_at).toLocaleDateString('de-DE')}
+                            </span>
+                          </div>
+                          
+                          <h5 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>
+                            {item.title}
+                          </h5>
+                          
+                          <p style={{ fontSize: '0.78rem', color: '#475569', margin: 0, fontWeight: 500, lineHeight: 1.4 }}>
+                            {item.content}
+                          </p>
                         </div>
-                        
-                        <h5 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                          {item.title}
-                        </h5>
-                        <p style={{ fontSize: '0.78rem', color: '#64748b', margin: 0, fontWeight: 500, lineHeight: 1.4 }}>
-                          {item.body}
-                        </p>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </div>
-              </div>            </aside>
+              </div>
+            </aside>
           </div>
         ) : activeTab === 'live' ? (
         <div className={`live-lab-grid ${isSidebarCollapsed ? 'collapsed' : ''}`}>
@@ -3711,7 +4689,7 @@ export function TeacherDashboard({
                                   zIndex: 100
                                 }}
                               >
-                                <CoachesNode coaches={coaches} onProfileSelect={setSelectedCoachProfile} />
+                                <CoachesNode coaches={coaches} onProfileSelect={setSelectedCoachProfile} activePlatform={activePlatform} />
                               </div>
                             );
                           }
@@ -3742,6 +4720,7 @@ export function TeacherDashboard({
                                 onProfileSelect={setSelectedStudentProfile}
                                 onLogout={handleLogoutStudent}
                                 hasHelpRequest={helpRequests.some(r => r.station_id === station.id)}
+                                activePlatform={activePlatform}
                               />
                             </div>
                           );
@@ -3798,7 +4777,7 @@ export function TeacherDashboard({
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '24px', background: '#ffffff', padding: '24px', borderRadius: '32px', border: '1px solid #e2e8f0' }}>
                   {/* Coaches Node */}
                   <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-                    <CoachesNode coaches={coaches} onProfileSelect={setSelectedCoachProfile} />
+                    <CoachesNode coaches={coaches} onProfileSelect={setSelectedCoachProfile} activePlatform={activePlatform} />
                   </div>
                   {roomStations.filter(s => {
                     const sName = s.name || '';
@@ -3824,6 +4803,7 @@ export function TeacherDashboard({
                           onProfileSelect={setSelectedStudentProfile}
                           onLogout={handleLogoutStudent}
                           hasHelpRequest={helpRequests.some(r => r.station_id === station.id)}
+                          activePlatform={activePlatform}
                         />
                       </div>
                     );
@@ -3924,7 +4904,7 @@ export function TeacherDashboard({
                         gap: '12px'
                       }}>
                         <div style={{ width: '40px', height: '40px', borderRadius: '12px', overflow: 'hidden', border: '2px solid #fff1f2' }}>
-                          <AvatarImage src={reqUser?.photo_url} user={reqUser} />
+                          <AvatarImage src={reqUser?.photo_url} user={reqUser} activePlatform={activePlatform} />
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 900, fontSize: '0.85rem', color: '#1e293b' }}>{reqUser?.first_name}</div>
@@ -4406,7 +5386,7 @@ export function TeacherDashboard({
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <div style={{ width: '44px', height: '44px', borderRadius: '14px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
-                            <AvatarImage src={sub.users?.photo_url} user={sub.users} />
+                            <AvatarImage src={sub.users?.photo_url} user={sub.users} activePlatform={activePlatform} />
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
 
@@ -4781,7 +5761,7 @@ export function TeacherDashboard({
                             };
 
                             const isPro = form.band_song?.difficulty_level === 'original' || form.band_song?.difficulty_level === 'pro';
-                            const levelText = isPro ? 'PRO' : 'STARTER';
+                      const levelText = isPro ? 'PRO' : 'STARTER';
 
                             return (
                               <div key={form.id} style={{ 
@@ -4789,13 +5769,14 @@ export function TeacherDashboard({
                                 borderRadius: '28px', 
                                 border: '1px solid rgba(165, 180, 252, 0.1)',
                                 boxShadow: '0 15px 35px rgba(0, 0, 0, 0.2)',
-                                display: 'grid',
-                                gridTemplateColumns: '320px 1fr',
+                                display: 'flex',
+                                flexWrap: 'wrap',
                                 overflow: 'hidden',
                                 minHeight: '260px'
                               }}>
                                 {/* Left Panel: Band & Song Info */}
                                 <div style={{ 
+                                  flex: '1 1 320px',
                                   padding: '32px', 
                                   background: 'rgba(255, 255, 255, 0.03)', 
                                   borderRight: '1px solid rgba(255, 255, 255, 0.05)',
@@ -4846,7 +5827,7 @@ export function TeacherDashboard({
                                 </div>
 
                                 {/* Right Panel: Slot Grid */}
-                                <div style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                <div style={{ flex: '1 1 400px', padding: '32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <h4 style={{ fontSize: '0.75rem', fontWeight: 950, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>
                                       Instrumenten-Belegung & Freischaltung
@@ -5092,7 +6073,7 @@ export function TeacherDashboard({
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                           <div style={{ width: '48px', height: '48px', borderRadius: '16px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 10px rgba(0,0,0,0.05)', flexShrink: 0 }}>
-                            <AvatarImage src={student.photo_url} user={student} />
+                            <AvatarImage src={student.photo_url} user={student} activePlatform={activePlatform} />
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontWeight: 900, fontSize: '1rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -5645,7 +6626,7 @@ export function TeacherDashboard({
                     </div>
                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                      <div style={{ width: '56px', height: '56px', borderRadius: '18px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 8px 16px rgba(0,0,0,0.05)' }}>
-                       <AvatarImage src={sub.users?.photo_url} user={sub.users} />
+                       <AvatarImage src={sub.users?.photo_url} user={sub.users} activePlatform={activePlatform} />
                      </div>
                      <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>

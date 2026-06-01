@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User } from 'lucide-react';
+import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key } from 'lucide-react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { getDistanceFromLatLonInM } from '../utils/geo';
+import jsQR from 'jsqr';
 
 interface LoginScreenProps {
   onLogin: (userId: string, isHome?: boolean) => void;
@@ -996,6 +997,45 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     }
   };
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+    setError(null);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          setError('Canvas-Kontext konnte nicht erstellt werden.');
+          setLoading(false);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, img.width, img.height);
+        const imageData = ctx.getImageData(0, 0, img.width, img.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
+        if (code) {
+          handleScan(code.data);
+        } else {
+          setError('Kein QR-Code im Bild gefunden. Bitte lade ein schärferes Foto hoch.');
+          setLoading(false);
+        }
+      };
+      img.onerror = () => {
+        setError('Bild konnte nicht geladen werden.');
+        setLoading(false);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleScan = async (scannedValue: string) => {
     if (loading) return;
     setLoading(true);
@@ -1579,6 +1619,75 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           )}
         </div>
 
+        {/* iOS-Style QR Image Upload & Passwort Anmeldung side-by-side */}
+        <div style={{ display: 'flex', gap: '12px', marginTop: '16px', width: '100%' }}>
+          <div style={{ flex: 1 }}>
+            <label 
+              htmlFor="qr-image-upload"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                width: '100%',
+                padding: '12px 6px',
+                borderRadius: '16px',
+                background: '#f8fafc',
+                border: '1.5px dashed #cbd5e1',
+                color: '#475569',
+                fontSize: '13px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                textAlign: 'center',
+                boxSizing: 'border-box',
+                height: '46px'
+              }}
+              onMouseOver={(e) => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.borderColor = '#94a3b8'; }}
+              onMouseOut={(e) => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+            >
+              <Upload size={16} />
+              Foto hochladen
+            </label>
+            <input 
+              id="qr-image-upload"
+              type="file"
+              accept="image/*"
+              onChange={handleFileUpload}
+              style={{ display: 'none' }}
+            />
+          </div>
+
+          <button 
+            onClick={() => setExpandedSection('pin')}
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '12px 6px',
+              borderRadius: '16px',
+              background: '#f8fafc',
+              border: '1.5px solid #cbd5e1',
+              color: '#475569',
+              fontSize: '13px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              textAlign: 'center',
+              boxSizing: 'border-box',
+              height: '46px',
+              outline: 'none'
+            }}
+            onMouseOver={(e) => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.borderColor = '#94a3b8'; }}
+            onMouseOut={(e) => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+          >
+            <Key size={16} />
+            Passwort Anmeldung
+          </button>
+        </div>
+
         {error && (
           <div style={{ marginTop: '16px', background: '#fef2f2', border: '1px solid #fee2e2', color: '#ef4444', padding: '14px', borderRadius: '16px', fontSize: '13px', fontWeight: 800, textAlign: 'center', width: '100%' }}>
             {error}
@@ -1587,23 +1696,15 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       </div>
       )}
 
-      {/* Links to expand PIN / Kiosk */}
-      {expandedSection === 'none' && (
-        <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+      {/* Kiosk Modus button under the card if available */}
+      {expandedSection === 'none' && schoolData && kioskRooms.length > 0 && (
+        <div style={{ marginTop: '24px' }}>
           <button 
-            onClick={() => setExpandedSection('pin')}
+            onClick={() => setExpandedSection('kiosk')}
             style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer', transition: 'color 0.2s' }}
           >
-            Passwort Anmeldung
+            Im GrooveLab anmelden
           </button>
-          {schoolData && kioskRooms.length > 0 && (
-            <button 
-              onClick={() => setExpandedSection('kiosk')}
-              style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer', transition: 'color 0.2s' }}
-            >
-              Im GrooveLab anmelden
-            </button>
-          )}
         </div>
       )}
 

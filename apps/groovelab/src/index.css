@@ -10,17 +10,17 @@
   --primary-color: #eab308;
   --brand-yellow: #eab308;
 
-  /* Swiss Neutral Palette */
-  --bg-color: #f8fafc; /* Softer light background slate-50 */
-  --bg-subtle: #f1f5f9;
+  /* Swiss Neutral Palette - Zurich Card Vibe */
+  --bg-color: #f3f3f6; /* Pure premium light gray canvas */
+  --bg-subtle: #e8e8ed; /* Clean cooler light gray accent */
   --surface: #ffffff;
-  --border: #f1f5f9; /* Soft border */
+  --border: #e8e8ed; /* Crisp clean border */
   --border-light: rgba(0, 0, 0, 0.02);
 
-  /* Text */
-  --text-main: #0f172a; /* slate-900 */
-  --text-secondary: #475569; /* slate-600 */
-  --text-muted: #94a3b8; /* slate-400 */
+  /* Text - High Contrast Bold Swiss */
+  --text-main: #000000; /* Deep absolute black */
+  --text-secondary: #232326; /* Highly legible dark charcoal */
+  --text-muted: #7d7d82; /* Clean gray for secondary metadata */
 
   /* Swiss Spacing Scale */
   --space-1: 4px;
@@ -33,37 +33,38 @@
   --space-10: 40px;
   --space-12: 48px;
 
-  /* Swiss Radius (Consulting SaaS Rounded corners) */
+  /* Swiss Radius (Zurich Card chunky rounded corners) */
   --radius-sm: 12px;
-  --radius-md: 18px;
-  --radius-lg: 24px; /* 24px rounded-3xl */
-  --radius-xl: 32px;
+  --radius-md: 20px;
+  --radius-lg: 28px; /* Slightly reduced chunky radius */
+  --radius-xl: 36px; /* Slightly reduced large wrapper radius */
   --radius-pill: 100px;
 
-  /* Liquid Glass (Advanced Apple Glassmorphism) */
-  --glass-bg: rgba(255, 255, 255, 0.70);
-  --glass-bg-strong: rgba(255, 255, 255, 0.85);
-  --glass-border: rgba(255, 255, 255, 0.45);
-  --glass-blur: blur(25px) saturate(1.8);
-  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.04), inset 0 1px 1px 0 rgba(255, 255, 255, 0.80);
-  --glass-shadow-lg: 0 16px 48px 0 rgba(31, 38, 135, 0.08), inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.90);
+  /* Liquid Glass (Clean Swiss Poster style - transparent pure white overlays) */
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-bg-strong: rgba(255, 255, 255, 0.95);
+  --glass-border: rgba(0, 0, 0, 0.04);
+  --glass-blur: blur(20px) saturate(1.4);
+  --glass-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.02), inset 0 1px 0 0 rgba(255, 255, 255, 0.80);
+  --glass-shadow-lg: 0 12px 36px 0 rgba(0, 0, 0, 0.04), inset 0 1px 1px 0 rgba(255, 255, 255, 0.90);
 
   /* Legacy */
-  --surface-glass: rgba(255, 255, 255, 0.75);
+  --surface-glass: rgba(255, 255, 255, 0.85);
 }
 
 .liquid-glass {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%) !important;
-  backdrop-filter: blur(24px) saturate(1.8) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(1.8) !important;
-  border: 1px solid rgba(255, 255, 255, 0.5) !important;
-  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(20px) saturate(1.4) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.4) !important;
+  border: 1px solid rgba(0, 0, 0, 0.04) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
 .liquid-glass:hover {
-  transform: translateY(-2px) scale(1.01) !important;
-  box-shadow: 0 16px 48px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+  transform: translateY(-2px) scale(1.005) !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
 }
 
 /* ── Base ── */
@@ -86,23 +87,23 @@ body {
   font-family: 'Urbanist', sans-serif !important;
   font-size: 2.25rem;
   font-weight: 900;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.04em;
   line-height: 1.05;
   color: var(--text-main);
 }
 .swiss-h2, h2 {
   font-family: 'Urbanist', sans-serif !important;
   font-size: 1.45rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-weight: 900;
+  letter-spacing: -0.03em;
   line-height: 1.15;
   color: var(--text-main);
 }
 .swiss-h3, h3 {
   font-family: 'Urbanist', sans-serif !important;
   font-size: 1.05rem;
-  font-weight: 800;
-  letter-spacing: -0.01em;
+  font-weight: 900;
+  letter-spacing: -0.02em;
   line-height: 1.2;
   color: var(--text-main);
 }
@@ -484,18 +485,18 @@ body {
 }
 
 .glass-panel {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%) !important;
-  backdrop-filter: blur(24px) saturate(1.8) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(1.8) !important;
-  border: 1px solid rgba(255, 255, 255, 0.5) !important;
-  border-radius: 32px;
-  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(20px) saturate(1.4) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.4) !important;
+  border: 1px solid rgba(0, 0, 0, 0.04) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
 .glass-panel:hover {
-  transform: translateY(-2px) scale(1.01) !important;
-  box-shadow: 0 16px 48px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+  transform: translateY(-2px) scale(1.005) !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
 }
 
 @keyframes pulse {
@@ -901,4 +902,92 @@ button, a, [role="button"], [onClick] {
   -webkit-appearance: none !important;
   -moz-appearance: textfield !important;
 }
+
+/* ============================================================
+   UNIFIED SWITCH & SEGMENTED CONTROLS DESIGN SYSTEM
+   ============================================================ */
+
+/* Segmented Switcher (Clean Apple Pill Look) */
+.app-segmented-switch {
+  display: flex;
+  background: rgba(255, 255, 255, 0.4);
+  padding: 4px;
+  border-radius: 12px;
+  width: fit-content;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.5);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.app-segmented-switch-btn {
+  padding: 8px 24px;
+  border-radius: 8px;
+  border: none;
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  background: transparent;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.app-segmented-switch-btn.active {
+  background: #ffffff !important;
+  font-weight: 700 !important;
+  color: #1d1d1f !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+}
+
+.app-segmented-switch-btn:hover:not(.active) {
+  color: #1d1d1f;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Premium Binary Switch (Matches Pill knob aesthetic) */
+.app-binary-switch {
+  width: 50px;
+  height: 26px;
+  border-radius: 13px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: #cbd5e1;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 0;
+  display: inline-block;
+  outline: none;
+}
+
+.app-binary-switch.active {
+  background: #34a853; /* Match brandColor */
+  border-color: rgba(52, 168, 83, 0.1);
+}
+
+.app-binary-switch-knob {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.app-binary-switch.active .app-binary-switch-knob {
+  left: 26px;
+}
+
+/* Timeline card hover effects */
+.google-timeline-card {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.google-timeline-card:hover {
+  transform: translateY(-2.5px) scale(1.005) !important;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06) !important;
+}
+
 

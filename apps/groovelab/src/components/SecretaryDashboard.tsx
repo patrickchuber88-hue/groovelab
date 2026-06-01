@@ -650,7 +650,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     return 'secretary';
   });
   const [secretarySubTab, setSecretarySubTab] = useState<'briefing' | 'employees' | 'linking' | 'licenses' | 'setup' | 'rooms' | 'equipment'>('briefing');
-  const [campusSubTab, setCampusSubTab] = useState<'briefing' | 'onboarding' | 'schedules' | 'status'>('briefing');
+  const [campusSubTab, setCampusSubTab] = useState<'briefing' | 'onboarding' | 'students' | 'schedules' | 'status'>('briefing');
   const [groovelabSubTab, setGroovelabSubTab] = useState<'briefing' | 'live' | 'students' | 'coaches' | 'kiosk' | 'status'>('briefing');
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
   const [liveSearchQuery, setLiveSearchQuery] = useState<string>('');
@@ -777,6 +777,28 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [selectedGroovelabStudentId, setSelectedGroovelabStudentId] = useState<string>('');
   const [linkingInProgress, setLinkingInProgress] = useState<boolean>(false);
 
+  // Compact Schülerboard States
+  const [studentSearchQuery, setStudentSearchQuery] = useState<string>('');
+  const [studentFilterInstrument, setStudentFilterInstrument] = useState<string>('All');
+  const [studentFilterTeacher, setStudentFilterTeacher] = useState<string>('All');
+  const [studentFilterStatus, setStudentFilterStatus] = useState<'all' | 'campus' | 'groovelab' | 'inactive'>('all');
+  const [isStudentCsvExpanded, setIsStudentCsvExpanded] = useState<boolean>(false);
+  const [studentCsvText, setStudentCsvText] = useState<string>('');
+  const [studentCurrentPage, setStudentCurrentPage] = useState<number>(1);
+  const [studentPageSize, setStudentPageSize] = useState<number>(50);
+
+  // Manual Student Creation Form States
+  const [showAddStudentModal, setShowAddStudentModal] = useState<boolean>(false);
+  const [newStudentFirstName, setNewStudentFirstName] = useState<string>('');
+  const [newStudentLastName, setNewStudentLastName] = useState<string>('');
+  const [newStudentNickname, setNewStudentNickname] = useState<string>('');
+  const [newStudentInstrument, setNewStudentInstrument] = useState<string>('');
+  const [newStudentDuration, setNewStudentDuration] = useState<number>(30); // 30m by default
+  const [newStudentTeacherId, setNewStudentTeacherId] = useState<string>('');
+  const [newStudentIsAppUser, setNewStudentIsAppUser] = useState<boolean>(false);
+  const [newStudentIsCampusActive, setNewStudentIsCampusActive] = useState<boolean>(true);
+  const [newStudentIsGroovelabActive, setNewStudentIsGroovelabActive] = useState<boolean>(false);
+
   // Administrative employees list
   const [employees, setEmployees] = useState<any[]>([]);
 
@@ -853,7 +875,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [importStatus, setImportStatus] = useState<{ success: boolean; message: string } | null>(null);
   // Redesigned Teacher Onboarding & Search states
   const [teacherSearchQuery, setTeacherSearchQuery] = useState<string>('');
-  const [alphabetLetter, setAlphabetLetter] = useState<string>('All');
   const [teacherStatusTab, setTeacherStatusTab] = useState<'all' | 'active' | 'inactive'>('all');
   
   // Manual Teacher Creation Form States
@@ -865,6 +886,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [newTeacherLimit, setNewTeacherLimit] = useState<number>(10);
   const [newTeacherContractEndsAt, setNewTeacherContractEndsAt] = useState<string>('');
   const [showCsvImportModal, setShowCsvImportModal] = useState<boolean>(false);
+  const [isCsvExpanded, setIsCsvExpanded] = useState<boolean>(false);
 
   // UI states
   const [loading, setLoading] = useState(true);
@@ -1798,6 +1820,1119 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     }
   };
 
+  const handleCreateStudentCampus = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStudentFirstName || !newStudentLastName) {
+      alert('Bitte Vor- und Nachname ausfüllen.');
+      return;
+    }
+
+    try {
+      const pin = 'GL-' + Math.floor(1000 + Math.random() * 9000);
+      const qrToken = crypto.randomUUID();
+      const defaultAvatarUrl = '/avatars/student_eguitar_1.png';
+
+      // Generate a highly unique email using initials or timestamps to avoid duplicates
+      const uniqueSuffix = Math.floor(100 + Math.random() * 900);
+      const finalEmail = `${newStudentFirstName.toLowerCase().trim().replace(/\s+/g, '')}.${newStudentLastName.toLowerCase().trim().replace(/\s+/g, '')}${uniqueSuffix}@campus.groovelab.de`;
+
+      const teacherId = newStudentTeacherId || null;
+
+      // 1. Insert student user
+      const { data: insertedStudent, error: insertError } = await supabase
+        .from('users')
+        .insert({
+          school_id: schoolId,
+          teacher_id: teacherId,
+          role: 'student',
+          first_name: newStudentFirstName,
+          last_name: newStudentLastName,
+          nickname: newStudentNickname || null,
+          email: finalEmail,
+          instrument: newStudentInstrument || 'Allgemein',
+          avatar_url: defaultAvatarUrl,
+          is_active: true,
+          is_campus_active: newStudentIsCampusActive,
+          is_groovelab_active: newStudentIsGroovelabActive,
+          status: 'active',
+          ausweis_nummer: pin,
+          qr_token: qrToken,
+          lesson_duration: newStudentDuration // 30 by default
+        })
+        .select('id, first_name, last_name')
+        .single();
+
+      if (insertError) throw insertError;
+
+      // 2. Initialize student avatar style
+      await supabase.from('avatars').insert({
+        user_id: insertedStudent.id,
+        avatar_style: 'Standard_Silhouette',
+        instrument_type: newStudentInstrument || 'Allgemein',
+        evolution_level: 1
+      });
+
+      alert(`Schüler ${newStudentFirstName} ${newStudentLastName} wurde erfolgreich angelegt.`);
+      
+      // Reset form
+      setNewStudentFirstName('');
+      setNewStudentLastName('');
+      setNewStudentNickname('');
+      setNewStudentInstrument('');
+      setNewStudentDuration(30);
+      setNewStudentTeacherId('');
+      setNewStudentIsAppUser(false);
+      setNewStudentIsCampusActive(true);
+      setNewStudentIsGroovelabActive(false);
+      setShowAddStudentModal(false);
+      
+      fetchDashboardData();
+    } catch (err: any) {
+      alert('Fehler beim Anlegen des Schülers: ' + err.message);
+    }
+  };
+
+  const handleDeleteStudentCampus = async (studentId: string, name: string) => {
+    if (!window.confirm(`Möchtest du den Schüler "${name}" wirklich unwiderruflich löschen?`)) return;
+    try {
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', studentId);
+      if (error) throw error;
+      alert(`Schüler "${name}" wurde gelöscht.`);
+      fetchDashboardData();
+    } catch (err: any) {
+      alert('Fehler beim Löschen des Schülers: ' + err.message);
+    }
+  };
+
+  const handleBulkStudentImport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!studentCsvText.trim()) {
+      alert('Bitte geben Sie Schülerdaten ein.');
+      return;
+    }
+
+    const lines = studentCsvText.split('\n');
+    let successCount = 0;
+    let failCount = 0;
+
+    // Load unique teachers list for naming check
+    const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
+      if (!acc.some(existing => existing.id === t.id)) {
+        acc.push(t);
+      }
+      return acc;
+    }, []);
+
+    const errors: string[] = [];
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      // Robust Delimiter Parsing
+      let parts = trimmed.split(';');
+      if (parts.length < 2) {
+        parts = trimmed.split(',');
+      }
+
+      let namePart = '';
+      let instrument = 'Allgemein';
+      let email = '';
+      let teacherNamePart = '';
+
+      if (parts.length >= 2) {
+        namePart = parts[0].trim();
+        instrument = parts[1].trim() || 'Allgemein';
+        email = parts[2]?.trim() || '';
+        teacherNamePart = parts[3]?.trim()?.toLowerCase() || '';
+      } else {
+        namePart = trimmed;
+      }
+
+      const nameParts = namePart.split(/\s+/);
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      if (!firstName) {
+        failCount++;
+        errors.push(`Zeile "${line}": Kein Vorname gefunden.`);
+        continue;
+      }
+
+      // Try matching associated teacher name
+      let teacherId: string | null = null;
+      if (teacherNamePart) {
+        const found = allUniqueTeachers.find(t => {
+          const fName = (t.firstName || t.first_name || '').toLowerCase();
+          const lName = (t.lastName || t.last_name || '').toLowerCase();
+          return `${fName} ${lName}`.includes(teacherNamePart) || lName.includes(teacherNamePart);
+        });
+        if (found) {
+          teacherId = found.id;
+        }
+      }
+
+      try {
+        const pin = 'GL-' + Math.floor(1000 + Math.random() * 9000);
+        const qrToken = crypto.randomUUID();
+        const defaultAvatarUrl = '/avatars/student_eguitar_1.png';
+        
+        const uniqueSuffix = Math.floor(100 + Math.random() * 900);
+        const finalEmail = email || `${firstName.toLowerCase().trim().replace(/\s+/g, '')}.${lastName.toLowerCase().trim().replace(/\s+/g, '')}${uniqueSuffix}@campus.groovelab.de`;
+
+        const { data: insertedStudent, error: insertError } = await supabase
+          .from('users')
+          .insert({
+            school_id: schoolId,
+            teacher_id: teacherId,
+            role: 'student',
+            first_name: firstName,
+            last_name: lastName,
+            email: finalEmail,
+            instrument: instrument || 'Allgemein',
+            avatar_url: defaultAvatarUrl,
+            is_active: true,
+            is_campus_active: true,
+            is_groovelab_active: false,
+            status: 'active',
+            ausweis_nummer: pin,
+            qr_token: qrToken,
+            lesson_duration: 30 // 30 Min by default
+          })
+          .select('id')
+          .single();
+
+        if (insertError) throw insertError;
+        if (!insertedStudent) throw new Error("Keine ID vom Server zurückgegeben.");
+
+        await supabase.from('avatars').insert({
+          user_id: insertedStudent.id,
+          avatar_style: 'Standard_Silhouette',
+          instrument_type: instrument || 'Allgemein',
+          evolution_level: 1
+        });
+
+        successCount++;
+      } catch (err: any) {
+        console.error('Import error for line:', line, err);
+        errors.push(`Zeile "${line}": ${err.message || err}`);
+        failCount++;
+      }
+    }
+
+    if (errors.length > 0) {
+      alert(`Bulk-Import abgeschlossen: ${successCount} Schüler erfolgreich angelegt, ${failCount} Fehler.\n\nFehlerdetails:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? '\n...weitere Fehler in der Browser-Konsole.' : ''}`);
+    } else {
+      alert(`Bulk-Import abgeschlossen: ${successCount} Schüler erfolgreich angelegt.`);
+    }
+
+    setStudentCsvText('');
+    setIsStudentCsvExpanded(false);
+    fetchDashboardData();
+  };
+
+  const renderCompactStudentBoard = () => {
+    const isBadSaeckingen = schoolName.toLowerCase().includes('bad säckingen') || 
+                            schoolName.toLowerCase().includes('bad saeckingen') || 
+                            schoolName.toLowerCase().includes('bad sackingen') || 
+                            schoolName.toLowerCase().includes('musäk');
+
+    // Only show students who are active on Campus AND belong to Bad Säckingen
+    const campusStudentsOnly = students.filter((s: any) => {
+      return s.is_campus_active && isBadSaeckingen;
+    });
+
+    const uniqueInstruments = Array.from(new Set(campusStudentsOnly.map(s => s.instrument || 'Allgemein')));
+    const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
+      if (!acc.some(existing => existing.id === t.id)) {
+        acc.push(t);
+      }
+      return acc;
+    }, []);
+
+    const filteredStudents = campusStudentsOnly.filter((s: any) => {
+      const firstName = (s.first_name || '').toLowerCase();
+      const lastName = (s.last_name || '').toLowerCase();
+      const nickname = (s.nickname || '').toLowerCase();
+      const query = studentSearchQuery.toLowerCase().trim();
+      
+      const matchesSearch = !query || firstName.includes(query) || lastName.includes(query) || nickname.includes(query);
+      const matchesInstrument = studentFilterInstrument === 'All' || (s.instrument || 'Allgemein') === studentFilterInstrument;
+      const matchesTeacher = studentFilterTeacher === 'All' || s.teacher_id === studentFilterTeacher;
+      
+      let matchesStatus = true;
+      if (studentFilterStatus === 'campus') matchesStatus = s.is_campus_active;
+      else if (studentFilterStatus === 'groovelab') matchesStatus = s.is_groovelab_active;
+      else if (studentFilterStatus === 'inactive') matchesStatus = !s.is_campus_active && !s.is_groovelab_active;
+
+      return matchesSearch && matchesInstrument && matchesTeacher && matchesStatus;
+    });
+
+    // Pagination calculation
+    const totalCount = filteredStudents.length;
+    const totalPages = Math.ceil(totalCount / studentPageSize) || 1;
+    const safeCurrentPage = Math.min(studentCurrentPage, totalPages);
+    const startIndex = (safeCurrentPage - 1) * studentPageSize;
+    const paginatedStudents = filteredStudents.slice(startIndex, startIndex + studentPageSize);
+
+    const totalStudents = campusStudentsOnly.length;
+    const activeCampusCount = campusStudentsOnly.filter(s => s.is_campus_active).length;
+    const activeGroovelabCount = campusStudentsOnly.filter(s => s.is_groovelab_active).length;
+
+    // Helper for beautiful pastel background based on student name
+    const getAvatarGradient = (name: string) => {
+      const charCode = name.charCodeAt(0) || 65;
+      const hue = (charCode * 23) % 360;
+      return `linear-gradient(135deg, hsl(${hue}, 85%, 94%) 0%, hsl(${hue}, 80%, 84%) 100%)`;
+    };
+    const getAvatarTextColor = (name: string) => {
+      const charCode = name.charCodeAt(0) || 65;
+      const hue = (charCode * 23) % 360;
+      return `hsl(${hue}, 90%, 25%)`;
+    };
+
+    return (
+      <>
+        <div style={{ display: 'flex', gap: '24px', width: '100%', alignItems: 'flex-start' }}>
+          <div className="google-card" style={{ 
+            flex: 1.8,
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '24px', 
+            padding: '24px',
+            borderRadius: '24px',
+            border: '1.5px solid #cbd5e1',
+            background: '#ffffff',
+            boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)',
+            minWidth: 0
+          }}>
+            {/* TITLE BLOCK */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Users size={22} style={{ color: '#0f172a' }} />
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                  Schülerboard
+                </h3>
+              </div>
+              
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  onClick={() => setIsStudentCsvExpanded(!isStudentCsvExpanded)}
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '6px', 
+                    borderRadius: '12px', 
+                    padding: '8px 16px', 
+                    fontSize: '0.8rem', 
+                    fontWeight: 800,
+                    background: isStudentCsvExpanded ? '#f1f5f9' : '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    cursor: 'pointer',
+                    fontFamily: 'Urbanist',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  📄 Sammel-Onboarding (CSV) {isStudentCsvExpanded ? '▲' : '▼'}
+                </button>
+
+                <button
+                  onClick={() => setShowAddStudentModal(true)}
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '6px', 
+                    borderRadius: '12px', 
+                    padding: '8px 16px', 
+                    fontSize: '0.8rem', 
+                    fontWeight: 800,
+                    background: '#34a853',
+                    color: '#ffffff',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontFamily: 'Urbanist',
+                    boxShadow: '0 4px 10px rgba(52,168,83,0.15)',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  ➕ Schüler anlegen
+                </button>
+              </div>
+            </div>
+
+            {/* CSV BOX */}
+            {isStudentCsvExpanded && (
+              <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px dashed #cbd5e1', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <strong style={{ fontSize: '0.85rem', color: '#1e293b' }}>Sammel-Onboarding via CSV (Schüler)</strong>
+                <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Geben Sie eine Schülerliste ein. Format pro Zeile: <code>Vorname Nachname; Instrument; E-Mail (optional); Dozent-Name (optional)</code></span>
+                <textarea
+                  value={studentCsvText}
+                  onChange={(e) => setStudentCsvText(e.target.value)}
+                  placeholder={"Max Mustermann; Klavier; max@familie.de; Weber\nLisa Schmidt; E-Gitarre; ; Becker"}
+                  style={{
+                    width: '100%',
+                    height: '100px',
+                    borderRadius: '10px',
+                    border: '1px solid #cbd5e1',
+                    padding: '10px',
+                    fontSize: '0.78rem',
+                    fontFamily: 'monospace',
+                    outline: 'none',
+                    resize: 'vertical'
+                  }}
+                />
+                <button
+                  onClick={handleBulkStudentImport}
+                  className="google-btn-primary"
+                  style={{ background: '#34a853', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, alignSelf: 'flex-start', cursor: 'pointer' }}
+                >
+                  Schüler importieren
+                </button>
+              </div>
+            )}
+
+            {/* KPI ROW */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
+              <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: '10px 14px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ fontSize: '0.62rem', color: '#1e40af', fontWeight: 800, textTransform: 'uppercase', fontFamily: 'Urbanist' }}>Schüler Gesamt</span>
+                <strong style={{ fontSize: '1.4rem', color: '#1e3a8a', fontWeight: 900, fontFamily: 'Urbanist' }}>{totalStudents}</strong>
+              </div>
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px 14px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ fontSize: '0.62rem', color: '#166534', fontWeight: 800, textTransform: 'uppercase', fontFamily: 'Urbanist' }}>Campus Aktiv</span>
+                <strong style={{ fontSize: '1.4rem', color: '#14532d', fontWeight: 900, fontFamily: 'Urbanist' }}>{activeCampusCount}</strong>
+              </div>
+              <div style={{ background: '#feefe3', border: '1px solid #fed7aa', padding: '10px 14px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ fontSize: '0.62rem', color: '#854d0e', fontWeight: 800, textTransform: 'uppercase', fontFamily: 'Urbanist' }}>GrooveLab Aktiv</span>
+                <strong style={{ fontSize: '1.4rem', color: '#713f12', fontWeight: 900, fontFamily: 'Urbanist' }}>{activeGroovelabCount}</strong>
+              </div>
+            </div>
+
+            {/* FILTER & SEARCH */}
+            <div style={{ 
+              display: 'flex', 
+              gap: '12px', 
+              background: '#f8fafc', 
+              padding: '12px', 
+              borderRadius: '16px',
+              border: '1px solid #cbd5e1',
+              flexWrap: 'wrap',
+              alignItems: 'center'
+            }}>
+              <div style={{ flex: 1.5, minWidth: '200px', position: 'relative' }}>
+                <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', fontSize: '0.8rem' }}>🔍</span>
+                <input 
+                  type="text" 
+                  placeholder="Schüler suchen..." 
+                  value={studentSearchQuery}
+                  onChange={(e) => {
+                    setStudentSearchQuery(e.target.value);
+                    setStudentCurrentPage(1);
+                  }}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: '8px 12px 8px 34px',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.78rem',
+                    outline: 'none',
+                    background: 'white',
+                    fontWeight: 700
+                  }}
+                />
+              </div>
+
+              <div style={{ flex: 1, minWidth: '130px' }}>
+                <select 
+                  value={studentFilterInstrument}
+                  onChange={(e) => {
+                    setStudentFilterInstrument(e.target.value);
+                    setStudentCurrentPage(1);
+                  }}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: 'white', fontWeight: 700 }}
+                >
+                  <option value="All">🎸 Alle Instrumente</option>
+                  {uniqueInstruments.map(inst => (
+                    <option key={inst} value={inst}>{inst}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ flex: 1, minWidth: '130px' }}>
+                <select 
+                  value={studentFilterTeacher}
+                  onChange={(e) => {
+                    setStudentFilterTeacher(e.target.value);
+                    setStudentCurrentPage(1);
+                  }}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: 'white', fontWeight: 700 }}
+                >
+                  <option value="All">👥 Alle Dozenten</option>
+                  {allUniqueTeachers.map(t => (
+                    <option key={t.id} value={t.id}>{t.lastName || t.last_name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ flex: 1, minWidth: '130px' }}>
+                <select
+                  value={studentFilterStatus}
+                  onChange={(e) => {
+                    setStudentFilterStatus(e.target.value as any);
+                    setStudentCurrentPage(1);
+                  }}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: 'white', fontWeight: 700 }}
+                >
+                  <option value="all">⚡ Alle Tarife</option>
+                  <option value="campus">🎓 Campus Aktiv</option>
+                  <option value="groovelab">🎸 GrooveLab Aktiv</option>
+                  <option value="inactive">⚪ Inaktiv</option>
+                </select>
+              </div>
+            </div>
+
+            {/* LIST ROW VIEW CONTAINER */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowX: 'auto', width: '100%' }}>
+              {paginatedStudents.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b', fontSize: '0.88rem', fontWeight: 700 }}>
+                  Keine Schüler mit diesen Filtereinstellungen gefunden.
+                </div>
+              ) : (
+                paginatedStudents.map((student: any) => {
+                  return (
+                    <div 
+                      key={student.id} 
+                      style={{ 
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '8px 14px',
+                        borderRadius: '12px',
+                        background: '#f8fafc',
+                        border: '1.5px solid #cbd5e1',
+                        minWidth: '850px'
+                      }}
+                    >
+                      {/* Avatar & Name */}
+                      <div style={{ flex: '1.5', display: 'flex', alignItems: 'center', gap: '10px', minWidth: '160px' }}>
+                        <div style={{
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '50%',
+                          background: getAvatarGradient(`${student.first_name || ''} ${student.last_name || ''}`),
+                          color: getAvatarTextColor(`${student.first_name || ''} ${student.last_name || ''}`),
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '0.82rem',
+                          fontWeight: 800
+                        }}>
+                          {(student.first_name?.[0] || '') + (student.last_name?.[0] || '')}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0f172a' }}>
+                            {student.first_name} {student.last_name}
+                          </span>
+                          {student.nickname && (
+                            <span style={{ fontSize: '0.68rem', color: '#64748b', fontStyle: 'italic' }}>
+                              „{student.nickname}“
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Instrument Badge */}
+                      <div style={{ flex: '1', minWidth: '100px' }}>
+                        <span style={{ 
+                          display: 'inline-block',
+                          padding: '4px 8px', 
+                          borderRadius: '6px', 
+                          background: '#ffffff', 
+                          color: '#475569', 
+                          fontSize: '0.7rem', 
+                          fontWeight: 800,
+                          border: '1px solid #e2e8f0',
+                          textAlign: 'center',
+                          width: '100%',
+                          boxSizing: 'border-box'
+                        }}>
+                          🎸 {student.instrument || 'Allgemein'}
+                        </span>
+                      </div>
+
+                      {/* Teacher Select */}
+                      <div style={{ flex: '1.2', minWidth: '120px' }}>
+                        <select
+                          value={student.teacher_id || ''}
+                          onChange={async (e) => {
+                            const { error } = await supabase
+                              .from('users')
+                              .update({ teacher_id: e.target.value || null })
+                              .eq('id', student.id);
+                            if (error) alert(error.message);
+                            else fetchDashboardData();
+                          }}
+                          style={{ 
+                            width: '100%', 
+                            padding: '4px 6px', 
+                            borderRadius: '6px', 
+                            border: '1px solid #cbd5e1', 
+                            fontSize: '0.72rem', 
+                            fontWeight: 700, 
+                            color: '#334155',
+                            background: '#ffffff',
+                            outline: 'none',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <option value="">Kein Dozent</option>
+                          {allUniqueTeachers.map((t: any) => (
+                            <option key={t.id} value={t.id}>{t.lastName || t.last_name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Duration Select */}
+                      <div style={{ flex: '0.7', minWidth: '70px' }}>
+                        <select
+                          value={student.lesson_duration || 30} // Default to 30 Min
+                          onChange={async (e) => {
+                            const { error } = await supabase
+                              .from('users')
+                              .update({ lesson_duration: parseInt(e.target.value) })
+                              .eq('id', student.id);
+                            if (error) alert(error.message);
+                            else fetchDashboardData();
+                          }}
+                          style={{ 
+                            width: '100%', 
+                            padding: '4px 6px', 
+                            borderRadius: '6px', 
+                            border: '1px solid #cbd5e1', 
+                            fontSize: '0.72rem', 
+                            fontWeight: 700, 
+                            color: '#334155',
+                            background: '#ffffff',
+                            outline: 'none',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <option value={30}>30 Min</option>
+                          <option value={45}>45 Min</option>
+                          <option value={60}>60 Min</option>
+                          <option value={90}>90 Min</option>
+                        </select>
+                      </div>
+
+                      {/* Micro status toggles */}
+                      <div style={{ flex: '1.4', display: 'flex', gap: '4px', minWidth: '140px' }}>
+                        {/* Campus Toggle */}
+                        <button
+                          onClick={async () => {
+                            const newVal = !student.is_campus_active;
+                            const { error } = await supabase
+                              .from('users')
+                              .update({ is_campus_active: newVal })
+                              .eq('id', student.id);
+                            if (error) alert(error.message);
+                            else fetchDashboardData();
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: '3px 4px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            fontSize: '0.68rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            background: student.is_campus_active ? '#34a853' : '#e2e8f0',
+                            color: student.is_campus_active ? '#ffffff' : '#475569',
+                            transition: 'all 0.1s ease',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          🎓 Campus
+                        </button>
+
+                        {/* Groove Toggle */}
+                        <button
+                          onClick={async () => {
+                            const newVal = !student.is_groovelab_active;
+                            const { error } = await supabase
+                              .from('users')
+                              .update({ is_groovelab_active: newVal })
+                              .eq('id', student.id);
+                            if (error) alert(error.message);
+                            else fetchDashboardData();
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: '3px 4px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            fontSize: '0.68rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            background: student.is_groovelab_active ? '#ea4335' : '#e2e8f0',
+                            color: student.is_groovelab_active ? '#ffffff' : '#475569',
+                            transition: 'all 0.1s ease',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          🎸 Groove
+                        </button>
+                      </div>
+
+                      {/* Access / Copy Parent Link */}
+                      <div style={{ flex: '1', minWidth: '120px', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
+                        {student.is_app_user ? (
+                          <span style={{ 
+                            fontSize: '0.65rem', 
+                            fontWeight: 800, 
+                            color: '#475569',
+                            background: '#f1f5f9',
+                            padding: '3px 6px',
+                            borderRadius: '6px',
+                            border: '1px solid #cbd5e1',
+                            fontFamily: 'monospace'
+                          }}>
+                            📱 PIN: {student.ausweis_nummer || 'Keine'}
+                          </span>
+                        ) : (() => {
+                          const parentLink = `${window.location.origin}/register-student?token=${student.qr_token || 'no-token'}`;
+                          return (
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(parentLink);
+                                alert('Registrierungslink für Eltern wurde kopiert!');
+                              }}
+                              style={{
+                                background: '#fff7ed',
+                                color: '#ea580c',
+                                border: '1px solid #ffedd5',
+                                borderRadius: '6px',
+                                padding: '3px 6px',
+                                fontSize: '0.65rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                transition: 'all 0.1s ease'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.background = '#ffedd5'}
+                              onMouseLeave={(e) => e.currentTarget.style.background = '#fff7ed'}
+                            >
+                              🔗 Link
+                            </button>
+                          );
+                        })()}
+
+                        {/* Detail Profile Button */}
+                        <button
+                          onClick={() => setSelectedStudentForDetail(student)}
+                          style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          title="Profil & Details"
+                        >
+                          🔍
+                        </button>
+
+                        {/* Delete Button */}
+                        <button
+                          onClick={() => handleDeleteStudentCampus(student.id, `${student.first_name} ${student.last_name}`)}
+                          style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          title="Schüler unwiderruflich löschen"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* PAGINATION CONTROLS */}
+            {totalPages > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>
+                  Zeige {startIndex + 1} bis {Math.min(startIndex + studentPageSize, totalCount)} von {totalCount} gefilterten Schülern (Seite {safeCurrentPage} von {totalPages})
+                </span>
+
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  <button 
+                    onClick={() => setStudentCurrentPage(1)}
+                    disabled={safeCurrentPage === 1}
+                    style={{ 
+                      padding: '5px 8px', 
+                      borderRadius: '6px', 
+                      border: '1px solid #cbd5e1', 
+                      background: '#ffffff', 
+                      fontSize: '0.7rem', 
+                      fontWeight: 800, 
+                      cursor: safeCurrentPage === 1 ? 'not-allowed' : 'pointer',
+                      opacity: safeCurrentPage === 1 ? 0.5 : 1
+                    }}
+                  >
+                    ⏪
+                  </button>
+                  <button 
+                    onClick={() => setStudentCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={safeCurrentPage === 1}
+                    style={{ 
+                      padding: '5px 8px', 
+                      borderRadius: '6px', 
+                      border: '1px solid #cbd5e1', 
+                      background: '#ffffff', 
+                      fontSize: '0.7rem', 
+                      fontWeight: 800, 
+                      cursor: safeCurrentPage === 1 ? 'not-allowed' : 'pointer',
+                      opacity: safeCurrentPage === 1 ? 0.5 : 1
+                    }}
+                  >
+                    ◀ Zurück
+                  </button>
+
+                  <span style={{ fontSize: '0.72rem', color: '#0f172a', fontWeight: 800, padding: '0 8px' }}>
+                    {safeCurrentPage} / {totalPages}
+                  </span>
+
+                  <button 
+                    onClick={() => setStudentCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={safeCurrentPage === totalPages}
+                    style={{ 
+                      padding: '5px 8px', 
+                      borderRadius: '6px', 
+                      border: '1px solid #cbd5e1', 
+                      background: '#ffffff', 
+                      fontSize: '0.7rem', 
+                      fontWeight: 800, 
+                      cursor: safeCurrentPage === totalPages ? 'not-allowed' : 'pointer',
+                      opacity: safeCurrentPage === totalPages ? 0.5 : 1
+                    }}
+                  >
+                    Vor ▶
+                  </button>
+
+                  <button 
+                    onClick={() => setStudentCurrentPage(totalPages)}
+                    disabled={safeCurrentPage === totalPages}
+                    style={{ 
+                      padding: '5px 8px', 
+                      borderRadius: '6px', 
+                      border: '1px solid #cbd5e1', 
+                      background: '#ffffff', 
+                      fontSize: '0.7rem', 
+                      fontWeight: 800, 
+                      cursor: safeCurrentPage === totalPages ? 'not-allowed' : 'pointer',
+                      opacity: safeCurrentPage === totalPages ? 0.5 : 1
+                    }}
+                  >
+                    ⏩
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>Einträge pro Seite:</span>
+                  <select
+                    value={studentPageSize}
+                    onChange={(e) => {
+                      setStudentPageSize(parseInt(e.target.value));
+                      setStudentCurrentPage(1);
+                    }}
+                    style={{ padding: '3px 6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '0.72rem', fontWeight: 800 }}
+                  >
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value={200}>200</option>
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right Side: Dozenten Sidebar */}
+          <div className="google-card" style={{
+            width: '300px',
+            flexShrink: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            padding: '24px',
+            borderRadius: '24px',
+            border: '1.5px solid #cbd5e1',
+            background: '#ffffff',
+            boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)',
+            position: 'sticky',
+            top: '24px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Users size={20} style={{ color: '#0f172a' }} />
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                Dozenten
+              </h3>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', fontWeight: 600, lineHeight: 1.4 }}>
+              Klicke auf einen Dozenten, um das Sammel-Onboarding zu öffnen und direkt Schüler für ihn zu erfassen.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '500px', overflowY: 'auto', paddingRight: '4px' }}>
+              {allUniqueTeachers.map((t: any) => {
+                const teacherName = `${t.firstName || t.first_name || ''} ${t.lastName || t.last_name || ''}`.trim();
+                const teacherLastName = t.lastName || t.last_name || '';
+                const assignedCount = students.filter(s => s.teacher_id === t.id && s.is_campus_active).length;
+                const initials = `${t.firstName?.[0] || t.first_name?.[0] || ''}${t.lastName?.[0] || t.last_name?.[0] || ''}`.toUpperCase() || 'D';
+
+                return (
+                  <div
+                    key={t.id}
+                    onClick={() => {
+                      setIsStudentCsvExpanded(true);
+                      // Prompt for student name
+                      const studentNamePrompt = prompt(`Name des Schülers für Dozent ${teacherLastName} eingeben:\n(Abbrechen für Musterzeile)`, "");
+                      if (studentNamePrompt !== null) {
+                        const finalName = studentNamePrompt.trim() || "Max Mustermann";
+                        const instrumentPrompt = prompt(`Instrument für ${finalName}:`, t.instrument || "Klavier");
+                        const finalInstrument = (instrumentPrompt || t.instrument || "Klavier").trim();
+                        const customLine = `${finalName}; ${finalInstrument}; ; ${teacherLastName}`;
+                        if (studentCsvText.trim()) {
+                          setStudentCsvText(prev => prev.trim() + `\n${customLine}`);
+                        } else {
+                          setStudentCsvText(customLine);
+                        }
+                      } else {
+                        // Template line fallback if cancelled
+                        const presetLine = `Max Mustermann; ${t.instrument || 'Klavier'}; ; ${teacherLastName}`;
+                        if (studentCsvText.trim()) {
+                          setStudentCsvText(prev => prev.trim() + `\n${presetLine}`);
+                        } else {
+                          setStudentCsvText(presetLine);
+                        }
+                      }
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 12px',
+                      borderRadius: '12px',
+                      border: '1px solid #cbd5e1',
+                      background: '#f8fafc',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#f0fdf4';
+                      e.currentTarget.style.borderColor = '#bbf7d0';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#f8fafc';
+                      e.currentTarget.style.borderColor = '#cbd5e1';
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        background: getAvatarGradient(teacherName),
+                        color: getAvatarTextColor(teacherName),
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        flexShrink: 0
+                      }}>
+                        {initials}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {teacherName}
+                        </span>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 650 }}>
+                          {t.instrument || 'Dozent'}
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{
+                      background: '#e0f2fe',
+                      color: '#0369a1',
+                      fontSize: '0.65rem',
+                      fontWeight: 850,
+                      padding: '3px 8px',
+                      borderRadius: '20px',
+                      flexShrink: 0
+                    }}>
+                      {assignedCount} Schüler
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* MANAGE STUDENT MODAL */}
+        {showAddStudentModal && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <div style={{ background: '#ffffff', borderRadius: '24px', maxWidth: '520px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', animation: 'modalFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)', display: 'flex', flexDirection: 'column' }}>
+              
+              {/* Modal Header */}
+              <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                  ➕ Neuen Schüler anlegen
+                </h3>
+                <button 
+                  onClick={() => setShowAddStudentModal(false)}
+                  style={{ border: 'none', background: 'transparent', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <form onSubmit={handleCreateStudentCampus} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto', maxHeight: '75vh' }}>
+                
+                {/* Form fields */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Vorname *</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={newStudentFirstName}
+                      onChange={(e) => setNewStudentFirstName(e.target.value)}
+                      placeholder="z.B. Max"
+                      style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Nachname *</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={newStudentLastName}
+                      onChange={(e) => setNewStudentLastName(e.target.value)}
+                      placeholder="z.B. Mustermann"
+                      style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Spitzname / Rufname (optional)</label>
+                  <input 
+                    type="text" 
+                    value={newStudentNickname}
+                    onChange={(e) => setNewStudentNickname(e.target.value)}
+                    placeholder="z.B. Mäxi"
+                    style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Hauptinstrument</label>
+                    <input 
+                      type="text" 
+                      value={newStudentInstrument}
+                      onChange={(e) => setNewStudentInstrument(e.target.value)}
+                      placeholder="z.B. E-Gitarre"
+                      style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Unterrichtsdauer</label>
+                    <select
+                      value={newStudentDuration}
+                      onChange={(e) => setNewStudentDuration(parseInt(e.target.value))}
+                      style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
+                    >
+                      <option value={30}>30 Min (Standard)</option>
+                      <option value={45}>45 Min</option>
+                      <option value={60}>60 Min</option>
+                      <option value={90}>90 Min</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Zugeordneter Hauptlehrer</label>
+                    <select
+                      value={newStudentTeacherId}
+                      onChange={(e) => setNewStudentTeacherId(e.target.value)}
+                      style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
+                    >
+                      <option value="">Keine Zuweisung</option>
+                      {allUniqueTeachers.map((t: any) => (
+                        <option key={t.id} value={t.id}>{t.firstName || t.first_name} {t.lastName || t.last_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Status Toggles */}
+                <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <strong style={{ display: 'block', fontSize: '0.82rem', color: '#1e293b' }}>Campus Modul aktiv</strong>
+                      <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Aktiviert die Teilnahme an den Campus-Stundenplänen.</span>
+                    </div>
+                    <input 
+                      type="checkbox" 
+                      checked={newStudentIsCampusActive}
+                      onChange={(e) => setNewStudentIsCampusActive(e.target.checked)}
+                      style={{ accentColor: '#34a853', width: '18px', height: '18px' }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                    <div>
+                      <strong style={{ display: 'block', fontSize: '0.82rem', color: '#1e293b' }}>GrooveLab Modul aktiv</strong>
+                      <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Erlaubt dem Schüler die Nutzung der GrooveLab-App.</span>
+                    </div>
+                    <input 
+                      type="checkbox" 
+                      checked={newStudentIsGroovelabActive}
+                      onChange={(e) => setNewStudentIsGroovelabActive(e.target.checked)}
+                      style={{ accentColor: '#ea4335', width: '18px', height: '18px' }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                    <div>
+                      <strong style={{ display: 'block', fontSize: '0.82rem', color: '#1e293b' }}>Direkter App-Nutzer (Tablet PIN)</strong>
+                      <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Erstellt direkt einen App-PIN. Sonst wird ein Eltern-Link generiert.</span>
+                    </div>
+                    <input 
+                      type="checkbox" 
+                      checked={newStudentIsAppUser}
+                      onChange={(e) => setNewStudentIsAppUser(e.target.checked)}
+                      style={{ accentColor: '#2563eb', width: '18px', height: '18px' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Submit button */}
+                <button
+                  type="submit"
+                  className="google-btn-primary"
+                  style={{ background: '#34a853', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '12px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', marginTop: '8px' }}
+                >
+                  Schüler anlegen
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  };
+
   const handleLinkProfiles = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCampusStudentId || !selectedGroovelabStudentId) {
@@ -2546,7 +3681,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           {/* If activeTab is Campus */}
           {activeTab === 'campus' && [
             { id: 'briefing', label: 'Startseite', icon: LayoutDashboard },
-            { id: 'onboarding', label: 'Lehrer-Onboarding', icon: UserPlus },
+            { id: 'onboarding', label: 'Lehrer', icon: UserPlus },
+            { id: 'students', label: 'Schüler', icon: Users },
             { id: 'schedules', label: `Stundenpläne`, count: pendingSchedules.length, icon: Calendar },
             { id: 'status', label: 'Status & API', icon: Sliders }
           ].map((item) => {
@@ -2581,7 +3717,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           {/* If activeTab is GrooveLab */}
           {activeTab === 'groovelab' && [
             { id: 'briefing', label: 'Dashboard', icon: LayoutDashboard },
-            { id: 'live', label: 'Live Lab', icon: Monitor },
             { id: 'coaches', label: 'Lehrer', icon: Coffee },
             { id: 'students', label: 'Schüler', icon: Users },
             { id: 'status', label: 'Support & Inventar', icon: ShieldAlert },
@@ -3091,41 +4226,22 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           {/* Active Tab Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <h2 className="swiss-h1" style={{ margin: 0, color: activeTab === 'campus' ? '#10b981' : '#f59e0b' }}>
-                {getTabTitle()}
-              </h2>
-              <p style={{ color: activeTab === 'campus' ? '#64748b' : '#a1a1aa', fontWeight: 500, fontSize: '0.85rem', marginTop: '4px', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                {currentUserProfile 
-                  ? `${currentUserProfile.first_name} ${currentUserProfile.last_name || ''} • Schulsekretariat` 
-                  : 'Schulsekretariat'
-                }
-              </p>
+              {!(activeTab === 'campus' && campusSubTab === 'onboarding') && (
+                <>
+                  <h2 className="swiss-h1" style={{ margin: 0, color: activeTab === 'campus' ? '#10b981' : '#f59e0b' }}>
+                    {getTabTitle()}
+                  </h2>
+                  <p style={{ color: activeTab === 'campus' ? '#64748b' : '#a1a1aa', fontWeight: 500, fontSize: '0.85rem', marginTop: '4px', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                    {currentUserProfile 
+                      ? `${currentUserProfile.first_name} ${currentUserProfile.last_name || ''} • Schulsekretariat` 
+                      : 'Schulsekretariat'
+                    }
+                  </p>
+                </>
+              )}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <button
-                onClick={fetchDashboardData}
-                disabled={loading}
-                className="google-btn-secondary"
-                style={{
-                  padding: '10px 20px',
-                }}>
-                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-                Aktualisieren
-              </button>
-              
-              <div style={{ 
-                background: activeTab === 'campus' ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 158, 11, 0.08)', 
-                padding: '8px 16px', 
-                borderRadius: 'var(--radius-pill)', 
-                border: '1px solid ' + (activeTab === 'campus' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)'), 
-                color: activeTab === 'campus' ? '#10b981' : '#f59e0b', 
-                fontSize: '0.82rem', 
-                fontWeight: 700,
-                fontFamily: "'Plus Jakarta Sans', sans-serif"
-              }}>
-                {activeSessions.length} im Lab
-              </div>
             </div>
           </div>
 
@@ -3637,7 +4753,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start' }}>
             
             {/* Left Content Pane (Main Board Content) */}
-            <div style={{ flex: 1.6, display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div style={{ flex: campusSubTab === 'onboarding' ? '1' : '1.6', display: 'flex', flexDirection: 'column', gap: '24px', width: campusSubTab === 'onboarding' ? '100%' : 'auto' }}>
               
               {/* Subtab: Startseite (Briefing) */}
               {campusSubTab === 'briefing' && (
@@ -3651,20 +4767,35 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       Willkommen in der Campus-Verwaltung. Hier koordinierst du die Lehrkräfte, das Onboarding neuer Kolleginnen und Kollegen sowie die Stundenplan-Freigaben für deine Musikschule.
                     </p>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginTop: '8px' }}>
-                      <div style={{ background: '#f6fbf7', border: '1px solid #e6f4ea', padding: '16px', borderRadius: '16px' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#137333', fontWeight: 800, textTransform: 'uppercase' }}>Aktive Lehrkräfte</span>
-                        <strong style={{ display: 'block', fontSize: '1.8rem', color: '#137333', marginTop: '4px' }}>{campusTeachers.length}</strong>
-                      </div>
-                      <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '16px', borderRadius: '16px' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#166534', fontWeight: 800, textTransform: 'uppercase' }}>Bypass (Inaktiv)</span>
-                        <strong style={{ display: 'block', fontSize: '1.8rem', color: '#166534', marginTop: '4px' }}>{bypassTeachers.length}</strong>
-                      </div>
-                      <div style={{ background: '#e6f4ea', border: '1px solid #34a853', padding: '16px', borderRadius: '16px' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#137333', fontWeight: 800, textTransform: 'uppercase' }}>Reviews Ausstehend</span>
-                        <strong style={{ display: 'block', fontSize: '1.8rem', color: '#137333', marginTop: '4px' }}>{pendingSchedules.length}</strong>
-                      </div>
-                    </div>
+                    {(() => {
+                      const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
+                        if (!acc.some(existing => existing.id === t.id)) {
+                          acc.push(t);
+                        }
+                        return acc;
+                      }, []);
+                      const totalStudentsSum = allUniqueTeachers.reduce((sum, t) => sum + (t.studentCount || 0), 0);
+                      return (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginTop: '16px' }}>
+                          <div style={{ background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', border: '1px solid #bfdbfe', padding: '24px', borderRadius: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#1e40af', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gesamt Lehrkräfte</span>
+                            <strong style={{ display: 'block', fontSize: '2.2rem', color: '#1e3a8a', marginTop: '6px', fontWeight: 900, fontFamily: 'Urbanist' }}>{allUniqueTeachers.length}</strong>
+                          </div>
+                          <div style={{ background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)', border: '1px solid #bbf7d0', padding: '24px', borderRadius: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Aktive Campus-Lehrer</span>
+                            <strong style={{ display: 'block', fontSize: '2.2rem', color: '#14532d', marginTop: '6px', fontWeight: 900, fontFamily: 'Urbanist' }}>{campusTeachers.length}</strong>
+                          </div>
+                          <div style={{ background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)', border: '1px solid #fde68a', padding: '24px', borderRadius: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#854d0e', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Inaktive Profile (Bypass)</span>
+                            <strong style={{ display: 'block', fontSize: '2.2rem', color: '#713f12', marginTop: '6px', fontWeight: 900, fontFamily: 'Urbanist' }}>{bypassTeachers.length}</strong>
+                          </div>
+                          <div style={{ background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)', border: '1px solid #fca5a5', padding: '24px', borderRadius: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#b91c1c', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schüler-Belegungen</span>
+                            <strong style={{ display: 'block', fontSize: '2.2rem', color: '#991b1b', marginTop: '6px', fontWeight: 900, fontFamily: 'Urbanist' }}>{totalStudentsSum}</strong>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Campus Announcements */}
@@ -3709,120 +4840,163 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   
                   const matchesSearch = !query || firstName.includes(query) || lastName.includes(query) || email.includes(query);
                   
-                  const lName = t.lastName || t.last_name || '';
-                  const matchesAlphabet = alphabetLetter === 'All' || 
-                    lName.toUpperCase().startsWith(alphabetLetter);
-                    
                   const isCampus = t.isCampusActive || t.is_campus_active;
                   const isActive = t.isActive ?? t.is_active;
                   const matchesStatus = teacherStatusTab === 'all' ||
                     (teacherStatusTab === 'active' && isCampus && isActive) ||
                     (teacherStatusTab === 'inactive' && !isActive);
                     
-                  return matchesSearch && matchesAlphabet && matchesStatus;
+                  return matchesSearch && matchesStatus;
                 });
 
                 const totalStudentsSum = allUniqueTeachers.reduce((sum, t) => sum + (t.studentCount || 0), 0);
 
                 return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', width: '100%' }}>
-                    {/* STATS OVERVIEW RIBBON */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
-                      <div style={{ background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', border: '1px solid #bfdbfe', padding: '24px', borderRadius: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
-                        <span style={{ fontSize: '0.75rem', color: '#1e40af', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gesamt Lehrkräfte</span>
-                        <strong style={{ display: 'block', fontSize: '2.2rem', color: '#1e3a8a', marginTop: '6px', fontWeight: 900, fontFamily: 'Urbanist' }}>{allUniqueTeachers.length}</strong>
-                      </div>
-                      <div style={{ background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)', border: '1px solid #bbf7d0', padding: '24px', borderRadius: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
-                        <span style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Aktive Campus-Lehrer</span>
-                        <strong style={{ display: 'block', fontSize: '2.2rem', color: '#14532d', marginTop: '6px', fontWeight: 900, fontFamily: 'Urbanist' }}>{campusTeachers.length}</strong>
-                      </div>
-                      <div style={{ background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)', border: '1px solid #fde68a', padding: '24px', borderRadius: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
-                        <span style={{ fontSize: '0.75rem', color: '#854d0e', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Inaktive Profile (Bypass)</span>
-                        <strong style={{ display: 'block', fontSize: '2.2rem', color: '#713f12', marginTop: '6px', fontWeight: 900, fontFamily: 'Urbanist' }}>{bypassTeachers.length}</strong>
-                      </div>
-                      <div style={{ background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)', border: '1px solid #fca5a5', padding: '24px', borderRadius: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
-                        <span style={{ fontSize: '0.75rem', color: '#b91c1c', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schüler-Belegungen</span>
-                        <strong style={{ display: 'block', fontSize: '2.2rem', color: '#991b1b', marginTop: '6px', fontWeight: 900, fontFamily: 'Urbanist' }}>{totalStudentsSum}</strong>
-                      </div>
+                  <div className="google-card" style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '28px', 
+                    width: '100%',
+                    padding: '32px',
+                    borderRadius: '24px',
+                    border: '1.5px solid #cbd5e1',
+                    background: '#ffffff',
+                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.02)'
+                  }}>
+                    {/* TITLE BLOCK */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <Users size={22} style={{ color: '#0f172a' }} />
+                      <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                        Lehrerverwaltung
+                      </h3>
                     </div>
 
-                    {/* DYNAMIC CSV IMPORT COLLAPSIBLE CARD */}
-                    <div className="google-card" style={{ 
-                      padding: '24px', 
-                      borderRadius: '24px', 
-                      border: '1px solid #e2e8f0', 
-                      background: '#ffffff',
-                      boxShadow: '0 10px 15px -3px rgba(0,0,0,0.02)',
-                      transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                    {/* ONBOARDING ACTION BAR */}
+                    <div style={{ 
+                      display: 'flex', 
+                      gap: '16px', 
+                      alignItems: 'center', 
+                      marginTop: '24px', 
+                      marginBottom: isCsvExpanded ? '8px' : '24px',
+                      flexWrap: 'wrap',
+                      width: '100%'
                     }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ padding: '8px', borderRadius: '12px', background: '#e8f0fe', color: '#0b57d0' }}>
-                            <Upload size={20} />
-                          </div>
-                          <div>
-                            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 850, color: '#0f172a' }}>Sammel-Onboarding via CSV</h3>
-                            <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>Mehrere Lehrkräfte gleichzeitig per Textliste importieren</p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => setShowCsvImportModal(!showCsvImportModal)}
-                          className="google-btn-secondary"
-                          style={{ fontSize: '0.8rem', padding: '8px 16px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                        >
-                          {showCsvImportModal ? 'Ausblenden' : 'Importbereich öffnen'}
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => setIsCsvExpanded(!isCsvExpanded)}
+                        className="google-btn-secondary"
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '8px', 
+                          borderRadius: '16px', 
+                          padding: '12px 24px', 
+                          fontSize: '0.88rem', 
+                          fontWeight: 800,
+                          background: isCsvExpanded ? '#f1f5f9' : '#ffffff',
+                          border: '1.5px solid #cbd5e1',
+                          cursor: 'pointer',
+                          fontFamily: 'Urbanist',
+                          transition: 'all 0.2s',
+                          flex: 3,
+                          justifyContent: 'center',
+                          minWidth: '320px'
+                        }}
+                      >
+                        📄 Sammel-Onboarding via CSV {isCsvExpanded ? '▲' : '▼'}
+                      </button>
 
-                      {showCsvImportModal && (
-                        <div style={{ marginTop: '20px', borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
-                          <p style={{ margin: '0 0 12px 0', fontSize: '0.8rem', color: '#475569', fontWeight: 600 }}>Formatvorlage kopieren oder Lehrkräfte eintragen:</p>
-                          <p style={{ margin: '0 0 16px 0', fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace', background: '#f8fafc', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>Vorname; Nachname; E-Mail; Hauptinstrument; SchülerLimit</p>
+                      <button
+                        onClick={() => setShowAddTeacherModal(true)}
+                        className="google-btn-primary"
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '8px', 
+                          borderRadius: '16px', 
+                          padding: '12px 24px', 
+                          fontSize: '0.88rem', 
+                          fontWeight: 800,
+                          background: '#10b981',
+                          color: '#ffffff',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontFamily: 'Urbanist',
+                          transition: 'all 0.2s',
+                          boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.2)',
+                          flex: 1,
+                          justifyContent: 'center',
+                          minWidth: '180px'
+                        }}
+                      >
+                        ➕ Lehrkraft hinzufügen
+                      </button>
+                    </div>
+
+                    {/* Collapsible CSV Onboarding Card */}
+                    {isCsvExpanded && (
+                      <div className="google-card" style={{ 
+                        padding: '28px', 
+                        borderRadius: '24px', 
+                        border: '1px solid #e2e8f0', 
+                        background: '#ffffff',
+                        boxShadow: '0 10px 15px -3px rgba(0,0,0,0.02)',
+                        marginTop: '16px',
+                        marginBottom: '24px',
+                        width: '100%',
+                        animation: 'modalFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                      }}>
+                        <h4 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'Urbanist' }}>
+                          📄 Sammel-Onboarding via CSV
+                        </h4>
+                        
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          <p style={{ margin: 0, fontSize: '0.78rem', color: '#475569', fontWeight: 700 }}>
+                            Formatvorlage kopieren oder Lehrkräfte eintragen:
+                          </p>
+                          <p style={{ margin: 0, fontSize: '0.72rem', color: '#000000', fontFamily: 'monospace', background: '#f8fafc', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', fontWeight: 'bold' }}>
+                            Vorname; Nachname; E-Mail; Hauptinstrument
+                          </p>
                           <textarea
-                            placeholder="Markus; Weber; markus@schule.de; Gitarre; 12&#10;Anna; Becker; anna@schule.de; Gesang; 8"
+                            placeholder="Markus; Weber; markus@schule.de; Gitarre&#10;Anna; Becker; anna@schule.de; Gesang"
                             value={csvText}
                             onChange={(e) => setCsvText(e.target.value)}
                             style={{
                               width: '100%',
                               boxSizing: 'border-box',
-                              height: '120px',
-                              borderRadius: '16px',
-                              border: '1.5px solid #e2e8f0',
-                              padding: '16px',
-                              fontSize: '0.85rem',
+                              height: '144px',
+                              borderRadius: '12px',
+                              border: '1.5px solid #cbd5e1',
+                              padding: '12px',
+                              fontSize: '0.82rem',
                               fontFamily: 'monospace',
                               background: '#f8fafc',
                               outline: 'none',
                               color: '#334155',
-                              transition: 'border-color 0.2s'
+                              transition: 'border-color 0.2s',
+                              resize: 'none'
                             }}
                             onFocus={(e) => e.target.style.borderColor = '#0b57d0'}
-                            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                            onBlur={(e) => e.target.style.borderColor = '#cbd5e1'}
                           />
                           {importStatus && (
-                            <div style={{ marginTop: '14px', padding: '12px 16px', borderRadius: '12px', background: '#e8f0fe', border: '1px solid #bfdbfe', color: '#0b57d0', fontSize: '0.8rem', fontWeight: 650 }}>
+                            <div style={{ padding: '10px 14px', borderRadius: '8px', background: '#e8f0fe', border: '1px solid #bfdbfe', color: '#0b57d0', fontSize: '0.78rem', fontWeight: 650 }}>
                               {importStatus.message}
                             </div>
                           )}
-                          <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+
+                          <div style={{ display: 'flex', marginTop: '4px' }}>
                             <button
+                              type="button"
                               onClick={handleImportTeachers}
                               className="google-btn-primary"
-                              style={{ background: '#0b57d0', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '10px 20px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                              style={{ background: '#000000', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '11px 20px', fontSize: '0.82rem', fontWeight: 700, width: '100%', cursor: 'pointer' }}
                             >
                               Import starten
                             </button>
-                            <button
-                              onClick={() => setCsvText('Markus; Weber; markus@schule.de; Gitarre; 12\nAnna; Becker; anna@schule.de; Gesang; 8')}
-                              className="google-btn-secondary"
-                              style={{ fontSize: '0.82rem', borderRadius: '12px' }}
-                            >
-                              Beispieldaten einfügen
-                            </button>
                           </div>
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
 
                     {/* REDESIGNED CONTROLS PANEL */}
                     <div className="google-card" style={{ 
@@ -3920,70 +5094,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             Inaktiv (Bypass)
                           </button>
                         </div>
-
-                        {/* Add Teacher Manual CTA */}
-                        <button
-                          onClick={() => setShowAddTeacherModal(true)}
-                          className="google-btn-primary"
-                          style={{
-                            background: '#0b57d0',
-                            color: '#ffffff',
-                            border: 'none',
-                            padding: '12px 24px',
-                            borderRadius: '16px',
-                            fontWeight: 700,
-                            fontSize: '0.85rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            cursor: 'pointer',
-                            boxShadow: '0 4px 12px rgba(11,87,208,0.2)'
-                          }}
-                        >
-                          <Plus size={16} /> Lehrkraft anlegen
-                        </button>
-                      </div>
-
-                      {/* ALPHABETICAL QUICKBAR */}
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
-                        {['All', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')].map(letter => {
-                          const isSelected = alphabetLetter === letter;
-                          return (
-                            <button
-                              key={letter}
-                              onClick={() => setAlphabetLetter(letter)}
-                              style={{
-                                width: letter === 'All' ? '54px' : '32px',
-                                height: '32px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                borderRadius: '8px',
-                                border: isSelected ? 'none' : '1px solid #e2e8f0',
-                                background: isSelected ? '#0b57d0' : '#ffffff',
-                                color: isSelected ? '#ffffff' : '#64748b',
-                                fontSize: '0.78rem',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
-                              }}
-                              onMouseEnter={(e) => {
-                                if (!isSelected) {
-                                  e.currentTarget.style.borderColor = '#0b57d0';
-                                  e.currentTarget.style.background = '#e8f0fe';
-                                }
-                              }}
-                              onMouseLeave={(e) => {
-                                if (!isSelected) {
-                                  e.currentTarget.style.borderColor = '#e2e8f0';
-                                  e.currentTarget.style.background = '#ffffff';
-                                }
-                              }}
-                            >
-                              {letter}
-                            </button>
-                          );
-                        })}
                       </div>
                     </div>
 
@@ -3993,11 +5103,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         <span style={{ fontSize: '0.88rem', color: '#64748b', fontWeight: 600 }}>
                           Suchtreffer: {filteredTeachers.length} {filteredTeachers.length === 1 ? 'Lehrkraft' : 'Lehrkräfte'}
                         </span>
-                        {(teacherSearchQuery || alphabetLetter !== 'All' || teacherStatusTab !== 'all') && (
+                        {(teacherSearchQuery || teacherStatusTab !== 'all') && (
                           <button
                             onClick={() => {
                               setTeacherSearchQuery('');
-                              setAlphabetLetter('All');
                               setTeacherStatusTab('all');
                             }}
                             style={{ border: 'none', background: 'transparent', color: '#0b57d0', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700 }}
@@ -4115,16 +5224,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   )}
                                 </div>
 
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '12px', fontSize: '0.78rem' }}>
-                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                    <span style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>Schüler</span>
-                                    <strong style={{ color: '#0f172a', fontSize: '0.88rem', fontWeight: 800 }}>{t.studentCount || 0}</strong>
-                                  </div>
-                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                                    <span style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>PIN</span>
-                                    <strong style={{ color: '#475569', fontSize: '0.85rem', fontFamily: 'monospace' }}>{t.ausweisNummer || t.ausweis_nummer || 'Keine'}</strong>
-                                  </div>
-                                </div>
+
                               </div>
                             );
                           })}
@@ -4182,7 +5282,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                     type="text"
                                     required
                                     value={newTeacherFirstName}
-                                    onChange={(e) => setNewTeacherFirstName(e.target.value)}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setNewTeacherFirstName(val);
+                                      setNewTeacherEmail(`${val.toLowerCase().trim().replace(/\s+/g, '')}.${newTeacherLastName.toLowerCase().trim().replace(/\s+/g, '')}@musaek.de`);
+                                    }}
                                     placeholder="z.B. Sebastian"
                                     style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
                                   />
@@ -4193,7 +5297,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                     type="text"
                                     required
                                     value={newTeacherLastName}
-                                    onChange={(e) => setNewTeacherLastName(e.target.value)}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setNewTeacherLastName(val);
+                                      setNewTeacherEmail(`${newTeacherFirstName.toLowerCase().trim().replace(/\s+/g, '')}.${val.toLowerCase().trim().replace(/\s+/g, '')}@musaek.de`);
+                                    }}
                                     placeholder="z.B. Bach"
                                     style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
                                   />
@@ -4223,16 +5331,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 />
                               </div>
 
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Max. Schüleranzahl (Limit)</label>
-                                <input
-                                  type="number"
-                                  min={1}
-                                  value={newTeacherLimit}
-                                  onChange={(e) => setNewTeacherLimit(parseInt(e.target.value) || 10)}
-                                  style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
-                                  />
-                              </div>
 
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                 <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Endzeit / Vertragsende (Zugriff erlischt automatisch)</label>
@@ -4270,6 +5368,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   </div>
                 );
               })()}
+
+              {/* Subtab: Schülerboard (Campus-Schülerverwaltung) */}
+              {campusSubTab === 'students' && renderCompactStudentBoard()}
 
               {/* Subtab: Schedules – Hybride Raumplanungs-Zentrale */}
               {campusSubTab === 'schedules' && (
@@ -4563,8 +5664,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       <strong style={{ display: 'block', marginBottom: '4px', color: '#475569' }}>CSV-Vorgaben:</strong>
                       <ul style={{ margin: '4px 0 0 16px', padding: 0, color: '#5f6368', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         <li>Trennzeichen: Semikolon (;)</li>
-                        <li>Spalten: Vorname; Nachname; Email; Instrument; Limit</li>
-                        <li>Limit gibt die maximale Schüleranzahl an</li>
+                        <li>Spalten: Vorname; Nachname; Email; Instrument</li>
                       </ul>
                     </div>
 

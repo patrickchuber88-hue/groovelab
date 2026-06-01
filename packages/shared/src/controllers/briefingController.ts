@@ -223,8 +223,36 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
       return;
     }
 
-    // Format & sort timeline chronologically by time_slot (e.g. "13:05", "13:20", etc.)
-    const timeline = (slots || []).map((slot: any) => {
+    const todayStr = new Date().toISOString().substring(0, 10);
+
+    // Fetch occurrences for today for this teacher
+    const { data: occurrences } = await supabase
+      .from('schedule_occurrences')
+      .select(`
+        id,
+        date,
+        original_date,
+        start_time,
+        status,
+        schedule_id,
+        schedules (
+          rooms (id, name)
+        ),
+        student:users!schedule_occurrences_student_id_fkey (
+          id,
+          first_name,
+          last_name,
+          is_app_user,
+          is_premium_user,
+          instrument,
+          avatars (avatar_style, evolution_level, xp)
+        )
+      `)
+      .eq('teacher_id', userId)
+      .or(`date.eq.${todayStr},original_date.eq.${todayStr}`);
+
+    // Format regular schedules
+    let timeline = (slots || []).map((slot: any) => {
       const student = slot.student;
       const avatar = student?.avatars?.[0] || null;
       const isPremium = student?.is_premium_user ?? false;
@@ -233,6 +261,8 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
       return {
         scheduleId: slot.id,
         timeSlot: slot.time_slot,
+        status: slot.status,
+        roomId: slot.rooms?.id || null,
         room: slot.rooms?.name || 'Hauptraum',
         instrument: student?.instrument || 'Klavier',
         student: student ? {
@@ -242,7 +272,52 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
           isAnalogStickerUser
         } : null
       };
-    }).sort((a, b) => a.timeSlot.localeCompare(b.timeSlot));
+    });
+
+    // Merge with occurrences for today
+    if (occurrences && occurrences.length > 0) {
+      occurrences.forEach((occ: any) => {
+        const student = occ.student;
+        const avatar = student?.avatars?.[0] || null;
+        const isPremium = student?.is_premium_user ?? false;
+        const isAnalogStickerUser = !student?.is_app_user || !isPremium || avatar?.avatar_style === 'Standard_Silhouette';
+        const formattedTime = occ.start_time ? occ.start_time.substring(0, 5) : '00:00';
+
+        if (occ.original_date === todayStr && occ.date !== todayStr) {
+          // Rescheduled AWAY from today -> remove from today's timeline
+          timeline = timeline.filter((t: any) => t.student?.id !== occ.student_id);
+        } else if (occ.date === todayStr) {
+          // Rescheduled TO today or updated today -> update or insert into today's timeline
+          const existingIdx = timeline.findIndex((t: any) => t.student?.id === occ.student_id);
+          const mappedItem = {
+            scheduleId: occ.schedule_id || occ.id,
+            timeSlot: formattedTime,
+            status: occ.status === 'rescheduled_confirmed' ? 'approved' : occ.status,
+            roomId: occ.schedules?.rooms?.id || null,
+            room: occ.schedules?.rooms?.name || 'Hauptraum',
+            instrument: student?.instrument || 'Klavier',
+            student: student ? {
+              id: student.id,
+              name: `${student.first_name} ${student.last_name}`,
+              isAppUser: student.is_app_user ?? false,
+              isAnalogStickerUser
+            } : null
+          };
+
+          if (occ.status === 'cancelled') {
+            mappedItem.status = 'canceled_by_student';
+          }
+
+          if (existingIdx !== -1) {
+            timeline[existingIdx] = mappedItem;
+          } else {
+            timeline.push(mappedItem);
+          }
+        }
+      });
+    }
+
+    timeline.sort((a, b) => a.timeSlot.localeCompare(b.timeSlot));
 
     // Vorbereitungs-Spiegel for the NEXT upcoming student
     // For local times, extract hour and minutes
@@ -296,7 +371,7 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
         studentId,
         studentName: nextSlot.student.name,
         timeSlot: nextSlot.timeSlot,
-        streakCount: (isPremium && studentAvatar?.avatar_style === 'Premium_Hero') ? 6 : 0, // mock/standard streak
+        streakCount: studentAvatar?.streak_flame || 0,
         evolutionLevel: isPremium ? (studentAvatar?.evolution_level || 1) : 1,
         verifiedSongs
       };
@@ -397,7 +472,7 @@ export async function getStudentBriefingHandler(req: Request, res: Response): Pr
       allowMessagesGlobal: allowMessages,
       todayLesson,
       gamification: {
-        streakFlame: (student?.is_premium_user && avatarRecord?.avatar_style === 'Premium_Hero') ? 6 : 0,
+        streakFlame: avatarRecord?.streak_flame || 0,
         evolutionLevel: student?.is_premium_user ? currentLevel : 1,
         currentXp,
         remainingXp,

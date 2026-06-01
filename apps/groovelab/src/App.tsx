@@ -1438,6 +1438,19 @@ function App() {
   const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => sessionStorage.getItem('groovelab_user_id'));
   const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
 
+  const [showDeletionPrompt, setShowDeletionPrompt] = useState(false);
+  const [deletionPromptUserId, setDeletionPromptUserId] = useState<string | null>(null);
+  const [deletionPromptIsHome, setDeletionPromptIsHome] = useState<boolean | undefined>(undefined);
+
+  const debounceDashboardTimerRef = useRef<any>(null);
+  
+  const debouncedFetchDashboardData = (userId: string, isInitial: boolean = false) => {
+    if (debounceDashboardTimerRef.current) clearTimeout(debounceDashboardTimerRef.current);
+    debounceDashboardTimerRef.current = setTimeout(() => {
+      fetchDashboardData(userId, isInitial);
+    }, 300);
+  };
+
   // States for Kiosk lookup and legal modals
   const [kioskDetails, setKioskDetails] = useState<any>(null);
   const [loadingKiosk, setLoadingKiosk] = useState<boolean>(() => typeof window !== 'undefined' ? !!localStorage.getItem('groovelab_kiosk_token') : false);
@@ -2235,36 +2248,77 @@ function App() {
     console.log('Base Origin:', window.location.origin);
     console.log('User Agent:', navigator.userAgent);
 
-    // Realtime subscription for sessions (Live Lab updates)
-    const sessionChannel = supabase
-      .channel('live-lab-sync')
-      .on('postgres_changes', { schema: 'public', event: '*', table: 'sessions' }, () => {
-        if (user?.id) fetchDashboardData(user.id);
-      })
-      .subscribe();
+    if (!user?.id) return;
 
-    // Realtime subscription for user_song_skills (Student's challenges/skills updates)
-    const skillsChannel = supabase
-      .channel('skills-realtime-sync')
-      .on('postgres_changes', { schema: 'public', event: '*', table: 'user_song_skills' }, () => {
-        console.log('[Realtime] user_song_skills update detected, refetching dashboard...');
-        if (user?.id) fetchDashboardData(user.id);
-      })
-      .subscribe();
+    const schoolId = user.school_id;
 
-    // Realtime subscription for campus_direct_messages
-    const campusMessagesChannel = supabase
-      .channel('campus-messages-sync')
-      .on('postgres_changes', { schema: 'public', event: '*', table: 'campus_direct_messages' }, () => {
-        console.log('[Realtime] campus_direct_messages update detected');
-        fetchCampusMessages();
-      })
-      .subscribe();
+    // We build a single consolidated high-performance channel for all user-specific updates
+    const syncChannel = supabase
+      .channel(`realtime_app_sync_${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'sessions', filter: `user_id=eq.${user.id}` },
+        () => {
+          debouncedFetchDashboardData(user.id);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_song_skills', filter: `user_id=eq.${user.id}` },
+        () => {
+          console.log('[Realtime] user_song_skills update detected, refetching dashboard...');
+          debouncedFetchDashboardData(user.id);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'campus_direct_messages' },
+        () => {
+          console.log('[Realtime] campus_direct_messages update detected');
+          fetchCampusMessages();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'band_members', filter: `user_id=eq.${user.id}` },
+        () => {
+          console.log('[Realtime] band_members update detected, refetching dashboard...');
+          debouncedFetchDashboardData(user.id);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'schedules', filter: `student_id=eq.${user.id}` },
+        () => {
+          console.log('[Realtime] schedules update detected, refetching dashboard...');
+          debouncedFetchDashboardData(user.id);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'schedule_occurrences', filter: `student_id=eq.${user.id}` },
+        () => {
+          console.log('[Realtime] schedule_occurrences update detected, refetching dashboard...');
+          debouncedFetchDashboardData(user.id);
+        }
+      );
+
+    // If the user has a school_id, also subscribe to the school's bands updates
+    if (schoolId) {
+      syncChannel.on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bands', filter: `school_id=eq.${schoolId}` },
+        () => {
+          console.log('[Realtime] bands update detected, refetching dashboard...');
+          debouncedFetchDashboardData(user.id);
+        }
+      );
+    }
+
+    syncChannel.subscribe();
 
     return () => {
-      supabase.removeChannel(sessionChannel);
-      supabase.removeChannel(skillsChannel);
-      supabase.removeChannel(campusMessagesChannel);
+      supabase.removeChannel(syncChannel);
     };
   }, [user]);
 
@@ -2396,30 +2450,17 @@ function App() {
       }
 
       if (isInitial) {
-        const savedPlatform = localStorage.getItem('groovelab_active_platform') as 'campus' | 'groovelab' | null;
-        if (savedPlatform) {
-          const hasRights = savedPlatform === 'campus' ? userData.is_campus_active : userData.is_groovelab_active;
-          if (hasRights) {
-            setActivePlatform(savedPlatform);
-            if (isStudent && savedPlatform === 'campus') {
-              setActiveStudentTab('profile');
-            }
-          } else {
-            const fallback = userData.is_campus_active ? 'campus' : 'groovelab';
-            setActivePlatform(fallback);
-            if (isStudent && fallback === 'campus') {
-              setActiveStudentTab('profile');
-            }
-          }
+        if (isStudent && isKioskMode) {
+          setActivePlatform('groovelab');
+          setActiveStudentTab('live');
+          localStorage.setItem('groovelab_active_platform', 'groovelab');
+          localStorage.setItem('groovelab_active_tab', 'live');
         } else {
-          if (userData.is_campus_active) {
-            setActivePlatform('campus');
-            if (isStudent) {
-              setActiveStudentTab('profile');
-            }
-          } else if (userData.is_groovelab_active) {
-            setActivePlatform('groovelab');
-          }
+          setActivePlatform('campus');
+          const defaultTab = isStudent ? 'briefing' : 'live';
+          setActiveStudentTab(defaultTab);
+          localStorage.setItem('groovelab_active_platform', 'campus');
+          localStorage.setItem('campus_active_tab', defaultTab);
         }
       }
 
@@ -2475,10 +2516,10 @@ function App() {
               profiles:users!band_song_slots_user_id_fkey(first_name, photo_url)
             )
           )
-        `).eq('school_id', schoolId),
+        `).eq('school_id', schoolId).eq('is_campus_active', false),
         supabase.from('band_members').select('user_id, bands!inner(id, status, song_id, school_id, band_songs(song_id, status))').eq('bands.school_id', schoolId),
         supabase.from('bands').select('*, band_members(*, profiles:users(id, first_name, photo_url)), band_songs(*, band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))').eq('school_id', schoolId).in('status', ['forming', 'active']),
-        supabase.from('songs').select('*').eq('school_id', schoolId).order('level').order('artist'),
+        supabase.from('songs').select('*').eq('school_id', schoolId).eq('is_campus_active', false).order('level').order('artist'),
         bandIds.length > 0
           ? supabase.from('bands').select(`
               *,
@@ -3492,16 +3533,20 @@ function App() {
         
       let bandIds: string[] = [];
       if (!annBands || annBands.length === 0) {
-        const { data: newBand } = await supabase
+        const { data: newBand, error: insertErr } = await supabase
           .from('bands')
           .insert({
             name: '__SYSTEM_ANNOUNCEMENTS__',
             status: 'active',
             school_id: schoolId,
+            coach_id: user?.id,
             genre: 'System',
             photo_url: '/logo.png'
           })
           .select();
+        if (insertErr) {
+          console.error('[fetchAnnouncements] Error inserting band:', insertErr);
+        }
         if (newBand && newBand[0]) {
           bandIds = [newBand[0].id];
           setAnnBandId(newBand[0].id);
@@ -3756,16 +3801,20 @@ function App() {
           .eq('name', '__SYSTEM_ANNOUNCEMENTS__');
           
         if (!annBands || annBands.length === 0) {
-          const { data: newBand } = await supabase
+          const { data: newBand, error: insertErr } = await supabase
             .from('bands')
             .insert({
               name: '__SYSTEM_ANNOUNCEMENTS__',
               status: 'active',
               school_id: user.school_id,
+              coach_id: user.id,
               genre: 'System',
               photo_url: '/logo.png'
             })
             .select();
+          if (insertErr) {
+            console.error('[handlePostAnnouncement] Error inserting band:', insertErr);
+          }
           if (newBand && newBand[0]) {
             bandId = newBand[0].id;
             setAnnBandId(bandId);
@@ -4724,6 +4773,22 @@ function App() {
   const hasInviteSchoolId = new URLSearchParams(window.location.search).has('invite_school_id');
 
   const handleLogin = async (userId: string, isHome?: boolean) => {
+    const { data: userToLogin } = await supabase.from('users').select('role, contract_ends_at, contract_decision_made').eq('id', userId).single();
+    if (userToLogin?.role === 'student' && userToLogin.contract_ends_at) {
+      const endsAt = new Date(userToLogin.contract_ends_at).getTime();
+      if (Date.now() > endsAt) {
+        alert("Dein Vertrag ist abgelaufen. Bitte wende dich an die Verwaltung.");
+        return;
+      }
+      
+      if (userToLogin.contract_decision_made === false || userToLogin.contract_decision_made === null) {
+        setDeletionPromptUserId(userId);
+        setDeletionPromptIsHome(isHome);
+        setShowDeletionPrompt(true);
+        return; // Pause login until decision is made
+      }
+    }
+
     const mode = isHome ? 'home' : 'lab';
     
     // If we are switching profiles, mark the OLD one as offline first
@@ -4931,8 +4996,45 @@ function App() {
   }
 
   // 2. AUTHENTICATION CHECK
-  if (!loggedInUserId) {
+  if (!loggedInUserId && !showDeletionPrompt) {
     return <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />;
+  }
+
+  if (showDeletionPrompt && deletionPromptUserId) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, background: '#09090b', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: '24px' }}>
+        <div style={{ background: '#ffffff', borderRadius: '32px', padding: '40px', maxWidth: '480px', width: '100%', textAlign: 'center' }}>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: '16px', color: '#1e293b' }}>Vertragsende bald erreicht</h2>
+          <p style={{ color: '#64748b', marginBottom: '32px', lineHeight: '1.5' }}>
+            Wir haben die Information erhalten, dass dein Vertrag bald endet. Bitte teile uns mit, was nach Ablauf mit deinem Account und deinen Daten passieren soll.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <button 
+              onClick={async () => {
+                await supabase.from('users').update({ delete_after_contract: true, contract_decision_made: true }).eq('id', deletionPromptUserId);
+                setShowDeletionPrompt(false);
+                setDeletionPromptUserId(null);
+                handleLogin(deletionPromptUserId, deletionPromptIsHome);
+              }}
+              style={{ background: '#ef4444', color: 'white', border: 'none', padding: '16px', borderRadius: '16px', fontWeight: 800, cursor: 'pointer' }}
+            >
+              Account nach Vertragsende löschen
+            </button>
+            <button 
+              onClick={async () => {
+                await supabase.from('users').update({ delete_after_contract: false, contract_decision_made: true }).eq('id', deletionPromptUserId);
+                setShowDeletionPrompt(false);
+                setDeletionPromptUserId(null);
+                handleLogin(deletionPromptUserId, deletionPromptIsHome);
+              }}
+              style={{ background: '#f1f5f9', color: '#64748b', border: 'none', padding: '16px', borderRadius: '16px', fontWeight: 700, cursor: 'pointer' }}
+            >
+              Account inaktiv behalten (Archiv)
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (loading || !user) {
@@ -5989,7 +6091,14 @@ function App() {
         }} />
 
 
-      <main className="main-content" style={{ overflow: activeStudentTab === 'live' ? 'hidden' : 'auto', flex: 1, display: 'flex', flexDirection: 'column', height: activeStudentTab === 'live' ? '100%' : 'auto' }}>
+      <main className="main-content" style={{ 
+        overflow: activeStudentTab === 'live' ? 'hidden' : 'auto', 
+        flex: 1, 
+        display: 'flex', 
+        flexDirection: 'column', 
+        height: activeStudentTab === 'live' ? '100%' : 'auto',
+        paddingRight: activePlatform === 'campus' ? '0px' : undefined
+      }}>
         {/* Live Lab Tab for Students */}
         {user.role?.toLowerCase() === 'student' && activeStudentTab === 'live' && (
           <ErrorBoundary>
@@ -7148,7 +7257,7 @@ function App() {
                                           } else {
                                             // 1. Determine Background, Border, and Text Color based strictly on heatmap density and coach presence
                                             if (teachersInSlot.length > 0) {
-                                              const styleDetails = getTeacherColorStyle(teachersInSlot, loggedInUserId);
+                                              const styleDetails = getTeacherColorStyle(teachersInSlot, loggedInUserId || undefined);
                                               bgColor = styleDetails.bgColor;
                                               textColor = styleDetails.textColor;
                                               border = styleDetails.border;
@@ -10754,6 +10863,12 @@ function App() {
             setSelectedBandForProfile(band);
             setBandProfileView('public');
             setShowBandProfile(true);
+            setSelectedStudentProfile(null);
+          }}
+          onOpenTageskompass={(student) => {
+            if ((window as any).openTageskompass) {
+              (window as any).openTageskompass(student);
+            }
             setSelectedStudentProfile(null);
           }}
           activePlatform={activePlatform}
