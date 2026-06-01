@@ -3086,6 +3086,32 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     Zurücksetzen
                   </button>
                 )}
+
+                <button
+                  type="submit"
+                  disabled={saving}
+                  style={{
+                    flex: 2,
+                    padding: '14px',
+                    borderRadius: '14px',
+                    border: 'none',
+                    background: useNotebookLayout ? '#456355' : '#007aff',
+                    color: 'white',
+                    fontWeight: 800,
+                    cursor: saving ? 'not-allowed' : 'pointer',
+                    fontSize: '0.82rem',
+                    boxShadow: useNotebookLayout ? '0 4px 10px rgba(69,99,85,0.2)' : '0 4px 10px rgba(0,122,255,0.2)',
+                    transition: 'all 0.15s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                  className="hover-scale"
+                >
+                  <Check size={14} strokeWidth={3} />
+                  <span>{saving ? 'Speichert...' : 'Eintrag speichern'}</span>
+                </button>
               </div>
 
               {error && (
