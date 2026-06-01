@@ -104,7 +104,7 @@ export async function createSchoolHandler(req: Request, res: Response): Promise<
       return;
     }
 
-    const origin = req.get('origin') || process.env.FRONTEND_URL || 'http://localhost:5173';
+    const origin = req.get('origin') || process.env.FRONTEND_URL || 'https://campus-groovelab.de';
     const secretaryOnboardingLink = `${origin}/secretary-onboarding?token=${secretaryOnboardingToken}`;
 
     const responseData: SchoolCreationResponse = {

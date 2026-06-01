@@ -19,7 +19,8 @@ export async function checkoutHandler(req: Request, res: Response): Promise<void
     }
 
     // Mock Stripe Session URL by pointing back to a success page
-    const checkoutUrl = `http://localhost:5173/success?session_id=mock_stripe_session_${Date.now()}&user_id=${userId}`;
+    const frontendUrl = process.env.FRONTEND_URL || 'https://campus-groovelab.de';
+    const checkoutUrl = `${frontendUrl}/success?session_id=mock_stripe_session_${Date.now()}&user_id=${userId}`;
 
     res.status(200).json({
       success: true,

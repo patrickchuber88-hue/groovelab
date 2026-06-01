@@ -69,7 +69,8 @@ export async function createTeacherLinkHandler(req: Request, res: Response): Pro
     }
 
     // Generate response with link
-    const activationLink = `http://localhost:5173/activate?token=${invitation.token}`;
+    const frontendUrl = process.env.FRONTEND_URL || 'https://campus-groovelab.de';
+    const activationLink = `${frontendUrl}/activate?token=${invitation.token}`;
 
     res.status(200).json({
       success: true,
