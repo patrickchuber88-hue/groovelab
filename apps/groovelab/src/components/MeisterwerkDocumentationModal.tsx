@@ -1579,7 +1579,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           overflow: 'hidden',
           minHeight: 0,
           background: useNotebookLayout ? 'radial-gradient(circle, #3a3a44 0%, #1a1a22 100%)' : 'transparent',
-          padding: useNotebookLayout ? '0 10px 10px 10px' : '0',
+          padding: '0',
           position: 'relative'
         }} className="flex-col lg:flex-row">
           {activeModalTab === 'document' ? (
@@ -2539,10 +2539,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               {Array.from({ length: 6 }).map((_, idx) => (
                 <div key={idx} style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}>
                   <div style={{
-                    width: '24px',
-                    height: '2px',
-                    borderRadius: '1px',
-                    background: '#71717a',
+                    width: '28px',
+                    height: '5px',
+                    borderRadius: '2.5px',
+                    background: 'linear-gradient(180deg, #ffd54f 0%, #ff9100 100%)',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.25)',
                     zIndex: 35
                   }} />
                 </div>
