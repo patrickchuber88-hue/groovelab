@@ -1416,9 +1416,10 @@ export function TeacherDashboard({
     if (!briefingData?.timeline || briefingData.timeline.length === 0) return false;
     const sorted = [...briefingData.timeline].sort((a: any, b: any) => a.timeSlot.localeCompare(b.timeSlot));
     const firstSlotStart = sorted[0].timeSlot;
-    const lastSlotStart = sorted[sorted.length - 1].timeSlot;
+    const lastSlot = sorted[sorted.length - 1];
+    const lastSlotStart = lastSlot.timeSlot;
     const [lh, lm] = lastSlotStart.split(':').map(Number);
-    const totalMin = lh * 60 + lm + 30;
+    const totalMin = lh * 60 + lm + (lastSlot.duration || 30);
     const lastSlotEnd = `${String(Math.floor(totalMin / 60) % 24).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')}`;
     return currentTimeStr >= firstSlotStart && currentTimeStr <= lastSlotEnd;
   }, [briefingData?.timeline, currentTimeStr]);
@@ -1614,6 +1615,7 @@ export function TeacherDashboard({
             .select(`
               id,
               time_slot,
+              duration,
               status,
               day_of_week,
               rooms (id, name),
@@ -1643,6 +1645,7 @@ export function TeacherDashboard({
               schedule_id,
               student_id,
               schedules (
+                duration,
                 rooms (id, name)
               ),
               student:users!schedule_occurrences_student_id_fkey (
@@ -1666,6 +1669,7 @@ export function TeacherDashboard({
             return {
               scheduleId: slot.id,
               timeSlot: slot.time_slot,
+              duration: slot.duration,
               status: slot.status,
               roomId: slot.rooms?.id || null,
               room: slot.rooms?.name || 'Hauptraum',
@@ -1697,6 +1701,7 @@ export function TeacherDashboard({
                 const mappedItem = {
                   scheduleId: occ.schedule_id || occ.id,
                   timeSlot: formattedTime,
+                  duration: occ.schedules?.duration || 30,
                   status: occ.status,
                   roomId: occ.schedules?.rooms?.id || null,
                   room: occ.schedules?.rooms?.name || 'Hauptraum',
@@ -4006,7 +4011,7 @@ export function TeacherDashboard({
                               const slotStart = slot.timeSlot;
                               const slotEnd = (() => {
                                 const [sh, sm] = slotStart.split(':').map(Number);
-                                const totalMin = sh * 60 + sm + 30;
+                                const totalMin = sh * 60 + sm + (slot.duration || 30);
                                 return `${String(Math.floor(totalMin / 60) % 24).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')}`;
                               })();
                               const isFinished = currentTimeStr >= slotEnd;
@@ -4021,7 +4026,7 @@ export function TeacherDashboard({
                             const slotStart = slot.timeSlot;
                             const slotEnd = (() => {
                               const [sh, sm] = slotStart.split(':').map(Number);
-                              const totalMin = sh * 60 + sm + 30;
+                              const totalMin = sh * 60 + sm + (slot.duration || 30);
                               return `${String(Math.floor(totalMin / 60) % 24).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')}`;
                             })();
  
@@ -4345,7 +4350,7 @@ export function TeacherDashboard({
                                              </span>
                                            </div>
                                          ) : (
-                                           <span style={{ fontWeight: 700, color: '#78350f', fontSize: '0.85rem' }}>☕️ Pause (30 Min.)</span>
+                                           <span style={{ fontWeight: 700, color: '#78350f', fontSize: '0.85rem' }}>☕️ Pause ({slot.duration || 30} Min.)</span>
                                          )}
                                        </div>
                                      </div>
