@@ -69,7 +69,7 @@ export async function createTeacherLinkHandler(req: Request, res: Response): Pro
     }
 
     // Generate response with link
-    const frontendUrl = process.env.FRONTEND_URL || 'https://campus-groovelab.de';
+    const frontendUrl = req.get('origin') || process.env.FRONTEND_URL || 'https://campus-groovelab.de';
     const activationLink = `${frontendUrl}/activate?token=${invitation.token}`;
 
     res.status(200).json({

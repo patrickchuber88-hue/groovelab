@@ -127,7 +127,7 @@ export async function onboardStudentHandler(req: Request, res: Response): Promis
     // 5. Generate parent web link if not an app user
     let parentWebLink = '';
     if (!isAppUser) {
-      const frontendUrl = process.env.FRONTEND_URL || 'https://campus-groovelab.de';
+      const frontendUrl = req.get('origin') || process.env.FRONTEND_URL || 'https://campus-groovelab.de';
       parentWebLink = `${frontendUrl}/parent-input?student_id=${insertedStudent.id}&token=${insertedStudent.qr_token}`;
     }
 
@@ -281,7 +281,7 @@ export async function generateStudentKaskadeHandler(req: Request, res: Response)
       return;
     }
 
-    const frontendUrl = process.env.FRONTEND_URL || 'https://campus-groovelab.de';
+    const frontendUrl = req.get('origin') || process.env.FRONTEND_URL || 'https://campus-groovelab.de';
     const registrationLink = `${frontendUrl}/student-signup?cascade=${cascade.token}`;
 
     res.status(200).json({

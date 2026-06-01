@@ -4861,7 +4861,10 @@ function App() {
     sessionStorage.setItem('groovelab_location_mode', mode);
 
     // Default start tab
-    const startTab = mode === 'home' ? 'practice' : 'live';
+    let startTab = mode === 'home' ? 'practice' : 'live';
+    if (userToLogin?.role === 'student') {
+      startTab = 'briefing';
+    }
     setActiveStudentTab(startTab);
     localStorage.setItem('groovelab_active_tab', startTab);
 
@@ -4880,7 +4883,7 @@ function App() {
 
   useEffect(() => {
     if (user && !localStorage.getItem('groovelab_active_tab')) {
-      const startTab = locationMode === 'home' ? (user.is_external_vocalist ? 'repertoire' : 'practice') : 'live';
+      const startTab = user.role === 'student' ? 'briefing' : (locationMode === 'home' ? (user.is_external_vocalist ? 'repertoire' : 'practice') : 'live');
       setActiveStudentTab(startTab);
       localStorage.setItem('groovelab_active_tab', startTab);
     }

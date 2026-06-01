@@ -58,7 +58,7 @@ export async function sendInvitationsHandler(req: Request, res: Response): Promi
 
     // 3. Loop and mock email sending (console log)
     for (const teacher of teachers) {
-      const frontendUrl = process.env.FRONTEND_URL || 'https://campus-groovelab.de';
+      const frontendUrl = req.get('origin') || process.env.FRONTEND_URL || 'https://campus-groovelab.de';
       const registrationUrl = `${frontendUrl}/register?token=${teacher.qr_token}`;
       
       console.log('--------------------------------------------------');

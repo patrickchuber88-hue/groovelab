@@ -311,7 +311,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
       });
       if (resp.ok) {
         const data = await resp.json();
-        setCascadeLink(data.registrationLink || `https://campus-groovelab.de/student-signup?cascade=${data.token}`);
+        setCascadeLink(data.registrationLink || `${window.location.origin}/student-signup?cascade=${data.token}`);
       } else {
         // Fallback Client-side generation using local parameters
         const cascadeToken = crypto.randomUUID();
@@ -325,12 +325,12 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
           expires_at: expiresAt.toISOString()
         });
 
-        setCascadeLink(`https://campus-groovelab.de/student-signup?cascade=${cascadeToken}`);
+        setCascadeLink(`${window.location.origin}/student-signup?cascade=${cascadeToken}`);
       }
     } catch (err) {
       console.error(err);
       // Hardcoded fallback using teacher's unique ausweis_id if DB inserts are constrained
-      setCascadeLink(`https://campus-groovelab.de/student-signup?teacher_ausweis=${teacher.ausweis_id || teacher.id}`);
+      setCascadeLink(`${window.location.origin}/student-signup?teacher_ausweis=${teacher.ausweis_id || teacher.id}`);
     }
   };
 
