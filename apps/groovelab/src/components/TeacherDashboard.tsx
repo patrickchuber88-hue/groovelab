@@ -3968,9 +3968,48 @@ export function TeacherDashboard({
                               { type: 'joke', text: "Warum klopft der Schlagzeuger immer an die Tür? Weil er nicht weiß, wann er einsetzen soll.", author: "Schlagzeuger-Witz" }
                             ];
 
-                            // Dynamic random selection
-                            const randomWish = wishes[Math.floor(Math.random() * wishes.length)];
-                            const randomItem = materials[Math.floor(Math.random() * materials.length)];
+                             const today = new Date();
+                             const currentDayOfWeek = today.getDay(); // 0 = Sunday, 6 = Saturday
+                             const isWeekend = currentDayOfWeek === 0 || currentDayOfWeek === 6;
+
+                             // Seeded selection based on calendar day to guarantee "one text per day" stability
+                             const dateSeed = today.getDate() + today.getMonth() * 31 + today.getFullYear();
+                             const dailyWishIndex = dateSeed % wishes.length;
+                             const dailyItemIndex = (dateSeed * 7 + 13) % materials.length;
+
+                             const dailyWish = wishes[dailyWishIndex];
+                             const dailyItem = materials[dailyItemIndex];
+
+                             if (isWeekend) {
+                               return (
+                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                     <div style={{ background: '#e6f4ea', color: '#137333', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                       <Award size={18} />
+                                     </div>
+                                     <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#1e293b' }}>
+                                       Wochenende
+                                     </h4>
+                                   </div>
+
+                                   {/* Premium Weekend Rest Card */}
+                                   <div style={{
+                                     background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
+                                     border: '1.5px solid #7dd3fc',
+                                     borderRadius: '16px',
+                                     padding: '20px 16px',
+                                     color: '#0369a1',
+                                     textAlign: 'center',
+                                     boxShadow: '0 4px 12px rgba(14, 165, 233, 0.08)'
+                                   }}>
+                                     <div style={{ fontSize: '1.25rem', fontWeight: 900, marginBottom: '6px' }}>☀️ Schönes Wochenende! ☀️</div>
+                                     <div style={{ fontSize: '0.85rem', fontWeight: 600, opacity: 0.9, lineHeight: '1.4' }}>
+                                       Genieße deine wohlverdiente Pause! Keine Termine, kein Schulstress. Erhole dich gut und tanke Kraft für neue musikalische Abenteuer in der kommenden Woche.
+                                     </div>
+                                   </div>
+                                 </div>
+                               );
+                             }
 
                             return (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -3995,7 +4034,7 @@ export function TeacherDashboard({
                                 }}>
                                   <div style={{ fontSize: '1.2rem', fontWeight: 900, marginBottom: '4px' }}>✨ Schönen Feierabend! ✨</div>
                                   <div style={{ fontSize: '0.82rem', fontWeight: 600, opacity: 0.9 }}>
-                                    {randomWish}
+                                    {dailyWish}
                                   </div>
                                 </div>
 
@@ -4012,9 +4051,9 @@ export function TeacherDashboard({
                                   textAlign: 'center'
                                 }}>
                                   <span style={{ fontSize: '1.5rem', color: '#cbd5e1', height: '10px', display: 'block', textIndent: '-6px' }}>“</span>
-                                  <span>{randomItem.text}</span>
+                                  <span>{dailyItem.text}</span>
                                   <strong style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, fontStyle: 'normal', marginTop: '4px' }}>
-                                    — {randomItem.author} ({randomItem.type === 'joke' ? 'Witz' : 'Zitat'})
+                                    — {dailyItem.author} ({dailyItem.type === 'joke' ? 'Witz' : 'Zitat'})
                                   </strong>
                                 </div>
                               </div>
