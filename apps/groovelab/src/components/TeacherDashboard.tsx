@@ -3964,16 +3964,16 @@ export function TeacherDashboard({
                                   gap: '12px'
                                 }}>
                                   <div style={{ fontSize: '0.85rem', color: '#475569', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                    Heutige Übersicht:
+                                    Gestrige Übersicht:
                                   </div>
                                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                     <div style={{ background: '#ffffff', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
                                       <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a' }}>{activeCount}</div>
-                                      <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700 }}>Unterrichtete Schüler</div>
+                                      <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700 }}>Unterrichtete Schüler gestern</div>
                                     </div>
                                     <div style={{ background: '#ffffff', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
                                       <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#b45309' }}>{cancelledCount}</div>
-                                      <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700 }}>Absagen heute</div>
+                                      <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700 }}>Absagen gestern</div>
                                     </div>
                                   </div>
                                 </div>
