@@ -1427,18 +1427,24 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         padding: useNotebookLayout ? '6px' : '0',
         position: 'relative'
       }} className="animation-slide-up">
-        {/* Header - Apple-style Translucent/White Header */}
+        {/* Header - Apple-style Translucent/White Header (Leather Design in Notebook Layout) */}
         <div style={{
           padding: '18px 24px',
-          background: 'rgba(255, 255, 255, 0.72)',
-          backdropFilter: 'blur(20px) saturate(190%)',
-          borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
+          background: useNotebookLayout 
+            ? 'radial-gradient(circle at center, #2e231c 0%, #17110d 100%)' 
+            : 'rgba(255, 255, 255, 0.72)',
+          backdropFilter: useNotebookLayout ? 'none' : 'blur(20px) saturate(190%)',
+          borderBottom: useNotebookLayout 
+            ? '2px solid #4a382c' 
+            : '1px solid rgba(0, 0, 0, 0.06)',
           borderRadius: useNotebookLayout ? '24px 24px 0 0' : '0',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           zIndex: 50,
-          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.01)'
+          boxShadow: useNotebookLayout 
+            ? '0 4px 20px rgba(0,0,0,0.3), inset 0 -2px 10px rgba(0,0,0,0.4)' 
+            : '0 1px 2px rgba(0, 0, 0, 0.01)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             <div style={{
@@ -1447,7 +1453,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               borderRadius: '12px',
               overflow: 'hidden',
               boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-              border: '1px solid rgba(0, 0, 0, 0.05)'
+              border: useNotebookLayout ? '1.5px solid rgba(255, 213, 79, 0.25)' : '1px solid rgba(0, 0, 0, 0.05)'
             }}>
               <img
                 src={getInstrumentAvatarUrl(studentInstrument)}
@@ -1459,7 +1465,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ 
                   fontSize: '0.62rem', 
-                  color: '#8e8e93', 
+                  color: useNotebookLayout ? '#a59385' : '#8e8e93', 
                   fontWeight: 700, 
                   textTransform: 'uppercase', 
                   letterSpacing: '0.08em' 
@@ -1467,11 +1473,19 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   Tageskompass
                 </span>
               </div>
-              <h2 className="swiss-h2" style={{ margin: 0, fontSize: '1.2rem', color: '#1d1d1f', fontWeight: 700, letterSpacing: '-0.025em', lineHeight: 1.15 }}>
-                Meisterwerk-Protokoll
+              <h2 className="swiss-h2" style={{ 
+                margin: 0, 
+                fontSize: '1.2rem', 
+                color: useNotebookLayout ? '#fbf8f5' : '#1d1d1f', 
+                fontWeight: 800, 
+                letterSpacing: '-0.025em', 
+                lineHeight: 1.15,
+                textShadow: useNotebookLayout ? '0 1px 3px rgba(0,0,0,0.5)' : 'none'
+              }}>
+                Schüler-Protokoll
               </h2>
-              <p style={{ fontSize: '0.78rem', color: '#86868b', margin: '1px 0 0 0', fontWeight: 500 }}>
-                Aktive Begleitung für: <strong style={{ color: '#1d1d1f', fontWeight: 600 }}>{student.first_name} {student.last_name}</strong>
+              <p style={{ fontSize: '0.78rem', color: useNotebookLayout ? '#a59385' : '#86868b', margin: '1px 0 0 0', fontWeight: 500 }}>
+                Aktive Begleitung für: <strong style={{ color: useNotebookLayout ? '#ffffff' : '#1d1d1f', fontWeight: 600 }}>{student.first_name} {student.last_name}</strong>
               </p>
             </div>
           </div>
@@ -1480,24 +1494,30 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
               display: 'inline-flex',
-              background: 'rgba(120, 120, 128, 0.08)',
+              background: useNotebookLayout ? 'rgba(0, 0, 0, 0.25)' : 'rgba(120, 120, 128, 0.08)',
               padding: '2.5px',
               borderRadius: '20px',
-              border: 'none'
+              border: useNotebookLayout ? '1px solid rgba(255, 255, 255, 0.05)' : 'none'
             }}>
               <button
                 type="button"
                 onClick={() => setActiveModalTab('document')}
                 style={{
-                  background: activeModalTab === 'document' ? 'white' : 'transparent',
+                  background: activeModalTab === 'document' 
+                    ? (useNotebookLayout ? '#3d2e25' : 'white') 
+                    : 'transparent',
                   border: 'none',
-                  color: activeModalTab === 'document' ? '#1d1d1f' : '#86868b',
+                  color: activeModalTab === 'document' 
+                    ? (useNotebookLayout ? '#ffd54f' : '#1d1d1f') 
+                    : (useNotebookLayout ? '#a59385' : '#86868b'),
                   padding: '6px 14px',
                   borderRadius: '17px',
                   fontSize: '0.76rem',
-                  fontWeight: 600,
+                  fontWeight: 650,
                   cursor: 'pointer',
-                  boxShadow: activeModalTab === 'document' ? '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)' : 'none',
+                  boxShadow: activeModalTab === 'document' 
+                    ? (useNotebookLayout ? '0 2px 5px rgba(0,0,0,0.3)' : '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)') 
+                    : 'none',
                   transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                   display: 'flex',
                   alignItems: 'center',
@@ -1511,15 +1531,21 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 type="button"
                 onClick={() => setActiveModalTab('logbook')}
                 style={{
-                  background: activeModalTab === 'logbook' ? 'white' : 'transparent',
+                  background: activeModalTab === 'logbook' 
+                    ? (useNotebookLayout ? '#3d2e25' : 'white') 
+                    : 'transparent',
                   border: 'none',
-                  color: activeModalTab === 'logbook' ? '#1d1d1f' : '#86868b',
+                  color: activeModalTab === 'logbook' 
+                    ? (useNotebookLayout ? '#ffd54f' : '#1d1d1f') 
+                    : (useNotebookLayout ? '#a59385' : '#86868b'),
                   padding: '6px 14px',
                   borderRadius: '17px',
                   fontSize: '0.76rem',
-                  fontWeight: 600,
+                  fontWeight: 650,
                   cursor: 'pointer',
-                  boxShadow: activeModalTab === 'logbook' ? '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)' : 'none',
+                  boxShadow: activeModalTab === 'logbook' 
+                    ? (useNotebookLayout ? '0 2px 5px rgba(0,0,0,0.3)' : '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)') 
+                    : 'none',
                   transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                   display: 'flex',
                   alignItems: 'center',
@@ -1540,9 +1566,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 localStorage.setItem('meisterwerk_notebook_layout', String(nextVal));
               }}
               style={{
-                background: 'rgba(120, 120, 128, 0.08)',
-                border: 'none',
-                color: '#1d1d1f',
+                background: useNotebookLayout ? 'rgba(0, 0, 0, 0.25)' : 'rgba(120, 120, 128, 0.08)',
+                border: useNotebookLayout ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
+                color: useNotebookLayout ? '#e5dcd3' : '#1d1d1f',
                 padding: '6px 14px',
                 borderRadius: '17px',
                 fontSize: '0.76rem',
@@ -1553,19 +1579,54 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 alignItems: 'center',
                 gap: '5px'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(120, 120, 128, 0.14)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(120, 120, 128, 0.08)'}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = useNotebookLayout ? 'rgba(0, 0, 0, 0.35)' : 'rgba(120, 120, 128, 0.14)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = useNotebookLayout ? 'rgba(0, 0, 0, 0.25)' : 'rgba(120, 120, 128, 0.08)';
+              }}
             >
               <Book size={13} style={{ opacity: 0.8 }} />
-              <span>{useNotebookLayout ? 'Modernes Design' : 'Notizbuch-Design'}</span>
+              <span>{useNotebookLayout ? 'Modernes Design' : 'Leder-Design'}</span>
             </button>
+
+            {/* Apple-style prominent Save Button in Header (appears only on changes) */}
+            {hasChanges && (
+              <button
+                type="button"
+                onClick={() => handleSave()}
+                disabled={saving}
+                style={{
+                  background: useNotebookLayout ? '#d97706' : '#007aff',
+                  color: 'white',
+                  border: 'none',
+                  padding: '6px 16px',
+                  borderRadius: '17px',
+                  fontSize: '0.76rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: useNotebookLayout 
+                    ? '0 2px 10px rgba(217,119,6,0.35)' 
+                    : '0 2px 10px rgba(0,122,255,0.3)',
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  animation: 'pulse 2s infinite'
+                }}
+                className="hover-scale"
+              >
+                <Check size={13} strokeWidth={3} />
+                <span>{saving ? 'Speichert...' : 'Speichern'}</span>
+              </button>
+            )}
           </div>
 
           <button
             onClick={onClose}
             style={{
-              background: 'rgba(120, 120, 128, 0.08)',
-              border: 'none',
+              background: useNotebookLayout ? 'rgba(0, 0, 0, 0.25)' : 'rgba(120, 120, 128, 0.08)',
+              border: useNotebookLayout ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
               borderRadius: '50%',
               width: '32px',
               height: '32px',
@@ -1573,16 +1634,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              color: '#86868b',
+              color: useNotebookLayout ? '#a59385' : '#86868b',
               transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(120, 120, 128, 0.16)';
-              e.currentTarget.style.color = '#1d1d1f';
+              e.currentTarget.style.background = useNotebookLayout ? 'rgba(0, 0, 0, 0.35)' : 'rgba(120, 120, 128, 0.16)';
+              e.currentTarget.style.color = useNotebookLayout ? '#ffd54f' : '#1d1d1f';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(120, 120, 128, 0.08)';
-              e.currentTarget.style.color = '#86868b';
+              e.currentTarget.style.background = useNotebookLayout ? 'rgba(0, 0, 0, 0.25)' : 'rgba(120, 120, 128, 0.08)';
+              e.currentTarget.style.color = useNotebookLayout ? '#a59385' : '#86868b';
             }}
             className="hover-scale"
           >
@@ -2925,7 +2986,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         <button
                           key={i}
                           type="button"
-                          onClick={() => setHomeworkNotes(prev => prev ? `${prev}\n\n${tpl.text}` : tpl.text)}
+                          onClick={() => {
+                            setHomeworkNotes(prev => prev ? `${prev}\n\n${tpl.text}` : tpl.text);
+                            setHasChanges(true);
+                          }}
                           style={{
                             background: '#ffffff',
                             color: '#4b5563',
