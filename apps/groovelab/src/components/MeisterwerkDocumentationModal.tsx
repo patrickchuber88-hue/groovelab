@@ -180,6 +180,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [pageUndoStack, setPageUndoStack] = useState<{ lehrwerkId: string, pageNum: number, prevStatus: any }[]>([]);
   const [hasChanges, setHasChanges] = useState<boolean>(false);
 
+  const handleClose = () => {
+    if (hasChanges) {
+      if (confirm('Du hast ungespeicherte Änderungen. Möchtest du das Protokoll wirklich schließen, ohne zu speichern?')) {
+        onClose();
+      }
+    } else {
+      onClose();
+    }
+  };
+
   const getISOWeek = (dateInput?: string | Date): string => {
     return getISOWeekRaw(dateInput, lessonDay);
   };
@@ -1622,7 +1632,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           </div>
 
           <button
-            onClick={onClose}
+            onClick={handleClose}
             style={{
               background: useNotebookLayout ? 'rgba(0, 0, 0, 0.2)' : 'rgba(120, 120, 128, 0.08)',
               border: useNotebookLayout ? '1px solid rgba(255, 255, 255, 0.08)' : 'none',
