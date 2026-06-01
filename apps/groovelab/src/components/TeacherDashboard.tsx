@@ -3927,24 +3927,17 @@ export function TeacherDashboard({
                               </>
                             );
                           })() : (() => {
-                            // Seeded Quotes of the day
-                            const quotes = [
-                              { text: "Die Musik drückt das aus, was nicht gesagt werden kann und worüber zu schweigen unmöglich ist.", author: "Victor Hugo" },
-                              { text: "Ohne Musik wäre das Leben ein Irrtum.", author: "Friedrich Nietzsche" },
-                              { text: "Musik ist die gemeinsame Sprache der Menschheit.", author: "Henry Wadsworth Longfellow" },
-                              { text: "Wo die Sprache aufhört, fängt die Musik an.", author: "E.T.A. Hoffmann" },
-                              { text: "Musik wäscht den Staub des Alltags von der Seele.", author: "Berthold Auerbach" }
+                            // Seeded Quotes & Musician Jokes of the day
+                            const materials = [
+                              { type: 'quote', text: "Die Musik drückt das aus, was nicht gesagt werden kann und worüber zu schweigen unmöglich ist.", author: "Victor Hugo" },
+                              { type: 'joke', text: "Was ist der Unterschied zwischen einer Geige und einer Bratsche? Die Bratsche brennt länger.", author: "Musiker-Witz" },
+                              { type: 'quote', text: "Ohne Musik wäre das Leben ein Irrtum.", author: "Friedrich Nietzsche" },
+                              { type: 'joke', text: "Wie nennt man jemanden, der gerne mit Musikern abhängt? Einen Schlagzeuger.", author: "Musiker-Witz" },
+                              { type: 'quote', text: "Musik ist die gemeinsame Sprache der Menschheit.", author: "Henry Wadsworth Longfellow" },
+                              { type: 'joke', text: "Warum sind Dirigenten-Partituren immer so groß? Damit sie sich dahinter verstecken können.", author: "Musiker-Witz" }
                             ];
-                            const daySeed = new Date().getDate() % quotes.length;
-                            const quote = quotes[daySeed];
-                            
-                            // Stats calculation
-                            const totalStudentsCount = briefingData?.timeline?.filter((s: any) => s.student).length || 0;
-                            const cancelledCount = briefingData?.timeline?.filter((s: any) => s.student && (s.status === 'canceled_by_student' || s.status === 'cancelled')).length || 0;
-                            
-                            // Fallback to high actual stats (> 4 students taught) for yesterday's display if today's timeline stats are small or empty
-                            const activeCount = totalStudentsCount > 4 ? (totalStudentsCount - cancelledCount) : 5;
-                            const displayCancelledCount = totalStudentsCount > 4 ? cancelledCount : 0;
+                            const daySeed = new Date().getDate() % materials.length;
+                            const item = materials[daySeed];
 
                             return (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -3953,31 +3946,23 @@ export function TeacherDashboard({
                                     <Award size={18} />
                                   </div>
                                   <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#1e293b' }}>
-                                    Schüler Notizen • Feierabend
+                                    Feierabend
                                   </h4>
                                 </div>
 
+                                {/* Premium Feierabend Wishing Card */}
                                 <div style={{
-                                  background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                                  border: '1.5px solid #e2e8f0',
+                                  background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)',
+                                  border: '1.5px solid #a5d6a7',
                                   borderRadius: '16px',
                                   padding: '16px',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: '12px'
+                                  color: '#1b5e20',
+                                  textAlign: 'center',
+                                  boxShadow: '0 4px 12px rgba(76, 175, 80, 0.08)'
                                 }}>
-                                  <div style={{ fontSize: '0.85rem', color: '#475569', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                    Gestrige Übersicht:
-                                  </div>
-                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                                    <div style={{ background: '#ffffff', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                                      <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a' }}>{activeCount}</div>
-                                      <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700 }}>Unterrichtete Schüler gestern</div>
-                                    </div>
-                                    <div style={{ background: '#ffffff', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                                      <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#b45309' }}>{displayCancelledCount}</div>
-                                      <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700 }}>Absagen gestern</div>
-                                    </div>
+                                  <div style={{ fontSize: '1.2rem', fontWeight: 900, marginBottom: '4px' }}>✨ Schönen Feierabend! ✨</div>
+                                  <div style={{ fontSize: '0.82rem', fontWeight: 600, opacity: 0.9 }}>
+                                    Du hast heute Großartiges geleistet. Entspanne dich, tanke neue Energie und lass den Tag gemütlich ausklingen!
                                   </div>
                                 </div>
 
@@ -3994,9 +3979,9 @@ export function TeacherDashboard({
                                   textAlign: 'center'
                                 }}>
                                   <span style={{ fontSize: '1.5rem', color: '#cbd5e1', height: '10px', display: 'block', textIndent: '-6px' }}>“</span>
-                                  <span>{quote.text}</span>
+                                  <span>{item.text}</span>
                                   <strong style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, fontStyle: 'normal', marginTop: '4px' }}>
-                                    — {quote.author}
+                                    — {item.author} ({item.type === 'joke' ? 'Witz' : 'Zitat'})
                                   </strong>
                                 </div>
                               </div>
