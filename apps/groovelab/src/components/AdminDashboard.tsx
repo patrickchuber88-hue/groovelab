@@ -56,22 +56,28 @@ const ADMIN_INSTRUMENT_ICONS: Record<string, any> = {
   "Keys": renderInstrumentIcon("Keys")
 };
 const getInstrumentAvatarUrl = (instrument: string | null | undefined): string => {
-  if (!instrument) return '/avatars/guitar_avatar.png';
+  if (!instrument) return '/avatars/gitarre_avatar_new.png';
   const inst = instrument.toLowerCase().trim();
-  if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/guitar_avatar.png';
+  if (inst.includes('e-gitarre')) return '/avatars/egitarre_avatar.png';
+  if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/gitarre_avatar_new.png';
+  if (inst.includes('e-bass')) return '/avatars/ebass_avatar.png';
+  if (inst.includes('kontrabass') || inst.includes('double bass')) return '/avatars/kontrabass_avatar.png';
   if (inst.includes('bass')) return '/avatars/bass_avatar.png';
-  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/drums_avatar.png';
-  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/piano_avatar.png';
-  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/vocals_avatar.png';
-  if (inst.includes('trompete') || inst.includes('trumpet')) return '/avatars/trumpet_avatar.png';
-  if (inst.includes('posaune') || inst.includes('trombone')) return '/avatars/trombone_avatar.png';
-  if (inst.includes('horn')) return '/avatars/horn_avatar.png';
-  if (inst.includes('cello')) return '/avatars/cello_avatar.png';
-  if (inst.includes('geige') || inst.includes('violin') || inst.includes('violine')) return '/avatars/violin_avatar.png';
-  if (inst.includes('klarinette') || inst.includes('clarinet')) return '/avatars/clarinet_avatar.png';
-  if (inst.includes('querflöte') || inst.includes('flute')) return '/avatars/flute_avatar.png';
-  if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return '/avatars/saxophone_avatar.png';
-  return '/avatars/guitar_avatar.png';
+  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/schlagzeug_avatar.png';
+  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/klavier_avatar_new.png';
+  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/gesang_avatar.png';
+  if (inst.includes('trompete') || inst.includes('trumpet')) return '/avatars/trompete_avatar_new.png';
+  if (inst.includes('posaune') || inst.includes('trombone')) return '/avatars/posaune_avatar.png';
+  if (inst.includes('horn')) return '/avatars/horn_avatar_new.png';
+  if (inst.includes('cello')) return '/avatars/cello_avatar_new.png';
+  if (inst.includes('geige') || inst.includes('violin') || inst.includes('violine')) return '/avatars/violine_avatar_new.png';
+  if (inst.includes('klarinette') || inst.includes('clarinet')) return '/avatars/klarinette_avatar_new.png';
+  if (inst.includes('querflöte') || inst.includes('flute')) return '/avatars/querfloete_avatar.png';
+  if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return '/avatars/saxophon_avatar_new.png';
+  if (inst.includes('blockflöte') || inst.includes('recorder') || inst.includes('blockfloete')) return '/avatars/blockfloete_avatar.png';
+  if (inst.includes('bariton') || inst.includes('baritone')) return '/avatars/bariton_avatar.png';
+  if (inst.includes('oboe')) return '/avatars/oboe_avatar.png';
+  return '/avatars/gitarre_avatar_new.png';
 };
 
 const getInstrumentTypeKey = (instrument: string | null | undefined): string => {
@@ -110,19 +116,24 @@ const TEACHER_AVATARS = [
 ];
 
 const STUDENT_AVATARS = [
-  { id: 'avatar_guitar', url: '/avatars/guitar_avatar.png', label: 'Gitarre' },
-  { id: 'avatar_bass', url: '/avatars/bass_avatar.png', label: 'Bass' },
-  { id: 'avatar_drums', url: '/avatars/drums_avatar.png', label: 'Drums' },
-  { id: 'avatar_piano', url: '/avatars/piano_avatar.png', label: 'Piano / Keys' },
-  { id: 'avatar_vocals', url: '/avatars/vocals_avatar.png', label: 'Vocals' },
-  { id: 'avatar_trumpet', url: '/avatars/trumpet_avatar.png', label: 'Trompete' },
-  { id: 'avatar_trombone', url: '/avatars/trombone_avatar.png', label: 'Posaune' },
-  { id: 'avatar_horn', url: '/avatars/horn_avatar.png', label: 'Horn' },
-  { id: 'avatar_cello', url: '/avatars/cello_avatar.png', label: 'Cello' },
-  { id: 'avatar_violin', url: '/avatars/violin_avatar.png', label: 'Geige' },
-  { id: 'avatar_clarinet', url: '/avatars/clarinet_avatar.png', label: 'Klarinette' },
-  { id: 'avatar_flute', url: '/avatars/flute_avatar.png', label: 'Querflöte' },
-  { id: 'avatar_saxophone', url: '/avatars/saxophone_avatar.png', label: 'Saxofon' }
+  { id: 'avatar_blockfloete', url: '/avatars/blockfloete_avatar.png', label: 'Blockflöte' },
+  { id: 'avatar_bariton', url: '/avatars/bariton_avatar.png', label: 'Bariton' },
+  { id: 'avatar_cello', url: '/avatars/cello_avatar_new.png', label: 'Cello' },
+  { id: 'avatar_ebass', url: '/avatars/ebass_avatar.png', label: 'E-Bass' },
+  { id: 'avatar_egitarre', url: '/avatars/egitarre_avatar.png', label: 'E-Gitarre' },
+  { id: 'avatar_guitar', url: '/avatars/gitarre_avatar_new.png', label: 'Gitarre' },
+  { id: 'avatar_horn', url: '/avatars/horn_avatar_new.png', label: 'Horn' },
+  { id: 'avatar_clarinet', url: '/avatars/klarinette_avatar_new.png', label: 'Klarinette' },
+  { id: 'avatar_piano', url: '/avatars/klavier_avatar_new.png', label: 'Piano / Keys' },
+  { id: 'avatar_kontrabass', url: '/avatars/kontrabass_avatar.png', label: 'Kontrabass' },
+  { id: 'avatar_oboe', url: '/avatars/oboe_avatar.png', label: 'Oboe' },
+  { id: 'avatar_trombone', url: '/avatars/posaune_avatar.png', label: 'Posaune' },
+  { id: 'avatar_flute', url: '/avatars/querfloete_avatar.png', label: 'Querflöte' },
+  { id: 'avatar_saxophone', url: '/avatars/saxophon_avatar_new.png', label: 'Saxofon' },
+  { id: 'avatar_drums', url: '/avatars/schlagzeug_avatar.png', label: 'Drums' },
+  { id: 'avatar_trumpet', url: '/avatars/trompete_avatar_new.png', label: 'Trompete' },
+  { id: 'avatar_violin', url: '/avatars/violine_avatar_new.png', label: 'Geige' },
+  { id: 'avatar_vocals', url: '/avatars/gesang_avatar.png', label: 'Vocals' }
 ];
 
 const getStationColor = (name: string | null | undefined) => {
@@ -408,7 +419,10 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     }
     
     let active = true;
-    const originalUrl = selectedQRUser.photo_url || '/avatar_ghost.jpg';
+    let originalUrl = selectedQRUser.photo_url || '/avatar_ghost.jpg';
+    if (selectedQRUser.role === 'student') {
+      originalUrl = getInstrumentAvatarUrl(selectedQRUser.instrument);
+    }
     
     if (originalUrl.startsWith('data:') || originalUrl.startsWith('blob:')) {
       setQrAvatarDataUrl(originalUrl);
@@ -1138,14 +1152,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     e.preventDefault();
     if (!admin?.school_id) return;
     
-    // Check limits if enabled
-    if (admin?.schools?.limits_enabled) {
-      const maxStudents = admin.schools.max_students ?? 6;
-      if (students.length >= maxStudents) {
-        alert(`Limit erreicht! Deine Schule darf maximal ${maxStudents} Schüler registrieren. Kontaktiere deinen Master-Admin.`);
-        return;
-      }
-    }
+    // Check limits - BYPASSED (Limits strictly removed)
     
     const qrToken = crypto.randomUUID();
     const studentInstrument = newStudent.isExternalVocalist ? 'Vocals' : (newStudent.instrument || 'Gitarre');
@@ -1212,14 +1219,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     if (!admin?.school_id || parsedStudents.length === 0) return;
     setIsBulkSaving(true);
 
-    if (admin?.schools?.limits_enabled) {
-      const maxStudents = admin.schools.max_students ?? 6;
-      if (students.length + parsedStudents.length > maxStudents) {
-        alert(`Limit überschritten! Du kannst nur noch ${maxStudents - students.length} Schüler anlegen.`);
-        setIsBulkSaving(false);
-        return;
-      }
-    }
+    // Check limits - BYPASSED (Limits strictly removed)
 
     const studentsToInsert = parsedStudents.map(student => {
       const qrToken = crypto.randomUUID();
@@ -2828,54 +2828,6 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 Archiv
               </button>
             </div>
-
-
-            <button 
-              onClick={() => {
-                setShowBulkAddStudents(!showBulkAddStudents);
-                setShowAddStudent(false);
-              }}
-              style={{
-                background: showBulkAddStudents ? '#cbd5e1' : `linear-gradient(135deg, #0284c7, #0369a1)`,
-                color: showBulkAddStudents ? '#475569' : 'white',
-                border: 'none',
-                padding: '8px 16px',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '0.85rem',
-                fontWeight: 900,
-                boxShadow: showBulkAddStudents ? 'none' : `0 6px 16px -6px rgba(2,132,199,0.4)`,
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <Users size={16} /> Schnell anlegen
-            </button>
-            <button 
-              onClick={() => {
-                setShowAddStudent(!showAddStudent);
-                setShowBulkAddStudents(false);
-              }} 
-              style={{ 
-                background: showAddStudent ? '#cbd5e1' : `linear-gradient(135deg, ${brandColor}, ${brandColor}ee)`, 
-                color: showAddStudent ? '#475569' : 'white', 
-                border: 'none', 
-                padding: '8px 16px', 
-                borderRadius: '12px', 
-                cursor: 'pointer', 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '8px', 
-                fontSize: '0.85rem', 
-                fontWeight: 900,
-                boxShadow: showAddStudent ? 'none' : `0 6px 16px -6px ${brandColor}60`,
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <Plus size={16} strokeWidth={3} /> Neu anlegen
-            </button>
           </div>
         </div>
 
@@ -5164,12 +5116,12 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         const { toJpeg } = await import('html-to-image');
         const dataUrl = await toJpeg(qrCardRef.current, { 
           quality: 0.95, 
-          backgroundColor: '#ffffff',
+          backgroundColor: selectedQRUser.role === 'student' ? '#064e3b' : '#ffffff',
           cacheBust: true,
           pixelRatio: 2,
         });
         const link = document.createElement('a');
-        link.download = `Groovelab_ID_${selectedQRUser.first_name}.jpg`;
+        link.download = selectedQRUser.role === 'student' ? `Campus_Pass_${selectedQRUser.first_name}.jpg` : `Groovelab_ID_${selectedQRUser.first_name}.jpg`;
         link.href = dataUrl;
         link.click();
       } catch (err) {
@@ -5188,10 +5140,27 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             <X size={24} />
           </button>
 
-          {/* Unified ID Card Design */}
+          {/* ID Card Design */}
           <div 
             ref={qrCardRef}
-            style={{ 
+            style={selectedQRUser.role === 'student' ? {
+              background: 'linear-gradient(135deg, #137333 0%, #064e3b 100%)', 
+              borderRadius: '32px', 
+              padding: '28px', 
+              color: 'white',
+              boxShadow: '0 25px 50px -12px rgba(2, 44, 34, 0.5), 0 0 30px rgba(4, 120, 87, 0.2)',
+              border: '1.5px solid rgba(251, 191, 36, 0.25)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              position: 'relative',
+              overflow: 'hidden',
+              width: '100%',
+              height: '480px',
+              minHeight: '480px',
+              boxSizing: 'border-box',
+              gap: '20px'
+            } : { 
               background: 'white', 
               borderRadius: '32px', 
               boxShadow: '0 30px 60px rgba(0,0,0,0.4)',
@@ -5202,90 +5171,185 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               width: '100%'
             }}
           >
-            {/* Lanyard Hole Mockup */}
-            <div style={{ height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e293b' }}>
-              <div style={{ width: '36px', height: '8px', borderRadius: '4px', background: '#0f172a' }}></div>
-            </div>
+            {selectedQRUser.role === 'student' ? (
+              <>
+                {/* Sheen effect */}
+                <div style={{
+                  position: 'absolute',
+                  top: '-50%', left: '-50%', right: '-50%', bottom: '-50%',
+                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, transparent 50%, rgba(251, 191, 36, 0.03) 100%)',
+                  pointerEvents: 'none'
+                }} />
 
-            {/* Status Header */}
-            <div style={{ 
-              background: selectedQRUser.role === 'student' ? brandColor : '#f59e0b', 
-              padding: '10px', 
-              textAlign: 'center',
-              textTransform: 'uppercase'
-            }}>
-              <div style={{ color: 'white', fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.2em' }}>
-                {selectedQRUser.role === 'student' ? 'Member Access' : 'Staff / Coach'}
-              </div>
-            </div>
+                {/* Top Info Section: Avatar left, Details right */}
+                <div style={{ display: 'flex', gap: '20px', alignItems: 'center', zIndex: 1 }}>
+                  {/* Left Side: Avatar Photo */}
+                  <img 
+                    src={qrAvatarDataUrl || '/avatar_ghost.jpg'} 
+                    onLoad={handleQRImageLoad}
+                    crossOrigin="anonymous"
+                    alt="Avatar" 
+                    style={{ 
+                      width: '96px', 
+                      height: '96px', 
+                      borderRadius: '24px', 
+                      objectFit: 'cover',
+                      border: '3px solid #fbbf24',
+                      boxShadow: '0 8px 24px rgba(251, 191, 36, 0.25)',
+                      flexShrink: 0
+                    }} 
+                  />
+                  
+                  {/* Right Side: Identity Details */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
+                    <span style={{ 
+                      fontSize: '0.68rem', 
+                      fontWeight: 900, 
+                      color: '#fbbf24', 
+                      textTransform: 'uppercase', 
+                      letterSpacing: '0.2em'
+                    }}>
+                      CAMPUS PASS
+                    </span>
+                    
+                    <div>
+                      <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Karteninhaber</span>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', marginTop: '1px', fontFamily: "'Outfit', sans-serif", letterSpacing: '-0.02em' }}>
+                        {selectedQRUser.first_name} {selectedQRUser.last_name}
+                      </div>
+                    </div>
 
-            {/* Content Area */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 24px 36px 24px', gap: '20px' }}>
-              {/* Portrait */}
-              <div style={{ 
-                width: '120px', 
-                height: '120px', 
-                borderRadius: '50%', 
-                border: `4px solid ${selectedQRUser.role === 'student' ? brandColor : '#f59e0b'}`,
-                padding: '4px',
-                background: 'white',
-                boxShadow: '0 8px 20px rgba(0,0,0,0.05)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                overflow: 'hidden'
-              }}>
-                <img 
-                  src={qrAvatarDataUrl || '/avatar_ghost.jpg'} 
-                  onLoad={handleQRImageLoad}
-                  crossOrigin="anonymous"
-                  alt="Profile"
-                  style={{ 
-                    width: '100%', 
-                    height: '100%', 
-                    objectFit: 'cover',
-                    borderRadius: '50%'
-                  }} 
-                />
-              </div>
+                    <div>
+                      <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Musikakademie</span>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ffffff', opacity: 0.95, marginTop: '1px' }}>
+                        Campus Musikschule
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-              {/* Identity */}
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.1, letterSpacing: '-0.02em' }}>{selectedQRUser.first_name}</div>
-                <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#64748b', marginTop: '4px' }}>{selectedQRUser.last_name || 'Member'}</div>
-              </div>
+                {/* Dashed divider line */}
+                <div style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(251, 191, 36, 0.3) 50%, transparent 100%)', height: '1px', width: '100%', margin: '8px 0', zIndex: 1 }} />
 
-              {/* QR Code Container */}
-              <div style={{ 
-                background: 'white', 
-                padding: '16px', 
-                borderRadius: '20px',
-                border: '1px solid #f1f5f9',
-                boxShadow: '0 10px 30px rgba(0,0,0,0.03)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <QRCode value={selectedQRUser.qr_token || selectedQRUser.id} size={150} />
-              </div>
-              
-              <p style={{ fontSize: '0.75rem', color: '#94a3b8', textAlign: 'center', margin: 0, fontWeight: 600, lineHeight: 1.4, maxWidth: '220px' }}>
-                Halte diesen Code vor die Kamera des iPads,<br />um dich automatisch am Platz anzumelden.
-              </p>
-            </div>
+                {/* QR Code Scan area */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', zIndex: 1, gap: '16px' }}>
+                  <div style={{ 
+                    background: '#ffffff', 
+                    padding: '16px', 
+                    borderRadius: '24px', 
+                    boxShadow: '0 20px 40px rgba(0,0,0,0.35)', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    border: '1.5px solid rgba(251, 191, 36, 0.3)'
+                  }}>
+                    <QRCode value={selectedQRUser.qr_token || selectedQRUser.id || ''} size={135} />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Lanyard Hole Mockup */}
+                <div style={{ height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e293b' }}>
+                  <div style={{ width: '36px', height: '8px', borderRadius: '4px', background: '#0f172a' }}></div>
+                </div>
 
-            {/* Bottom Brand Stripe */}
-            <div style={{ 
-              height: '12px', 
-              background: `linear-gradient(90deg, ${selectedQRUser.role === 'student' ? brandColor : '#f59e0b'}, #1e293b, ${selectedQRUser.role === 'student' ? brandColor : '#f59e0b'})` 
-            }}></div>
+                {/* Status Header */}
+                <div style={{ 
+                  background: selectedQRUser.role === 'student' ? brandColor : '#f59e0b', 
+                  padding: '10px', 
+                  textAlign: 'center',
+                  textTransform: 'uppercase'
+                }}>
+                  <div style={{ color: 'white', fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.2em' }}>
+                    {selectedQRUser.role === 'student' ? 'Member Access' : 'Staff / Coach'}
+                  </div>
+                </div>
+
+                {/* Content Area */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 24px 36px 24px', gap: '20px' }}>
+                  {/* Portrait */}
+                  <div style={{ 
+                    width: '120px', 
+                    height: '120px', 
+                    borderRadius: '50%', 
+                    border: `4px solid ${selectedQRUser.role === 'student' ? brandColor : '#f59e0b'}`,
+                    padding: '4px',
+                    background: 'white',
+                    boxShadow: '0 8px 20px rgba(0,0,0,0.05)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden'
+                  }}>
+                    <img 
+                      src={qrAvatarDataUrl || '/avatar_ghost.jpg'} 
+                      onLoad={handleQRImageLoad}
+                      crossOrigin="anonymous"
+                      alt="Profile"
+                      style={{ 
+                        width: '100%', 
+                        height: '100%', 
+                        objectFit: 'cover',
+                        borderRadius: '50%'
+                      }} 
+                    />
+                  </div>
+
+                  {/* Identity */}
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.1, letterSpacing: '-0.02em' }}>{selectedQRUser.first_name}</div>
+                    <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#64748b', marginTop: '4px' }}>{selectedQRUser.last_name || 'Member'}</div>
+                  </div>
+
+                  {/* QR Code Container */}
+                  <div style={{ 
+                    background: 'white', 
+                    padding: '16px', 
+                    borderRadius: '20px',
+                    border: '1px solid #f1f5f9',
+                    boxShadow: '0 10px 30px rgba(0,0,0,0.03)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <QRCode value={selectedQRUser.qr_token || selectedQRUser.id} size={150} />
+                  </div>
+                  
+                  <p style={{ fontSize: '0.75rem', color: '#94a3b8', textAlign: 'center', margin: 0, fontWeight: 600, lineHeight: 1.4, maxWidth: '220px' }}>
+                    Halte diesen Code vor die Kamera des iPads,<br />um dich automatisch am Platz anzumelden.
+                  </p>
+                </div>
+
+                {/* Bottom Brand Stripe */}
+                <div style={{ 
+                  height: '12px', 
+                  background: `linear-gradient(90deg, ${selectedQRUser.role === 'student' ? brandColor : '#f59e0b'}, #1e293b, ${selectedQRUser.role === 'student' ? brandColor : '#f59e0b'})` 
+                }}></div>
+              </>
+            )}
           </div>
 
           <button 
             onClick={saveAsImage} 
-            style={{ width: '100%', background: brandColor, color: 'white', border: 'none', padding: '20px', borderRadius: '24px', fontWeight: 900, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginTop: '24px', boxShadow: `0 15px 35px ${brandColor}50`, transition: 'all 0.2s' }} 
-             
-            
+            style={{ 
+              width: '100%', 
+              background: selectedQRUser.role === 'student' ? '#137333' : brandColor, 
+              color: 'white', 
+              border: 'none', 
+              padding: '20px', 
+              borderRadius: '24px', 
+              fontWeight: 900, 
+              fontSize: '1rem', 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              gap: '10px', 
+              marginTop: '24px', 
+              boxShadow: `0 15px 35px ${selectedQRUser.role === 'student' ? '#137333' : brandColor}50`, 
+              transition: 'all 0.2s' 
+            }} 
           >
             <Download size={24} /> Ausweis als JPEG speichern
           </button>
@@ -5820,22 +5884,19 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   return (
     <div style={{ 
       flex: 1, 
-      padding: (activeTab === 'live' || activeTab === 'schedule') ? '0px 16px 16px 16px' : '0px 48px 48px 48px', 
+      padding: '10px', 
       overflowY: activeTab === 'live' ? 'hidden' : 'auto',
       height: activeTab === 'live' ? '100%' : 'auto',
       display: 'flex',
       flexDirection: 'column'
     }}>
-      {activeTab !== 'live' && (
+      {activeTab !== 'live' && activeTab !== 'schedule' && (
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', marginTop: '16px', gap: '20px', flexWrap: 'wrap' }}>
           {activeTab !== 'students' && (
             <div>
               <h1 style={{ fontSize: '2rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.03em', margin: 0 }}>
                 {sidebarItems.find(i => i.id === activeTab)?.label}
               </h1>
-              <p style={{ color: '#94a3b8', fontSize: '0.9rem', fontWeight: 500, marginTop: '2px' }}>
-                {(admin as any)?.schools?.name} • Management Dashboard
-              </p>
             </div>
           )}
 

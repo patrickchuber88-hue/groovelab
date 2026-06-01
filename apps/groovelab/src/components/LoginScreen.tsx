@@ -567,6 +567,15 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     }
   }, []);
 
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const qrToken = urlParams.get('qr_token');
+    if (qrToken && !loading) {
+      console.log('[Login] Auto-logging in via URL qr_token:', qrToken);
+      handlePinLogin(qrToken);
+    }
+  }, [schoolData]);
+
   let effectiveStationId = kioskStationId || localStorage.getItem('groovelab_station_id');
   if (effectiveStationId === 'skip') effectiveStationId = null;
 
@@ -917,30 +926,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         query = query.eq('ausweis_nummer', cleanPin);
       }
 
-      if (schoolData?.id) {
-        query = query.eq('school_id', schoolData.id);
-      }
-
       const { data: user, error: userErr } = await query.maybeSingle();
 
       if (userErr || !user) {
-        if (schoolData?.id) {
-          let checkQuery = supabase.from('users').select('*, schools(*)');
-          if (cleanPin.includes('-') && cleanPin.length > 20) {
-            const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanPin);
-            if (isUuid) {
-              checkQuery = checkQuery.eq('qr_token', cleanPin);
-            } else {
-              checkQuery = checkQuery.eq('teacher_qr_token', cleanPin);
-            }
-          } else {
-            checkQuery = checkQuery.eq('ausweis_nummer', cleanPin);
-          }
-          const { data: checkUser } = await checkQuery.maybeSingle();
-          if (checkUser && checkUser.role === 'student' && checkUser.school_id !== schoolData.id) {
-            throw new Error('Login verweigert. Dieser Login-Link gehört nicht zu deiner Schule.');
-          }
-        }
         throw new Error('Ungültiger Ausweis-PIN oder QR-Token.');
       }
 

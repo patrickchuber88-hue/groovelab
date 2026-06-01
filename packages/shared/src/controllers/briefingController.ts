@@ -235,6 +235,7 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
         start_time,
         status,
         schedule_id,
+        student_id,
         schedules (
           rooms (id, name)
         ),
@@ -282,13 +283,14 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
         const isPremium = student?.is_premium_user ?? false;
         const isAnalogStickerUser = !student?.is_app_user || !isPremium || avatar?.avatar_style === 'Standard_Silhouette';
         const formattedTime = occ.start_time ? occ.start_time.substring(0, 5) : '00:00';
+        const occStudentId = occ.student?.id || occ.student_id;
 
         if (occ.original_date === todayStr && occ.date !== todayStr) {
           // Rescheduled AWAY from today -> remove from today's timeline
-          timeline = timeline.filter((t: any) => t.student?.id !== occ.student_id);
+          timeline = timeline.filter((t: any) => t.student?.id !== occStudentId);
         } else if (occ.date === todayStr) {
           // Rescheduled TO today or updated today -> update or insert into today's timeline
-          const existingIdx = timeline.findIndex((t: any) => t.student?.id === occ.student_id);
+          const existingIdx = timeline.findIndex((t: any) => t.student?.id === occStudentId);
           const mappedItem = {
             scheduleId: occ.schedule_id || occ.id,
             timeSlot: formattedTime,
@@ -377,12 +379,76 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
       };
     }
 
+    // Fetch all occurrences for this teacher in the current week to detect rescheduled appointments
+    let rescheduledReminders: any[] = [];
+    try {
+      const startOfWeek = new Date();
+      const currentDay = startOfWeek.getDay();
+      const distance = currentDay === 0 ? -6 : 1 - currentDay; // distance to Monday
+      const monday = new Date(startOfWeek);
+      monday.setDate(startOfWeek.getDate() + distance);
+      monday.setHours(0, 0, 0, 0);
+
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      sunday.setHours(23, 59, 59, 999);
+
+      const mondayStr = monday.toISOString().substring(0, 10);
+      const sundayStr = sunday.toISOString().substring(0, 10);
+
+      const { data: weekOccurrences } = await supabase
+        .from('schedule_occurrences')
+        .select(`
+          id,
+          date,
+          original_date,
+          start_time,
+          status,
+          student:users!schedule_occurrences_student_id_fkey (
+            first_name,
+            last_name
+          )
+        `)
+        .eq('teacher_id', userId)
+        .gte('date', mondayStr)
+        .lte('date', sundayStr);
+
+      if (weekOccurrences && weekOccurrences.length > 0) {
+        const rescheduledUpcoming = weekOccurrences.filter((occ: any) => {
+          const hasDateDiff = occ.original_date && occ.original_date !== occ.date;
+          // Return only rescheduled items that are today or in the future
+          return hasDateDiff && occ.date >= todayStr;
+        });
+
+        rescheduledReminders = rescheduledUpcoming.map((occ: any) => {
+          const dateObj = new Date(occ.date);
+          const weekdayStr = dateObj.toLocaleDateString('de-DE', { weekday: 'long' });
+          const dateFormatted = dateObj.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+          const timeFormatted = occ.start_time ? occ.start_time.substring(0, 5) : '';
+          const originalDateObj = occ.original_date ? new Date(occ.original_date) : null;
+          const originalWeekdayStr = originalDateObj ? originalDateObj.toLocaleDateString('de-DE', { weekday: 'long' }) : 'seinem regulären Termin';
+
+          return {
+            id: occ.id,
+            studentName: `${occ.student?.first_name || ''} ${occ.student?.last_name || ''}`.trim(),
+            originalWeekday: originalWeekdayStr,
+            weekday: weekdayStr,
+            dateStr: dateFormatted,
+            time: timeFormatted
+          };
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to fetch rescheduled reminders', err);
+    }
+
     res.status(200).json({
       success: true,
       allowMessagesGlobal: allowMessages,
       todayWeekday,
       timeline,
-      prepMirror
+      prepMirror,
+      rescheduledReminders
     });
 
   } catch (err: any) {

@@ -649,7 +649,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     if (saved === 'campus' || saved === 'groovelab' || saved === 'secretary') return saved as any;
     return 'secretary';
   });
-  const [secretarySubTab, setSecretarySubTab] = useState<'briefing' | 'employees' | 'linking' | 'licenses' | 'setup' | 'rooms' | 'equipment'>('briefing');
+  const [secretarySubTab, setSecretarySubTab] = useState<'briefing' | 'employees' | 'linking' | 'licenses' | 'setup' | 'rooms' | 'equipment' | 'crisis'>('briefing');
   const [campusSubTab, setCampusSubTab] = useState<'briefing' | 'onboarding' | 'students' | 'schedules' | 'status'>('briefing');
   const [groovelabSubTab, setGroovelabSubTab] = useState<'briefing' | 'live' | 'students' | 'coaches' | 'kiosk' | 'status'>('briefing');
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
@@ -658,6 +658,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [selectedStudentForDetail, setSelectedStudentForDetail] = useState<any>(null);
   const [tickets, setTickets] = useState<any[]>([]);
   const [manageTeacher, setManageTeacher] = useState<any | null>(null);
+  const [selectedCrisisTeacherId, setSelectedCrisisTeacherId] = useState<string | null>(null);
   const [activeContextMenu, setActiveContextMenu] = useState<string | null>(null);
 
   // Visual Live Lab states & refs
@@ -895,20 +896,45 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [briefingData, setBriefingData] = useState<SecretaryBriefingData | null>(null);
   const [crisisNotifications, setCrisisNotifications] = useState<any[]>([]);
 
-  // Realtime subscription for crisis updates
+  // Realtime subscription for crisis updates, system alerts, and user profiles with 500ms settling debounce
   useEffect(() => {
     if (!schoolId) return;
     
     fetchCrisisNotifications();
 
+    let crisisTimeout: any = null;
+    let dashboardTimeout: any = null;
+
+    const debouncedFetchCrisisNotifications = () => {
+      if (crisisTimeout) clearTimeout(crisisTimeout);
+      crisisTimeout = setTimeout(() => {
+        fetchCrisisNotifications();
+      }, 500);
+    };
+
+    const debouncedFetchDashboardData = () => {
+      if (dashboardTimeout) clearTimeout(dashboardTimeout);
+      dashboardTimeout = setTimeout(() => {
+        fetchDashboardData();
+      }, 500);
+    };
+
     const channel = supabase
       .channel('public:crisis_notifications')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'crisis_notifications' }, () => {
-        fetchCrisisNotifications();
+        debouncedFetchCrisisNotifications();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'system_alerts' }, () => {
+        debouncedFetchDashboardData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
+        debouncedFetchDashboardData();
       })
       .subscribe();
 
     return () => {
+      if (crisisTimeout) clearTimeout(crisisTimeout);
+      if (dashboardTimeout) clearTimeout(dashboardTimeout);
       supabase.removeChannel(channel);
     };
   }, [schoolId]);
@@ -925,7 +951,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           status,
           notified_at,
           student:users!crisis_notifications_student_id_fkey (first_name, last_name, personal_pin, ausweis_id, instrument),
-          teacher:users!crisis_notifications_teacher_id_fkey (first_name, last_name)
+          teacher:users!crisis_notifications_teacher_id_fkey (id, first_name, last_name, sick_until)
         `)
         .order('slot_start_datetime', { ascending: true });
 
@@ -3405,6 +3431,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       case 'secretary':
         switch (secretarySubTab) {
           case 'briefing': return '📊 Tägliches Briefing & Status';
+          case 'crisis': return '🚨 Operations-Cockpit: Krisen-Dashboard';
           case 'equipment': return '🎸 Instrumente & Ausstattung';
           case 'employees': return '👥 Mitarbeiterverwaltung';
           case 'linking': return '🔗 Schüler-Profilverknüpfung';
@@ -3655,6 +3682,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           {/* If activeTab is Secretary */}
           {activeTab === 'secretary' && [
             { id: 'briefing', label: 'Briefing', icon: LayoutDashboard },
+            { id: 'crisis', label: 'Krisen-Dashboard', icon: ShieldAlert, count: crisisNotifications.filter(n => n.status === 'UNREAD').length },
             { id: 'rooms', label: 'Räume', icon: DoorOpen },
             { id: 'equipment', label: 'Instrumente & Ausstattung', icon: Settings },
             { id: 'employees', label: 'Mitarbeiter', icon: Users },
@@ -3674,6 +3702,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   <Icon size={16} />
                 </div>
                 <span style={{ flex: 1 }}>{item.label}</span>
+                {item.count !== undefined && item.count > 0 && (
+                  <span style={{
+                    background: isSelected ? '#ea4335' : '#fce8e6',
+                    color: isSelected ? '#ffffff' : '#c5221f',
+                    fontSize: '0.68rem',
+                    fontWeight: 900,
+                    padding: '2px 8px',
+                    borderRadius: '100px'
+                  }}>
+                    {item.count}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -4025,208 +4065,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
         {/* Main scrollable body content */}
         <div style={{ padding: '36px 40px', display: 'flex', flexDirection: 'column', gap: '32px', flex: 1, overflowY: 'auto' }}>
-          
-          {/* crisis notifications operations cockpit */}
-          {crisisNotifications.length > 0 && (
-            <div style={{
-              background: activeTab === 'campus' ? '#fff5f5' : '#2d1a1a',
-              border: activeTab === 'campus' ? '1px solid #fecaca' : '1px solid #7f1d1d',
-              borderRadius: '24px',
-              padding: '28px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '24px',
-              boxShadow: '0 4px 20px rgba(239, 68, 68, 0.03)'
-            }} className="animation-slide-up">
-              <style>{`
-                @keyframes pulse-red-border {
-                  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); border-color: rgba(239, 68, 68, 1); }
-                  70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); border-color: rgba(239, 68, 68, 1); }
-                  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); border-color: rgba(239, 68, 68, 1); }
-                }
-                .pulsing-red-ticket {
-                  animation: pulse-red-border 1.5s infinite;
-                  background-color: #ffffff !important;
-                  border: 2px solid #ef4444 !important;
-                }
-              `}</style>
-              
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: activeTab === 'campus' ? '1px solid #fee2e2' : '1px solid #7f1d1d', paddingBottom: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ background: '#ef4444', color: 'white', padding: '10px', borderRadius: '14px' }}>
-                    <ShieldAlert size={20} />
-                  </div>
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: activeTab === 'campus' ? '#991b1b' : '#fecaca', fontFamily: 'Urbanist' }}>🚨 OPERATIONS-COCKPIT: KRISEN-DASHBOARD</h3>
-                    <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: activeTab === 'campus' ? '#b91c1c' : '#fca5a5', fontWeight: 600, fontFamily: 'Inter' }}>Automatisierte Krankmeldungs-Kaskade aktiv</p>
-                  </div>
-                </div>
-                <div style={{ background: activeTab === 'campus' ? '#fee2e2' : '#7f1d1d', color: activeTab === 'campus' ? '#991b1b' : '#fecaca', padding: '6px 14px', borderRadius: '100px', fontSize: '0.75rem', fontWeight: 800, border: '1px solid ' + (activeTab === 'campus' ? '#fee2e2' : '#7f1d1d'), fontFamily: 'Inter' }}>
-                  {crisisNotifications.filter(n => n.status === 'UNREAD').length} Offene Fälle
-                </div>
-              </div>
-
-              {/* CRISIS TICKETS RENDER */}
-              {(() => {
-                const now = new Date();
-                
-                // Helper to classify tickets
-                const classifiedTickets = crisisNotifications.map(t => {
-                  const urgency = t.status === 'READ' ? 'GREEN' : ( (new Date(t.slot_start_datetime).getTime() - now.getTime()) / (1000 * 60) < 120 ? 'RED' : 'YELLOW' );
-                  return { ...t, urgency };
-                });
-
-                // RED Tickets pushed to absolute top of the entire dashboard
-                const redTickets = classifiedTickets.filter(t => t.urgency === 'RED');
-
-                // Date categorisation for yellow/green tickets
-                const getDayDiff = (d1: Date, d2: Date) => {
-                  const t1 = new Date(d1).setHours(0,0,0,0);
-                  const t2 = new Date(d2).setHours(0,0,0,0);
-                  return Math.round((t1 - t2) / (1000 * 60 * 60 * 24));
-                };
-
-                const todayTickets = classifiedTickets.filter(t => t.urgency !== 'RED' && getDayDiff(new Date(t.slot_start_datetime), now) === 0);
-                const tomorrowTickets = classifiedTickets.filter(t => t.urgency !== 'RED' && getDayDiff(new Date(t.slot_start_datetime), now) === 1);
-                const futureTickets = classifiedTickets.filter(t => t.urgency !== 'RED' && getDayDiff(new Date(t.slot_start_datetime), now) > 1);
-
-                const renderTicketCard = (t: any) => {
-                  const studentName = t.student ? `${t.student.first_name} ${t.student.last_name}` : 'Unbekannter Schüler';
-                  const teacherName = t.teacher ? `${t.teacher.first_name} ${t.teacher.last_name}` : 'Lehrkraft';
-                  const supportPin = t.student?.personal_pin || t.student?.ausweis_id || '999999';
-                  const subject = t.student?.instrument || 'Musikunterricht';
-                  const timeStr = new Date(t.slot_start_datetime).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-                  const dateStr = new Date(t.slot_start_datetime).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
-
-                  let cardClass = '';
-                  let urgencyBadge = '';
-                  let urgencyStyle = {};
-
-                  if (t.urgency === 'RED') {
-                    cardClass = 'pulsing-red-ticket';
-                    urgencyBadge = '🔴 Sofort anrufen!';
-                    urgencyStyle = { background: '#ef4444', color: 'white' };
-                  } else if (t.urgency === 'YELLOW') {
-                    cardClass = '';
-                    urgencyBadge = '🟡 Ungelesen (Puffer)';
-                    urgencyStyle = { background: '#fef3c7', color: '#d97706', border: '1px solid #fde68a' };
-                  } else {
-                    cardClass = '';
-                    urgencyBadge = '🟢 Informiert (Gelesen)';
-                    urgencyStyle = { background: '#d1fae5', color: '#065f46', border: '1px solid #a7f3d0' };
-                  }
-
-                  return (
-                    <div
-                      key={t.id}
-                      className={cardClass}
-                      style={{
-                        background: t.urgency === 'GREEN' ? (activeTab === 'campus' ? '#f8fafc' : '#18181b') : (activeTab === 'campus' ? 'white' : '#27272a'),
-                        border: activeTab === 'campus' ? '1.5px solid #e2e8f0' : '1.5px solid #3f3f46',
-                        borderRadius: '20px',
-                        padding: '18px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '12px',
-                        opacity: t.urgency === 'GREEN' ? 0.65 : 1,
-                        transition: 'opacity 0.2s',
-                        position: 'relative',
-                        boxShadow: t.urgency === 'RED' ? '0 10px 15px -3px rgba(239, 68, 68, 0.1)' : 'none'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                          <strong style={{ fontSize: '0.95rem', color: activeTab === 'campus' ? '#1e293b' : '#ffffff' }}>{studentName}</strong>
-                          <div style={{ fontSize: '0.72rem', color: activeTab === 'campus' ? '#64748b' : '#a1a1aa', marginTop: '4px', fontWeight: 650 }}>
-                            Lehrer: {teacherName} • Fach: {subject}
-                          </div>
-                        </div>
-                        <span style={{
-                          padding: '4px 10px',
-                          borderRadius: '8px',
-                          fontSize: '0.65rem',
-                          fontWeight: 900,
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          ...urgencyStyle
-                        }}>
-                          {urgencyBadge}
-                        </span>
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', borderTop: activeTab === 'campus' ? '1px solid #f1f5f9' : '1px solid #3f3f46', paddingTop: '10px', fontSize: '0.78rem' }}>
-                        <div>
-                          <span style={{ display: 'block', fontSize: '0.62rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 800 }}>Termin:</span>
-                          <strong style={{ color: activeTab === 'campus' ? '#334155' : '#cbd5e1' }}>{dateStr} - {timeStr} Uhr</strong>
-                        </div>
-                        <div>
-                          <span style={{ display: 'block', fontSize: '0.62rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 800 }}>Support-PIN (Telefon):</span>
-                          <strong style={{ color: '#ef4444', letterSpacing: '0.05em', fontSize: '0.85rem' }}>{supportPin}</strong>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                };
-
-                return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                    {/* 1. RED PRIORITY SECTION */}
-                    {redTickets.length > 0 && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 950, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          ⚠️ AKUTE ESKALATION (UNTERRICHTS-BEGINN IN UNTER 2 STUNDEN)
-                        </span>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-                          {redTickets.map(renderTicketCard)}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 2. TODAY */}
-                    {todayTickets.length > 0 && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 950, color: activeTab === 'campus' ? '#475569' : '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                          Heute betroffene Schüler
-                        </span>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-                          {todayTickets.map(renderTicketCard)}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 3. TOMORROW */}
-                    {tomorrowTickets.length > 0 && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 950, color: activeTab === 'campus' ? '#475569' : '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                          Morgen betroffene Schüler
-                        </span>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-                          {tomorrowTickets.map(renderTicketCard)}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 4. FUTURE */}
-                    {futureTickets.length > 0 && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 950, color: activeTab === 'campus' ? '#475569' : '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                          Zukünftige Ausfälle
-                        </span>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-                          {futureTickets.map(renderTicketCard)}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-          )}
 
           {/* Active Tab Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              {!(activeTab === 'campus' && campusSubTab === 'onboarding') && (
+              {!(activeTab === 'campus' && campusSubTab === 'onboarding') && !(activeTab === 'secretary' && secretarySubTab === 'crisis') && (
                 <>
                   <h2 className="swiss-h1" style={{ margin: 0, color: activeTab === 'campus' ? '#10b981' : '#f59e0b' }}>
                     {getTabTitle()}
@@ -4553,6 +4396,343 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               </div>
 
             </div>
+          </div>
+        )}
+
+        {/* TAB 1.1: SECRETARY - CRISIS */}
+        {activeTab === 'secretary' && secretarySubTab === 'crisis' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {crisisNotifications.length === 0 ? (
+              <div style={{
+                background: '#e6f4ea',
+                borderRadius: '24px',
+                padding: '40px',
+                textAlign: 'center',
+                color: '#137333',
+                border: '1px solid rgba(52, 168, 83, 0.1)',
+                fontFamily: 'Inter'
+              }}>
+                <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🎉</div>
+                <strong style={{ display: 'block', fontSize: '1.2rem', marginBottom: '8px', fontFamily: 'Urbanist', fontWeight: 800 }}>Derzeit keine Krankmeldungen</strong>
+                <p style={{ margin: 0, fontSize: '0.9rem', opacity: 0.9 }}>
+                  Alle Lehrkräfte sind im Dienst. Es liegen keine aktiven Ausfälle vor.
+                </p>
+              </div>
+            ) : (() => {
+              // Calculate unique sick teachers
+              const sickTeachersMap = new Map();
+              crisisNotifications.forEach(t => {
+                if (t.teacher) {
+                  sickTeachersMap.set(t.teacher.id, t.teacher);
+                }
+              });
+              const sickTeachers = Array.from(sickTeachersMap.values());
+
+              const getSickDurationStr = (sickUntilStr: string | null) => {
+                if (!sickUntilStr) return 'Dauer unbefristet';
+                try {
+                  const d = new Date(sickUntilStr);
+                  return `bis ${d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}`;
+                } catch (e) {
+                  return 'Dauer unbekannt';
+                }
+              };
+
+              return (
+                <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
+                  
+                  {/* LEFT COLUMN: compact operations cockpit */}
+                  <div style={{ flex: 1.6, display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                    
+                    <div style={{
+                      background: '#2d1a1a',
+                      border: '1px solid #7f1d1d',
+                      borderRadius: '24px',
+                      padding: '24px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '20px',
+                      boxShadow: '0 4px 20px rgba(239, 68, 68, 0.03)'
+                    }} className="animation-slide-up">
+                      
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #7f1d1d', paddingBottom: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ background: '#ef4444', color: 'white', padding: '10px', borderRadius: '14px' }}>
+                            <ShieldAlert size={20} />
+                          </div>
+                          <div>
+                            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#fecaca', fontFamily: 'Urbanist' }}>
+                              🚨 OPERATIONS-COCKPIT {selectedCrisisTeacherId && ' (GEFILTERT)'}
+                            </h3>
+                            <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#fca5a5', fontWeight: 600, fontFamily: 'Inter' }}>Automatisierte Krankmeldungs-Kaskade aktiv</p>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                          {selectedCrisisTeacherId && (
+                            <button 
+                              onClick={() => setSelectedCrisisTeacherId(null)}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#fca5a5',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                textDecoration: 'underline',
+                                marginRight: '16px'
+                              }}
+                            >
+                              Filter aufheben
+                            </button>
+                          )}
+                          <div style={{ background: '#7f1d1d', color: '#fecaca', padding: '6px 14px', borderRadius: '100px', fontSize: '0.75rem', fontWeight: 800, border: '1px solid #7f1d1d', fontFamily: 'Inter' }}>
+                            {crisisNotifications.filter(n => n.status === 'UNREAD').length} Offene Fälle
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* CRISIS TICKETS RENDER */}
+                      {(() => {
+                        const now = new Date();
+                        
+                        // Filter notifications by selected teacher if any
+                        const filteredNotifications = selectedCrisisTeacherId
+                          ? crisisNotifications.filter(t => t.teacher?.id === selectedCrisisTeacherId)
+                          : crisisNotifications;
+
+                        // Helper to classify tickets
+                        const classifiedTickets = filteredNotifications.map(t => {
+                          const urgency = t.status === 'READ' ? 'GREEN' : ( (new Date(t.slot_start_datetime).getTime() - now.getTime()) / (1000 * 60) < 120 ? 'RED' : 'YELLOW' );
+                          return { ...t, urgency };
+                        });
+
+                        const redTickets = classifiedTickets.filter(t => t.urgency === 'RED');
+
+                        const getDayDiff = (d1: Date, d2: Date) => {
+                          const t1 = new Date(d1).setHours(0,0,0,0);
+                          const t2 = new Date(d2).setHours(0,0,0,0);
+                          return Math.round((t1 - t2) / (1000 * 60 * 60 * 24));
+                        };
+
+                        const todayTickets = classifiedTickets.filter(t => t.urgency !== 'RED' && getDayDiff(new Date(t.slot_start_datetime), now) === 0);
+                        const tomorrowTickets = classifiedTickets.filter(t => t.urgency !== 'RED' && getDayDiff(new Date(t.slot_start_datetime), now) === 1);
+                        const futureTickets = classifiedTickets.filter(t => t.urgency !== 'RED' && getDayDiff(new Date(t.slot_start_datetime), now) > 1);
+
+                        const renderTicketCard = (t: any) => {
+                          const studentName = t.student ? `${t.student.first_name} ${t.student.last_name}` : 'Unbekannter Schüler';
+                          const teacherName = t.teacher ? `${t.teacher.first_name} ${t.teacher.last_name}` : 'Lehrkraft';
+                          const subject = t.student?.instrument || 'Musikunterricht';
+                          const timeStr = new Date(t.slot_start_datetime).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                          const dateStr = new Date(t.slot_start_datetime).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+
+                          let urgencyBadge = '';
+                          let urgencyStyle = {};
+
+                          if (t.urgency === 'RED') {
+                            urgencyBadge = '🔴 Sofort anrufen!';
+                            urgencyStyle = { background: '#ef4444', color: 'white' };
+                          } else if (t.urgency === 'YELLOW') {
+                            urgencyBadge = '🟡 Ungelesen';
+                            urgencyStyle = { background: '#fef3c7', color: '#d97706', border: '1px solid #fde68a' };
+                          } else {
+                            urgencyBadge = '🟢 Informiert';
+                            urgencyStyle = { background: '#d1fae5', color: '#065f46', border: '1px solid #a7f3d0' };
+                          }
+
+                          return (
+                            <div
+                              key={t.id}
+                              style={{
+                                background: t.urgency === 'GREEN' ? '#1c1212' : '#331b1b',
+                                border: t.urgency === 'RED' ? '1.5px solid #ef4444' : '1px solid #542727',
+                                borderRadius: '16px',
+                                padding: '12px 16px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '16px',
+                                opacity: t.urgency === 'GREEN' ? 0.6 : 1,
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <strong style={{ fontSize: '0.9rem', color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{studentName}</strong>
+                                  <span style={{ fontSize: '0.65rem', color: '#fca5a5', background: 'rgba(239,68,68,0.2)', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>{subject}</span>
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: '#fca5a5', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span>🕒 {dateStr} - {timeStr} Uhr</span>
+                                  <span style={{ opacity: 0.4 }}>•</span>
+                                  <span>Lehrer: {teacherName}</span>
+                                </div>
+                              </div>
+
+                              <span style={{
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                                fontSize: '0.62rem',
+                                fontWeight: 900,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.05em',
+                                whiteSpace: 'nowrap',
+                                ...urgencyStyle
+                              }}>
+                                {urgencyBadge}
+                              </span>
+                            </div>
+                          );
+                        };
+
+                        if (filteredNotifications.length === 0) {
+                          return (
+                            <div style={{ padding: '40px 24px', textAlign: 'center', color: '#fca5a5', opacity: 0.8, fontFamily: 'Inter' }}>
+                              Keine betroffenen Schüler für diese Lehrkraft.
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                            {/* 1. RED PRIORITY SECTION */}
+                            {redTickets.length > 0 && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <span style={{ fontSize: '0.68rem', fontWeight: 950, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  ⚠️ AKUTE ESKALATION ({"<"} 2 STD.)
+                                </span>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                  {redTickets.map(renderTicketCard)}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 2. TODAY */}
+                            {todayTickets.length > 0 && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <span style={{ fontSize: '0.68rem', fontWeight: 950, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                                  Heute betroffene Schüler
+                                </span>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                  {todayTickets.map(renderTicketCard)}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 3. TOMORROW */}
+                            {tomorrowTickets.length > 0 && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <span style={{ fontSize: '0.68rem', fontWeight: 950, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                                  Morgen betroffene Schüler
+                                </span>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                  {tomorrowTickets.map(renderTicketCard)}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 4. FUTURE */}
+                            {futureTickets.length > 0 && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <span style={{ fontSize: '0.68rem', fontWeight: 950, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                                  Zukünftige Ausfälle
+                                </span>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                  {futureTickets.map(renderTicketCard)}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  <div style={{ width: '270px', display: 'flex', flexDirection: 'column', gap: '20px', flexShrink: 0 }} className="animation-slide-up">
+                    <div style={{
+                      background: '#ea4335',
+                      borderRadius: '24px',
+                      padding: '20px',
+                      border: '1.5px solid #dc2626',
+                      color: '#ffffff',
+                      boxShadow: '0 8px 30px rgba(234, 67, 53, 0.15)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                        <UserX size={18} color="#ffffff" />
+                        <strong style={{ fontSize: '0.92rem', fontWeight: 800 }}>Erfasste Ausfälle</strong>
+                      </div>
+
+                      {sickTeachers.length === 0 ? (
+                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#ffffff', opacity: 0.9 }}>
+                          Keine krankgemeldeten Lehrkräfte erfasst.
+                        </p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          {sickTeachers.map((teacher: any) => {
+                            const teacherLessonsCount = crisisNotifications.filter(n => n.teacher?.id === teacher.id).length;
+                            const isSelected = selectedCrisisTeacherId === teacher.id;
+
+                            return (
+                              <div 
+                                key={teacher.id} 
+                                onClick={() => setSelectedCrisisTeacherId(isSelected ? null : teacher.id)}
+                                style={{ 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  gap: '10px', 
+                                  background: 'white', 
+                                  padding: '10px 14px', 
+                                  borderRadius: '16px', 
+                                  border: isSelected ? '3px solid #7f1d1d' : '1.5px solid rgba(255, 255, 255, 0.4)',
+                                  boxShadow: isSelected ? '0 6px 16px rgba(0, 0, 0, 0.15)' : '0 2px 8px rgba(0,0,0,0.03)',
+                                  cursor: 'pointer',
+                                  transform: isSelected ? 'scale(1.02)' : 'scale(1)',
+                                  transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+                                }}
+                              >
+                                <div style={{ 
+                                  width: '36px', 
+                                  height: '36px', 
+                                  borderRadius: '50%', 
+                                  background: isSelected ? '#7f1d1d' : '#fee2e2', 
+                                  color: isSelected ? 'white' : '#ef4444', 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'center', 
+                                  fontWeight: 800, 
+                                  fontSize: '0.9rem',
+                                  border: '2px solid white',
+                                  boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
+                                  flexShrink: 0,
+                                  transition: 'all 0.2s'
+                                }}>
+                                  {teacher.first_name?.[0] || 'L'}
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontWeight: 800, fontSize: '0.8rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {teacher.first_name} {teacher.last_name}
+                                  </div>
+                                  
+                                  <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#ef4444', textTransform: 'uppercase', marginTop: '2px', display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                      <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#ef4444' }}></span>
+                                      {teacherLessonsCount} Ausfälle
+                                    </span>
+                                    <span style={{ color: '#94a3b8' }}>•</span>
+                                    <span style={{ color: '#475569', background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px', textTransform: 'none', fontWeight: 600 }}>
+                                      {getSickDurationStr(teacher.sick_until)}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+              );
+            })()}
           </div>
         )}
 

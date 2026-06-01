@@ -53,10 +53,10 @@ export async function onboardStudentHandler(req: Request, res: Response): Promis
       return;
     }
 
-    // 2. Validate student onboarding limits (MAXIMAL-SCHÜLER-BREMSE - USP 1)
-    const maxStudentsAllowed = teacherProfile.max_students ?? 0;
+    // 2. Validate student onboarding limits - BYPASSED (Limits strictly removed)
+    const maxStudentsAllowed = 999999; // Unlimited
     
-    // Count current students assigned to this teacher
+    // Count current students assigned to this teacher for reference stats
     const { count: currentStudentsCount, error: countError } = await supabase
       .from('users')
       .select('id', { count: 'exact', head: true })
@@ -69,33 +69,7 @@ export async function onboardStudentHandler(req: Request, res: Response): Promis
     }
 
     const activeStudents = currentStudentsCount || 0;
-    if (activeStudents >= maxStudentsAllowed) {
-      // Trigger a 'Capacity Overrun Alert' in the system_alerts table for the secretary and teacher
-      const alertMessage = `Kapazitäts-Alarm: Lehrkraft ${teacherProfile.first_name} ${teacherProfile.last_name} (ID: ${teacherProfile.id}) hat versucht, einen neuen Schüler anzulegen, obwohl das Limit von ${maxStudentsAllowed} Schülern erreicht ist (${activeStudents}/${maxStudentsAllowed} belegt).`;
-      
-      const { error: alertError } = await supabase
-        .from('system_alerts')
-        .insert({
-          school_id: schoolId,
-          teacher_id: teacherProfile.id,
-          type: 'Capacity Overrun Alert',
-          message: alertMessage,
-          resolved: false
-        });
 
-      if (alertError) {
-        console.error('Failed to log Capacity Overrun Alert to database:', alertError.message);
-      }
-
-      res.status(422).json({
-        error: 'Limit erreicht. Sie haben bereits die maximale Anzahl an Schüler-Slots belegt. Ein Kapazitäts-Alarm wurde an das Sekretariat übermittelt.',
-        details: {
-          used: activeStudents,
-          max: maxStudentsAllowed
-        }
-      });
-      return;
-    }
 
     // 3. Extract and validate student payload
     const { firstName, lastName, instrument, isAppUser = false } = req.body;
@@ -364,7 +338,7 @@ export async function registerStudentViaKaskadeHandler(req: Request, res: Respon
       return;
     }
 
-    // 3. Count current students assigned to this teacher
+    // 3. Count current students assigned to this teacher - BYPASSED (Limits strictly removed)
     const { count: currentStudentsCount, error: countError } = await supabase
       .from('users')
       .select('id', { count: 'exact', head: true })
@@ -377,28 +351,8 @@ export async function registerStudentViaKaskadeHandler(req: Request, res: Respon
     }
 
     const activeStudents = currentStudentsCount || 0;
-    const maxStudentsAllowed = teacherProfile.max_students ?? 0;
+    const maxStudentsAllowed = 999999; // Unlimited
 
-    if (activeStudents >= maxStudentsAllowed) {
-      // Limit exceeded! Block registration and insert alert into system_alerts (Board: Härtebremsen-Zentrale)
-      const alertMessage = `Capacity Overrun Alert: New student registration blocked. Teacher ${teacherProfile.first_name} ${teacherProfile.last_name} has reached the student limit of ${maxStudentsAllowed} (${activeStudents}/${maxStudentsAllowed} used).`;
-      
-      await supabase
-        .from('system_alerts')
-        .insert({
-          school_id: cascade.school_id,
-          teacher_id: teacherProfile.id,
-          type: 'Capacity Overrun Alert',
-          message: alertMessage,
-          resolved: false
-        });
-
-      res.status(422).json({
-        error: 'Slot capacity exceeded. Registration blocked. An alert ticket has been posted to the administration board.',
-        details: { used: activeStudents, max: maxStudentsAllowed }
-      });
-      return;
-    }
 
     // 4. Create student profile
     const studentQrToken = uuidv4();

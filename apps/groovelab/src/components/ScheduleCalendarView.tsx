@@ -8,21 +8,23 @@ import {
   AlertCircle,
   CheckCircle,
   X,
-  Send
+  Send,
+  Trash2
 } from 'lucide-react';
 
 interface ScheduleOccurrence {
   id: string;
-  student_id: string;
+  student_id: string | null;
   teacher_id: string;
   schedule_id?: string;
   date: string;
   start_time: string;
   duration: number;
-  status: 'scheduled' | 'pending_reschedule' | 'rescheduled_confirmed' | 'cancelled';
+  status: 'scheduled' | 'pending_reschedule' | 'rescheduled_confirmed' | 'cancelled' | 'teacher_sick' | 'canceled_by_teacher_sick';
   original_date?: string;
   original_start_time?: string;
   student_acknowledged?: boolean;
+  vacant_student_id?: string;
   student?: {
     first_name: string;
     last_name: string;
@@ -34,9 +36,11 @@ interface ScheduleCalendarViewProps {
   schoolId: string;
   userId: string;
   boards: any[];
+  activeTab?: string;
+  setActiveTab?: (tab: 'calendar' | 'designer') => void;
 }
 
-export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalendarViewProps) {
+export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setActiveTab }: ScheduleCalendarViewProps) {
   const toLocalYYYYMMDD = (d: Date) => {
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -50,6 +54,20 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
   const [loading, setLoading] = useState(true);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [editOccState, setEditOccState] = useState<{ id: string, date: string, start_time: string } | null>(null);
+  
+  // State for cancelled swap confirmation flow
+  const [swapConfirmState, setSwapConfirmState] = useState<{
+    sourceId: string;
+    targetId: string;
+    sourceStudentName: string;
+    targetStudentName: string;
+    sourceDate: string;
+    sourceStartTime: string;
+    targetDate: string;
+    targetStartTime: string;
+  } | null>(null);
+
+  const [sickUntil, setSickUntil] = useState<string | null>(null);
 
   const occurrences: ScheduleOccurrence[] = useMemo(() => {
     const merged = baseOccurrences.filter(o => !pendingChanges[o.id]);
@@ -62,13 +80,20 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
   const [chatTypedMessage, setChatTypedMessage] = useState('');
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
 
-  const fetchChat = async (studentId: string) => {
+  const fetchChat = async (studentId: string, occurrenceId?: string) => {
     if (!userId || !studentId) return;
-    const { data } = await supabase
+    
+    let query = supabase
       .from('campus_direct_messages')
-      .select('*')
-      .or(`and(sender_id.eq.${userId},recipient_id.eq.${studentId}),and(sender_id.eq.${studentId},recipient_id.eq.${userId})`)
-      .order('created_at', { ascending: true });
+      .select('*');
+      
+    if (occurrenceId) {
+      query = query.eq('occurrence_id', occurrenceId);
+    } else {
+      query = query.or(`and(sender_id.eq.${userId},recipient_id.eq.${studentId}),and(sender_id.eq.${studentId},recipient_id.eq.${userId})`);
+    }
+    
+    const { data } = await query.order('created_at', { ascending: true });
     if (data) {
       setChatMessages(data);
       setTimeout(() => chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
@@ -81,14 +106,14 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
       return;
     }
     const occ = occurrences.find(o => o.id === editOccState.id);
-    if (!occ || !occ.student_id) return;
+    if (!occ || !occ.student_id || occ.student_id === 'vacant') return;
 
-    fetchChat(occ.student_id);
+    fetchChat(occ.student_id || '', editOccState.id);
 
     const channel = supabase
       .channel(`chat_occ_${editOccState.id}`)
       .on('postgres_changes', { schema: 'public', event: '*', table: 'campus_direct_messages' }, () => {
-        fetchChat(occ.student_id);
+        fetchChat(occ.student_id || '', editOccState.id);
       })
       .subscribe();
 
@@ -101,12 +126,27 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
     e.preventDefault();
     if (!chatTypedMessage.trim()) return;
 
+    // Freeze Check
+    try {
+      const timePart = occ.start_time.includes(':') ? occ.start_time : `${occ.start_time}:00`;
+      const lessonDateTime = new Date(`${occ.date}T${timePart}`);
+      if (Date.now() > lessonDateTime.getTime() + 48 * 60 * 60 * 1000) {
+        alert('Dieser Chat ist eingefroren (48 Stunden nach dem Termin) und kann nicht mehr bearbeitet werden.');
+        return;
+      }
+    } catch (err) {
+      console.warn(err);
+    }
+
+    const typedMsg = chatTypedMessage.trim();
     const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
     const d = new Date(occ.date);
     const dayLabel = DAYS_DE[d.getDay()] || 'Termin';
     const timeLabel = occ.start_time.substring(0, 5);
     const prefix = `[Termin ${dayLabel} ${timeLabel} Uhr] `;
-    const messageContent = `${prefix}${chatTypedMessage.trim()}`;
+    const messageContent = `${prefix}${typedMsg}`;
+
+
 
     try {
       // Optimistic update
@@ -116,6 +156,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
         sender_id: userId,
         recipient_id: studentId,
         content: messageContent,
+        occurrence_id: occ.id,
         created_at: new Date().toISOString(),
         is_read: false
       };
@@ -126,18 +167,19 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
       const { error } = await supabase.from('campus_direct_messages').insert({
         sender_id: userId,
         recipient_id: studentId,
-        content: messageContent
+        content: messageContent,
+        occurrence_id: occ.id
       });
       if (error) throw error;
       
-      await fetchChat(studentId);
+      await fetchChat(studentId, occ.id);
     } catch (err) {
       console.error('Error sending quick chat message:', err);
     }
   };
-
   // Helper für Mutations
   const updateOccurrence = (id: string, updates: Partial<ScheduleOccurrence>) => {
+    if (id.startsWith('vacant-')) return;
     setPendingChanges(prev => {
       const baseOcc = baseOccurrences.find(o => o.id === id);
       const existing = prev[id] || baseOcc;
@@ -280,6 +322,40 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
     };
   }, [userId]);
 
+  useEffect(() => {
+    if (!userId) return;
+    const fetchSickUntil = async () => {
+      const { data } = await supabase
+        .from('users')
+        .select('sick_until')
+        .eq('id', userId)
+        .single();
+      if (data?.sick_until) {
+        setSickUntil(data.sick_until.substring(0, 10));
+      } else {
+        setSickUntil(null);
+      }
+    };
+    fetchSickUntil();
+
+    const channel = supabase
+      .channel(`user_profile_sick_${userId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${userId}` },
+        (payload) => {
+          if (payload.new && 'sick_until' in payload.new) {
+            setSickUntil(payload.new.sick_until ? payload.new.sick_until.substring(0, 10) : null);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
+
   const loadOccurrences = async () => {
     setLoading(true);
     setSwapLinks([]); 
@@ -296,8 +372,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
           .from('schedule_occurrences')
           .select('*, student:users!schedule_occurrences_student_id_fkey(first_name, last_name, instrument)')
           .eq('teacher_id', userId)
-          .gte('date', startDateStr)
-          .lte('date', endDateStr)
+          .or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`)
           .order('date')
           .order('start_time');
 
@@ -360,9 +435,9 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
           board.students.forEach((student: any) => {
             const formattedTime = student.assignedTime ? `${student.assignedTime}:00` : '00:00:00';
             if (student.isBreak) {
-              // Add projected break/pause card if not already in fetchedData
-              const exists = fetchedData.some(o => o.start_time.substring(0, 5) === student.assignedTime.substring(0, 5) && o.date === dateStr && !o.student_id);
-              if (!exists) {
+              // Only project the break if there is no active/non-cancelled appointment occupying this slot
+              const isOccupied = fetchedData.some(o => o.date === dateStr && o.start_time.substring(0, 5) === student.assignedTime.substring(0, 5) && o.status !== 'cancelled');
+              if (!isOccupied) {
                 projectedData.push({
                   id: `mock-${board.id}-${student.id}`,
                   student_id: '',
@@ -380,22 +455,49 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
               }
             } else {
               // Check if a saved database record already covers this student in this week range
-              const exists = fetchedData.some(o => o.student_id === student.id);
-              if (!exists) {
-                projectedData.push({
-                  id: `mock-${board.id}-${student.id}`,
-                  student_id: student.id,
-                  teacher_id: userId,
-                  date: dateStr,
-                  start_time: formattedTime,
-                  duration: student.duration,
-                  status: 'scheduled',
-                  student: { 
-                    first_name: student.first_name || 'Pause', 
-                    last_name: student.last_name || '', 
-                    instrument: student.instrument || 'Allgemein' 
-                  }
-                });
+              const dbRecord = fetchedData.find(o => o.student_id === student.id);
+              
+              // If there is no DB record, OR if the DB record has been rescheduled/moved away from this template day/time
+              const isRescheduledAway = dbRecord && (dbRecord.date !== dateStr || dbRecord.start_time.substring(0, 5) !== formattedTime.substring(0, 5));
+              
+              if (!dbRecord || isRescheduledAway) {
+                // If the student was rescheduled away, project a vacant placeholder to anchor the original time slot
+                // only if the slot is not already occupied by another active reschedule/swap record.
+                const isSlotOccupied = fetchedData.some(o => o.date === dateStr && o.start_time.substring(0, 5) === formattedTime.substring(0, 5) && o.student_id && o.student_id !== 'vacant');
+                
+                if (isRescheduledAway && !isSlotOccupied) {
+                  projectedData.push({
+                    id: `vacant-${board.id}-${student.id}`,
+                    student_id: 'vacant', // special marker for vacant placeholder
+                    vacant_student_id: student.id,
+                    teacher_id: userId,
+                    date: dateStr,
+                    start_time: formattedTime,
+                    duration: student.duration,
+                    status: 'scheduled',
+                    student: { 
+                      first_name: '❇️ Freier Slot', 
+                      last_name: `(zuvor: ${student.first_name})`, 
+                      instrument: student.instrument || ''
+                    }
+                  });
+                } else if (!dbRecord && !isSlotOccupied) {
+                  // Standard projected card for student not in DB yet
+                  projectedData.push({
+                    id: `mock-${board.id}-${student.id}`,
+                    student_id: student.id,
+                    teacher_id: userId,
+                    date: dateStr,
+                    start_time: formattedTime,
+                    duration: student.duration,
+                    status: 'scheduled',
+                    student: { 
+                      first_name: student.first_name || 'Pause', 
+                      last_name: student.last_name || '', 
+                      instrument: student.instrument || 'Allgemein' 
+                    }
+                  });
+                }
               }
             }
           });
@@ -433,6 +535,36 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
 
     try {
       setLoading(true);
+
+      // Notify students who had rescheduled/cancelled lessons in this week before deleting them
+      const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+      const rescheduledOrCancelled = baseOccurrences.filter(occ => 
+        occ.student_id && 
+        occ.student_id !== 'vacant' && 
+        !occ.id.startsWith('mock-') && 
+        (occ.status === 'cancelled' || (occ.original_date && (occ.original_date !== occ.date || occ.original_start_time !== occ.start_time)))
+      );
+
+      for (const occ of rescheduledOrCancelled) {
+        try {
+          const origDateStr = occ.original_date || occ.date;
+          const origTimeStr = occ.original_start_time || occ.start_time;
+          const origDate = new Date(origDateStr);
+          const origDayLabel = DAYS_DE[origDate.getDay()];
+          const origDateLabel = origDate.toLocaleDateString('de-DE');
+          const origTimeLabel = origTimeStr.substring(0, 5);
+
+          const notificationMessage = `Hallo! Der verschobene oder abgesagte Termin wurde wieder auf deinen ursprünglichen regulären Termin zurückgesetzt: ${origDayLabel}, ${origDateLabel} um ${origTimeLabel} Uhr.`;
+          
+          await supabase.from('campus_direct_messages').insert({
+            sender_id: userId,
+            recipient_id: occ.student_id,
+            content: notificationMessage
+          });
+        } catch (err) {
+          console.warn('Error sending reset week notification:', err);
+        }
+      }
 
       const { error } = await supabase
         .from('schedule_occurrences')
@@ -479,6 +611,86 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
     const targetOcc = occurrences.find(o => o.id === targetId);
     if (!sourceOcc || !targetOcc) return;
 
+    // Prevent swapping with break / pause / vacant slots due to duration mismatch
+    const isSourceBreak = !sourceOcc.student_id || sourceOcc.student_id === 'vacant';
+    const isTargetBreak = !targetOcc.student_id || targetOcc.student_id === 'vacant';
+
+    if (isSourceBreak || isTargetBreak) {
+      if (isTargetBreak && !isSourceBreak) {
+        const confirmMsg = `Möchtest du ${sourceOcc.student?.first_name || 'den Schüler'} auf die Position der Pause (${targetOcc.start_time.substring(0, 5)} Uhr) verschieben? \n\nHinweis: Dadurch werden alle nachfolgenden Unterrichtsstunden dieses Tages automatisch lückenlos nach hinten verschoben (Sliding-Modus).`;
+        if (confirm(confirmMsg)) {
+          // 1. Move source student to target break position (e.g. 16:00)
+          updateOccurrence(sourceId, { 
+            date: targetOcc.date, 
+            start_time: targetOcc.start_time, 
+            status: 'pending_reschedule' 
+          });
+
+          const addMins = (t: string, mins: number) => {
+            const [h, m] = t.split(':').map(Number);
+            const total = h * 60 + m + mins;
+            return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}:00`;
+          };
+
+          // 2. Shift the target break/pause directly behind the student (e.g. 16:00 + 30 min = 16:30)
+          const breakNewStartTime = addMins(targetOcc.start_time, sourceOcc.duration);
+          updateOccurrence(targetOcc.id, {
+            start_time: breakNewStartTime,
+            status: 'pending_reschedule'
+          });
+
+          // 3. Find and shift all subsequent student and break appointments of this day lückenlos
+          const sameDayOccs = occurrences.filter(o => 
+            o.date === targetOcc.date && 
+            o.id !== sourceId && 
+            o.id !== targetId &&
+            o.student_id !== 'vacant' &&
+            o.start_time.localeCompare(targetOcc.start_time) > 0
+          ).sort((a, b) => a.start_time.localeCompare(b.start_time));
+
+          // Subsequent slots start after the shifted break ends (e.g. 16:30 + 15 min = 16:45)
+          let nextTime = addMins(breakNewStartTime, targetOcc.duration);
+
+          sameDayOccs.forEach(occ => {
+            updateOccurrence(occ.id, { 
+              start_time: nextTime, 
+              status: 'pending_reschedule' 
+            });
+            nextTime = addMins(nextTime, occ.duration);
+          });
+
+          setDraggedId(null);
+          return;
+        }
+      }
+
+      alert('Tausch blockiert: Ein Unterrichtstermin kann nicht mit einer Pause oder einem freien Slot getauscht werden.');
+      setDraggedId(null);
+      return;
+    }
+
+    // Detect if either slot is a cancelled lesson
+    const isSourceCancelled = sourceOcc.status === 'cancelled';
+    const isTargetCancelled = targetOcc.status === 'cancelled';
+
+    if (isSourceCancelled || isTargetCancelled) {
+      const cancelledOcc = isSourceCancelled ? sourceOcc : targetOcc;
+      const normalOcc = isSourceCancelled ? targetOcc : sourceOcc;
+
+      setSwapConfirmState({
+        sourceId: normalOcc.id,
+        targetId: cancelledOcc.id,
+        sourceStudentName: `${normalOcc.student?.first_name || ''} ${normalOcc.student?.last_name || ''}`.trim() || 'Schüler',
+        targetStudentName: `${cancelledOcc.student?.first_name || ''} ${cancelledOcc.student?.last_name || ''}`.trim() || 'Schüler',
+        sourceDate: normalOcc.date,
+        sourceStartTime: normalOcc.start_time,
+        targetDate: cancelledOcc.date,
+        targetStartTime: cancelledOcc.start_time
+      });
+      setDraggedId(null);
+      return;
+    }
+
     updateOccurrence(sourceId, { date: targetOcc.date, start_time: targetOcc.start_time, status: 'pending_reschedule' });
     updateOccurrence(targetId, { date: sourceOcc.date, start_time: sourceOcc.start_time, status: 'pending_reschedule' });
     
@@ -509,14 +721,21 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
         const originalOcc = baseOccurrences.find(o => o.id === change.id);
 
         if (change.id.startsWith('mock-')) {
+          if (!change.student_id || change.student_id === 'vacant') {
+            continue;
+          }
           const { id, student, original_start_time, ...insertData } = change;
           insertData.original_date = insertData.original_date || change.date;
           
+          if (!insertData.student_id) {
+            insertData.student_id = null;
+          }
+
           try {
             const { data: schData } = await supabase
               .from('schedules')
               .select('id')
-              .eq('student_id', change.student_id)
+              .eq('student_id', change.student_id || null)
               .eq('teacher_id', userId)
               .limit(1);
             
@@ -534,7 +753,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
           const origTimeStr = change.original_start_time || (originalOcc ? originalOcc.start_time : change.start_time);
           
           let finalStatus = change.status;
-          if (change.date === origDateStr && change.start_time.substring(0, 5) === origTimeStr.substring(0, 5)) {
+          if (change.status !== 'cancelled' && change.date === origDateStr && change.start_time.substring(0, 5) === origTimeStr.substring(0, 5)) {
             finalStatus = 'scheduled';
           }
 
@@ -548,7 +767,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
           const origTimeStr = change.original_start_time || (originalOcc ? originalOcc.start_time : change.start_time);
           
           let finalStatus = change.status;
-          if (change.date === origDateStr && change.start_time.substring(0, 5) === origTimeStr.substring(0, 5)) {
+          if (change.status !== 'cancelled' && change.date === origDateStr && change.start_time.substring(0, 5) === origTimeStr.substring(0, 5)) {
             finalStatus = 'scheduled';
           }
 
@@ -558,7 +777,8 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
               start_time: change.start_time,
               status: finalStatus,
               original_date: origDateStr,
-              student_acknowledged: false
+              student_acknowledged: false,
+              student_id: change.student_id ? change.student_id : null
             })
             .eq('id', change.id);
           
@@ -628,10 +848,50 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
     updateOccurrence(id, { status: 'cancelled' });
   };
 
+  const handleCancelBreak = (e: React.MouseEvent, breakOcc: ScheduleOccurrence) => {
+    e.stopPropagation();
+    
+    const confirmMsg = `Möchtest du diese Pause wirklich löschen? Dadurch werden alle nachfolgenden Termine dieses Tages automatisch lückenlos vorgezogen.`;
+    if (!confirm(confirmMsg)) return;
+
+    // 1. Cancel the break occurrence
+    updateOccurrence(breakOcc.id, { status: 'cancelled' });
+
+    // Helper to add or subtract minutes
+    const addMins = (t: string, mins: number) => {
+      const [h, m] = t.split(':').map(Number);
+      const total = h * 60 + m + mins;
+      return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}:00`;
+    };
+
+    // 2. Find and shift all subsequent student and break appointments of this day lückenlos
+    const sameDayOccs = occurrences.filter(o => 
+      o.date === breakOcc.date && 
+      o.id !== breakOcc.id &&
+      o.student_id !== 'vacant' &&
+      o.status !== 'cancelled' &&
+      o.start_time.localeCompare(breakOcc.start_time) > 0
+    ).sort((a, b) => a.start_time.localeCompare(b.start_time));
+
+    // Subsequent slots start exactly where the deleted break started
+    let nextTime = breakOcc.start_time;
+
+    sameDayOccs.forEach(occ => {
+      updateOccurrence(occ.id, { 
+        start_time: nextTime, 
+        status: 'pending_reschedule' 
+      });
+      nextTime = addMins(nextTime, occ.duration);
+    });
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'scheduled': return { bg: '#dcfce7', border: '#10b981', text: '#065f46' };
-      case 'cancelled': return { bg: '#fee2e2', border: '#ef4444', text: '#991b1b' };
+      case 'cancelled':
+      case 'teacher_sick':
+      case 'canceled_by_teacher_sick':
+        return { bg: '#fee2e2', border: '#ef4444', text: '#991b1b' };
       case 'pending_reschedule': return { bg: '#fef3c7', border: '#f59e0b', text: '#92400e' };
       case 'rescheduled_confirmed': return { bg: '#dcfce7', border: '#10b981', text: '#065f46' };
       default: return { bg: '#f1f5f9', border: '#cbd5e1', text: '#475569' };
@@ -667,6 +927,23 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
             </p>
           </div>
         </div>
+
+        {activeTab && setActiveTab && (
+          <div className="app-segmented-switch" style={{ margin: 0 }}>
+            <button 
+              onClick={() => setActiveTab('calendar')}
+              className={`app-segmented-switch-btn ${activeTab === 'calendar' ? 'active' : ''}`}
+            >
+              Stundenplan
+            </button>
+            <button 
+              onClick={() => setActiveTab('designer')}
+              className={`app-segmented-switch-btn ${activeTab === 'designer' ? 'active' : ''}`}
+            >
+              Stundenplan-Designer
+            </button>
+          </div>
+        )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button 
@@ -772,7 +1049,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
           `}
         </style>
 
-        <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '12px' }}>
+        <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '12px' }}>
         {[0, 1, 2, 3, 4, 5, 6].map(offset => {
           const dayDate = new Date(weekStart);
           dayDate.setDate(dayDate.getDate() + offset);
@@ -801,47 +1078,71 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
               ) : (
                 dayOccurrences.map(occ => {
                   const isBreak = !occ.student_id;
-                  const colors = isBreak ? { bg: '#fffbeb', border: '#f59e0b', text: '#b45309' } : getStatusColor(occ.status);
+                  const isVacant = occ.student_id === 'vacant';
+
+                  if (isVacant || (isBreak && occ.status === 'cancelled')) {
+                    return null;
+                  }
+
+                  const isSick = !isBreak && !isVacant && (
+                    occ.status === 'teacher_sick' || 
+                    occ.status === 'canceled_by_teacher_sick' ||
+                    (sickUntil && occ.date <= sickUntil)
+                  );
+
+                  const colors = isBreak 
+                    ? { bg: '#f5ebe0', border: '#b45309', text: '#78350f' } 
+                    : isSick 
+                      ? { bg: '#fee2e2', border: '#ef4444', text: '#991b1b' }
+                      : getStatusColor(occ.status);
                   let finalColors = { ...colors };
                   let cardBackground = '';
-
-                  const isRescheduled = !isBreak && (
+ 
+                  const isRescheduled = !isBreak && !isVacant && !isSick && (
                     occ.status === 'pending_reschedule' || 
                     occ.status === 'rescheduled_confirmed' ||
                     (occ.original_date && occ.original_date !== occ.date)
                   );
-
+ 
                   if (isRescheduled) {
                     const isConfirmed = occ.status === 'rescheduled_confirmed' || occ.student_acknowledged;
                     if (isConfirmed) {
-                      cardBackground = 'linear-gradient(135deg, #fef3c7 0%, #dcfce7 100%)';
+                      cardBackground = '#fef3c7';
                       finalColors.border = '#10b981';
-                      finalColors.text = '#065f46';
+                      finalColors.text = '#713f12';
                     } else {
-                      finalColors.bg = '#fef3c7';
+                      cardBackground = '#fef3c7';
                       finalColors.border = '#f59e0b';
                       finalColors.text = '#92400e';
                     }
                   }
-
+ 
                   return (
                     <div 
                       key={occ.id} 
                       id={`occ-${occ.id}`}
-                      draggable={!isBreak}
+                      draggable={!isBreak && !isVacant}
                       onDragStart={(e) => handleDragStart(e, occ.id)}
                       onDragOver={handleDragOver}
                       onDrop={(e) => handleDropOnOccurrence(e, occ.id)}
-                      onClick={() => !isBreak && setEditOccState({ id: occ.id, date: occ.date, start_time: occ.start_time })}
+                      title={isVacant ? `${occ.student?.first_name} ${occ.student?.last_name}` : undefined}
+                       onClick={() => {
+                        if (!isBreak) {
+                          setEditOccState({ id: occ.id, date: occ.date, start_time: occ.start_time });
+                        }
+                        // Save selected sick date to localStorage for persistence across tab unmounts
+                        localStorage.setItem('selected_sick_date', occ.date);
+                        localStorage.setItem('expand_sick_widget', 'true');
+                        // Dispatch custom event to sync date with sickUntilDate state in TeacherDashboard
+                        window.dispatchEvent(new CustomEvent('select-appointment-date', { detail: { date: occ.date } }));
+                      }}
                       style={{ 
                         background: cardBackground || finalColors.bg, 
-                        borderLeft: `3px solid ${finalColors.border}`,
-                        borderTop: '1px solid rgba(255,255,255,0.4)',
-                        borderRight: '1px solid rgba(255,255,255,0.4)',
-                        borderBottom: '1px solid rgba(255,255,255,0.4)',
+                        border: isRescheduled ? `1.5px solid ${finalColors.border}` : isVacant ? '1px dashed #10b981' : '1px solid rgba(255,255,255,0.4)',
+                        borderLeft: isRescheduled ? `5px solid ${finalColors.border}` : isVacant ? '3px dashed #10b981' : `3px solid ${finalColors.border}`,
                         borderRadius: '8px', 
                         padding: '8px',
-                        cursor: isBreak ? 'default' : 'grab',
+                        cursor: isSick ? 'pointer' : isVacant ? 'pointer' : isBreak ? 'default' : 'grab',
                         opacity: draggedId === occ.id ? 0.5 : 1,
                         position: 'relative',
                         boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
@@ -854,24 +1155,35 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
                           <span style={{ fontSize: '0.75rem', fontWeight: 800, color: finalColors.text, background: 'rgba(0,0,0,0.04)', padding: '2px 4px', borderRadius: '4px' }}>
                             {occ.start_time.substring(0, 5)}
                           </span>
-                          {occ.status === 'rescheduled_confirmed' && (
+                          {isSick && (
+                            <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid #fecaca' }}>
+                              Entfällt
+                            </span>
+                          )}
+                          {isRescheduled && (
                             <span 
-                              title="Termin verschoben und bestätigt"
+                              title={occ.status === 'rescheduled_confirmed' || occ.student_acknowledged ? "Termin verschoben und bestätigt" : "Termin verschoben (ausstehend)"}
                               style={{ 
                                 width: '8px', 
                                 height: '8px', 
                                 borderRadius: '50%', 
-                                background: '#f59e0b', 
-                                boxShadow: '0 0 6px #f59e0b',
+                                background: (occ.status === 'rescheduled_confirmed' || occ.student_acknowledged) ? '#10b981' : '#f59e0b', 
+                                boxShadow: (occ.status === 'rescheduled_confirmed' || occ.student_acknowledged) ? '0 0 6px #10b981' : '0 0 6px #f59e0b',
                                 display: 'inline-block' 
                               }} 
                             />
                           )}
                         </div>
-                        {!isBreak && (
+                        {((!isBreak && !isVacant && !isSick) || (isBreak && occ.status !== 'cancelled')) && (
                           <button 
-                            onClick={(e) => handleCancel(e, occ.id)}
-                            title="Termin absagen"
+                            onClick={(e) => {
+                              if (isBreak) {
+                                handleCancelBreak(e, occ);
+                              } else {
+                                handleCancel(e, occ.id);
+                              }
+                            }}
+                            title={isBreak ? "Pause löschen" : "Termin absagen"}
                             style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: colors.border, padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', transition: 'all 0.1s' }}
                             onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
                             onMouseOut={e => e.currentTarget.style.background = 'transparent'}
@@ -880,8 +1192,11 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
                           </button>
                         )}
                       </div>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {occ.student?.first_name} {occ.student?.last_name}
+                      <div style={{ fontSize: '0.75rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span>{occ.student?.first_name} {occ.student?.last_name}</span>
+                        {isBreak && (
+                          <span style={{ fontSize: '0.65rem', fontWeight: 600, opacity: 0.7 }}>• {occ.duration || 15} Min</span>
+                        )}
                       </div>
                     </div>
                   );
@@ -896,65 +1211,278 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
       {/* Edit Modal */}
       {editOccState && (() => {
         const occ = occurrences.find(o => o.id === editOccState.id);
+        
+        if (occ?.student_id === 'vacant') {
+          const studentName = occ.student?.last_name.replace(/^\(zuvor: /, '').replace(/\)$/, '') || 'Schüler';
+          const rescheduledOcc = occurrences.find(o => o.student_id === occ.vacant_student_id);
+          
+          let newAppointmentText = '';
+          if (rescheduledOcc) {
+            const d = new Date(rescheduledOcc.date);
+            const weekday = d.toLocaleDateString('de-DE', { weekday: 'long' });
+            const dateFormatted = d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const timeFormatted = rescheduledOcc.start_time.substring(0, 5);
+            newAppointmentText = `${weekday}, ${dateFormatted} um ${timeFormatted} Uhr`;
+          }
+
+          return (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ 
+                position: 'relative',
+                background: '#ffffff', 
+                padding: '32px', 
+                borderRadius: '24px', 
+                boxShadow: '0 20px 50px rgba(0,0,0,0.08)', 
+                width: '420px', 
+                maxWidth: '90vw', 
+                border: '1px solid rgba(0,0,0,0.08)', 
+                display: 'flex', 
+                flexDirection: 'column',
+                gap: '18px', 
+                alignItems: 'center',
+                textAlign: 'center',
+                boxSizing: 'border-box' 
+              }}>
+                <div style={{ fontSize: '2.5rem' }}>❇️</div>
+                <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, color: '#1d1d1f', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Freier Slot</h3>
+                <p style={{ margin: 0, fontSize: '0.95rem', color: '#515154', lineHeight: 1.6, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>
+                  Dieser Termin war zuvor für <strong>{studentName}</strong> eingeteilt.
+                </p>
+                {rescheduledOcc ? (
+                  <div style={{ 
+                    background: '#f0fdf4', 
+                    border: '1px solid #10b981', 
+                    borderRadius: '16px', 
+                    padding: '14px 18px', 
+                    width: '100%', 
+                    boxSizing: 'border-box',
+                    textAlign: 'center'
+                  }}>
+                    <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Neuer Termin</span>
+                    <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#065f46', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>{newAppointmentText}</span>
+                  </div>
+                ) : (
+                  <div style={{ 
+                    background: '#fef2f2', 
+                    border: '1px solid #ef4444', 
+                    borderRadius: '16px', 
+                    padding: '14px 18px', 
+                    width: '100%', 
+                    boxSizing: 'border-box',
+                    textAlign: 'center'
+                  }}>
+                    <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#b91c1c', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Status</span>
+                    <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#991b1b', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Termin abgesagt / keine Ausweichstunde</span>
+                  </div>
+                )}
+                <button
+                  onClick={() => setEditOccState(null)}
+                  style={{
+                    marginTop: '8px',
+                    padding: '12px 28px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: '#10b981',
+                    color: '#ffffff',
+                    fontSize: '0.9rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.background = '#059669'}
+                  onMouseOut={e => e.currentTarget.style.background = '#10b981'}
+                >
+                  Schließen
+                </button>
+              </div>
+            </div>
+          );
+        }
+        
         const isMoved = occ?.original_date && (occ.original_date !== occ.date || occ.original_start_time !== occ.start_time);
         const isCancelled = occ?.status === 'cancelled';
         const canDiscard = isMoved || isCancelled;
         
         return (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ background: 'white', padding: '24px', borderRadius: '20px', boxShadow: '0 20px 40px rgba(0,0,0,0.15)', width: '740px', maxWidth: '95vw', border: '1px solid rgba(255,255,255,0.5)', display: 'flex', gap: '24px', boxSizing: 'border-box' }}>
+            <div style={{ 
+              position: 'relative',
+              background: '#ffffff', 
+              padding: '28px', 
+              borderRadius: '24px', 
+              boxShadow: '0 20px 50px rgba(0,0,0,0.08)', 
+              width: '780px', 
+              maxWidth: '95vw', 
+              border: '1px solid rgba(0,0,0,0.08)', 
+              display: 'flex', 
+              gap: '28px', 
+              boxSizing: 'border-box' 
+            }}>
+              
+              {/* Close Button Top Right */}
+              <button
+                onClick={() => setEditOccState(null)}
+                title="Schließen"
+                style={{
+                  position: 'absolute',
+                  top: '20px',
+                  right: '20px',
+                  background: 'rgba(0,0,0,0.04)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '30px',
+                  height: '30px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#86868b',
+                  transition: 'all 0.2s',
+                  zIndex: 10
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.background = 'rgba(0,0,0,0.08)';
+                  e.currentTarget.style.color = '#1d1d1f';
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.background = 'rgba(0,0,0,0.04)';
+                  e.currentTarget.style.color = '#86868b';
+                }}
+              >
+                <X size={16} strokeWidth={2.5} />
+              </button>
               
               {/* Left Column: Edit Form */}
               <div style={{ width: '320px', display: 'flex', flexDirection: 'column' }}>
-                <h3 style={{ marginTop: 0, marginBottom: '20px', fontSize: '1.25rem', fontWeight: 700, color: '#1d1d1f' }}>Termin bearbeiten</h3>
+                <h3 style={{ marginTop: 0, marginBottom: '24px', fontSize: '1.35rem', fontWeight: 800, color: '#1d1d1f', letterSpacing: '-0.02em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Termin bearbeiten</h3>
                 
-                {isMoved && (
-                  <div style={{ marginBottom: '16px', padding: '10px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '8px', border: '1px dashed #f59e0b' }}>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#b45309', textTransform: 'uppercase', marginBottom: '2px' }}>Ursprungstermin</div>
-                    <div style={{ fontSize: '0.8rem', color: '#92400e' }}>
-                      {new Date(occ.original_date!).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}, {occ.original_start_time?.substring(0, 5)} Uhr
-                    </div>
-                  </div>
-                )}
-
-                <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#86868b', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Datum</label>
+                <div style={{ marginBottom: '18px' }}>
+                  <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#86868b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Datum</label>
                   <input 
                     type="date" 
                     value={editOccState.date} 
                     onChange={e => setEditOccState({ ...editOccState, date: e.target.value })} 
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d2d2d7', fontSize: '1rem', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} 
+                    style={{ 
+                      width: '100%', 
+                      padding: '11px 14px', 
+                      borderRadius: '10px', 
+                      border: '1px solid rgba(0, 0, 0, 0.15)', 
+                      background: 'rgba(255,255,255,0.8)',
+                      fontSize: '0.92rem', 
+                      fontFamily: 'inherit', 
+                      outline: 'none', 
+                      boxSizing: 'border-box',
+                      boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
+                      transition: 'border-color 0.2s'
+                    }} 
                   />
                 </div>
-                
-                <div style={{ marginBottom: '24px' }}>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#86868b', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Uhrzeit</label>
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#86868b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Uhrzeit</label>
                   <input 
                     type="time" 
                     value={editOccState.start_time.substring(0, 5)} 
                     onChange={e => setEditOccState({ ...editOccState, start_time: e.target.value })} 
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d2d2d7', fontSize: '1rem', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} 
+                    style={{ 
+                      width: '100%', 
+                      padding: '11px 14px', 
+                      borderRadius: '10px', 
+                      border: '1px solid rgba(0, 0, 0, 0.15)', 
+                      background: 'rgba(255,255,255,0.8)',
+                      fontSize: '0.92rem', 
+                      fontFamily: 'inherit',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
+                      transition: 'border-color 0.2s'
+                    }} 
                   />
                 </div>
+
+                {/* Explicit Cancel Lesson Section */}
+                {!isCancelled && (
+                  <div style={{ marginBottom: '24px' }}>
+                    <button 
+                      onClick={(e) => {
+                        handleCancel(e as any, editOccState.id);
+                        setEditOccState(null);
+                      }}
+                      style={{ 
+                        width: '100%',
+                        padding: '12px', 
+                        borderRadius: '12px', 
+                        border: '1px solid rgba(255, 59, 48, 0.15)', 
+                        background: 'rgba(255, 59, 48, 0.04)', 
+                        color: '#ff3b30', 
+                        fontSize: '0.85rem', 
+                        fontWeight: 600, 
+                        cursor: 'pointer', 
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        transition: 'all 0.2s' 
+                      }}
+                      onMouseOver={e => {
+                        e.currentTarget.style.background = 'rgba(255, 59, 48, 0.08)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 59, 48, 0.25)';
+                      }}
+                      onMouseOut={e => {
+                        e.currentTarget.style.background = 'rgba(255, 59, 48, 0.04)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 59, 48, 0.15)';
+                      }}
+                    >
+                      <Trash2 size={16} />
+                      Termin absagen
+                    </button>
+                  </div>
+                )}
                 
-                <div style={{ display: 'flex', gap: '12px', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
                   <div>
+                    {/* Discard changes / Reset button */}
                     {canDiscard && (
                       <button 
                         onClick={async () => {
                           if (!editOccState.id.startsWith('mock-')) {
                             try {
                               setLoading(true);
+                              const targetDate = occ.original_date || occ.date;
+                              const targetStartTime = occ.original_start_time || occ.start_time;
+
                               const { error } = await supabase
                                 .from('schedule_occurrences')
                                 .update({
-                                  date: occ.original_date || occ.date,
-                                  start_time: occ.original_start_time || occ.start_time,
+                                  date: targetDate,
+                                  start_time: targetStartTime,
                                   status: 'scheduled',
                                   student_acknowledged: false
                                 })
                                 .eq('id', editOccState.id);
                               if (error) throw error;
+
+                              // Automatic Notification to Student about Reverting to Regular Time
+                              try {
+                                if (occ.student_id) {
+                                  const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+                                  const newDate = new Date(targetDate);
+                                  const newDayLabel = DAYS_DE[newDate.getDay()];
+                                  const newDateLabel = newDate.toLocaleDateString('de-DE');
+                                  const newTimeLabel = targetStartTime.substring(0, 5);
+
+                                  const notificationMessage = `Hallo! Der verschobene Termin wurde wieder auf deinen ursprünglichen regulären Termin zurückgesetzt: ${newDayLabel}, ${newDateLabel} um ${newTimeLabel} Uhr.`;
+                                  
+                                  await supabase.from('campus_direct_messages').insert({
+                                    sender_id: userId,
+                                    recipient_id: occ.student_id,
+                                    content: notificationMessage
+                                  });
+                                }
+                              } catch (notifErr) {
+                                console.warn('Could not send revert notification:', notifErr);
+                              }
+
                               await loadOccurrences();
                             } catch (err) {
                               console.error(err);
@@ -967,25 +1495,28 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
                           }
                           setEditOccState(null);
                         }} 
-                        style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.3)', background: 'transparent', color: '#ef4444', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+                        style={{ padding: '8px 14px', borderRadius: '100px', border: '1px solid rgba(0,0,0,0.15)', background: 'transparent', color: '#1d1d1f', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background 0.2s' }}
+                        onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.03)'}
+                        onMouseOut={e => e.currentTarget.style.background = 'transparent'}
                       >
-                        Änderung verwerfen
+                        Zurücksetzen
                       </button>
                     )}
                   </div>
+                  
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button 
                       onClick={() => setEditOccState(null)} 
-                      style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: '#f5f5f7', color: '#1d1d1f', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s' }}
-                      onMouseOver={e => e.currentTarget.style.background = '#e5e5ea'}
-                      onMouseOut={e => e.currentTarget.style.background = '#f5f5f7'}
+                      style={{ padding: '10px 18px', borderRadius: '100px', border: 'none', background: 'rgba(0,0,0,0.05)', color: '#1d1d1f', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                      onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.09)'}
+                      onMouseOut={e => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
                     >
                       Abbrechen
                     </button>
                     <button 
                       onClick={handleSaveEdit} 
-                      style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: '#0071e3', color: 'white', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s' }}
-                      onMouseOver={e => e.currentTarget.style.background = '#0077ED'}
+                      style={{ padding: '10px 18px', borderRadius: '100px', border: 'none', background: '#0071e3', color: 'white', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                      onMouseOver={e => e.currentTarget.style.background = '#0077ed'}
                       onMouseOut={e => e.currentTarget.style.background = '#0071e3'}
                     >
                       Speichern
@@ -994,86 +1525,264 @@ export function ScheduleCalendarView({ schoolId, userId, boards }: ScheduleCalen
                 </div>
               </div>
 
-              {/* Right Column: QuickChat Shoutbox */}
-              {occ && occ.student_id && (
-                <div style={{ flex: 1, borderLeft: '1px solid #e5e5ea', paddingLeft: '24px', display: 'flex', flexDirection: 'column', height: '100%', minHeight: '380px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                    <div style={{ fontWeight: 700, fontSize: '1rem', color: '#1d1d1f' }}>
-                      Shoutbox – {occ.student?.first_name} {occ.student?.last_name}
-                    </div>
-                    <span style={{ fontSize: '0.75rem', color: '#86868b', background: '#f5f5f7', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>1:1 Chat</span>
-                  </div>
+              {occ && occ.student_id && (() => {
+                let isFrozen = false;
+                try {
+                  const timePart = occ.start_time.includes(':') ? occ.start_time : `${occ.start_time}:00`;
+                  const lessonDateTime = new Date(`${occ.date}T${timePart}`);
+                  isFrozen = Date.now() > lessonDateTime.getTime() + 48 * 60 * 60 * 1000;
+                } catch (e) {}
 
-                  {/* Chat messages viewport */}
-                  <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px', paddingRight: '4px', maxHeight: '280px', minHeight: '200px' }}>
-                    {chatMessages.length === 0 ? (
-                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#86868b', fontSize: '0.8rem', textAlign: 'center', padding: '16px' }}>
-                        Noch keine Nachrichten. Schreib dem Schüler für eine Terminabsprache.
+                return (
+                  <div style={{ flex: 1, width: '320px', borderLeft: '1px solid #e5e5ea', paddingLeft: '24px', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
+                    <h3 style={{ marginTop: 0, marginBottom: '20px', fontSize: '1.25rem', fontWeight: 700, color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      Shoutbox {isFrozen && <span style={{ fontSize: '0.9rem' }}>🔒</span>}
+                    </h3>
+
+                    {isMoved && (
+                      <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '6px', background: '#fffbeb', border: '1px solid #fef3c7', padding: '6px 12px', borderRadius: '100px', alignSelf: 'flex-start' }}>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Regulär:</span>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#92400e' }}>
+                          {new Date(occ.original_date!).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}, {occ.original_start_time ? occ.original_start_time.substring(0, 5) : ''} Uhr
+                        </span>
                       </div>
-                    ) : (
-                      chatMessages.map((msg, idx) => {
-                        const isMe = msg.sender_id === userId;
-                        const isTerminMsg = msg.content.startsWith('[Termin');
-                        let displayedContent = msg.content;
-                        let prefixText = '';
-                        if (isTerminMsg) {
-                          const closeBracketIdx = msg.content.indexOf(']');
-                          if (closeBracketIdx !== -1) {
-                            prefixText = msg.content.substring(1, closeBracketIdx);
-                            displayedContent = msg.content.substring(closeBracketIdx + 1).trim();
-                          }
-                        }
-
-                        return (
-                          <div key={msg.id || idx} style={{ display: 'flex', flexDirection: 'column', alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '85%' }}>
-                            {prefixText && (
-                              <span style={{ fontSize: '0.65rem', color: '#86868b', marginBottom: '2px', alignSelf: isMe ? 'flex-end' : 'flex-start', fontWeight: 600 }}>
-                                📅 {prefixText}
-                              </span>
-                            )}
-                            <div style={{ 
-                              background: isMe ? '#0071e3' : '#f5f5f7', 
-                              color: isMe ? 'white' : '#1d1d1f', 
-                              padding: '8px 12px', 
-                              borderRadius: '12px', 
-                              borderBottomRightRadius: isMe ? '2px' : '12px',
-                              borderBottomLeftRadius: isMe ? '12px' : '2px',
-                              fontSize: '0.82rem',
-                              lineHeight: 1.4,
-                              wordBreak: 'break-word'
-                            }}>
-                              {displayedContent}
-                            </div>
-                            <span style={{ fontSize: '0.6rem', color: '#86868b', marginTop: '2px', alignSelf: isMe ? 'flex-end' : 'flex-start' }}>
-                              {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          </div>
-                        );
-                      })
                     )}
-                    <div ref={chatMessagesEndRef} />
+
+                    {/* Chat messages viewport */}
+                    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px', paddingRight: '4px', maxHeight: '280px', minHeight: '200px' }}>
+                      {isFrozen && (
+                        <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#991b1b', padding: '8px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', textAlign: 'center', justifyContent: 'center' }}>
+                          🔒 Shoutbox eingefroren (Schreibschutz aktiv)
+                        </div>
+                      )}
+                      {chatMessages.length === 0 ? (
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#86868b', fontSize: '0.8rem', textAlign: 'center', padding: '16px' }}>
+                          Noch keine Nachrichten. Schreib dem Schüler für eine Terminabsprache.
+                        </div>
+                      ) : (
+                        chatMessages.map((msg, idx) => {
+                          const isMe = msg.sender_id === userId;
+                          const isTerminMsg = msg.content.startsWith('[Termin');
+                          let displayedContent = msg.content;
+                          let prefixText = '';
+                          if (isTerminMsg) {
+                            const closeBracketIdx = msg.content.indexOf(']');
+                            if (closeBracketIdx !== -1) {
+                              prefixText = msg.content.substring(1, closeBracketIdx);
+                              displayedContent = msg.content.substring(closeBracketIdx + 1).trim();
+                            }
+                          }
+
+                          return (
+                            <div key={msg.id || idx} style={{ display: 'flex', flexDirection: 'column', alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '85%', textAlign: 'left' }}>
+                              {prefixText && (
+                                <span style={{ fontSize: '0.65rem', color: '#86868b', marginBottom: '2px', alignSelf: isMe ? 'flex-end' : 'flex-start', fontWeight: 600 }}>
+                                  📅 {prefixText}
+                                </span>
+                              )}
+                              <div style={{ 
+                                background: isMe ? '#0071e3' : '#f5f5f7', 
+                                color: isMe ? 'white' : '#1d1d1f', 
+                                padding: '8px 12px', 
+                                borderRadius: '12px', 
+                                borderBottomRightRadius: isMe ? '2px' : '12px',
+                                borderBottomLeftRadius: isMe ? '12px' : '2px',
+                                fontSize: '0.82rem',
+                                lineHeight: 1.4,
+                                wordBreak: 'break-word'
+                              }}>
+                                {displayedContent}
+                              </div>
+                              <span style={{ fontSize: '0.6rem', color: '#86868b', marginTop: '2px', alignSelf: isMe ? 'flex-end' : 'flex-start' }}>
+                                {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                          );
+                        })
+                      )}
+                      <div ref={chatMessagesEndRef} />
+                    </div>
+
+                    {/* Send Input Form */}
+                    <form onSubmit={(e) => handleSendChatMessage(e, occ.student_id || '', occ)} style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
+                      <input 
+                        type="text" 
+                        placeholder={isFrozen ? "Shoutbox nach 48h eingefroren..." : "Nachricht senden..."}
+                        disabled={isFrozen}
+                        value={chatTypedMessage}
+                        onChange={e => setChatTypedMessage(e.target.value)}
+                        style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #d2d2d7', fontSize: '0.85rem', outline: 'none', background: isFrozen ? '#f5f5f7' : '#ffffff' }}
+                      />
+                      <button type="submit" disabled={isFrozen} style={{ background: isFrozen ? '#cbd5e1' : '#0071e3', color: 'white', border: 'none', borderRadius: '8px', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isFrozen ? 'not-allowed' : 'pointer' }}>
+                        <Send size={14} />
+                      </button>
+                    </form>
                   </div>
-
-                  {/* Send Input Form */}
-                  <form onSubmit={(e) => handleSendChatMessage(e, occ.student_id, occ)} style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
-                    <input 
-                      type="text" 
-                      placeholder="Nachricht senden..." 
-                      value={chatTypedMessage}
-                      onChange={e => setChatTypedMessage(e.target.value)}
-                      style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #d2d2d7', fontSize: '0.85rem', outline: 'none' }}
-                    />
-                    <button type="submit" style={{ background: '#0071e3', color: 'white', border: 'none', borderRadius: '8px', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                      <Send size={14} />
-                    </button>
-                  </form>
-                </div>
-              )}
-
+                );
+              })()}
             </div>
           </div>
         );
       })()}
+      
+      {/* Cancelled Lesson Swap Confirmation Dialog */}
+      {swapConfirmState && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'white', padding: '24px', borderRadius: '20px', boxShadow: '0 20px 40px rgba(0,0,0,0.15)', width: '480px', maxWidth: '90vw', border: '1px solid rgba(255,255,255,0.5)', boxSizing: 'border-box' }}>
+            <h3 style={{ marginTop: 0, marginBottom: '16px', fontSize: '1.2rem', fontWeight: 800, color: '#1e293b' }}>
+              Termintausch mit abgesagtem Termin
+            </h3>
+            
+            <p style={{ fontSize: '0.9rem', color: '#475569', lineHeight: 1.5, marginBottom: '24px' }}>
+              Du tauschst den aktiven Termin von <strong>{swapConfirmState.sourceStudentName}</strong> mit dem abgesagten Termin von <strong>{swapConfirmState.targetStudentName}</strong>. 
+              <br/><br/>
+              Soll der abgesagte Termin für <strong>{swapConfirmState.targetStudentName}</strong> auf den alten Sendeplatz verschoben werden (somit ein neuer Alternativtermin angeboten werden), oder soll dieser Termin endgültig <strong>abgesagt bleiben</strong>?
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button 
+                onClick={() => {
+                  // Perform a complete swap, keeping both active. Proposes target student the old time slot of the source student.
+                  updateOccurrence(swapConfirmState.sourceId, { 
+                    date: swapConfirmState.targetDate, 
+                    start_time: swapConfirmState.targetStartTime, 
+                    status: 'pending_reschedule' 
+                  });
+                  updateOccurrence(swapConfirmState.targetId, { 
+                    date: swapConfirmState.sourceDate, 
+                    start_time: swapConfirmState.sourceStartTime, 
+                    status: 'pending_reschedule' // becomes pending reschedule so target student gets offered the new time slot
+                  });
+                  setSwapLinks(prev => [...prev, { id1: swapConfirmState.sourceId, id2: swapConfirmState.targetId }]);
+                  setSwapConfirmState(null);
+                }}
+                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: '#0071e3', color: 'white', fontWeight: 600, cursor: 'pointer', fontSize: '0.85rem' }}
+              >
+                Neuen Alternativtermin anbieten (Vollständiger Tausch)
+              </button>
+
+              <button 
+                onClick={() => {
+                  // Reschedule the active student, but keep the cancelled student cancelled.
+                  // Active student goes to the new slot.
+                  updateOccurrence(swapConfirmState.sourceId, { 
+                    date: swapConfirmState.targetDate, 
+                    start_time: swapConfirmState.targetStartTime, 
+                    status: 'pending_reschedule' 
+                  });
+                  // Cancelled student stays cancelled, but moves to the old time slot of the active student.
+                  updateOccurrence(swapConfirmState.targetId, { 
+                    date: swapConfirmState.sourceDate, 
+                    start_time: swapConfirmState.sourceStartTime, 
+                    status: 'cancelled' 
+                  });
+                  setSwapLinks(prev => [...prev, { id1: swapConfirmState.sourceId, id2: swapConfirmState.targetId }]);
+                  setSwapConfirmState(null);
+                }}
+                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#1e293b', fontWeight: 600, cursor: 'pointer', fontSize: '0.85rem' }}
+              >
+                Termin abgesagt lassen (Nur aktiven Schüler verschieben)
+              </button>
+
+              <button 
+                onClick={() => setSwapConfirmState(null)}
+                style={{ width: '100%', padding: '10px', borderRadius: '10px', border: 'none', background: 'transparent', color: '#64748b', fontWeight: 600, cursor: 'pointer', fontSize: '0.85rem', marginTop: '4px' }}
+              >
+                Tausch abbrechen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Floating Save Actions Bar at the bottom of the screen */}
+      {Object.keys(pendingChanges).length > 0 && (
+        <>
+          <style>{`
+            @keyframes floating-slide-up {
+              0% { transform: translate(-50%, 40px); opacity: 0; }
+              100% { transform: translate(-50%, 0); opacity: 1; }
+            }
+          `}</style>
+          <div style={{
+            position: 'fixed',
+            bottom: '24px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(20px) saturate(190%)',
+            border: '1px solid rgba(0, 0, 0, 0.08)',
+            borderRadius: '100px',
+            padding: '10px 18px 10px 24px',
+            boxShadow: '0 12px 40px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.02)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '24px',
+            zIndex: 999,
+            animation: 'floating-slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '1.2rem', display: 'inline-flex' }}>⚠️</span>
+              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1d1d1f', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>
+                Du hast {Object.keys(pendingChanges).length} ungespeicherte {Object.keys(pendingChanges).length === 1 ? 'Änderung' : 'Änderungen'} in diesem Stundenplan.
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                onClick={() => setPendingChanges({})}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#ff3b30',
+                  padding: '8px 16px',
+                  borderRadius: '100px',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'background 0.2s'
+                }}
+                onMouseOver={e => e.currentTarget.style.background = 'rgba(255, 59, 48, 0.08)'}
+                onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                title="Alle Änderungen verwerfen"
+              >
+                Verwerfen
+              </button>
+
+              <button
+                onClick={savePendingChanges}
+                style={{
+                  background: '#0071e3',
+                  border: 'none',
+                  color: 'white',
+                  padding: '8px 20px',
+                  borderRadius: '100px',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(0, 113, 227, 0.3)',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.background = '#0077ed';
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 113, 227, 0.45)';
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.background = '#0071e3';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 113, 227, 0.3)';
+                }}
+              >
+                Jetzt speichern
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
     </div>
   );
 }

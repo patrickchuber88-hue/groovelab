@@ -930,24 +930,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', maxWidth: '100%', margin: '0', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
       
-      {/* Tabs */}
-      <div className="app-segmented-switch" style={{ alignSelf: 'flex-start', marginBottom: '8px' }}>
-        <button 
-          onClick={() => setActiveTab('calendar')}
-          className={`app-segmented-switch-btn ${activeTab === 'calendar' ? 'active' : ''}`}
-        >
-          Stundenplan
-        </button>
-        <button 
-          onClick={() => setActiveTab('designer')}
-          className={`app-segmented-switch-btn ${activeTab === 'designer' ? 'active' : ''}`}
-        >
-          Stundenplan-Designer
-        </button>
-      </div>
-
       {activeTab === 'calendar' ? (
-        <ScheduleCalendarView schoolId={schoolId} userId={userId} boards={boards} />
+        <ScheduleCalendarView schoolId={schoolId} userId={userId} boards={boards} activeTab={activeTab} setActiveTab={setActiveTab} />
       ) : (
         <>
           {showCelebration ? (
@@ -1003,6 +987,21 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   Ziehe Schüler aus dem Pool direkt in deine Unterrichtstage. Pausen & Slots berechnen sich automatisch.
                 </p>
               </div>
+            </div>
+
+            <div className="app-segmented-switch" style={{ margin: 0 }}>
+              <button 
+                onClick={() => setActiveTab('calendar')}
+                className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`}
+              >
+                Stundenplan
+              </button>
+              <button 
+                onClick={() => setActiveTab('designer')}
+                className={`app-segmented-switch-btn ${(activeTab as string) === 'designer' ? 'active' : ''}`}
+              >
+                Stundenplan-Designer
+              </button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

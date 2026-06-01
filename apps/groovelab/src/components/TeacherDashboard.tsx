@@ -87,24 +87,29 @@ const renderBandAvatar = (name: string, photoUrl?: string | null, size: string =
 
 const brandColor = 'var(--primary-color)';
 
-// --- ANTI-FLICKER AVATAR SYSTEM ---
 const getInstrumentAvatarUrl = (instrument: string | null | undefined): string => {
-  if (!instrument) return '/avatars/guitar_avatar.png';
+  if (!instrument) return '/avatars/gitarre_avatar_new.png';
   const inst = instrument.toLowerCase().trim();
-  if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/guitar_avatar.png';
+  if (inst.includes('e-gitarre')) return '/avatars/egitarre_avatar.png';
+  if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/gitarre_avatar_new.png';
+  if (inst.includes('e-bass')) return '/avatars/ebass_avatar.png';
+  if (inst.includes('kontrabass') || inst.includes('double bass')) return '/avatars/kontrabass_avatar.png';
   if (inst.includes('bass')) return '/avatars/bass_avatar.png';
-  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/drums_avatar.png';
-  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/piano_avatar.png';
-  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/vocals_avatar.png';
-  if (inst.includes('trompete') || inst.includes('trumpet')) return '/avatars/trumpet_avatar.png';
-  if (inst.includes('posaune') || inst.includes('trombone')) return '/avatars/trombone_avatar.png';
-  if (inst.includes('horn')) return '/avatars/horn_avatar.png';
-  if (inst.includes('cello')) return '/avatars/cello_avatar.png';
-  if (inst.includes('geige') || inst.includes('violin') || inst.includes('violine')) return '/avatars/violin_avatar.png';
-  if (inst.includes('klarinette') || inst.includes('clarinet')) return '/avatars/clarinet_avatar.png';
-  if (inst.includes('querflöte') || inst.includes('flute')) return '/avatars/flute_avatar.png';
-  if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return '/avatars/saxophone_avatar.png';
-  return '/avatars/guitar_avatar.png';
+  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/schlagzeug_avatar.png';
+  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/klavier_avatar_new.png';
+  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/gesang_avatar.png';
+  if (inst.includes('trompete') || inst.includes('trumpet')) return '/avatars/trompete_avatar_new.png';
+  if (inst.includes('posaune') || inst.includes('trombone')) return '/avatars/posaune_avatar.png';
+  if (inst.includes('horn')) return '/avatars/horn_avatar_new.png';
+  if (inst.includes('cello')) return '/avatars/cello_avatar_new.png';
+  if (inst.includes('geige') || inst.includes('violin') || inst.includes('violine')) return '/avatars/violine_avatar_new.png';
+  if (inst.includes('klarinette') || inst.includes('clarinet')) return '/avatars/klarinette_avatar_new.png';
+  if (inst.includes('querflöte') || inst.includes('flute')) return '/avatars/querfloete_avatar.png';
+  if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return '/avatars/saxophon_avatar_new.png';
+  if (inst.includes('blockflöte') || inst.includes('recorder') || inst.includes('blockfloete')) return '/avatars/blockfloete_avatar.png';
+  if (inst.includes('bariton') || inst.includes('baritone')) return '/avatars/bariton_avatar.png';
+  if (inst.includes('oboe')) return '/avatars/oboe_avatar.png';
+  return '/avatars/gitarre_avatar_new.png';
 };
 
 const getDefaultMusicianAvatarUrl = (instrument: string | null | undefined, role: string | null | undefined): string => {
@@ -131,29 +136,47 @@ const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, 
     const targetUser = user;
     
     if (activePlat === 'campus') {
-      if (targetUser && (targetUser.instrument || targetUser.role === 'student' || targetUser.role === 'teacher')) {
+      if (targetUser && (targetUser.instrument || targetUser.role === 'student' || targetUser.role === 'teacher' || targetUser.role === 'admin')) {
         return getInstrumentAvatarUrl(targetUser.instrument);
       }
       if (src && !src.includes('_avatar.png') && !src.includes('avatar_ghost')) {
-        return '/avatars/guitar_avatar.png';
+        return '/avatars/gitarre_avatar_new.png';
       }
     } else {
       // GrooveLab rules: strictly block instrument avatars and fall back to musician avatars
       const isInstrumentAvatar = src && (
         src.includes('avatar.png') || 
         src.includes('guitar_avatar') || 
+        src.includes('gitarre_avatar_new') || 
+        src.includes('ebass_avatar') || 
+        src.includes('egitarre_avatar') || 
+        src.includes('kontrabass_avatar') || 
         src.includes('bass_avatar') || 
         src.includes('drums_avatar') || 
+        src.includes('schlagzeug_avatar') || 
         src.includes('piano_avatar') || 
+        src.includes('klavier_avatar_new') || 
         src.includes('vocals_avatar') || 
+        src.includes('gesang_avatar') || 
         src.includes('trumpet_avatar') || 
+        src.includes('trompete_avatar_new') || 
         src.includes('trombone_avatar') || 
+        src.includes('posaune_avatar') || 
         src.includes('horn_avatar') || 
+        src.includes('horn_avatar_new') || 
         src.includes('cello_avatar') || 
+        src.includes('cello_avatar_new') || 
         src.includes('violin_avatar') || 
+        src.includes('violine_avatar_new') || 
         src.includes('clarinet_avatar') || 
+        src.includes('klarinette_avatar_new') || 
         src.includes('flute_avatar') || 
-        src.includes('saxophone_avatar')
+        src.includes('querfloete_avatar') || 
+        src.includes('saxophone_avatar') || 
+        src.includes('saxophon_avatar_new') || 
+        src.includes('blockfloete_avatar') || 
+        src.includes('bariton_avatar') || 
+        src.includes('oboe_avatar')
       );
       if (!src || isInstrumentAvatar || src === '/avatar_ghost.jpg') {
         // Fall back to student/teacher musician avatar
@@ -593,6 +616,7 @@ export function TeacherDashboard({
   const [allStudents, setAllStudents] = useState<any[]>([]);
   const [studentSearch, setStudentSearch] = useState('');
   const [studentLetter, setStudentLetter] = useState<string | null>(null);
+  const [studentInstrumentFilter, setStudentInstrumentFilter] = useState<string>('all');
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [editingStudent, setEditingStudent] = useState<any | null>(null);
   const [newStudent, setNewStudent] = useState({
@@ -689,7 +713,7 @@ export function TeacherDashboard({
     }
 
     // 2. Collision Check: Is the target slot occupied?
-    const hasCollision = briefingData.timeline.some((s: any) => 
+    const targetConflictSlot = briefingData.timeline.find((s: any) => 
       s.scheduleId !== draggedSchedId && 
       s.timeSlot === targetSlot.timeSlot && 
       s.status !== 'canceled_by_student' &&
@@ -697,11 +721,37 @@ export function TeacherDashboard({
       s.student !== null
     );
 
-    if (hasCollision) {
-      return 'RED';
+    if (targetConflictSlot) {
+      // It's a 1:1 swap! Verify original room matrix for target student
+      const targetStudentInst = targetConflictSlot.instrument || 'Klavier';
+      const originalRoomId = sourceSlot.roomId;
+      const originalRoom = rooms.find(r => r.id === originalRoomId);
+      if (originalRoom && originalRoom.allowed_instruments && originalRoom.allowed_instruments.length > 0) {
+        const allowedOriginal = originalRoom.allowed_instruments.map((i: string) => i.toLowerCase());
+        if (!allowedOriginal.includes(targetStudentInst.toLowerCase())) {
+          return 'RED'; // Swapped student not allowed in original room
+        }
+      }
+
+      // Check availability for both students in their new swapped slots
+      const todayWeekday = new Date().getDay() === 0 ? 7 : new Date().getDay();
+      
+      const draggedStudentAvailable = availabilities.some(a => 
+        a.user_id === studentId && 
+        a.day_of_week === todayWeekday && 
+        a.time_slot === targetSlot.timeSlot
+      );
+
+      const targetStudentAvailable = availabilities.some(a => 
+        a.user_id === targetConflictSlot.student.id && 
+        a.day_of_week === todayWeekday && 
+        a.time_slot === sourceSlot.timeSlot
+      );
+
+      return (draggedStudentAvailable && targetStudentAvailable) ? 'GREEN' : 'YELLOW';
     }
 
-    // 3. Availability Check
+    // 3. Availability Check for regular moves
     const rawDay = new Date().getDay();
     const todayWeekday = rawDay === 0 ? 7 : rawDay;
     const isAvailable = availabilities.some(a => 
@@ -764,15 +814,49 @@ export function TeacherDashboard({
 
       // Fallback: direct Supabase swap
       const status = color === 'GREEN' ? 'approved' : 'pending_parent_approval';
-      const { error } = await supabase
-        .from('schedules')
-        .update({
-          time_slot: targetSlot.timeSlot,
-          status: status
-        })
-        .eq('id', draggedSchedId);
+      
+      const targetConflict = briefingData.timeline.find((s: any) => 
+        s.scheduleId !== draggedSchedId && 
+        s.timeSlot === targetSlot.timeSlot && 
+        s.status !== 'canceled_by_student' &&
+        s.status !== 'teacher_sick' &&
+        s.student !== null
+      );
 
-      if (error) throw error;
+      if (targetConflict) {
+        // Swap both schedules in Supabase
+        const sourceSlot = briefingData.timeline.find((s: any) => s.scheduleId === draggedSchedId);
+        if (sourceSlot) {
+          const { error: err1 } = await supabase
+            .from('schedules')
+            .update({
+              time_slot: targetSlot.timeSlot,
+              status: status
+            })
+            .eq('id', draggedSchedId);
+
+          const { error: err2 } = await supabase
+            .from('schedules')
+            .update({
+              time_slot: sourceSlot.timeSlot,
+              status: status
+            })
+            .eq('id', targetConflict.scheduleId);
+
+          if (err1 || err2) throw (err1 || err2);
+        }
+      } else {
+        // Direct update for single move
+        const { error } = await supabase
+          .from('schedules')
+          .update({
+            time_slot: targetSlot.timeSlot,
+            status: status
+          })
+          .eq('id', draggedSchedId);
+
+        if (error) throw error;
+      }
       setTicker(t => t + 1);
     } catch (err) {
       console.error(err);
@@ -902,6 +986,14 @@ export function TeacherDashboard({
 
       if (schedError) throw schedError;
 
+      // 2b. Fetch one-off schedule occurrences (for rescheduled slots)
+      const { data: occurrences, error: occError } = await supabase
+        .from('schedule_occurrences')
+        .select('*')
+        .eq('teacher_id', userId);
+
+      if (occError) throw occError;
+
       const now = new Date();
       const todayStart = new Date(now);
       todayStart.setHours(0, 0, 0, 0);
@@ -941,14 +1033,16 @@ export function TeacherDashboard({
             
             if (isCurrentlySick) {
               scheduleIdsToCancel.add(sched.id);
-              const notifKey = `${startDateTime.toISOString()}-${sched.student_id}`;
-              if (!existingNotifsSet.has(notifKey)) {
-                notificationsToInsert.push({
-                  teacher_id: userId,
-                  student_id: sched.student_id,
-                  slot_start_datetime: startDateTime.toISOString(),
-                  status: 'UNREAD'
-                });
+              if (sched.student_id) {
+                const notifKey = `${startDateTime.toISOString()}-${sched.student_id}`;
+                if (!existingNotifsSet.has(notifKey)) {
+                  notificationsToInsert.push({
+                    teacher_id: userId,
+                    student_id: sched.student_id,
+                    slot_start_datetime: startDateTime.toISOString(),
+                    status: 'UNREAD'
+                  });
+                }
               }
             } else {
               scheduleIdsToRestore.add(sched.id);
@@ -960,6 +1054,36 @@ export function TeacherDashboard({
         currentDate.setDate(currentDate.getDate() + 1);
       }
 
+      // Process one-off schedule occurrences for sickness cancellations and restores
+      const occurrenceIdsToCancel = new Set<string>();
+      const occurrenceIdsToRestore = new Set<string>();
+
+      (occurrences || []).forEach(occ => {
+        const startDateTime = new Date(`${occ.date}T${occ.start_time}`);
+        
+        if (startDateTime >= now) {
+          const isCurrentlySick = startDateTime <= new Date(sickUntil.getTime() + 24 * 60 * 60 * 1000 - 1);
+          
+          if (isCurrentlySick) {
+            occurrenceIdsToCancel.add(occ.id);
+            if (occ.student_id) {
+              const notifKey = `${startDateTime.toISOString()}-${occ.student_id}`;
+              if (!existingNotifsSet.has(notifKey)) {
+                notificationsToInsert.push({
+                  teacher_id: userId,
+                  student_id: occ.student_id,
+                  slot_start_datetime: startDateTime.toISOString(),
+                  status: 'UNREAD'
+                });
+              }
+            }
+          } else {
+            occurrenceIdsToRestore.add(occ.id);
+            datesToDeleteNotifs.push(startDateTime.toISOString());
+          }
+        }
+      });
+
       // Apply schedule cancellations
       if (scheduleIdsToCancel.size > 0) {
         await supabase
@@ -968,12 +1092,29 @@ export function TeacherDashboard({
           .in('id', Array.from(scheduleIdsToCancel));
       }
 
+      // Apply occurrence cancellations
+      if (occurrenceIdsToCancel.size > 0) {
+        await supabase
+          .from('schedule_occurrences')
+          .update({ status: 'canceled_by_teacher_sick' })
+          .in('id', Array.from(occurrenceIdsToCancel));
+      }
+
       // Restore active schedules
       if (scheduleIdsToRestore.size > 0) {
         await supabase
           .from('schedules')
           .update({ status: 'approved' })
           .in('id', Array.from(scheduleIdsToRestore))
+          .eq('status', 'canceled_by_teacher_sick');
+      }
+
+      // Restore active occurrences
+      if (occurrenceIdsToRestore.size > 0) {
+        await supabase
+          .from('schedule_occurrences')
+          .update({ status: 'rescheduled_confirmed' })
+          .in('id', Array.from(occurrenceIdsToRestore))
           .eq('status', 'canceled_by_teacher_sick');
       }
 
@@ -1010,8 +1151,11 @@ export function TeacherDashboard({
 
       setSickSuccessShown(true);
       setIsSickWidgetExpanded(false);
-      setTimeout(() => setSickSuccessShown(false), 6000);
       setTicker(t => t + 1);
+      setTimeout(() => {
+        setSickSuccessShown(false);
+        window.location.reload();
+      }, 800);
     } catch (err) {
       console.error(err);
       alert('Fehler bei der Krankheitsmeldung.');
@@ -1052,6 +1196,12 @@ export function TeacherDashboard({
 
       if (schedError) throw schedError;
 
+      // 2b. Fetch occurrences
+      const { data: occurrences } = await supabase
+        .from('schedule_occurrences')
+        .select('*')
+        .eq('teacher_id', userId);
+
       const now = new Date();
       const todayStart = new Date(now);
       todayStart.setHours(0, 0, 0, 0);
@@ -1082,12 +1232,32 @@ export function TeacherDashboard({
         currentDate.setDate(currentDate.getDate() + 1);
       }
 
+      // Process one-off schedule occurrences for restoration
+      const occurrenceIdsToRestore = new Set<string>();
+
+      (occurrences || []).forEach(occ => {
+        const startDateTime = new Date(`${occ.date}T${occ.start_time}`);
+        if (startDateTime >= now) {
+          occurrenceIdsToRestore.add(occ.id);
+          datesToDeleteNotifs.push(startDateTime.toISOString());
+        }
+      });
+
       // Restore all future schedules to approved
       if (scheduleIdsToRestore.size > 0) {
         await supabase
           .from('schedules')
           .update({ status: 'approved' })
           .in('id', Array.from(scheduleIdsToRestore))
+          .eq('status', 'canceled_by_teacher_sick');
+      }
+
+      // Restore all future occurrences to rescheduled_confirmed
+      if (occurrenceIdsToRestore.size > 0) {
+        await supabase
+          .from('schedule_occurrences')
+          .update({ status: 'rescheduled_confirmed' })
+          .in('id', Array.from(occurrenceIdsToRestore))
           .eq('status', 'canceled_by_teacher_sick');
       }
 
@@ -1114,6 +1284,7 @@ export function TeacherDashboard({
 
       alert('Erfolgreich gesundgemeldet! Zukünftige Stundenplandaten wurden wieder aktiviert.');
       setTicker(t => t + 1);
+      window.location.reload();
     } catch (err) {
       console.error(err);
       alert('Fehler bei der Gesundmeldung.');
@@ -1169,9 +1340,23 @@ export function TeacherDashboard({
   const [briefingData, setBriefingData] = useState<any>(null);
   const [briefingLoading, setBriefingLoading] = useState(true);
 
+
+
   // New Right Sidebar Sickness & Administrative feedback states
-  const [isSickWidgetExpanded, setIsSickWidgetExpanded] = useState(false);
+  const [isSickWidgetExpanded, setIsSickWidgetExpanded] = useState(() => {
+    const shouldExpand = localStorage.getItem('expand_sick_widget') === 'true';
+    if (shouldExpand) {
+      localStorage.removeItem('expand_sick_widget');
+      return true;
+    }
+    return false;
+  });
   const [sickUntilDate, setSickUntilDate] = useState<string>(() => {
+    const saved = localStorage.getItem('selected_sick_date');
+    if (saved) {
+      localStorage.removeItem('selected_sick_date');
+      return saved;
+    }
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     return tomorrow.toISOString().substring(0, 10);
@@ -1186,11 +1371,31 @@ export function TeacherDashboard({
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [adminFeedbackTab, setAdminFeedbackTab] = useState<'open' | 'done'>('open');
 
+  const lastSickUntilRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (teacher?.sick_until) {
-      setSickUntilDate(teacher.sick_until.substring(0, 10));
+      if (teacher.sick_until !== lastSickUntilRef.current) {
+        lastSickUntilRef.current = teacher.sick_until;
+        setSickUntilDate(teacher.sick_until.substring(0, 10));
+      }
+    } else {
+      lastSickUntilRef.current = undefined;
     }
   }, [teacher?.sick_until]);
+
+  useEffect(() => {
+    const handleSelectDate = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail && customEvent.detail.date) {
+        setSickUntilDate(customEvent.detail.date);
+        setIsSickWidgetExpanded(true);
+      }
+    };
+    window.addEventListener('select-appointment-date', handleSelectDate);
+    return () => {
+      window.removeEventListener('select-appointment-date', handleSelectDate);
+    };
+  }, []);
 
   const [currentTimeStr, setCurrentTimeStr] = useState<string>(() => {
     const now = new Date();
@@ -1206,6 +1411,76 @@ export function TeacherDashboard({
     const interval = setInterval(updateTime, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // Stable daily choices (hellos, subtitles) based on date-based seed
+  const dailyBriefingStableChoices = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    // Simple hash from the date string
+    let seed = 0;
+    for (let i = 0; i < todayStr.length; i++) {
+      seed = (seed << 5) - seed + todayStr.charCodeAt(i);
+      seed |= 0;
+    }
+    
+    const random = () => {
+      const x = Math.sin(seed++) * 10000;
+      return x - Math.floor(x);
+    };
+
+    const isWeekend = new Date().getDay() === 0 || new Date().getDay() === 6;
+    const subtitles = isWeekend
+      ? [
+          'Wir wünschen dir ein schönes, erholsames Wochenende!',
+          'Ruh dich aus und tanke neue Energie für die Woche!',
+          'Ein entspanntes Wochenende für dich! Hier ist deine Übersicht.',
+          'Zeit zum Durchatmen! Schönes Wochenende!',
+          'Hier ist dein Wochenend-Cockpit. Genieße die freien Stunden!',
+          'Musik im Herzen, Entspannung im Kopf. Schönes Wochenende!',
+          'Dein Groove-Fahrplan fürs Wochenende steht bereit.',
+          'Schönes Wochenende! Lass es dir gutgehen!'
+        ]
+      : [
+          'Hier ist dein persönliches Briefing für heute.',
+          'Bereit für einen produktiven Tag? Hier ist deine Übersicht.',
+          'Dein grooviger Fahrplan für heute steht bereit.',
+          'Lass uns heute wieder Großartiges erschaffen! Hier ist dein Plan.',
+          'Alle Termine auf einen Blick – dein Tag im Überblick.',
+          'Hier ist deine Übersicht für einen erfolgreichen Tag.',
+          'Deine Schüler warten schon! Hier ist dein Tagesbriefing.',
+          'Dein Groove-Cockpit ist bereit. Hier ist dein Tag im Überblick.'
+        ];
+    const subtitle = subtitles[Math.floor(random() * subtitles.length)];
+    const greetingOptionIndex = Math.floor(random() * 4); // 0 = time-based, 1 = Hallo, 2 = Hi, 3 = Hey
+
+    return { greetingOptionIndex, subtitle };
+  }, [userId, new Date().toDateString()]);
+
+  // Dynamic greeting that adapts time greetings to the hour, but keeps others completely stable
+  const dynamicGreeting = useMemo(() => {
+    const hours = parseInt(currentTimeStr.split(':')[0], 10);
+    let greeting = '';
+
+    if (dailyBriefingStableChoices.greetingOptionIndex === 0) {
+      if (hours >= 5 && hours < 12) {
+        greeting = 'Guten Morgen';
+      } else if (hours >= 12 && hours < 18) {
+        greeting = 'Guten Mittag';
+      } else if (hours >= 18 && hours < 23) {
+        greeting = 'Guten Abend';
+      } else {
+        greeting = 'Gute Nacht';
+      }
+    } else {
+      const generalGreetings = ['Hallo', 'Hi', 'Hey'];
+      greeting = generalGreetings[dailyBriefingStableChoices.greetingOptionIndex - 1];
+    }
+
+    return { 
+      greeting, 
+      subtitle: dailyBriefingStableChoices.subtitle 
+    };
+  }, [dailyBriefingStableChoices, currentTimeStr]);
 
   const activeStudent = useMemo(() => {
     if (!briefingData?.timeline || briefingData.timeline.length === 0) return null;
@@ -1355,6 +1630,7 @@ export function TeacherDashboard({
               start_time,
               status,
               schedule_id,
+              student_id,
               schedules (
                 rooms (id, name)
               ),
@@ -1399,17 +1675,18 @@ export function TeacherDashboard({
               const avatar = student?.avatars?.[0] || null;
               const isAnalogStickerUser = !student?.is_app_user || avatar?.avatar_style === 'Standard_Silhouette';
               const formattedTime = occ.start_time ? occ.start_time.substring(0, 5) : '00:00';
+              const occStudentId = occ.student?.id || occ.student_id;
 
               if (occ.original_date === todayStr && occ.date !== todayStr) {
                 // Rescheduled AWAY from today -> remove from today's timeline
-                timeline = timeline.filter((t: any) => t.student?.id !== occ.student_id);
+                timeline = timeline.filter((t: any) => t.student?.id !== occStudentId);
               } else if (occ.date === todayStr) {
                 // Rescheduled TO today or updated today -> update or insert into today's timeline
-                const existingIdx = timeline.findIndex((t: any) => t.student?.id === occ.student_id);
+                const existingIdx = timeline.findIndex((t: any) => t.student?.id === occStudentId);
                 const mappedItem = {
                   scheduleId: occ.schedule_id || occ.id,
                   timeSlot: formattedTime,
-                  status: occ.status === 'rescheduled_confirmed' ? 'approved' : occ.status,
+                  status: occ.status,
                   roomId: occ.schedules?.rooms?.id || null,
                   room: occ.schedules?.rooms?.name || 'Hauptraum',
                   instrument: student?.instrument || 'Klavier',
@@ -1483,12 +1760,75 @@ export function TeacherDashboard({
             };
           }
 
+          // Fetch rescheduled reminders for this week in fallback
+          let rescheduledReminders: any[] = [];
+          try {
+            const startOfWeek = new Date();
+            const currentDay = startOfWeek.getDay();
+            const distance = currentDay === 0 ? -6 : 1 - currentDay; // distance to Monday
+            const monday = new Date(startOfWeek);
+            monday.setDate(startOfWeek.getDate() + distance);
+            monday.setHours(0, 0, 0, 0);
+
+            const sunday = new Date(monday);
+            sunday.setDate(monday.getDate() + 6);
+            sunday.setHours(23, 59, 59, 999);
+
+            const mondayStr = monday.toISOString().substring(0, 10);
+            const sundayStr = sunday.toISOString().substring(0, 10);
+
+            const { data: weekOccurrences } = await supabase
+              .from('schedule_occurrences')
+              .select(`
+                id,
+                date,
+                original_date,
+                start_time,
+                status,
+                student:users!schedule_occurrences_student_id_fkey (
+                  first_name,
+                  last_name
+                )
+              `)
+              .eq('teacher_id', userId)
+              .gte('date', mondayStr)
+              .lte('date', sundayStr);
+
+            if (weekOccurrences && weekOccurrences.length > 0) {
+              const rescheduledUpcoming = weekOccurrences.filter((occ: any) => {
+                const hasDateDiff = occ.original_date && occ.original_date !== occ.date;
+                return hasDateDiff && occ.date >= todayStr;
+              });
+
+              rescheduledReminders = rescheduledUpcoming.map((occ: any) => {
+                const dateObj = new Date(occ.date);
+                const weekdayStr = dateObj.toLocaleDateString('de-DE', { weekday: 'long' });
+                const dateFormatted = dateObj.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+                const timeFormatted = occ.start_time ? occ.start_time.substring(0, 5) : '';
+                const originalDateObj = occ.original_date ? new Date(occ.original_date) : null;
+                const originalWeekdayStr = originalDateObj ? originalDateObj.toLocaleDateString('de-DE', { weekday: 'long' }) : 'seinem regulären Termin';
+
+                return {
+                  id: occ.id,
+                  studentName: `${occ.student?.first_name || ''} ${occ.student?.last_name || ''}`.trim(),
+                  originalWeekday: originalWeekdayStr,
+                  weekday: weekdayStr,
+                  dateStr: dateFormatted,
+                  time: timeFormatted
+                };
+              });
+            }
+          } catch (err) {
+            console.warn('Failed to fetch fallback rescheduled reminders', err);
+          }
+
           setBriefingData({
             success: true,
             allowMessagesGlobal: allowMessages,
             todayWeekday,
             timeline,
-            prepMirror
+            prepMirror,
+            rescheduledReminders
           });
         } catch (err) {
           console.error('Error loading briefing fallback:', err);
@@ -3119,10 +3459,9 @@ export function TeacherDashboard({
         </div>
       )}
 
-      {/* Main Content Area */}
       <div style={{
         flex: 1,
-        padding: hideHeader ? '0' : (activeTab === 'briefing' ? '16px 40px 40px 40px' : '40px'),
+        padding: hideHeader ? '0' : '10px',
         overflowY: activeTab === 'briefing' ? 'hidden' : 'auto',
         height: '100vh',
         boxSizing: 'border-box',
@@ -3205,7 +3544,8 @@ export function TeacherDashboard({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   
                   {/* AdminLTE style KPI Cards row (Bold Swiss design, now super-compact and strictly one-line) */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '4px' }}>
+                  {!teacher?.sick_until && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '4px' }}>
                     {/* Heutige Schüler Card (Blue) */}
                     <div style={{ 
                       position: 'relative', overflow: 'hidden', background: '#007bff', color: 'white',
@@ -3278,113 +3618,179 @@ export function TeacherDashboard({
                       </div>
                     </div>
                   </div>
+                  )}
 
                   {/* Premium Greeting Banner with Avatar & Wave Design */}
-                  <div style={{
-                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
-                    backdropFilter: 'blur(24px) saturate(1.8)',
-                    WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
-                    border: '1px solid rgba(255, 255, 255, 0.5)',
-                    borderRadius: '24px',
-                    padding: '14px 20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '20px',
-                    marginBottom: '4px',
-                    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
-                    transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                      <div style={{
-                        width: '64px',
-                        height: '64px',
-                        borderRadius: '50%',
-                        border: '4px solid #ffffff',
-                        boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)',
-                        background: '#ffffff',
-                        flexShrink: 0,
-                        marginTop: '-18px',
-                        marginBottom: '-18px',
-                        position: 'relative',
-                        zIndex: 10,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        overflow: 'hidden',
-                        transition: 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-                      }}
-                      className="hover-scale"
-                      >
-                        <img src={getInstrumentAvatarUrl(teacher?.instrument)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scale(1.15)' }} />
-                      </div>
-                      <div>
-                        <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          Hallo, <span style={{ 
-                            color: '#007aff', 
-                            fontSize: '1.15rem',
-                            fontWeight: 900,
-                            letterSpacing: '-0.01em',
-                            display: 'inline-flex',
-                            alignItems: 'center'
-                          }}>{teacher?.first_name || 'Coach'}</span>! 
-                          <span className="inline-block animate-bounce" style={{ marginLeft: '4px' }}>
-                            {(new Date().getDay() === 0 || new Date().getDay() === 6) ? '☀️' : '👋'}
-                          </span>
-                        </h3>
-                        <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
-                          {(new Date().getDay() === 0 || new Date().getDay() === 6) 
-                            ? 'Wir wünschen dir ein schönes, erholsames Wochenende!' 
-                            : 'Hier ist deine Übersicht für den heutigen Tag.'}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    {/* Live Clock Badge */}
+                  {!teacher?.sick_until && (
                     <div style={{
-                      background: '#ffffff',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '12px',
-                      padding: '5px 10px',
+                      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
+                      backdropFilter: 'blur(24px) saturate(1.8)',
+                      WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
+                      border: '1px solid rgba(255, 255, 255, 0.5)',
+                      borderRadius: '24px',
+                      padding: '14px 20px',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '6px',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.01)',
-                      flexShrink: 0
+                      justifyContent: 'space-between',
+                      gap: '20px',
+                      marginBottom: '4px',
+                      boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+                      transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
                     }}>
-                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }} />
-                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', letterSpacing: '0.02em', fontFamily: 'monospace' }}>
-                        {currentTimeStr || '13:00'} UHR
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                        <div style={{
+                          width: '64px',
+                          height: '64px',
+                          borderRadius: '50%',
+                          border: '4px solid #ffffff',
+                          boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)',
+                          background: '#ffffff',
+                          flexShrink: 0,
+                          marginTop: '-18px',
+                          marginBottom: '-18px',
+                          position: 'relative',
+                          zIndex: 10,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          overflow: 'hidden',
+                          transition: 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+                        }}
+                        className="hover-scale"
+                        >
+                          <img src={getInstrumentAvatarUrl(teacher?.instrument)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scale(1.15)' }} />
+                        </div>
+                        <div>
+                          <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {dynamicGreeting.greeting}, <span style={{ 
+                              color: '#007aff', 
+                              fontSize: '1.15rem',
+                              fontWeight: 900,
+                              letterSpacing: '-0.01em',
+                              display: 'inline-flex',
+                              alignItems: 'center'
+                            }}>{teacher?.first_name || 'Coach'}</span>! 
+                            <span className="inline-block animate-bounce" style={{ marginLeft: '4px' }}>
+                              {(new Date().getDay() === 0 || new Date().getDay() === 6) ? '☀️' : '👋'}
+                            </span>
+                          </h3>
+                          <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                            {dynamicGreeting.subtitle}
+                          </p>
+                          {briefingData?.rescheduledReminders && briefingData.rescheduledReminders.length > 0 && (
+                            <div style={{ 
+                              marginTop: '10px', 
+                              display: 'flex', 
+                              flexDirection: 'column', 
+                              gap: '6px',
+                              width: 'fit-content'
+                            }}>
+                              {briefingData.rescheduledReminders.map((rem: any) => (
+                                <div key={rem.id} style={{ 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  gap: '10px', 
+                                  background: 'rgba(0, 122, 255, 0.03)', 
+                                  border: '1px solid rgba(0, 122, 255, 0.06)', 
+                                  borderLeft: '3px solid #007aff',
+                                  borderRadius: '8px', 
+                                  padding: '5px 12px',
+                                  fontSize: '0.74rem', 
+                                  color: '#475569',
+                                  fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#007aff', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: '0.62rem', flexShrink: 0 }}>
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.9 }}>
+                                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                                      <line x1="16" y1="2" x2="16" y2="6" />
+                                      <line x1="8" y1="2" x2="8" y2="6" />
+                                      <line x1="3" y1="10" x2="21" y2="10" />
+                                    </svg>
+                                    <span>Verschiebung:</span>
+                                  </div>
+                                  <span style={{ color: '#334155', fontWeight: 500 }}>
+                                    <strong>{rem.studentName}</strong> wurde von {rem.originalWeekday === 'seinem regulären Termin' ? 'seinem regulären Termin' : rem.originalWeekday} auf <strong style={{ color: '#007aff', fontWeight: 700 }}>{rem.weekday}, {rem.dateStr}. um {rem.time} Uhr</strong> verschoben.
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Live Clock Badge */}
+                      <div style={{
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        padding: '5px 10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.01)',
+                        flexShrink: 0
+                      }}>
+                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }} />
+                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', letterSpacing: '0.02em', fontFamily: 'monospace' }}>
+                          {currentTimeStr || '13:00'} UHR
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  )}
  
                   {/* SCHEDULE & PREP-MIRROR ROW */}
                   <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '24px', alignItems: 'start', width: '100%' }}>
                     
                     {/* TAGESPLAN (timeline schedule) */}
-                    <div className="google-card" style={{ flex: '1 1 450px', minWidth: '300px', padding: '20px 24px', borderRadius: '20px', border: '1px solid #f1f5f9', boxShadow: '0 2px 12px rgba(0,0,0,0.04)', background: 'white' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#1f2937' }}>
-                          <Clock size={20} color="#0b57d0" />
-                          <strong style={{ fontSize: '1.05rem', fontWeight: 800, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Tagesplan – {new Date().toLocaleDateString('de-DE')} (Unterrichte Heute)</strong>
-                        </div>
-                        <span style={{
-                          fontSize: '0.72rem',
-                          fontWeight: 800,
-                          padding: '4px 12px',
-                          borderRadius: '100px',
-                          background: '#e8f0fe',
-                          color: '#0b57d0',
-                          fontFamily: 'Inter'
-                        }}>
-                          LIVE
-                        </span>
+                    {teacher?.sick_until ? (
+                      <div style={{
+                        flex: '1 1 450px',
+                        minWidth: '300px',
+                        background: 'linear-gradient(135deg, #fff1f2 0%, #fff5f5 100%)',
+                        border: '1.5px solid #fecaca',
+                        borderRadius: '20px',
+                        padding: '24px',
+                        textAlign: 'center',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.6), 0 2px 12px rgba(0,0,0,0.02)'
+                      }}>
+                         <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#9f1239', fontFamily: "'Plus Jakarta Sans', sans-serif", display: 'flex', alignItems: 'center', gap: '6px' }}>
+                           Gute Besserung &amp; gute Erholung! 
+                           <svg width="16" height="16" viewBox="0 0 24 24" fill="#9f1239" stroke="none" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+                             <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+                           </svg>
+                         </h4>
+                         <p style={{ margin: 0, fontSize: '0.8rem', color: '#be123c', fontWeight: 600, maxWidth: '420px', lineHeight: 1.4 }}>
+                           Ruh dich aus – keine Sorge, wir übernehmen heute für dich!
+                         </p>
                       </div>
+                    ) : (
+                      <div className="google-card" style={{ flex: '1 1 450px', minWidth: '300px', padding: '20px 24px', borderRadius: '20px', border: '1px solid #f1f5f9', boxShadow: '0 2px 12px rgba(0,0,0,0.04)', background: 'white' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#1f2937' }}>
+                            <Clock size={20} color="#0b57d0" />
+                            <strong style={{ fontSize: '1.05rem', fontWeight: 800, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Tagesplan – {new Date().toLocaleDateString('de-DE')} (Unterrichte Heute)</strong>
+                          </div>
+                          <span style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 800,
+                            padding: '4px 12px',
+                            borderRadius: '100px',
+                            background: '#e8f0fe',
+                            color: '#0b57d0',
+                            fontFamily: 'Inter'
+                          }}>
+                            LIVE
+                          </span>
+                        </div>
  
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative' }}>
-                        <div style={{ position: 'absolute', top: '16px', bottom: '16px', left: '9px', width: '2px', background: '#e2e8f0' }} />
-                        {briefingData.timeline && briefingData.timeline.length > 0 ? (() => {
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative' }}>
+                          <div style={{ position: 'absolute', top: '16px', bottom: '16px', left: '9px', width: '2px', background: '#e2e8f0' }} />
+                            {briefingData.timeline && briefingData.timeline.length > 0 ? (() => {
                           // Find prepIndex: first slot that is not canceled and not finished
                           let prepIndex = -1;
                           for (let i = 0; i < briefingData.timeline.length; i++) {
@@ -3413,9 +3819,12 @@ export function TeacherDashboard({
                               return `${String(Math.floor(totalMin / 60) % 24).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')}`;
                             })();
 
-                            const isCanceled = slot.status === 'canceled_by_student' || slot.status === 'teacher_sick';
+                            const isBreak = !slot.student;
+                            const isCanceled = slot.status === 'canceled_by_student' || slot.status === 'teacher_sick' || slot.status === 'cancelled';
                             const isFinished = currentTimeStr >= slotEnd;
+                            const isCurrentSlot = currentTimeStr >= slotStart && currentTimeStr < slotEnd;
                             const isRescheduledPending = slot.status === 'rescheduled_pending' || slot.status === 'pending' || slot.status === 'pending_reschedule';
+                            const isRescheduledConfirmed = slot.status === 'rescheduled_confirmed';
 
                             let slotBg = '#ffffff';
                             let slotBorder = '1.5px solid #e2e8f0';
@@ -3423,7 +3832,22 @@ export function TeacherDashboard({
                             let titleColor = '#1e293b';
                             let dotComponent = null;
 
-                            if (isCanceled) {
+                            if (isBreak) {
+                              slotBg = '#f5ebe0';
+                              slotBorder = '1.5px solid #e2d1c3';
+                              slotBorderLeft = '5px solid #b45309';
+                              titleColor = '#78350f';
+                              dotComponent = (
+                                <div style={{
+                                  width: '12px',
+                                  height: '12px',
+                                  borderRadius: '50%',
+                                  border: '3px solid #b45309',
+                                  background: isFinished ? '#b45309' : '#ffffff',
+                                  boxSizing: 'border-box'
+                                }} />
+                              );
+                            } else if (isCanceled) {
                               slotBg = '#ffffff';
                               slotBorder = '1.5px dashed rgba(239, 68, 68, 0.3)';
                               slotBorderLeft = '5px solid #ef4444';
@@ -3434,9 +3858,35 @@ export function TeacherDashboard({
                                   height: '12px',
                                   borderRadius: '50%',
                                   border: '3px solid #ef4444',
-                                  background: '#ef4444',
+                                  background: isFinished ? '#ef4444' : '#ffffff',
                                   boxSizing: 'border-box'
                                 }} />
+                              );
+                            } else if (isCurrentSlot && !isFinished) {
+                              slotBg = 'linear-gradient(135deg, #e8f0fe 0%, #f4f8ff 100%)';
+                              slotBorder = '1.5px solid #8ab4f8';
+                              slotBorderLeft = '5px solid #1a73e8';
+                              titleColor = '#174ea6';
+                              dotComponent = (
+                                <div style={{
+                                  width: '20px',
+                                  height: '20px',
+                                  borderRadius: '50%',
+                                  border: '3px solid #1a73e8',
+                                  background: '#ffffff',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  boxSizing: 'border-box',
+                                  animation: 'pulse 1.5s infinite'
+                                }}>
+                                  <div style={{
+                                    width: '8px',
+                                    height: '8px',
+                                    borderRadius: '50%',
+                                    background: '#1a73e8'
+                                  }} />
+                                </div>
                               );
                             } else if (isFinished) {
                               slotBg = '#ffffff';
@@ -3453,18 +3903,18 @@ export function TeacherDashboard({
                                   boxSizing: 'border-box'
                                 }} />
                               );
-                            } else if (isRescheduledPending) {
-                              slotBg = '#ffffff';
-                              slotBorder = '1.5px dashed #fed7aa'; // light orange dashed border
-                              slotBorderLeft = '5px solid #ea580c'; // premium orange left accent
-                              titleColor = '#1e293b';
-                              dotComponent = (idx === prepIndex) ? (
+                            } else if (isRescheduledConfirmed) {
+                              slotBg = 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)';
+                              slotBorder = '1px solid rgba(16, 185, 129, 0.25)'; // Premium translucent green border
+                              slotBorderLeft = '5px solid #10b981'; // Green left accent
+                              titleColor = '#713f12';
+                              dotComponent = isCurrentSlot ? (
                                 <div style={{
                                   width: '20px',
                                   height: '20px',
                                   borderRadius: '50%',
-                                  border: '3px solid #ea580c',
-                                  background: '#ffffff',
+                                  border: '3px solid #10b981', // Matches border accent color
+                                  background: isFinished ? '#10b981' : '#ffffff',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
@@ -3474,7 +3924,7 @@ export function TeacherDashboard({
                                     width: '8px',
                                     height: '8px',
                                     borderRadius: '50%',
-                                    background: '#ea580c'
+                                    background: '#10b981'
                                   }} />
                                 </div>
                               ) : (
@@ -3482,8 +3932,42 @@ export function TeacherDashboard({
                                   width: '12px',
                                   height: '12px',
                                   borderRadius: '50%',
-                                  border: '3px solid #ea580c',
-                                  background: '#ffffff',
+                                  border: '3px solid #10b981', // Matches border accent color
+                                  background: isFinished ? '#10b981' : '#ffffff',
+                                  boxSizing: 'border-box'
+                                }} />
+                              );
+                            } else if (isRescheduledPending) {
+                              slotBg = 'linear-gradient(135deg, #ffffff 0%, #fffbeb 100%)';
+                              slotBorder = '1px dashed rgba(251, 188, 5, 0.25)'; // Premium translucent yellow dashed border
+                              slotBorderLeft = '5px solid #fbbc05'; // Yellow left accent
+                              titleColor = '#1e293b';
+                              dotComponent = isCurrentSlot ? (
+                                <div style={{
+                                  width: '20px',
+                                  height: '20px',
+                                  borderRadius: '50%',
+                                  border: '3px solid #fbbc05', // Matches border accent color
+                                  background: isFinished ? '#fbbc05' : '#ffffff',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  boxSizing: 'border-box'
+                                }}>
+                                  <div style={{
+                                    width: '8px',
+                                    height: '8px',
+                                    borderRadius: '50%',
+                                    background: '#fbbc05'
+                                  }} />
+                                </div>
+                              ) : (
+                                <div style={{
+                                  width: '12px',
+                                  height: '12px',
+                                  borderRadius: '50%',
+                                  border: '3px solid #fbbc05', // Matches border accent color
+                                  background: isFinished ? '#fbbc05' : '#ffffff',
                                   boxSizing: 'border-box'
                                 }} />
                               );
@@ -3492,7 +3976,7 @@ export function TeacherDashboard({
                               slotBorder = '1.5px solid #e2e8f0';
                               slotBorderLeft = '5px solid #0b57d0';
                               titleColor = '#1e293b';
-                              dotComponent = (idx === prepIndex) ? (
+                              dotComponent = isCurrentSlot ? (
                                 <div style={{
                                   width: '20px',
                                   height: '20px',
@@ -3550,6 +4034,10 @@ export function TeacherDashboard({
                                          photo_url: slot.student.photo_url || '/avatar_ghost.jpg'
                                        });
                                      }
+                                     // Log the date of the clicked appointment (today's date)
+                                     const todayStr = new Date().toISOString().substring(0, 10);
+                                     setSickUntilDate(todayStr);
+                                     setIsSickWidgetExpanded(true);
                                    }}
                                    style={{
                                      flex: 1,
@@ -3573,50 +4061,96 @@ export function TeacherDashboard({
                                    <div style={{
                                      fontSize: '0.8rem',
                                      fontWeight: 900,
-                                     color: '#0f172a',
+                                     color: isCurrentSlot && !isFinished && slot.student ? '#1a73e8' : '#0f172a',
                                      fontFamily: "'Plus Jakarta Sans', sans-serif",
                                      whiteSpace: 'nowrap',
                                      flexShrink: 0,
                                      background: '#ffffff',
                                      padding: '4px 8px',
                                      borderRadius: '6px',
-                                     border: 'none',
+                                     border: isCurrentSlot && !isFinished && slot.student ? '1.5px solid #1a73e8' : 'none',
                                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
                                      display: 'inline-flex',
                                      alignItems: 'center',
-                                     justifyContent: 'center'
+                                     justifyContent: 'center',
+                                     gap: '4px'
                                    }}>
+                                     {isCurrentSlot && !isFinished && slot.student && (
+                                       <span className="pulse" style={{
+                                         width: '6px',
+                                         height: '6px',
+                                         borderRadius: '50%',
+                                         background: '#1a73e8',
+                                         display: 'inline-block'
+                                       }} />
+                                     )}
                                      {slot.timeSlot} Uhr
                                    </div>
 
                                    {/* Vertical separator */}
                                    <div style={{ width: '1.5px', height: '18px', background: '#e2e8f0', flexShrink: 0 }} />
 
-                                   {/* Student name and instrument details */}
-                                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                                    <div style={{ minWidth: 0, flex: 1 }}>
-                                      <div style={{ fontWeight: 800, color: titleColor, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {slot.student ? (
-                                          <>
-                                            <span style={{ fontWeight: 900, color: isFinished ? '#15803d' : '#0f172a', fontSize: '0.9rem' }}>{slot.student.name}</span>
-                                            <span style={{ color: '#94a3b8', margin: '0 6px', fontWeight: 400 }}>•</span>
-                                            <span style={{ color: '#64748b', fontWeight: 500, fontSize: '0.78rem' }}>{slot.instrument || 'Musiker'}</span>
-                                            <span style={{ color: '#94a3b8', margin: '0 6px', fontWeight: 400 }}>•</span>
-                                            <span style={{ color: '#64748b', fontWeight: 500, fontSize: '0.78rem' }}>{slot.room || 'Groovelab'}</span>
-                                          </>
-                                        ) : (
-                                          <span style={{ fontWeight: 700, color: '#64748b', fontSize: '0.85rem' }}>☕️ Pause</span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
+                                   <div style={{ display: 'flex', alignItems: 'center', minWidth: 0, flex: 1 }}>
+                                     <div style={{ minWidth: 0, flex: 1 }}>
+                                       <div style={{ fontWeight: 800, color: titleColor, display: 'flex', alignItems: 'center', fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                         {slot.student ? (
+                                           <div style={{ display: 'flex', alignItems: 'center', width: '100%', minWidth: 0 }}>
+                                             <span style={{ 
+                                               fontWeight: 900, 
+                                               color: isFinished ? '#15803d' : '#0f172a', 
+                                               fontSize: '0.9rem', 
+                                               width: '140px', 
+                                               flexShrink: 0, 
+                                               overflow: 'hidden', 
+                                               textOverflow: 'ellipsis', 
+                                               whiteSpace: 'nowrap' 
+                                             }}>
+                                               {slot.student.name}
+                                             </span>
+                                             
+                                             <span style={{ color: '#94a3b8', margin: '0 8px', fontWeight: 400, flexShrink: 0 }}>•</span>
+                                             
+                                             <span style={{ 
+                                               color: '#64748b', 
+                                               fontWeight: 500, 
+                                               fontSize: '0.78rem', 
+                                               width: '80px', 
+                                               flexShrink: 0, 
+                                               overflow: 'hidden', 
+                                               textOverflow: 'ellipsis', 
+                                               whiteSpace: 'nowrap' 
+                                             }}>
+                                               {slot.instrument || 'Musiker'}
+                                             </span>
+                                             
+                                             <span style={{ color: '#94a3b8', margin: '0 8px', fontWeight: 400, flexShrink: 0 }}>•</span>
+                                             
+                                             <span style={{ 
+                                               color: '#64748b', 
+                                               fontWeight: 500, 
+                                               fontSize: '0.78rem', 
+                                               flex: 1, 
+                                               minWidth: 0, 
+                                               overflow: 'hidden', 
+                                               textOverflow: 'ellipsis', 
+                                               whiteSpace: 'nowrap' 
+                                             }}>
+                                               {slot.room || 'Groovelab'}
+                                             </span>
+                                           </div>
+                                         ) : (
+                                           <span style={{ fontWeight: 700, color: '#78350f', fontSize: '0.85rem' }}>☕️ Pause (30 Min.)</span>
+                                         )}
+                                       </div>
+                                     </div>
+                                   </div>
 
                                   {/* Unbestätigt Badge (on the right) */}
                                   {isRescheduledPending && (
                                     <span style={{
-                                      background: '#fff7ed',
-                                      color: '#ea580c',
-                                      border: '1px solid #ffedd5',
+                                      background: '#fffbeb',
+                                      color: '#eab308',
+                                      border: '1px solid #fde68a',
                                       padding: '4px 10px',
                                       borderRadius: '6px',
                                       fontSize: '0.72rem',
@@ -3625,13 +4159,33 @@ export function TeacherDashboard({
                                       alignItems: 'center',
                                       gap: '6px',
                                       flexShrink: 0,
-                                      boxShadow: '0 1px 2px rgba(234, 88, 12, 0.04)'
+                                      boxShadow: '0 1px 2px rgba(251, 188, 5, 0.04)'
                                     }}>
                                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                         <circle cx="12" cy="12" r="10" strokeDasharray="3 3" />
                                         <polyline points="12 6 12 12 16 14" />
                                       </svg>
                                       Unbestätigt
+                                    </span>
+                                  )}
+
+                                  {/* Bestätigt Badge (on the right) */}
+                                  {isRescheduledConfirmed && (
+                                    <span style={{
+                                      background: '#f0fdf4',
+                                      color: '#16a34a',
+                                      border: '1px solid #bbf7d0',
+                                      padding: '4px 6px',
+                                      borderRadius: '50%',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      flexShrink: 0,
+                                      boxShadow: '0 1px 2px rgba(22, 163, 74, 0.04)'
+                                    }}>
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="20 6 9 17 4 12" />
+                                      </svg>
                                     </span>
                                   )}
                                 </div>
@@ -3745,9 +4299,10 @@ export function TeacherDashboard({
                         })()}
                       </div>
                     </div>
+                  )}
 
                     {/* Next Student Prep Mirror */}
-                    {(dynamicPrepMirror || briefingData.prepMirror) && (
+                    {!teacher?.sick_until && (dynamicPrepMirror || briefingData.prepMirror) && (
                       <div className="google-card" style={{ flex: '1 1 280px', minWidth: '280px', borderLeft: '4px solid #10b981', opacity: loadingPrepMirror ? 0.6 : 1, transition: 'opacity 0.2s' }}>
                         {(() => {
                           const prep = dynamicPrepMirror || briefingData.prepMirror;
@@ -3870,7 +4425,7 @@ export function TeacherDashboard({
               
               {/* SICKNESS CARD – always red */}
               <div style={{ 
-                padding: isSickWidgetExpanded || teacher?.sick_until ? '20px 24px' : '12px 20px', 
+                padding: isSickWidgetExpanded ? '20px 24px' : '12px 20px', 
                 borderRadius: '24px',
                 background: 'linear-gradient(135deg, #fff1f2 0%, #fff5f5 100%)',
                 boxShadow: '0 4px 20px rgba(239,68,68,0.10)',
@@ -3969,12 +4524,37 @@ export function TeacherDashboard({
                     </div>
 
                     {teacher?.sick_until && !isSickWidgetExpanded && (
-                      <div style={{ fontSize: '0.78rem', color: '#dc2626', fontWeight: 700, paddingLeft: '30px' }}>
-                        Bis: {new Date(teacher.sick_until).toLocaleDateString('de-DE')}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '32px', marginTop: '6px' }}>
+                        <div style={{ fontSize: '0.78rem', color: '#dc2626', fontWeight: 700 }}>
+                          Bis: {new Date(teacher.sick_until).toLocaleDateString('de-DE')}
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEndSick();
+                          }}
+                          disabled={reportingSick}
+                          style={{
+                            background: '#ffffff',
+                            color: '#166534',
+                            border: '1.5px solid #16a34a',
+                            padding: '6px 14px',
+                            borderRadius: '10px',
+                            fontWeight: 700,
+                            fontSize: '0.75rem',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            width: 'fit-content',
+                            boxShadow: '0 2px 6px rgba(22, 163, 74, 0.1)'
+                          }}
+                          className="hover-scale"
+                        >
+                          ✅ Wieder gesund melden
+                        </button>
                       </div>
                     )}
 
-                    {(isSickWidgetExpanded || teacher?.sick_until) && (
+                    {isSickWidgetExpanded && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingTop: '8px', borderTop: '1px solid #fecaca' }}>
                         {teacher?.sick_until ? (
                           <div style={{ fontSize: '0.78rem', color: '#7f1d1d', fontWeight: 550, lineHeight: 1.4 }}>
@@ -4062,8 +4642,10 @@ export function TeacherDashboard({
                 )}
               </div>
 
-              {/* INFOS DER VERWALTUNG */}
-              <div style={{ 
+              {!teacher?.sick_until && (
+                <>
+                  {/* INFOS DER VERWALTUNG */}
+                  <div style={{ 
                 background: '#ffffff', 
                 borderRadius: '24px', 
                 padding: '24px', 
@@ -4298,6 +4880,8 @@ export function TeacherDashboard({
                   )}
                 </div>
               </div>
+                </>
+              )}
             </aside>
           </div>
         ) : activeTab === 'live' ? (
@@ -5943,45 +6527,6 @@ export function TeacherDashboard({
                   style={{ width: '100%', padding: '16px 16px 16px 48px', borderRadius: '24px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', outline: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' }} 
                 />
               </div>
-              <button
-                onClick={() => { setInviteLink(null); setInviteEmail(''); setInviteFirstName(''); setInviteLastName(''); setShowInviteStudent(true); }}
-                style={{
-                  background: 'white',
-                  color: '#8b5cf6',
-                  border: '2px solid #8b5cf6',
-                  padding: '14px 22px',
-                  borderRadius: '24px',
-                  fontWeight: 800,
-                  fontSize: '0.9rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  transition: 'all 0.2s'
-                }}
-              >
-                <Mail size={18} /> Einladen
-              </button>
-              <button
-                onClick={() => setShowAddStudent(true)}
-                style={{
-                  background: '#8b5cf6',
-                  color: 'white',
-                  border: 'none',
-                  padding: '16px 24px',
-                  borderRadius: '24px',
-                  fontWeight: 800,
-                  fontSize: '0.9rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  boxShadow: '0 8px 20px rgba(139, 92, 246, 0.2)',
-                  transition: 'all 0.2s'
-                }}
-              >
-                <Plus size={18} /> Schüler anlegen
-              </button>
             </div>
 
             {/* A-Z Schnellsuche */}
@@ -6037,7 +6582,9 @@ export function TeacherDashboard({
                 const matchesSearch = (student.first_name || '').toLowerCase().includes(studentSearch.toLowerCase()) || 
                                       (student.last_name || '').toLowerCase().includes(studentSearch.toLowerCase());
                 const matchesLetter = studentLetter ? (student.first_name || '').toUpperCase().startsWith(studentLetter) : true;
-                return matchesSearch && matchesLetter;
+                const matchesInstrument = studentInstrumentFilter === 'all' || 
+                  (student.instrument && student.instrument.toLowerCase().trim() === studentInstrumentFilter.toLowerCase().trim());
+                return matchesSearch && matchesLetter && matchesInstrument;
               });
 
               if (filtered.length === 0) {
@@ -6178,12 +6725,13 @@ export function TeacherDashboard({
 
           {/* Schüler Sidebar */}
           <aside style={{ flex: 1, minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* Schüler-Statistik Card without limit block */}
             <div style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
               <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', fontWeight: 900, color: '#1e293b' }}>
                 Schüler-Statistik
               </h3>
               
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px' }}>
                   <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>Gesamt registriert</span>
                   <span style={{ fontSize: '1.1rem', fontWeight: 950, color: '#8b5cf6' }}>{allStudents.length}</span>
@@ -6197,32 +6745,224 @@ export function TeacherDashboard({
                   <span style={{ fontSize: '1.1rem', fontWeight: 950, color: '#64748b' }}>{allStudents.filter(s => s.status === 'inactive').length}</span>
                 </div>
               </div>
-
-              {teacher?.schools?.limits_enabled ? (
-                <div style={{ background: '#f3e8ff', border: '1px solid #e9d5ff', padding: '16px', borderRadius: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', fontWeight: 800, color: '#6b21a8', marginBottom: '8px' }}>
-                    <span>Schulauslastung</span>
-                    <span>{allStudents.length} / {teacher.schools.max_students ?? 6}</span>
-                  </div>
-                  <div style={{ width: '100%', height: '8px', background: 'rgba(139, 92, 246, 0.15)', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ 
-                      width: `${Math.min(100, (allStudents.length / (teacher.schools.max_students ?? 6)) * 100)}%`, 
-                      height: '100%', 
-                      background: '#8b5cf6', 
-                      borderRadius: '4px',
-                      transition: 'width 0.3s ease'
-                    }} />
-                  </div>
-                  <p style={{ margin: '8px 0 0 0', fontSize: '0.68rem', color: '#7c3aed', fontWeight: 600, lineHeight: 1.4 }}>
-                    Sobald das Limit erreicht ist, können keine weiteren Schüler angelegt werden.
-                  </p>
-                </div>
-              ) : (
-                <div style={{ background: '#e6f4ea', border: '1px solid #a7f3d0', padding: '16px', borderRadius: '16px', fontSize: '0.75rem', color: '#137333', fontWeight: 700 }}>
-                  ✓ Unbegrenztes Schülerlimit aktiv!
-                </div>
-              )}
             </div>
+
+            {/* Premium Instrument Avatar Filter Widget */}
+            {(() => {
+              const widgetUniqueInstruments = Array.from(new Set(
+                allStudents
+                  .map((s: any) => s.instrument)
+                  .filter((inst: string) => inst && inst.trim().length > 0)
+              )) as string[];
+
+              return (
+                <div className="google-card" style={{ padding: '20px', borderRadius: '24px', border: '1px solid #cbd5e1', background: '#ffffff', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.01)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>
+                    Instrumenten-Filter
+                  </h3>
+                  
+                  <div style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '12px',
+                    justifyContent: 'flex-start',
+                    alignItems: 'center',
+                    width: '100%'
+                  }}>
+                    {/* ALL Button */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                      <button
+                        onClick={() => setStudentInstrumentFilter('all')}
+                        title="Alle Instrumente anzeigen"
+                        style={{
+                          width: '60px',
+                          height: '60px',
+                          borderRadius: '20px',
+                          border: studentInstrumentFilter === 'all' ? '2.5px solid #8b5cf6' : '1px solid #cbd5e1',
+                          background: studentInstrumentFilter === 'all' ? '#ffffff' : '#f1f5f9',
+                          color: '#1e293b',
+                          fontSize: '0.9rem',
+                          fontWeight: 900,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          fontFamily: 'Urbanist',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                          boxShadow: studentInstrumentFilter === 'all' ? '0 4px 12px -2px rgba(139, 92, 246, 0.2)' : 'none',
+                          transform: studentInstrumentFilter === 'all' ? 'scale(1.08)' : 'scale(1)'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (studentInstrumentFilter !== 'all') {
+                            e.currentTarget.style.borderColor = '#8b5cf6';
+                            e.currentTarget.style.background = '#ffffff';
+                            e.currentTarget.style.transform = 'translateY(-1px) scale(1.03)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (studentInstrumentFilter !== 'all') {
+                            e.currentTarget.style.borderColor = '#cbd5e1';
+                            e.currentTarget.style.background = '#f1f5f9';
+                            e.currentTarget.style.transform = 'scale(1)';
+                          }
+                        }}
+                      >
+                        ALL
+                      </button>
+                      <span style={{ fontSize: '0.62rem', color: studentInstrumentFilter === 'all' ? '#0f172a' : '#64748b', fontWeight: 800, fontFamily: 'Urbanist' }}>Alle</span>
+                    </div>
+
+                    {/* Dynamic Instrument Avatars */}
+                    {widgetUniqueInstruments.map((inst: string) => {
+                      const instLower = inst.toLowerCase().trim();
+                      
+                      // Determine visual photo files based on instrument name
+                      let imgFile = 'guitar_avatar.png';
+                      if (instLower.includes('klavier') || instLower.includes('piano') || instLower.includes('tasten')) {
+                        imgFile = 'piano_avatar.png';
+                      } else if (instLower.includes('gitar') || instLower.includes('guitar')) {
+                        imgFile = 'guitar_avatar.png';
+                      } else if (instLower.includes('bass')) {
+                        imgFile = 'bass_avatar.png';
+                      } else if (instLower.includes('schlag') || instLower.includes('drum') || instLower.includes('percussion')) {
+                        imgFile = 'drums_avatar.png';
+                      } else if (instLower.includes('gesang') || instLower.includes('stimme') || instLower.includes('sing') || instLower.includes('vocals')) {
+                        imgFile = 'vocals_avatar.png';
+                      } else if (instLower.includes('geige') || instLower.includes('violine') || instLower.includes('streich') || instLower.includes('cello')) {
+                        imgFile = instLower.includes('cello') ? 'cello_avatar.png' : 'violin_avatar.png';
+                      } else if (instLower.includes('sax')) {
+                        imgFile = 'saxophone_avatar.png';
+                      } else if (instLower.includes('klarinette')) {
+                        imgFile = 'clarinet_avatar.png';
+                      } else if (instLower.includes('flöte')) {
+                        imgFile = 'flute_avatar.png';
+                      } else if (instLower.includes('horn')) {
+                        imgFile = 'horn_avatar.png';
+                      } else if (instLower.includes('posaune')) {
+                        imgFile = 'trombone_avatar.png';
+                      } else if (instLower.includes('trompete')) {
+                        imgFile = 'trumpet_avatar.png';
+                      } else {
+                        imgFile = 'guitar_avatar.png';
+                      }
+
+                      const isActive = studentInstrumentFilter.toLowerCase().trim() === instLower;
+
+                      return (
+                        <div key={inst} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                          <button
+                            onClick={() => setStudentInstrumentFilter(inst)}
+                            title={inst}
+                            style={{
+                              width: '60px',
+                              height: '60px',
+                              borderRadius: '20px',
+                              border: isActive ? '2.5px solid #8b5cf6' : '1px solid #cbd5e1',
+                              background: isActive ? '#ffffff' : '#f1f5f9',
+                              padding: 0,
+                              overflow: 'hidden',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                              boxShadow: isActive ? '0 4px 12px -2px rgba(139, 92, 246, 0.2)' : 'none',
+                              transform: isActive ? 'scale(1.08)' : 'scale(1)'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!isActive) {
+                                e.currentTarget.style.borderColor = '#8b5cf6';
+                                e.currentTarget.style.background = '#ffffff';
+                                e.currentTarget.style.transform = 'translateY(-1px) scale(1.03)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isActive) {
+                                  e.currentTarget.style.borderColor = '#cbd5e1';
+                                  e.currentTarget.style.background = '#f1f5f9';
+                                  e.currentTarget.style.transform = 'scale(1)';
+                                }
+                            }}
+                          >
+                            <img 
+                              src={`/avatars/${imgFile}`} 
+                              alt={inst} 
+                              style={{ 
+                                width: '100%', 
+                                height: '100%', 
+                                objectFit: 'cover',
+                                opacity: isActive ? 1 : 0.65,
+                                transition: 'opacity 0.2s'
+                              }} 
+                            />
+                          </button>
+                          <span style={{ 
+                            fontSize: '0.62rem', 
+                            color: isActive ? '#0f172a' : '#64748b', 
+                            fontWeight: 800, 
+                            fontFamily: 'Urbanist',
+                            textAlign: 'center',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            maxWidth: '70px'
+                          }}>
+                            {inst}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Active Filter Pill */}
+                  {studentInstrumentFilter !== 'all' && (
+                    <div style={{
+                      alignSelf: 'flex-start',
+                      padding: '6px 12px',
+                      borderRadius: '20px',
+                      background: '#f5f3ff',
+                      border: '1px solid #ddd6fe',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      animation: 'fadeIn 0.2s ease-out'
+                    }}>
+                      <span style={{ fontSize: '0.68rem', color: '#6d28d9', fontWeight: 800, fontFamily: 'Urbanist' }}>
+                        Aktiv: {studentInstrumentFilter}
+                      </span>
+                      <button
+                        onClick={() => setStudentInstrumentFilter('all')}
+                        style={{
+                          border: 'none',
+                          background: 'transparent',
+                          color: '#ef4444',
+                          fontSize: '0.75rem',
+                          fontWeight: 900,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: 0,
+                          borderRadius: '50%',
+                          width: '16px',
+                          height: '16px',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = '#fee2e2';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'transparent';
+                        }}
+                        title="Filter aufheben"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             <div style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
               <h3 style={{ margin: '0 0 12px 0', fontSize: '1rem', fontWeight: 900, color: '#1e293b' }}>

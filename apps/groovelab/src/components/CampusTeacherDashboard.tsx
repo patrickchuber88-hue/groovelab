@@ -15,7 +15,8 @@ import {
   X, 
   BookOpen,
   Award,
-  Zap
+  Zap,
+  Box
 } from 'lucide-react';
 
 interface CampusTeacherDashboardProps {
@@ -25,7 +26,7 @@ interface CampusTeacherDashboardProps {
 
 export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashboardProps) {
   // Navigation State
-  const [activeBoard, setActiveBoard] = useState<'compass' | 'classes' | 'schedule' | 'bypass' | 'setup'>('compass');
+  const [activeBoard, setActiveBoard] = useState<'compass' | 'classes' | 'schedule' | 'bypass' | 'setup' | 'rooms'>('compass');
 
   // Teacher Profile Data
   const [teacher, setTeacher] = useState<any>(null);
@@ -66,6 +67,15 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
   const [newBreakStart, setNewBreakStart] = useState('');
   const [newBreakEnd, setNewBreakEnd] = useState('');
   const [newBreakLabel, setNewBreakLabel] = useState('');
+
+  // Board 6: Räume Overview & Bookings
+  const [allSchoolSchedules, setAllSchoolSchedules] = useState<any[]>([]);
+  const [selectedRoom, setSelectedRoom] = useState<any>(null);
+  const [bookingModalOpen, setBookingModalOpen] = useState(false);
+  const [bookingDay, setBookingDay] = useState<number | null>(null);
+  const [bookingSlot, setBookingSlot] = useState<string>('');
+  const [bookingType, setBookingType] = useState<'solo' | 'lesson'>('solo');
+  const [bookingStudentId, setBookingStudentId] = useState<string>('');
 
   // Loading States
   const [loading, setLoading] = useState(true);
@@ -228,6 +238,9 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
       .eq('school_id', schoolId)
       .order('sort_order', { ascending: true });
     setRooms(rData || []);
+    if (rData && rData.length > 0) {
+      setSelectedRoom((prev: any) => prev || rData[0]);
+    }
 
     // 3. Fetch Availabilities
     const { data: aData } = await supabase
@@ -263,6 +276,24 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
     const todayWeekday = currentDay;
     const todaySlots = mappedSchedData.filter(s => s.day_of_week === todayWeekday);
     setTodaySchedules(todaySlots);
+
+    // 5. Fetch all school schedules for Room Board
+    const { data: allSchedData } = await supabase
+      .from('schedules')
+      .select('*, student:users!schedules_student_id_fkey(*), teacher:users!schedules_teacher_id_fkey(*), rooms(*), schedule_exceptions(exception_date, status)')
+      .eq('school_id', schoolId);
+
+    const mappedAllSchedData = (allSchedData || []).map(s => {
+      const targetDate = new Date(monday);
+      targetDate.setDate(monday.getDate() + s.day_of_week - 1);
+      const targetDateStr = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`;
+      const exception = (s.schedule_exceptions || []).find((ex: any) => ex.exception_date === targetDateStr);
+      return {
+        ...s,
+        status: exception ? exception.status : s.status
+      };
+    });
+    setAllSchoolSchedules(mappedAllSchedData);
 
     await fetchNotifications(teacherId);
   };
@@ -454,8 +485,8 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
       }
     }
 
-    // 3. Physical Collisions Check
-    const isOccupied = weekSchedules.some(s => 
+    // 3. Physical Collisions & Swap Check
+    const targetConflictSlot = weekSchedules.find(s => 
       s.id !== draggedId &&
       s.day_of_week === dayOfWeek &&
       s.time_slot === timeSlot &&
@@ -464,7 +495,27 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
       s.status !== 'teacher_sick'
     );
 
-    if (isOccupied) return 'RED';
+    if (targetConflictSlot) {
+      // It's a 1:1 swap! Verify original room matrix for target student
+      const targetStudentInst = (targetConflictSlot.student?.instrument || '').toLowerCase();
+      const originalRoomId = sched.room_id;
+      const originalRoom = rooms.find(r => r.id === originalRoomId);
+      if (originalRoom && originalRoom.allowed_instruments && originalRoom.allowed_instruments.length > 0) {
+        const allowedOriginal = originalRoom.allowed_instruments.map((i: string) => i.toLowerCase());
+        if (!allowedOriginal.includes(targetStudentInst)) {
+          return 'RED'; // Swapped student not allowed in original room
+        }
+      }
+
+      // Check availability for both students in their new swapped slots
+      const userAvails1 = studentAvailabilities.filter(a => a.user_id === sched.student_id);
+      const targetAvail1 = userAvails1.find(a => a.day_of_week === dayOfWeek && a.time_slot === timeSlot);
+
+      const userAvails2 = studentAvailabilities.filter(a => a.user_id === targetConflictSlot.student_id);
+      const targetAvail2 = userAvails2.find(a => a.day_of_week === sched.day_of_week && a.time_slot === sched.time_slot);
+
+      return (targetAvail1 && targetAvail2) ? 'GREEN' : 'YELLOW';
+    }
 
     // Check teacher pause/break time
     const isTeacherInBreak = breakTimes.some(b => {
@@ -537,17 +588,57 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
 
       // Fallback update
       const status = color === 'GREEN' ? 'approved' : 'pending_parent_approval';
-      const { error } = await supabase
-        .from('schedules')
-        .update({
-          time_slot: timeSlot,
-          day_of_week: dayOfWeek,
-          room_id: roomId,
-          status: status
-        })
-        .eq('id', scheduleId);
 
-      if (error) throw error;
+      const targetConflict = weekSchedules.find(s => 
+        s.id !== scheduleId &&
+        s.day_of_week === dayOfWeek &&
+        s.time_slot === timeSlot &&
+        s.room_id === roomId &&
+        s.status !== 'canceled_by_student' &&
+        s.status !== 'teacher_sick'
+      );
+
+      if (targetConflict) {
+        // Swap both schedules in Supabase
+        const sourceSlot = weekSchedules.find(s => s.id === scheduleId);
+        if (sourceSlot) {
+          const { error: err1 } = await supabase
+            .from('schedules')
+            .update({
+              time_slot: timeSlot,
+              day_of_week: dayOfWeek,
+              room_id: roomId,
+              status: status
+            })
+            .eq('id', scheduleId);
+
+          const { error: err2 } = await supabase
+            .from('schedules')
+            .update({
+              time_slot: sourceSlot.time_slot,
+              day_of_week: sourceSlot.day_of_week,
+              room_id: sourceSlot.room_id,
+              status: status
+            })
+            .eq('id', targetConflict.id);
+
+          if (err1 || err2) throw (err1 || err2);
+        }
+      } else {
+        // Direct update for single move
+        const { error } = await supabase
+          .from('schedules')
+          .update({
+            time_slot: timeSlot,
+            day_of_week: dayOfWeek,
+            room_id: roomId,
+            status: status
+          })
+          .eq('id', scheduleId);
+
+        if (error) throw error;
+      }
+
       await refreshAllData(teacher.school_id, teacher.id);
       alert('Stundenplan erfolgreich angepasst! ✅');
     } catch (err) {
@@ -932,6 +1023,68 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
     setBreakTimes(prev => prev.filter((_, i) => i !== idx));
   };
 
+  // Board 6: Rooms Handlers
+  const handleOpenBookingModal = (day: number, slot: string) => {
+    setBookingDay(day);
+    setBookingSlot(slot);
+    setBookingType('solo');
+    setBookingStudentId('');
+    setBookingModalOpen(true);
+  };
+
+  const handleBookRoomSubmit = async () => {
+    if (!selectedRoom || !bookingDay || !bookingSlot) return;
+
+    try {
+      const payload: any = {
+        school_id: teacher.school_id,
+        teacher_id: userId,
+        day_of_week: bookingDay,
+        time_slot: bookingSlot,
+        room_id: selectedRoom.id,
+        status: 'approved'
+      };
+
+      if (bookingType === 'lesson' && bookingStudentId) {
+        payload.student_id = bookingStudentId;
+      }
+
+      const { data, error } = await supabase
+        .from('schedules')
+        .insert(payload)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      alert('Raum erfolgreich gebucht! ✅');
+      setBookingModalOpen(false);
+      await refreshAllData(teacher.school_id, userId);
+    } catch (err: any) {
+      console.error('Error booking room:', err);
+      alert('Fehler beim Buchen des Raums: ' + err.message);
+    }
+  };
+
+  const handleCancelRoomBooking = async (bookingId: string) => {
+    if (!window.confirm('Möchtest du diese Raumbuchung wirklich stornieren?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('schedules')
+        .delete()
+        .eq('id', bookingId);
+
+      if (error) throw error;
+
+      alert('Buchung erfolgreich storniert! ✅');
+      await refreshAllData(teacher.school_id, userId);
+    } catch (err: any) {
+      console.error('Error canceling room booking:', err);
+      alert('Fehler beim Stornieren der Buchung: ' + err.message);
+    }
+  };
+
   // Filter student lists
   const filteredStudents = students.filter(s => 
     `${s.first_name} ${s.last_name}`.toLowerCase().includes(searchTerm.toLowerCase())
@@ -1011,6 +1164,18 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
               <Calendar size={18} />
               <span>Mein Stundenplan</span>
               <span className="ml-auto text-[10px] bg-slate-800 px-2 py-0.5 rounded text-emerald-400 border border-slate-700">80/20</span>
+            </button>
+
+            <button
+              onClick={() => setActiveBoard('rooms')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all duration-200 ${
+                activeBoard === 'rooms'
+                  ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }`}
+            >
+              <Box size={18} />
+              <span>Räume</span>
             </button>
 
             <button
@@ -1217,15 +1382,26 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                       </div>
 
                       <div 
-                        onClick={() => !isSick && sched.status !== 'pending_reschedule' && handleOpenDocModal(sched)}
+                        onClick={() => {
+                          if (!isSick && sched.status !== 'pending_reschedule') {
+                            handleOpenDocModal(sched);
+                          }
+                          const clickDate = sched.date || new Date().toISOString().substring(0, 10);
+                          setSickUntilDate(clickDate);
+                        }}
+                        style={{
+                          borderLeft: sched.status === 'rescheduled_confirmed' ? '5px solid #fbbc05' : undefined
+                        }}
                         className={`p-5 rounded-2xl border transition-all duration-200 cursor-pointer ${
                           isSick 
                             ? 'bg-red-950/20 border-red-900/35 hover:bg-red-950/30' 
-                            : sched.status === 'pending_reschedule'
-                              ? 'bg-emerald-950/15 border-emerald-500/50 hover:border-emerald-500 shadow-md shadow-emerald-500/5'
-                              : isActive 
-                                ? 'bg-emerald-950/10 border-emerald-500/50 shadow-md shadow-emerald-500/5 hover:border-emerald-500' 
-                                : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                            : !sched.student
+                              ? 'bg-purple-950/10 border-purple-900/30 hover:bg-purple-950/20 shadow-md shadow-purple-500/5'
+                              : sched.status === 'pending_reschedule'
+                                ? 'bg-emerald-950/15 border-emerald-500/50 hover:border-emerald-500 shadow-md shadow-emerald-500/5'
+                                : isActive 
+                                  ? 'bg-emerald-950/10 border-emerald-500/50 shadow-md shadow-emerald-500/5 hover:border-emerald-500' 
+                                  : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
                         }`}
                       >
                         <div className="flex items-start justify-between">
@@ -1233,7 +1409,20 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                             <span className="font-mono text-xs font-bold text-emerald-400">{sched.time_slot} Uhr</span>
                             <h3 className="text-lg font-bold text-white flex items-center gap-2">
                               {sched.status === 'pending_reschedule' && <span className="text-yellow-500">🔄</span>}
-                              {sched.student ? `${sched.student.first_name} ${sched.student.last_name}` : '☕ Pause'}
+                              {sched.status === 'rescheduled_confirmed' && (
+                                <span 
+                                  title="Termin verschoben und bestätigt"
+                                  style={{ 
+                                    width: '10px', 
+                                    height: '10px', 
+                                    borderRadius: '50%', 
+                                    background: '#10b981', 
+                                    boxShadow: '0 0 8px #10b981',
+                                    display: 'inline-block' 
+                                  }} 
+                                />
+                              )}
+                              {sched.student ? `${sched.student.first_name} ${sched.student.last_name}` : '☕ Pause (45 Min.)'}
                             </h3>
                             <div className="flex gap-2">
                               {sched.student?.instrument && (
@@ -1253,6 +1442,10 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                             {isSick ? (
                               <span className="px-2.5 py-1 text-[10px] font-black uppercase bg-red-500/10 text-red-400 border border-red-500/20 rounded-md">
                                 Ausfall (Krankheit)
+                              </span>
+                            ) : !sched.student ? (
+                              <span className="px-2.5 py-1 text-[10px] font-black uppercase bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-md">
+                                Pause
                               </span>
                             ) : sched.status === 'canceled_by_student' ? (
                               <span className="px-2.5 py-1 text-[10px] font-black uppercase bg-slate-800 text-slate-500 rounded-md border border-slate-700">
@@ -1278,6 +1471,10 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                                   </button>
                                 </div>
                               </div>
+                            ) : sched.status === 'rescheduled_confirmed' ? (
+                              <span className="px-2.5 py-1 text-[10px] font-black uppercase bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 rounded-md">
+                                Verschoben & Bestätigt
+                              </span>
                             ) : (
                               <span className="px-2.5 py-1 text-[10px] font-black uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-md">
                                 Unterricht aktiv
@@ -1466,8 +1663,8 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                             }}
                           >
                             {isBreak ? (
-                              <div className="py-2.5 px-3 rounded-xl bg-slate-950 border border-slate-850 text-center flex items-center justify-center">
-                                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest flex items-center gap-1">
+                              <div className="py-2.5 px-3 rounded-xl bg-purple-950/10 border border-purple-900/30 text-center flex items-center justify-center">
+                                <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest flex items-center gap-1">
                                   ☕ {slot} Pause
                                 </span>
                               </div>
@@ -1479,7 +1676,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                                   onDragStart={(e) => handleDragStart(e, sched.id)}
                                   className={`p-3 rounded-xl border cursor-grab active:cursor-grabbing select-none ${
                                     !sched.student
-                                      ? 'bg-amber-950/20 border-amber-800/60 text-amber-300'
+                                      ? 'bg-purple-950/20 border-purple-800/60 text-purple-300'
                                       : sched.status === 'teacher_sick' || sched.status === 'canceled_by_teacher_sick'
                                         ? 'bg-red-950/30 border-red-900/60 text-red-300'
                                         : sched.status === 'pending_parent_approval'
@@ -1488,10 +1685,10 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                                   }`}
                                 >
                                   <p className="text-xs font-bold truncate">
-                                    {sched.student ? `${sched.student.first_name} ${sched.student.last_name[0]}.` : `☕ ${sched.time_slot} Pause`}
+                                    {sched.student ? `${sched.student.first_name} ${sched.student.last_name[0]}.` : `☕ ${sched.time_slot} Pause (45 Min.)`}
                                   </p>
                                   <p className="text-[9px] uppercase font-bold text-slate-500 tracking-wider mt-0.5">
-                                    {sched.student ? (sched.student.instrument || 'Inst') : 'Pause'}
+                                    {sched.student ? (sched.student.instrument || 'Inst') : 'Pause (45 Min.)'}
                                   </p>
                                   {sched.rooms?.name && (
                                     <p className="text-[9px] font-bold text-emerald-400 mt-1">
@@ -1710,7 +1907,260 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
             </div>
           </div>
         )}
+
+        {/* Board 6: RÄUME OVERVIEW & BOOKINGS */}
+        {activeBoard === 'rooms' && (
+          <div className="p-8 max-w-full w-full mx-auto space-y-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-3xl font-black tracking-tight text-white">Raum-Belegungen & Buchung</h1>
+                <p className="text-slate-400 text-sm mt-1">Hier siehst du freie und belegte Räume in Echtzeit und kannst Buchungen vornehmen.</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              {/* Left Column: Physical Rooms List */}
+              <div className="lg:col-span-4 space-y-4">
+                <div className="p-4 bg-slate-905 border border-slate-850 rounded-2xl">
+                  <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Akademie Räume</h3>
+                  <div className="space-y-3">
+                    {rooms.map((room) => {
+                      const isSelected = selectedRoom?.id === room.id;
+                      // Calculate occupancy stats for today
+                      const todayWeekday = new Date().getDay() || 7;
+                      const todayBookingsCount = allSchoolSchedules.filter(
+                        s => s.room_id === room.id && s.day_of_week === todayWeekday
+                      ).length;
+                      const freeTodayCount = timeSlots.length - todayBookingsCount;
+
+                      return (
+                        <div
+                          key={room.id}
+                          onClick={() => setSelectedRoom(room)}
+                          className={`p-4 rounded-2xl border transition-all duration-200 cursor-pointer ${
+                            isSelected
+                              ? 'bg-slate-900 border-emerald-500/60 shadow-lg shadow-emerald-500/10'
+                              : 'bg-slate-900/40 border-slate-800 hover:border-slate-700 hover:bg-slate-900/70'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className={`p-2.5 rounded-xl ${isSelected ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-400'}`}>
+                                <Box size={18} />
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-white text-sm">{room.name}</h4>
+                                <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mt-0.5">
+                                  {room.allowed_instruments && room.allowed_instruments.length > 0
+                                    ? room.allowed_instruments.join(', ')
+                                    : 'Alle Instrumente'}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 flex items-center justify-between border-t border-slate-800/40 pt-3 text-[11px] font-semibold text-slate-400">
+                            <span>Größe: {room.qm || 'N/A'} qm</span>
+                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                              todayBookingsCount > 4 ? 'bg-red-950/40 text-red-400' : 'bg-emerald-950/40 text-emerald-400'
+                            }`}>
+                              {todayBookingsCount} Belegt | {freeTodayCount} Frei
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Weekly Grid for Selected Room */}
+              <div className="lg:col-span-8 space-y-4">
+                {selectedRoom ? (
+                  <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-6 space-y-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-xl font-black text-white">{selectedRoom.name} - Stundenplan</h2>
+                        <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mt-0.5">
+                          {selectedRoom.allowed_instruments && selectedRoom.allowed_instruments.length > 0
+                            ? `Erlaubt: ${selectedRoom.allowed_instruments.join(', ')}`
+                            : 'Keine Instrumenten-Einschränkungen'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Booking Calendar Grid */}
+                    <div className="overflow-x-auto rounded-2xl border border-slate-850 bg-slate-950/20">
+                      <table className="w-full border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-850 bg-slate-900/50 text-left">
+                            <th className="p-4 text-xs font-black uppercase text-slate-500 tracking-wider">Uhrzeit</th>
+                            {weekDays.map(day => (
+                              <th key={day} className="p-4 text-xs font-black uppercase text-slate-300 tracking-wider">
+                                {daysOfWeekLabels[day]}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {timeSlots.map(slot => (
+                            <tr key={slot} className="border-b border-slate-900/40 hover:bg-slate-900/10">
+                              <td className="p-4 font-mono text-xs font-bold text-slate-500 bg-slate-950/30">{slot}</td>
+                              {weekDays.map(day => {
+                                const booking = allSchoolSchedules.find(
+                                  s => s.room_id === selectedRoom.id && s.day_of_week === day && s.time_slot === slot
+                                );
+                                const isCurrentTeacherBooking = booking && booking.teacher_id === userId;
+
+                                return (
+                                  <td key={`${day}-${slot}`} className="p-2 min-w-[130px] relative">
+                                    {booking ? (
+                                      <div className={`p-2.5 rounded-xl border flex flex-col justify-between h-full min-h-[72px] transition duration-200 ${
+                                        isCurrentTeacherBooking
+                                          ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-200'
+                                          : 'bg-red-950/25 border-red-900/30 text-red-200'
+                                      }`}>
+                                        <div>
+                                          <p className="text-[10px] font-black uppercase tracking-wider opacity-75">
+                                            {booking.student ? 'Unterricht' : 'Eigenübung'}
+                                          </p>
+                                          <p className="text-[11px] font-bold truncate mt-0.5">
+                                            {booking.student 
+                                              ? `${booking.student.first_name} ${booking.student.last_name[0]}.` 
+                                              : 'Freie Buchung'}
+                                          </p>
+                                          <p className="text-[9px] opacity-60 font-semibold mt-1">
+                                            Coach: {booking.teacher ? `${booking.teacher.first_name} ${booking.teacher.last_name[0]}.` : 'Unbekannt'}
+                                          </p>
+                                        </div>
+
+                                        {isCurrentTeacherBooking && (
+                                          <button
+                                            onClick={() => handleCancelRoomBooking(booking.id)}
+                                            className="mt-2 text-[9px] font-black uppercase tracking-widest text-red-400 hover:text-red-300 transition duration-150 self-start bg-red-950/40 border border-red-900/40 px-2 py-0.5 rounded"
+                                          >
+                                            Stornieren
+                                          </button>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleOpenBookingModal(day, slot)}
+                                        className="w-full py-4 rounded-xl border border-dashed border-slate-800 hover:border-emerald-500/40 hover:bg-emerald-500/5 text-center text-[10px] font-bold uppercase text-slate-500 hover:text-emerald-400 transition duration-150"
+                                      >
+                                        + Buchen
+                                      </button>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-20 text-center bg-slate-900/20 border border-slate-850 rounded-3xl">
+                    <p className="text-slate-400 font-bold text-sm">Wähle einen Raum aus der Liste, um seinen Plan anzuzeigen.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </main>
+
+      {/* Board 6 Overlay: ROOM BOOKING MODAL */}
+      {bookingModalOpen && selectedRoom && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-black text-white">Raum buchen</h3>
+                <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider mt-0.5">
+                  {selectedRoom.name} - {bookingDay ? daysOfWeekLabels[bookingDay] : ''} um {bookingSlot}
+                </p>
+              </div>
+              <button 
+                onClick={() => setBookingModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-6">
+              <div className="space-y-2">
+                <label className="text-xs font-black uppercase tracking-wider text-slate-400">Art der Buchung</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setBookingType('solo')}
+                    className={`py-3 px-4 rounded-xl border text-sm font-bold transition duration-200 ${
+                      bookingType === 'solo'
+                        ? 'bg-emerald-500 border-emerald-500 text-slate-950'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Eigenübung
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBookingType('lesson')}
+                    className={`py-3 px-4 rounded-xl border text-sm font-bold transition duration-200 ${
+                      bookingType === 'lesson'
+                        ? 'bg-emerald-500 border-emerald-500 text-slate-950'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Unterricht
+                  </button>
+                </div>
+              </div>
+
+              {bookingType === 'lesson' && (
+                <div className="space-y-2">
+                  <label className="text-xs font-black uppercase tracking-wider text-slate-400">Schüler auswählen</label>
+                  <select
+                    value={bookingStudentId}
+                    onChange={(e) => setBookingStudentId(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 font-bold"
+                  >
+                    <option value="">-- Schüler wählen --</option>
+                    {students.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.first_name} {s.last_name} ({s.instrument || 'Kein Instrument'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-slate-800 bg-slate-950/20 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setBookingModalOpen(false)}
+                className="flex-1 py-3 bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-400 hover:text-white font-bold text-sm uppercase tracking-wider rounded-xl transition duration-150"
+              >
+                Abbrechen
+              </button>
+              <button
+                type="button"
+                onClick={handleBookRoomSubmit}
+                disabled={bookingType === 'lesson' && !bookingStudentId}
+                className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-400 disabled:bg-emerald-800/40 disabled:text-slate-500 text-slate-950 font-black text-sm uppercase tracking-wider rounded-xl transition duration-150 shadow-lg shadow-emerald-500/20"
+              >
+                Buchen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Board 1 Overlay: MEISTERWERK DOCUMENTATION MODAL */}
       {docModalOpen && selectedStudentForDoc && (

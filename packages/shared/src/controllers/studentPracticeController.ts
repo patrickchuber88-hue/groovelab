@@ -197,3 +197,227 @@ export async function finishSessionHandler(req: Request, res: Response): Promise
     res.status(500).json({ error: 'Internal Server Error', details: err.message });
   }
 }
+
+/**
+ * POST /api/fokus/session-end
+ * body: {
+ *   studentId: string,
+ *   goalLevel: number,
+ *   flameTier: string,
+ *   targetDurationSeconds: number,
+ *   streakTimeMastered: number,
+ *   additionalPracticeMinutes: number,
+ *   startedAt: string,
+ *   endedAt: string
+ * }
+ */
+export async function sessionEndHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const {
+      studentId,
+      goalLevel,
+      flameTier,
+      targetDurationSeconds,
+      streakTimeMastered,
+      additionalPracticeMinutes,
+      startedAt,
+      endedAt
+    } = req.body;
+
+    if (!studentId || typeof streakTimeMastered !== 'number' || typeof additionalPracticeMinutes !== 'number') {
+      res.status(400).json({ error: 'studentId, streakTimeMastered and additionalPracticeMinutes are required.' });
+      return;
+    }
+
+    // 1. Fetch student's profile to retrieve school_id (Tenant)
+    const { data: userProfile, error: profileError } = await supabase
+      .from('users')
+      .select('school_id')
+      .eq('id', studentId)
+      .maybeSingle();
+
+    if (profileError || !userProfile) {
+      res.status(404).json({ error: 'Student or associated school tenant not found.' });
+      return;
+    }
+
+    const schoolId = userProfile.school_id;
+
+    // 2. Anti-Cheat & Integrity Check
+    const startMs = new Date(startedAt).getTime();
+    const endMs = new Date(endedAt).getTime();
+    const actualElapsedSeconds = (endMs - startMs) / 1000;
+    const reportedTotalSeconds = streakTimeMastered + (additionalPracticeMinutes * 60);
+    const toleranceSeconds = 10;
+
+    if (reportedTotalSeconds > actualElapsedSeconds + toleranceSeconds) {
+      res.status(400).json({
+        success: false,
+        error: 'Daten-Integritätsverletzung: Übertragene Zeiten überschreiten die echte Zeitdauer.'
+      });
+      return;
+    }
+
+    const completedStreak = streakTimeMastered >= targetDurationSeconds;
+
+    // 3. Insert Focus Session Record into public.focus_sessions
+    const { data: focusSession, error: insertSessionError } = await supabase
+      .from('focus_sessions')
+      .insert({
+        school_id: schoolId,
+        student_id: studentId,
+        goal_level: goalLevel,
+        flame_tier: flameTier,
+        target_duration_seconds: targetDurationSeconds,
+        streak_time_mastered: streakTimeMastered,
+        additional_practice_minutes: additionalPracticeMinutes,
+        completed_streak: completedStreak,
+        started_at: startedAt,
+        ended_at: endedAt
+      })
+      .select()
+      .single();
+
+    if (insertSessionError) {
+      res.status(500).json({ error: 'Failed to insert focus session.', details: insertSessionError.message });
+      return;
+    }
+
+    // 4. Update Student Stats & Gamification XP (+10 XP per minute)
+    const totalMinutesPracticed = (streakTimeMastered / 60) + additionalPracticeMinutes;
+    const xpAdded = Math.round(totalMinutesPracticed * 10);
+
+    const { data: stats, error: statsError } = await supabase
+      .from('student_stats')
+      .select('*')
+      .eq('student_id', studentId)
+      .maybeSingle();
+
+    let totalFocus = 0;
+    let monthlyFocus = 0;
+    let currentXp = 0;
+    let streakFlame = 0;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    let lastPracticeDate = stats?.last_practice_date ? String(stats.last_practice_date) : null;
+
+    if (stats) {
+      totalFocus = stats.total_focus_minutes || 0;
+      monthlyFocus = stats.monthly_focus_minutes || 0;
+      currentXp = stats.current_xp || 0;
+      streakFlame = stats.streak_flame || 0;
+    }
+
+    totalFocus += Math.round(totalMinutesPracticed);
+    monthlyFocus += Math.round(totalMinutesPracticed);
+    currentXp += xpAdded;
+
+    // Update streak if streak was mastered successfully
+    if (completedStreak) {
+      if (!lastPracticeDate) {
+        streakFlame = 1;
+      } else if (lastPracticeDate === yesterdayStr) {
+        streakFlame += 1;
+      } else if (lastPracticeDate === todayStr) {
+        // Keep current streak
+      } else {
+        streakFlame = 1;
+      }
+      lastPracticeDate = todayStr;
+    }
+
+    await supabase
+      .from('student_stats')
+      .upsert({
+        student_id: studentId,
+        total_focus_minutes: totalFocus,
+        monthly_focus_minutes: monthlyFocus,
+        streak_flame: streakFlame,
+        last_practice_date: lastPracticeDate,
+        current_xp: currentXp,
+        updated_at: new Date().toISOString()
+      });
+
+    // 5. Update Avatar Gamification Level matching evolution benchmarks
+    const { data: avatar } = await supabase
+      .from('avatars')
+      .select('*')
+      .eq('user_id', studentId)
+      .maybeSingle();
+
+    if (avatar) {
+      const currentLevel = avatar.evolution_level || 1;
+      let newLevel = currentLevel;
+      const instrument = avatar.instrument_type || 'guitarist';
+
+      const STAGES: Record<string, Record<number, { xpThreshold: number; assetPath: string }>> = {
+        guitarist: {
+          1: { xpThreshold: 0, assetPath: '/avatars/hero_guitarist_lvl1.png' },
+          2: { xpThreshold: 100, assetPath: '/avatars/hero_guitarist_lvl2.png' },
+          3: { xpThreshold: 300, assetPath: '/avatars/hero_guitarist_lvl3.png' }
+        },
+        drummer: {
+          1: { xpThreshold: 0, assetPath: '/avatars/hero_drummer_lvl1.png' },
+          2: { xpThreshold: 100, assetPath: '/avatars/hero_drummer_lvl2.png' },
+          3: { xpThreshold: 300, assetPath: '/avatars/hero_drummer_lvl3.png' }
+        },
+        keyboardist: {
+          1: { xpThreshold: 0, assetPath: '/avatars/hero_keys_lvl1.png' },
+          2: { xpThreshold: 100, assetPath: '/avatars/hero_keys_lvl2.png' },
+          3: { xpThreshold: 300, assetPath: '/avatars/hero_keys_lvl3.png' }
+        },
+        vocalist: {
+          1: { xpThreshold: 0, assetPath: '/avatars/hero_vocals_lvl1.png' },
+          2: { xpThreshold: 100, assetPath: '/avatars/hero_vocals_lvl2.png' },
+          3: { xpThreshold: 300, assetPath: '/avatars/hero_vocals_lvl3.png' }
+        }
+      };
+
+      const heroStages = STAGES[instrument] || STAGES.guitarist;
+      if (currentXp >= heroStages[3].xpThreshold) {
+        newLevel = 3;
+      } else if (currentXp >= heroStages[2].xpThreshold) {
+        newLevel = 2;
+      } else {
+        newLevel = 1;
+      }
+
+      const nextAssetPath = heroStages[newLevel].assetPath;
+
+      await supabase
+        .from('avatars')
+        .update({
+          xp: currentXp,
+          evolution_level: newLevel,
+          asset_path: nextAssetPath,
+          streak_flame: streakFlame,
+          last_focus_date: todayStr
+        })
+        .eq('id', avatar.id);
+
+      await supabase
+        .from('users')
+        .update({ avatar_url: nextAssetPath })
+        .eq('id', studentId);
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Fokussession erfolgreich verbucht.',
+      sessionId: focusSession.id,
+      completedStreak,
+      stats: {
+        totalFocusMinutes: totalFocus,
+        monthlyFocusMinutes: monthlyFocus,
+        streakFlame,
+        currentXp,
+        xpAdded
+      }
+    });
+
+  } catch (err: any) {
+    res.status(500).json({ error: 'Internal Server Error', details: err.message });
+  }
+}

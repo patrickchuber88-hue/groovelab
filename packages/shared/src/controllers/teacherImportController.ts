@@ -156,7 +156,7 @@ export async function importTeachersHandler(req: Request, res: Response): Promis
         ausweis_nummer: ausweisNummer,
         teacher_qr_token: teacherQrToken,
         is_active: false,
-        is_campus_active: false,
+        is_campus_active: true,
         is_groovelab_active: false
       });
     }

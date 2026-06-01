@@ -606,7 +606,121 @@ export async function swapScheduleHandler(req: Request, res: Response): Promise<
       return;
     }
 
-    // 3. Collision Validation (teacher occupancy or room occupancy)
+    // Check if there is an active target schedule occupying the target slot for a 1:1 swap
+    const { data: targetSchedule, error: targetError } = await supabase
+      .from('schedules')
+      .select(`
+        id,
+        school_id,
+        teacher_id,
+        student_id,
+        day_of_week,
+        time_slot,
+        room_id,
+        status,
+        student:users!schedules_student_id_fkey (id, instrument, first_name, last_name)
+      `)
+      .eq('day_of_week', targetDayOfWeek)
+      .eq('time_slot', targetTimeSlot)
+      .eq('room_id', targetRoomId)
+      .neq('status', 'canceled_by_student')
+      .neq('id', scheduleId)
+      .maybeSingle();
+
+    if (targetError) {
+      res.status(500).json({ error: 'Error querying target schedule.', details: targetError.message });
+      return;
+    }
+
+    if (targetSchedule) {
+      // 1. Validate room matrix for target schedule in dragged schedule's original room
+      const targetStudent = (targetSchedule as any).student;
+      const targetInstrument = targetStudent?.instrument || 'Klavier';
+
+      const { data: originalRoom } = await supabase
+        .from('rooms')
+        .select('id, name, allowed_instruments')
+        .eq('id', schedule.room_id)
+        .single();
+
+      if (originalRoom) {
+        const allowedOriginal = (originalRoom.allowed_instruments || []).map((i: string) => i.toLowerCase());
+        const formattedTargetInstrument = targetInstrument.trim().toLowerCase();
+        const supportsTargetInstrument = allowedOriginal.includes(formattedTargetInstrument) ||
+                                         allowedOriginal.includes(targetInstrument.toLowerCase()) ||
+                                         allowedOriginal.length === 0;
+
+        if (!supportsTargetInstrument) {
+          res.status(200).json({
+            success: false,
+            color: 'RED',
+            message: `Raum-Kollision: Der originale Raum ${originalRoom.name} erlaubt das Instrument '${targetInstrument}' des getauschten Schülers nicht.`
+          });
+          return;
+        }
+      }
+
+      // 2. Validate availability for both students in their new swapped slots
+      const { data: avail1 } = await supabase
+        .from('user_availability')
+        .select('id')
+        .eq('user_id', schedule.student_id)
+        .eq('day_of_week', targetDayOfWeek)
+        .eq('time_slot', targetTimeSlot)
+        .maybeSingle();
+
+      const { data: avail2 } = await supabase
+        .from('user_availability')
+        .select('id')
+        .eq('user_id', targetSchedule.student_id)
+        .eq('day_of_week', schedule.day_of_week)
+        .eq('time_slot', schedule.time_slot)
+        .maybeSingle();
+
+      const isBothAvailable = !!avail1 && !!avail2;
+      const swapStatus = isBothAvailable ? 'approved' : 'pending_parent_approval';
+
+      // Perform the 1:1 swap in schedules
+      const { error: updateError1 } = await supabase
+        .from('schedules')
+        .update({
+          day_of_week: targetDayOfWeek,
+          time_slot: targetTimeSlot,
+          room_id: targetRoomId,
+          status: swapStatus
+        })
+        .eq('id', scheduleId);
+
+      const { error: updateError2 } = await supabase
+        .from('schedules')
+        .update({
+          day_of_week: schedule.day_of_week,
+          time_slot: schedule.time_slot,
+          room_id: schedule.room_id,
+          status: swapStatus
+        })
+        .eq('id', targetSchedule.id);
+
+      if (updateError1 || updateError2) {
+        res.status(500).json({ error: 'Failed to execute 1:1 swap.', details: (updateError1 || updateError2)?.message });
+        return;
+      }
+
+      // Regenerate occurrences for the teacher
+      await generateOccurrencesForTeacher(schedule.teacher_id);
+
+      res.status(200).json({
+        success: true,
+        color: isBothAvailable ? 'GREEN' : 'YELLOW',
+        message: isBothAvailable
+          ? 'Tausch erfolgreich: Beide Termine wurden 1:1 im Platz getauscht (GRÜN).'
+          : 'Tausch erfolgreich: 1:1 Tausch durchgeführt, benötigt Eltern-Freigabe (GELB).',
+        schedule: { ...schedule, day_of_week: targetDayOfWeek, time_slot: targetTimeSlot, room_id: targetRoomId }
+      });
+      return;
+    }
+
+    // 3. Collision Validation (teacher occupancy or room occupancy for normal moves)
     const { data: conflicts, error: conflictError } = await supabase
       .from('schedules')
       .select('id, teacher_id, room_id, status')

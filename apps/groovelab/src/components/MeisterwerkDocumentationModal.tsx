@@ -67,22 +67,28 @@ const getISOWeekRaw = (dateInput?: string | Date, lessonDay: number = 1): string
 };
 
 const getInstrumentAvatarUrl = (instrument: string | null | undefined): string => {
-  if (!instrument) return '/avatars/guitar_avatar.png';
-  const inst = instrument.toLowerCase();
-  if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/guitar_avatar.png';
+  if (!instrument) return '/avatars/gitarre_avatar_new.png';
+  const inst = instrument.toLowerCase().trim();
+  if (inst.includes('e-gitarre')) return '/avatars/egitarre_avatar.png';
+  if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/gitarre_avatar_new.png';
+  if (inst.includes('e-bass')) return '/avatars/ebass_avatar.png';
+  if (inst.includes('kontrabass') || inst.includes('double bass')) return '/avatars/kontrabass_avatar.png';
   if (inst.includes('bass')) return '/avatars/bass_avatar.png';
-  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/drums_avatar.png';
-  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/piano_avatar.png';
-  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/vocals_avatar.png';
-  if (inst.includes('trompete') || inst.includes('trumpet')) return '/avatars/trumpet_avatar.png';
-  if (inst.includes('posaune') || inst.includes('trombone')) return '/avatars/trombone_avatar.png';
-  if (inst.includes('horn')) return '/avatars/horn_avatar.png';
-  if (inst.includes('cello')) return '/avatars/cello_avatar.png';
-  if (inst.includes('geige') || inst.includes('violin') || inst.includes('violine')) return '/avatars/violin_avatar.png';
-  if (inst.includes('klarinette') || inst.includes('clarinet')) return '/avatars/clarinet_avatar.png';
-  if (inst.includes('querflöte') || inst.includes('flute')) return '/avatars/flute_avatar.png';
-  if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return '/avatars/saxophone_avatar.png';
-  return '/avatars/guitar_avatar.png';
+  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/schlagzeug_avatar.png';
+  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/klavier_avatar_new.png';
+  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/gesang_avatar.png';
+  if (inst.includes('trompete') || inst.includes('trumpet')) return '/avatars/trompete_avatar_new.png';
+  if (inst.includes('posaune') || inst.includes('trombone')) return '/avatars/posaune_avatar.png';
+  if (inst.includes('horn')) return '/avatars/horn_avatar_new.png';
+  if (inst.includes('cello')) return '/avatars/cello_avatar_new.png';
+  if (inst.includes('geige') || inst.includes('violin') || inst.includes('violine')) return '/avatars/violine_avatar_new.png';
+  if (inst.includes('klarinette') || inst.includes('clarinet')) return '/avatars/klarinette_avatar_new.png';
+  if (inst.includes('querflöte') || inst.includes('flute')) return '/avatars/querfloete_avatar.png';
+  if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return '/avatars/saxophon_avatar_new.png';
+  if (inst.includes('blockflöte') || inst.includes('recorder') || inst.includes('blockfloete')) return '/avatars/blockfloete_avatar.png';
+  if (inst.includes('bariton') || inst.includes('baritone')) return '/avatars/bariton_avatar.png';
+  if (inst.includes('oboe')) return '/avatars/oboe_avatar.png';
+  return '/avatars/gitarre_avatar_new.png';
 };
 
 export const formatPageNumbers = (pages: number[]): string => {
@@ -158,6 +164,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   // Active paintbrush mode
   const [activeBrush, setActiveBrush] = useState<'NONE' | 'LOCKED' | 'HOMEWORK' | 'MASTERED' | 'THEORY'>('NONE');
+  const [showAllPagesGrid, setShowAllPagesGrid] = useState(false);
 
   // Session log to capture all modifications made in current modal open state
   const [sessionLogs, setSessionLogs] = useState<string[]>([]);
@@ -1443,15 +1450,32 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           {activeModalTab === 'document' ? (
             <>
           
-          {/* COLUMN 1: 📚 LEHRWERKE (35%) */}
+          {/* LEFT COLUMN: 🎯 FOKUS-ARBEITSPLATZ (Lehrwerke & Songs) */}
+          <style dangerouslySetInnerHTML={{__html: `
+            .hide-scrollbar::-webkit-scrollbar {
+              display: none;
+            }
+            .hide-scrollbar {
+              -ms-overflow-style: none;
+              scrollbar-width: none;
+            }
+            @keyframes fadeIn {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+            @keyframes slideUp {
+              from { transform: translateY(20px); opacity: 0; }
+              to { transform: translateY(0); opacity: 1; }
+            }
+          `}} />
           <div style={{
-            flex: '1.2 1 0%',
+            flex: '1.4 1 0%',
             borderRight: '1px solid #e8e8ed',
             padding: '24px',
             overflowY: 'auto',
             display: 'flex',
             flexDirection: 'column',
-            gap: '16px',
+            gap: '20px',
             background: 'white'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
@@ -1461,7 +1485,58 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 </span>
               </div>
               
-              <div style={{ position: 'relative' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {/* Ultra-compact Apple-style Pinsel-Bar */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: '#f3f3f6',
+                  padding: '3px 6px',
+                  borderRadius: '16px',
+                  border: '1px solid rgba(0, 0, 0, 0.05)'
+                }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#4b5563', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                    <span>🖌️</span> Pinsel:
+                  </span>
+                  <div style={{ display: 'flex', gap: '2px' }}>
+                    {[
+                      { mode: 'NONE', label: 'Aus', color: '#7d7d82' },
+                      { mode: 'LOCKED', label: '🔴', color: '#ef4444' },
+                      { mode: 'HOMEWORK', label: '🟡', color: '#eab308' },
+                      { mode: 'MASTERED', label: '🟢', color: '#10b981' },
+                      { mode: 'THEORY', label: '🟣', color: '#af52de' }
+                    ].map(b => {
+                      const isActive = activeBrush === b.mode;
+                      return (
+                        <button
+                          key={b.mode}
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setActiveBrush(b.mode as any); }}
+                          style={{
+                            border: 'none',
+                            background: isActive ? b.color : 'transparent',
+                            color: isActive ? 'white' : b.color,
+                            padding: '3px 6px',
+                            borderRadius: '8px',
+                            fontSize: '0.62rem',
+                            fontWeight: 900,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s',
+                            boxShadow: isActive ? `0 2px 4px ${b.color}40` : 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          {b.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div style={{ position: 'relative' }}>
                 <button
                   onClick={() => setShowAssignDropdown(!showAssignDropdown)}
                   style={{
@@ -1536,154 +1611,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   </div>
                 )}
               </div>
-            </div>
-
-            {/* Brush Palette & Legend Combined Card */}
-            <div style={{
-              background: '#f3f3f6',
-              padding: '12px 14px',
-              borderRadius: '24px',
-              border: '1px solid rgba(0, 0, 0, 0.05)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '10px',
-              marginBottom: '6px',
-              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ 
-                  fontSize: '0.72rem', 
-                  fontWeight: 900, 
-                  color: '#000', 
-                  textTransform: 'uppercase', 
-                  letterSpacing: '0.08em',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}>
-                  <span style={{ fontSize: '0.9rem' }}>🖌️</span> Pinsel-Modus
-                </span>
-                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#7d7d82', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                  iPad Schnell-Einfärbung
-                </span>
-              </div>
-
-              <div style={{ 
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr 1fr 1fr',
-                gap: '6px',
-                background: 'rgba(255, 255, 255, 0.5)',
-                padding: '6px',
-                borderRadius: '18px',
-                border: '1px solid rgba(0, 0, 0, 0.03)'
-              }}>
-                {/* ROT */}
-                <button
-                  type="button"
-                  onClick={() => setActiveBrush(activeBrush === 'LOCKED' ? 'NONE' : 'LOCKED')}
-                  style={{
-                    padding: '14px 4px',
-                    borderRadius: '14px',
-                    border: 'none',
-                    background: activeBrush === 'LOCKED' ? '#ef4444' : 'transparent',
-                    color: activeBrush === 'LOCKED' ? 'white' : '#ef4444',
-                    fontSize: '0.7rem',
-                    fontWeight: 900,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                    boxShadow: activeBrush === 'LOCKED' ? '0 2px 6px rgba(239,68,68,0.2)' : 'none',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '4px'
-                  }}
-                  className="hover-scale-mini"
-                >
-                  <span style={{ fontSize: '0.75rem' }}>🔴</span>
-                  <span style={{ fontSize: '0.62rem', color: activeBrush === 'LOCKED' ? 'white' : '#991b1b' }}>Ungestartet</span>
-                </button>
-
-                {/* GELB */}
-                <button
-                  type="button"
-                  onClick={() => setActiveBrush(activeBrush === 'HOMEWORK' ? 'NONE' : 'HOMEWORK')}
-                  style={{
-                    padding: '14px 4px',
-                    borderRadius: '14px',
-                    border: 'none',
-                    background: activeBrush === 'HOMEWORK' ? '#eab308' : 'transparent',
-                    color: activeBrush === 'HOMEWORK' ? 'white' : '#d97706',
-                    fontSize: '0.7rem',
-                    fontWeight: 900,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                    boxShadow: activeBrush === 'HOMEWORK' ? '0 2px 6px rgba(234,179,8,0.25)' : 'none',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '4px'
-                  }}
-                  className="hover-scale-mini"
-                >
-                  <span style={{ fontSize: '0.75rem' }}>🟡</span>
-                  <span style={{ fontSize: '0.62rem', color: activeBrush === 'HOMEWORK' ? 'white' : '#92400e' }}>Hausaufgabe</span>
-                </button>
-
-                {/* GRÜN */}
-                <button
-                  type="button"
-                  onClick={() => setActiveBrush(activeBrush === 'MASTERED' ? 'NONE' : 'MASTERED')}
-                  style={{
-                    padding: '14px 4px',
-                    borderRadius: '14px',
-                    border: 'none',
-                    background: activeBrush === 'MASTERED' ? '#10b981' : 'transparent',
-                    color: activeBrush === 'MASTERED' ? 'white' : '#059669',
-                    fontSize: '0.7rem',
-                    fontWeight: 900,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                    boxShadow: activeBrush === 'MASTERED' ? '0 2px 6px rgba(16,185,129,0.25)' : 'none',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '4px'
-                  }}
-                  className="hover-scale-mini"
-                >
-                  <span style={{ fontSize: '0.75rem' }}>🟢</span>
-                  <span style={{ fontSize: '0.62rem', color: activeBrush === 'MASTERED' ? 'white' : '#166534' }}>Gemeistert</span>
-                </button>
-
-                {/* LILA */}
-                <button
-                  type="button"
-                  onClick={() => setActiveBrush(activeBrush === 'THEORY' ? 'NONE' : 'THEORY')}
-                  style={{
-                    padding: '14px 4px',
-                    borderRadius: '14px',
-                    border: 'none',
-                    background: activeBrush === 'THEORY' ? '#af52de' : 'transparent',
-                    color: activeBrush === 'THEORY' ? 'white' : '#af52de',
-                    fontSize: '0.7rem',
-                    fontWeight: 900,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                    boxShadow: activeBrush === 'THEORY' ? '0 2px 6px rgba(175,82,222,0.25)' : 'none',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '4px'
-                  }}
-                  className="hover-scale-mini"
-                >
-                  <span style={{ fontSize: '0.75rem' }}>🟣</span>
-                  <span style={{ fontSize: '0.62rem', color: activeBrush === 'THEORY' ? 'white' : '#6d28d9' }}>Theorie/Info</span>
-                </button>
               </div>
             </div>
 
@@ -1904,139 +1831,123 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             </div>
                           )}
 
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                            {pages.slice(pageGroupIndex * 49, (pageGroupIndex + 1) * 49).map(num => {
-                            const pageState = assigned.pageStates[num] || { status: 'locked' };
-                            const globalPage = book.globalPageStates?.[num] === 'purple';
-                            const status = globalPage ? 'purple' : (pageState.status || 'locked');
-
-                            let borderColor = '#ef4444'; // locked / unstarted = rot
-                            let bg = '#fef2f2';
-                            let textColor = '#991b1b';
-
-                            if (status === 'homework') {
-                              borderColor = '#eab308'; // homework = gold/gelb
-                              bg = '#fffbeb';
-                              textColor = '#92400e';
-                            } else if (status === 'mastered') {
-                              borderColor = '#10b981'; // mastered = grün
-                              bg = '#f0fdf4';
-                              textColor = '#166534';
-                            } else if (status === 'purple') {
-                              borderColor = '#af52de'; // purple = lila
-                              bg = '#f5f3ff';
-                              textColor = '#6d28d9';
-                            }
-
-                            let solidActiveBg = '#ef4444'; // locked/unstarted active
-                            let activeBorder = '#ef4444';
-                            if (status === 'homework') {
-                              solidActiveBg = '#eab308';
-                              activeBorder = '#eab308';
-                            } else if (status === 'mastered') {
-                              solidActiveBg = '#10b981';
-                              activeBorder = '#10b981';
-                            } else if (status === 'purple') {
-                              solidActiveBg = '#af52de';
-                              activeBorder = '#af52de';
-                            }
-
-                            const isPageActive = activePageNumber === num && activeLehrwerkId === assigned.lehrwerkId;
-
-                            return (
-                              <button
-                                key={num}
-                                onClick={() => {
-                                  if (activeBrush === 'NONE') {
-                                    selectTextbookPage(assigned.lehrwerkId, num);
-                                  } else {
-                                    let targetStatus: 'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED' = 'IN_PROGRESS';
-                                    let targetHomework = false;
-
-                                    if (activeBrush === 'LOCKED') {
-                                      targetStatus = 'IN_PROGRESS';
-                                      targetHomework = false;
-                                    } else if (activeBrush === 'HOMEWORK') {
-                                      targetStatus = 'IN_PROGRESS';
-                                      targetHomework = true;
-                                    } else if (activeBrush === 'MASTERED') {
-                                      targetStatus = 'MASTERED';
-                                      targetHomework = false;
-                                    } else if (activeBrush === 'THEORY') {
-                                      targetStatus = 'THEORY_DONE';
-                                      targetHomework = false;
-                                    }
-
-                                    triggerDirectSave(assigned.lehrwerkId, num, targetStatus, targetHomework);
-                                  }
-                                }}
-                                style={{
-                                  width: '46px',
-                                  height: '46px',
-                                  borderRadius: '50%',
-                                  border: `2px solid ${isPageActive ? solidActiveBg : borderColor}`,
-                                  background: isPageActive ? solidActiveBg : bg,
-                                  color: isPageActive ? 'white' : textColor,
-                                  fontWeight: 900,
-                                  fontSize: '0.95rem',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  transition: 'all 0.15s',
-                                  boxShadow: isPageActive ? '0 4px 10px rgba(0,0,0,0.15)' : 'none',
-                                  transform: isPageActive ? 'scale(1.1)' : 'none'
-                                }}
-                                className="hover-scale-mini"
-                              >
-                                {num}
-                              </button>
-                            );
-                          })}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', marginTop: '6px' }}>
+                            <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#7d7d82' }}>Seitenübersicht:</span>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setShowAllPagesGrid(true); }}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#10b981',
+                                fontSize: '0.72rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                              className="hover-scale"
+                            >
+                              <span>📱</span> Ganzes Lehrwerk anzeigen
+                            </button>
                           </div>
 
-                          {pages.length > 49 && (
-                            <div style={{
-                              display: 'flex',
-                              justifyContent: 'center',
-                              alignItems: 'center',
-                              gap: '6px',
-                              marginTop: '10px',
-                              background: '#f3f3f6',
-                              padding: '4px',
-                              borderRadius: '16px',
-                              alignSelf: 'center',
-                              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)'
-                            }}>
-                              {Array.from({ length: Math.ceil(pages.length / 49) }).map((_, idx) => {
-                                const startNum = idx * 49 + 1;
-                                const endNum = Math.min((idx + 1) * 49, pages.length);
-                                const isCurrent = pageGroupIndex === idx;
-                                return (
-                                  <button
-                                    key={idx}
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); setPageGroupIndex(idx); }}
-                                    style={{
-                                      border: 'none',
-                                      background: isCurrent ? 'white' : 'transparent',
-                                      color: isCurrent ? '#000' : '#7d7d82',
-                                      padding: '6px 14px',
-                                      borderRadius: '12px',
-                                      fontSize: '0.74rem',
-                                      fontWeight: 800,
-                                      cursor: 'pointer',
-                                      boxShadow: isCurrent ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
-                                      transition: 'all 0.2s'
-                                    }}
-                                    className="hover-scale-mini"
-                                  >
-                                    {startNum}–{endNum}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
+                          <div style={{
+                            display: 'flex',
+                            overflowX: 'auto',
+                            gap: '10px',
+                            padding: '12px 6px',
+                            margin: '0 -8px',
+                            scrollbarWidth: 'none',
+                            WebkitOverflowScrolling: 'touch'
+                          }} className="hide-scrollbar">
+                            {pages.map(num => {
+                              const pageState = assigned.pageStates[num] || { status: 'locked' };
+                              const globalPage = book.globalPageStates?.[num] === 'purple';
+                              const status = globalPage ? 'purple' : (pageState.status || 'locked');
+
+                              let borderColor = '#ef4444'; // locked / unstarted = rot
+                              let bg = '#fef2f2';
+                              let textColor = '#991b1b';
+
+                              if (status === 'homework') {
+                                borderColor = '#eab308'; // homework = gold/gelb
+                                bg = '#fffbeb';
+                                textColor = '#92400e';
+                              } else if (status === 'mastered') {
+                                borderColor = '#10b981'; // mastered = grün
+                                bg = '#f0fdf4';
+                                textColor = '#166534';
+                              } else if (status === 'purple') {
+                                borderColor = '#af52de'; // purple = lila
+                                bg = '#f5f3ff';
+                                textColor = '#6d28d9';
+                              }
+
+                              let solidActiveBg = '#ef4444'; // locked/unstarted active
+                              if (status === 'homework') {
+                                solidActiveBg = '#eab308';
+                              } else if (status === 'mastered') {
+                                solidActiveBg = '#10b981';
+                              } else if (status === 'purple') {
+                                solidActiveBg = '#af52de';
+                              }
+
+                              const isPageActive = activePageNumber === num && activeLehrwerkId === assigned.lehrwerkId;
+
+                              return (
+                                <button
+                                  key={num}
+                                  onClick={() => {
+                                    if (activeBrush === 'NONE') {
+                                      selectTextbookPage(assigned.lehrwerkId, num);
+                                    } else {
+                                      let targetStatus: 'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED' = 'IN_PROGRESS';
+                                      let targetHomework = false;
+
+                                      if (activeBrush === 'LOCKED') {
+                                        targetStatus = 'IN_PROGRESS';
+                                        targetHomework = false;
+                                      } else if (activeBrush === 'HOMEWORK') {
+                                        targetStatus = 'IN_PROGRESS';
+                                        targetHomework = true;
+                                      } else if (activeBrush === 'MASTERED') {
+                                        targetStatus = 'MASTERED';
+                                        targetHomework = false;
+                                      } else if (activeBrush === 'THEORY') {
+                                        targetStatus = 'THEORY_DONE';
+                                        targetHomework = false;
+                                      }
+
+                                      triggerDirectSave(assigned.lehrwerkId, num, targetStatus, targetHomework);
+                                    }
+                                  }}
+                                  style={{
+                                    flex: '0 0 46px',
+                                    width: '46px',
+                                    height: '46px',
+                                    borderRadius: '50%',
+                                    border: `2px solid ${isPageActive ? solidActiveBg : borderColor}`,
+                                    background: isPageActive ? solidActiveBg : bg,
+                                    color: isPageActive ? 'white' : textColor,
+                                    fontWeight: 900,
+                                    fontSize: '0.95rem',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'all 0.15s',
+                                    boxShadow: isPageActive ? '0 4px 10px rgba(0,0,0,0.15)' : 'none',
+                                    transform: isPageActive ? 'scale(1.1)' : 'none'
+                                  }}
+                                  className="hover-scale-mini"
+                                >
+                                  {num}
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -2044,19 +1955,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 })}
               </div>
             )}
-          </div>
-
-          {/* COLUMN 2: 🎵 SONGS & SONG KATALOG (33%) */}
-          <div style={{
-            flex: '1.1 1 0%',
-            borderRight: '1px solid #e8e8ed',
-            padding: '24px',
-            overflowY: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px',
-            background: 'white'
-          }}>
+            {/* Visual separator between Lehrwerke and Songs */}
+            <div style={{ borderTop: '1px solid #e8e8ed', margin: '20px 0 10px 0' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
               <Music size={18} style={{ color: '#000' }} />
               <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#000', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -3021,6 +2921,169 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           })()}
         </div>
       )}
+      
+      {/* Apple-style Backdrop Blur Overlay for All Pages Grid */}
+      {showAllPagesGrid && activeLehrwerkId && (() => {
+        const assigned = assignedLehrwerke.find(a => a.lehrwerkId === activeLehrwerkId);
+        if (!assigned) return null;
+        const book = globalLehrwerke.find(g => g.id === activeLehrwerkId) || { title: 'Lehrwerk', emoji: '📚', totalPages: 50 };
+        const pages = Array.from({ length: book.totalPages || 50 }, (_, i) => i + 1);
+
+        return (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+            animation: 'fadeIn 0.25s ease'
+          }}>
+            <div style={{
+              background: 'white',
+              borderRadius: '32px',
+              width: '100%',
+              maxWidth: '640px',
+              maxHeight: '90%',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 24px 60px rgba(0,0,0,0.2)',
+              overflow: 'hidden',
+              animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}>
+              {/* Header */}
+              <div style={{
+                padding: '20px 24px',
+                borderBottom: '1px solid #e8e8ed',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '20px' }}>{book.emoji}</span>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#000' }}>
+                    {book.title} — Alle Seiten
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setShowAllPagesGrid(false)}
+                  style={{
+                    background: '#f3f3f6',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: '#000'
+                  }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Grid Content */}
+              <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '10px', justifyItems: 'center' }}>
+                  {pages.map(num => {
+                    const pageState = assigned.pageStates[num] || { status: 'locked' };
+                    const globalPage = book.globalPageStates?.[num] === 'purple';
+                    const status = globalPage ? 'purple' : (pageState.status || 'locked');
+
+                    let borderColor = '#ef4444';
+                    let bg = '#fef2f2';
+                    let textColor = '#991b1b';
+
+                    if (status === 'homework') {
+                      borderColor = '#eab308';
+                      bg = '#fffbeb';
+                      textColor = '#92400e';
+                    } else if (status === 'mastered') {
+                      borderColor = '#10b981';
+                      bg = '#f0fdf4';
+                      textColor = '#166534';
+                    } else if (status === 'purple') {
+                      borderColor = '#af52de';
+                      bg = '#f5f3ff';
+                      textColor = '#6d28d9';
+                    }
+
+                    let solidActiveBg = '#ef4444';
+                    if (status === 'homework') {
+                      solidActiveBg = '#eab308';
+                    } else if (status === 'mastered') {
+                      solidActiveBg = '#10b981';
+                    } else if (status === 'purple') {
+                      solidActiveBg = '#af52de';
+                    }
+
+                    const isPageActive = activePageNumber === num;
+
+                    return (
+                      <button
+                        key={num}
+                        onClick={() => {
+                          if (activeBrush === 'NONE') {
+                            selectTextbookPage(assigned.lehrwerkId, num);
+                            setShowAllPagesGrid(false);
+                          } else {
+                            let targetStatus: 'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED' = 'IN_PROGRESS';
+                            let targetHomework = false;
+
+                            if (activeBrush === 'LOCKED') {
+                              targetStatus = 'IN_PROGRESS';
+                              targetHomework = false;
+                            } else if (activeBrush === 'HOMEWORK') {
+                              targetStatus = 'IN_PROGRESS';
+                              targetHomework = true;
+                            } else if (activeBrush === 'MASTERED') {
+                              targetStatus = 'MASTERED';
+                              targetHomework = false;
+                            } else if (activeBrush === 'THEORY') {
+                              targetStatus = 'THEORY_DONE';
+                              targetHomework = false;
+                            }
+
+                            triggerDirectSave(assigned.lehrwerkId, num, targetStatus, targetHomework);
+                          }
+                        }}
+                        style={{
+                          width: '46px',
+                          height: '46px',
+                          borderRadius: '50%',
+                          border: `2px solid ${isPageActive ? solidActiveBg : borderColor}`,
+                          background: isPageActive ? solidActiveBg : bg,
+                          color: isPageActive ? 'white' : textColor,
+                          fontWeight: 900,
+                          fontSize: '0.95rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.15s',
+                          boxShadow: isPageActive ? '0 4px 10px rgba(0,0,0,0.15)' : 'none',
+                          transform: isPageActive ? 'scale(1.1)' : 'none'
+                        }}
+                      >
+                        {num}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       </div>
       </div>
     </div>

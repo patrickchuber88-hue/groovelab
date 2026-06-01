@@ -78,22 +78,28 @@ const brandColor = "#f59e0b"; // Orange (matched with legend)
 
 // --- ANTI-FLICKER AVATAR SYSTEM ---
 const getInstrumentAvatarUrl = (instrument: string | null | undefined): string => {
-  if (!instrument) return '/avatars/guitar_avatar.png';
+  if (!instrument) return '/avatars/gitarre_avatar_new.png';
   const inst = instrument.toLowerCase().trim();
-  if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/guitar_avatar.png';
+  if (inst.includes('e-gitarre')) return '/avatars/egitarre_avatar.png';
+  if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/gitarre_avatar_new.png';
+  if (inst.includes('e-bass')) return '/avatars/ebass_avatar.png';
+  if (inst.includes('kontrabass') || inst.includes('double bass')) return '/avatars/kontrabass_avatar.png';
   if (inst.includes('bass')) return '/avatars/bass_avatar.png';
-  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/drums_avatar.png';
-  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/piano_avatar.png';
-  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/vocals_avatar.png';
-  if (inst.includes('trompete') || inst.includes('trumpet')) return '/avatars/trumpet_avatar.png';
-  if (inst.includes('posaune') || inst.includes('trombone')) return '/avatars/trombone_avatar.png';
-  if (inst.includes('horn')) return '/avatars/horn_avatar.png';
-  if (inst.includes('cello')) return '/avatars/cello_avatar.png';
-  if (inst.includes('geige') || inst.includes('violin') || inst.includes('violine')) return '/avatars/violin_avatar.png';
-  if (inst.includes('klarinette') || inst.includes('clarinet')) return '/avatars/clarinet_avatar.png';
-  if (inst.includes('querflöte') || inst.includes('flute')) return '/avatars/flute_avatar.png';
-  if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return '/avatars/saxophone_avatar.png';
-  return '/avatars/guitar_avatar.png';
+  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/schlagzeug_avatar.png';
+  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/klavier_avatar_new.png';
+  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/gesang_avatar.png';
+  if (inst.includes('trompete') || inst.includes('trumpet')) return '/avatars/trompete_avatar_new.png';
+  if (inst.includes('posaune') || inst.includes('trombone')) return '/avatars/posaune_avatar.png';
+  if (inst.includes('horn')) return '/avatars/horn_avatar_new.png';
+  if (inst.includes('cello')) return '/avatars/cello_avatar_new.png';
+  if (inst.includes('geige') || inst.includes('violin') || inst.includes('violine')) return '/avatars/violine_avatar_new.png';
+  if (inst.includes('klarinette') || inst.includes('clarinet')) return '/avatars/klarinette_avatar_new.png';
+  if (inst.includes('querflöte') || inst.includes('flute')) return '/avatars/querfloete_avatar.png';
+  if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return '/avatars/saxophon_avatar_new.png';
+  if (inst.includes('blockflöte') || inst.includes('recorder') || inst.includes('blockfloete')) return '/avatars/blockfloete_avatar.png';
+  if (inst.includes('bariton') || inst.includes('baritone')) return '/avatars/bariton_avatar.png';
+  if (inst.includes('oboe')) return '/avatars/oboe_avatar.png';
+  return '/avatars/gitarre_avatar_new.png';
 };
 
 // --- ANTI-FLICKER AVATAR SYSTEM ---
@@ -122,12 +128,25 @@ const StudioAvatar = React.memo(({ src, style, className, user, userId, onClick,
   if (activePlat === 'campus') {
     if (targetUser) {
       const role = (targetUser.role || '').toLowerCase();
-      if (role === 'student' || role === 'teacher' || role === 'admin') {
+      if (role === 'student') {
+        const inst = (targetUser.instrument || '').toLowerCase().trim();
+        if (inst.includes('guitar') || inst.includes('gitarre')) {
+          if (targetUser.photo_url && (targetUser.photo_url.includes('egitarre_avatar') || targetUser.photo_url.includes('gitarre_avatar_new'))) {
+            displaySrc = targetUser.photo_url;
+          } else {
+            displaySrc = '/avatars/gitarre_avatar_new.png';
+          }
+        } else {
+          displaySrc = getInstrumentAvatarUrl(targetUser.instrument);
+        }
+      } else if (role === 'teacher' || role === 'admin') {
         displaySrc = getInstrumentAvatarUrl(targetUser.instrument);
       }
     } else {
-      if (src && !src.includes('_avatar.png') && !src.includes('avatar_ghost')) {
-        displaySrc = '/avatars/guitar_avatar.png';
+      if (src && (src.includes('egitarre_avatar') || src.includes('gitarre_avatar_new'))) {
+        displaySrc = src;
+      } else if (src && !src.includes('_avatar.png') && !src.includes('avatar_ghost')) {
+        displaySrc = '/avatars/gitarre_avatar_new.png';
       }
     }
   } else {
@@ -135,18 +154,36 @@ const StudioAvatar = React.memo(({ src, style, className, user, userId, onClick,
     const isInstrumentAvatar = src && (
       src.includes('avatar.png') || 
       src.includes('guitar_avatar') || 
+      src.includes('gitarre_avatar_new') || 
+      src.includes('ebass_avatar') || 
+      src.includes('egitarre_avatar') || 
+      src.includes('kontrabass_avatar') || 
       src.includes('bass_avatar') || 
       src.includes('drums_avatar') || 
+      src.includes('schlagzeug_avatar') || 
       src.includes('piano_avatar') || 
+      src.includes('klavier_avatar_new') || 
       src.includes('vocals_avatar') || 
+      src.includes('gesang_avatar') || 
       src.includes('trumpet_avatar') || 
+      src.includes('trompete_avatar_new') || 
       src.includes('trombone_avatar') || 
+      src.includes('posaune_avatar') || 
       src.includes('horn_avatar') || 
+      src.includes('horn_avatar_new') || 
       src.includes('cello_avatar') || 
+      src.includes('cello_avatar_new') || 
       src.includes('violin_avatar') || 
+      src.includes('violine_avatar_new') || 
       src.includes('clarinet_avatar') || 
+      src.includes('klarinette_avatar_new') || 
       src.includes('flute_avatar') || 
-      src.includes('saxophone_avatar')
+      src.includes('querfloete_avatar') || 
+      src.includes('saxophone_avatar') || 
+      src.includes('saxophon_avatar_new') || 
+      src.includes('blockfloete_avatar') || 
+      src.includes('bariton_avatar') || 
+      src.includes('oboe_avatar')
     );
     if (!src || isInstrumentAvatar || src === '/avatar_ghost.jpg') {
       displaySrc = getDefaultMusicianAvatarUrl(targetUser?.instrument, targetUser?.role);
@@ -2144,6 +2181,27 @@ function App() {
     { id: 'band_duo_1', url: '/avatars/band_duo_1.png', size: 2 },
     { id: 'band_quartet_1', url: '/avatars/band_quartet_1.png', size: 4 },
     { id: 'band_quintet_1', url: '/avatars/band_quintet_1.png', size: 5 },
+  ];
+
+  const CAMPUS_AVATARS = [
+    { id: 'avatar_blockfloete', url: '/avatars/blockfloete_avatar.png' },
+    { id: 'avatar_bariton', url: '/avatars/bariton_avatar.png' },
+    { id: 'avatar_cello', url: '/avatars/cello_avatar_new.png' },
+    { id: 'avatar_ebass', url: '/avatars/ebass_avatar.png' },
+    { id: 'avatar_egitarre', url: '/avatars/egitarre_avatar.png' },
+    { id: 'avatar_gitarre', url: '/avatars/gitarre_avatar_new.png' },
+    { id: 'avatar_horn', url: '/avatars/horn_avatar_new.png' },
+    { id: 'avatar_klarinette', url: '/avatars/klarinette_avatar_new.png' },
+    { id: 'avatar_klavier', url: '/avatars/klavier_avatar_new.png' },
+    { id: 'avatar_kontrabass', url: '/avatars/kontrabass_avatar.png' },
+    { id: 'avatar_oboe', url: '/avatars/oboe_avatar.png' },
+    { id: 'avatar_posaune', url: '/avatars/posaune_avatar.png' },
+    { id: 'avatar_querfloete', url: '/avatars/querfloete_avatar.png' },
+    { id: 'avatar_saxophon', url: '/avatars/saxophon_avatar_new.png' },
+    { id: 'avatar_schlagzeug', url: '/avatars/schlagzeug_avatar.png' },
+    { id: 'avatar_trompete', url: '/avatars/trompete_avatar_new.png' },
+    { id: 'avatar_violine', url: '/avatars/violine_avatar_new.png' },
+    { id: 'avatar_vocals', url: '/avatars/gesang_avatar.png' }
   ];
 
   const STUDENT_AVATARS = [
@@ -6028,8 +6086,8 @@ function App() {
             {/* Ausweis Button (Only Student, Desktop only) */}
             {user.role?.toLowerCase() === 'student' && windowWidth > 1024 && (
               <button onClick={() => setShowQR(true)} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'white', padding: '10px 20px', borderRadius: '16px', border: '1px solid #f1f5f9', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', cursor: 'pointer' }}>
-                <span style={{ color: '#eab308', fontWeight: 800, fontSize: '0.85rem' }}>Ausweis</span>
-                <QrCode size={18} color="#eab308" />
+                <span style={{ color: activePlatform === 'campus' ? '#34a853' : '#eab308', fontWeight: 800, fontSize: '0.85rem' }}>Ausweis</span>
+                <QrCode size={18} color={activePlatform === 'campus' ? '#34a853' : '#eab308'} />
               </button>
             )}
 
@@ -6087,7 +6145,7 @@ function App() {
               ? '#fbbc05'
               : '#0b57d0',
           flexShrink: 0,
-          marginBottom: '24px'
+          marginBottom: '10px'
         }} />
 
 
@@ -10905,7 +10963,45 @@ function App() {
                     </div>
                   </div>
 
-
+                  {user.instrument && (user.instrument.toLowerCase().includes('guitar') || user.instrument.toLowerCase().includes('gitarre')) && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Profilbild (Avatar)</label>
+                      <div style={{ display: 'flex', gap: '20px' }}>
+                        {[
+                          { id: 'gitarre', label: 'Akustische Gitarre (Standard)', url: '/avatars/gitarre_avatar_new.png' },
+                          { id: 'egitarre', label: 'E-Gitarre', url: '/avatars/egitarre_avatar.png' }
+                        ].map((avatar) => {
+                          const isSelected = editingProfile.photo_url === avatar.url || (!editingProfile.photo_url && avatar.id === 'gitarre');
+                          return (
+                            <button
+                              key={avatar.id}
+                              type="button"
+                              onClick={() => setEditingProfile({ ...editingProfile, photo_url: avatar.url })}
+                              style={{
+                                flex: 1,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '10px',
+                                padding: '16px',
+                                borderRadius: '20px',
+                                border: `3px solid ${isSelected ? brandColor : '#f1f5f9'}`,
+                                background: isSelected ? `${brandColor}08` : 'white',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                outline: 'none'
+                              }}
+                            >
+                              <div style={{ width: '80px', height: '80px', borderRadius: '20px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                                <img src={avatar.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={avatar.label} />
+                              </div>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: isSelected ? '#1e293b' : '#64748b' }}>{avatar.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </>
               ) : (
                 <>
@@ -11283,6 +11379,7 @@ function App() {
               }}>
                 {(() => {
                   if (avatarPickerType === 'band') return BAND_AVATARS;
+                  if (activePlatform === 'campus') return CAMPUS_AVATARS;
                   const role = (user?.role || '').toLowerCase();
                   if (role === 'teacher' || role === 'admin') return TEACHER_AVATARS;
                   return STUDENT_AVATARS;
