@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronRight } from 'lucide-react';
+import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronRight, Book } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { supabase } from '../lib/supabase';
 
@@ -1427,24 +1427,27 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         padding: useNotebookLayout ? '6px' : '0',
         position: 'relative'
       }} className="animation-slide-up">
-        {/* Header - Premium Zurich Card Style Header */}
+        {/* Header - Apple-style Translucent/White Header */}
         <div style={{
-          padding: '20px 32px',
-          background: useNotebookLayout ? '#f5efe0' : 'white',
-          borderBottom: useNotebookLayout ? '2px solid #e5e0d4' : '1px solid #e8e8ed',
-          borderRadius: useNotebookLayout ? '20px 20px 0 0' : '0',
+          padding: '18px 24px',
+          background: 'rgba(255, 255, 255, 0.72)',
+          backdropFilter: 'blur(20px) saturate(190%)',
+          borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
+          borderRadius: useNotebookLayout ? '24px 24px 0 0' : '0',
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
+          zIndex: 50,
+          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.01)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             <div style={{
-              width: '52px',
-              height: '52px',
-              borderRadius: '16px',
+              width: '44px',
+              height: '44px',
+              borderRadius: '12px',
               overflow: 'hidden',
-              boxShadow: '0 4px 15px rgba(0,0,0,0.06)',
-              border: '2px solid white'
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+              border: '1px solid rgba(0, 0, 0, 0.05)'
             }}>
               <img
                 src={getInstrumentAvatarUrl(studentInstrument)}
@@ -1452,17 +1455,23 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 alt=""
               />
             </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span className="swiss-label" style={{ fontSize: '0.62rem', background: '#f3f3f6', color: '#4b5563', padding: '3px 8px', borderRadius: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ 
+                  fontSize: '0.62rem', 
+                  color: '#8e8e93', 
+                  fontWeight: 700, 
+                  textTransform: 'uppercase', 
+                  letterSpacing: '0.08em' 
+                }}>
                   Tageskompass
                 </span>
-                <h2 className="swiss-h2" style={{ margin: 0, fontSize: '1.25rem', color: '#000', fontWeight: 900, letterSpacing: '-0.02em' }}>
-                  Meisterwerk-Protokoll
-                </h2>
               </div>
-              <p style={{ fontSize: '0.8rem', color: '#4b5563', margin: '4px 0 0 0', fontWeight: 600 }}>
-                Aktive Begleitung für: <strong style={{ color: '#000', fontWeight: 800 }}>{student.first_name} {student.last_name}</strong>
+              <h2 className="swiss-h2" style={{ margin: 0, fontSize: '1.2rem', color: '#1d1d1f', fontWeight: 700, letterSpacing: '-0.025em', lineHeight: 1.15 }}>
+                Meisterwerk-Protokoll
+              </h2>
+              <p style={{ fontSize: '0.78rem', color: '#86868b', margin: '1px 0 0 0', fontWeight: 500 }}>
+                Aktive Begleitung für: <strong style={{ color: '#1d1d1f', fontWeight: 600 }}>{student.first_name} {student.last_name}</strong>
               </p>
             </div>
           </div>
@@ -1471,10 +1480,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
               display: 'inline-flex',
-              background: '#f3f3f6',
-              padding: '4px',
-              borderRadius: '24px',
-              border: '1px solid #e2e8f0'
+              background: 'rgba(120, 120, 128, 0.08)',
+              padding: '2.5px',
+              borderRadius: '20px',
+              border: 'none'
             }}>
               <button
                 type="button"
@@ -1482,20 +1491,20 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 style={{
                   background: activeModalTab === 'document' ? 'white' : 'transparent',
                   border: 'none',
-                  color: activeModalTab === 'document' ? '#000' : '#4b5563',
-                  padding: '8px 16px',
-                  borderRadius: '20px',
-                  fontSize: '0.78rem',
-                  fontWeight: activeModalTab === 'document' ? 800 : 600,
+                  color: activeModalTab === 'document' ? '#1d1d1f' : '#86868b',
+                  padding: '6px 14px',
+                  borderRadius: '17px',
+                  fontSize: '0.76rem',
+                  fontWeight: 600,
                   cursor: 'pointer',
-                  boxShadow: activeModalTab === 'document' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
-                  transition: 'all 0.2s',
+                  boxShadow: activeModalTab === 'document' ? '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)' : 'none',
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: '5px'
                 }}
               >
-                <span>📝</span>
+                <BookOpen size={13} style={{ opacity: activeModalTab === 'document' ? 1 : 0.8 }} />
                 <span>Unterricht dokumentieren</span>
               </button>
               <button
@@ -1504,20 +1513,20 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 style={{
                   background: activeModalTab === 'logbook' ? 'white' : 'transparent',
                   border: 'none',
-                  color: activeModalTab === 'logbook' ? '#000' : '#4b5563',
-                  padding: '8px 16px',
-                  borderRadius: '20px',
-                  fontSize: '0.78rem',
-                  fontWeight: activeModalTab === 'logbook' ? 800 : 600,
+                  color: activeModalTab === 'logbook' ? '#1d1d1f' : '#86868b',
+                  padding: '6px 14px',
+                  borderRadius: '17px',
+                  fontSize: '0.76rem',
+                  fontWeight: 600,
                   cursor: 'pointer',
-                  boxShadow: activeModalTab === 'logbook' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
-                  transition: 'all 0.2s',
+                  boxShadow: activeModalTab === 'logbook' ? '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)' : 'none',
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: '5px'
                 }}
               >
-                <span>🏆</span>
+                <Award size={13} style={{ opacity: activeModalTab === 'logbook' ? 1 : 0.8 }} />
                 <span>Meisterwerk-Logbuch</span>
               </button>
             </div>
@@ -1531,22 +1540,23 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 localStorage.setItem('meisterwerk_notebook_layout', String(nextVal));
               }}
               style={{
-                background: useNotebookLayout ? '#e5e0d4' : '#f3f3f6',
-                border: useNotebookLayout ? '1.5px solid #dcd7ca' : '1px solid #e2e8f0',
-                color: '#000',
-                padding: '8px 16px',
-                borderRadius: '20px',
-                fontSize: '0.78rem',
-                fontWeight: 800,
+                background: 'rgba(120, 120, 128, 0.08)',
+                border: 'none',
+                color: '#1d1d1f',
+                padding: '6px 14px',
+                borderRadius: '17px',
+                fontSize: '0.76rem',
+                fontWeight: 600,
                 cursor: 'pointer',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                transition: 'all 0.2s',
+                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px'
+                gap: '5px'
               }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(120, 120, 128, 0.14)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(120, 120, 128, 0.08)'}
             >
-              <span>📓</span>
+              <Book size={13} style={{ opacity: 0.8 }} />
               <span>{useNotebookLayout ? 'Modernes Design' : 'Notizbuch-Design'}</span>
             </button>
           </div>
@@ -1554,21 +1564,29 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           <button
             onClick={onClose}
             style={{
-              background: '#f3f3f6',
+              background: 'rgba(120, 120, 128, 0.08)',
               border: 'none',
               borderRadius: '50%',
-              width: '40px',
-              height: '40px',
+              width: '32px',
+              height: '32px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              color: '#000',
-              transition: 'all 0.2s'
+              color: '#86868b',
+              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(120, 120, 128, 0.16)';
+              e.currentTarget.style.color = '#1d1d1f';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(120, 120, 128, 0.08)';
+              e.currentTarget.style.color = '#86868b';
             }}
             className="hover-scale"
           >
-            <X size={20} />
+            <X size={15} />
           </button>
         </div>
 
