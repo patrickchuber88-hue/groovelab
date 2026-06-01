@@ -3761,9 +3761,9 @@ export function TeacherDashboard({
                       )}
 
                       {/* Schüler Notizen (former Prep Mirror) */}
-                      {!teacher?.sick_until && isWithinActiveHours && (dynamicPrepMirror || briefingData.prepMirror) && (
+                      {!teacher?.sick_until && (
                         <div className="google-card" style={{ width: '100%', borderLeft: '4px solid #10b981', opacity: loadingPrepMirror ? 0.6 : 1, transition: 'opacity 0.2s', boxSizing: 'border-box' }}>
-                          {(() => {
+                          {isWithinActiveHours && (dynamicPrepMirror || briefingData.prepMirror) ? (() => {
                             const prep = dynamicPrepMirror || briefingData.prepMirror;
                             return (
                               <>
@@ -3925,6 +3925,78 @@ export function TeacherDashboard({
                                   </div>
                                 </div>
                               </>
+                            );
+                          })() : (() => {
+                            // Seeded Quotes of the day
+                            const quotes = [
+                              { text: "Die Musik drückt das aus, was nicht gesagt werden kann und worüber zu schweigen unmöglich ist.", author: "Victor Hugo" },
+                              { text: "Ohne Musik wäre das Leben ein Irrtum.", author: "Friedrich Nietzsche" },
+                              { text: "Musik ist die gemeinsame Sprache der Menschheit.", author: "Henry Wadsworth Longfellow" },
+                              { text: "Wo die Sprache aufhört, fängt die Musik an.", author: "E.T.A. Hoffmann" },
+                              { text: "Musik wäscht den Staub des Alltags von der Seele.", author: "Berthold Auerbach" }
+                            ];
+                            const daySeed = new Date().getDate() % quotes.length;
+                            const quote = quotes[daySeed];
+                            
+                            // Stats calculation
+                            const totalStudentsCount = briefingData?.timeline?.filter((s: any) => s.student).length || 0;
+                            const cancelledCount = briefingData?.timeline?.filter((s: any) => s.student && (s.status === 'canceled_by_student' || s.status === 'cancelled')).length || 0;
+                            const activeCount = totalStudentsCount - cancelledCount;
+
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                  <div style={{ background: '#e6f4ea', color: '#137333', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Award size={18} />
+                                  </div>
+                                  <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#1e293b' }}>
+                                    Schüler Notizen • Feierabend
+                                  </h4>
+                                </div>
+
+                                <div style={{
+                                  background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                                  border: '1.5px solid #e2e8f0',
+                                  borderRadius: '16px',
+                                  padding: '16px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '12px'
+                                }}>
+                                  <div style={{ fontSize: '0.85rem', color: '#475569', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                    Heutige Übersicht:
+                                  </div>
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                    <div style={{ background: '#ffffff', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                                      <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a' }}>{activeCount}</div>
+                                      <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700 }}>Unterrichtete Schüler</div>
+                                    </div>
+                                    <div style={{ background: '#ffffff', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                                      <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#b45309' }}>{cancelledCount}</div>
+                                      <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700 }}>Absagen heute</div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div style={{ 
+                                  borderTop: '1px solid #f1f5f9', 
+                                  paddingTop: '16px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '8px',
+                                  fontStyle: 'italic',
+                                  color: '#475569',
+                                  fontSize: '0.85rem',
+                                  lineHeight: '1.5',
+                                  textAlign: 'center'
+                                }}>
+                                  <span style={{ fontSize: '1.5rem', color: '#cbd5e1', height: '10px', display: 'block', textIndent: '-6px' }}>“</span>
+                                  <span>{quote.text}</span>
+                                  <strong style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, fontStyle: 'normal', marginTop: '4px' }}>
+                                    — {quote.author}
+                                  </strong>
+                                </div>
+                              </div>
                             );
                           })()}
                         </div>
