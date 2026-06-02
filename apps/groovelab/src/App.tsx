@@ -6682,7 +6682,7 @@ function App() {
             ) : (
               /* --- GROOVELAB PROFILE LOOK (ORIGINAL) --- */
               <>
-                <div className="animation-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '100%', margin: '0 auto', width: '100%' }}>
+                <div className="animation-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '100%', margin: '0 auto', width: '100%', marginTop: '14px' }}>
               {/* Top: Massive Hero Card */}
               <div className="glass-panel" style={{ background: 'white', borderRadius: '32px', display: 'flex', overflow: 'hidden', minHeight: '340px' }}>
                 <div style={{ flex: '0 0 40%', background: '#f8fafc', position: 'relative', overflow: 'hidden' }}>
