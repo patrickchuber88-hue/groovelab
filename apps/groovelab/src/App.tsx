@@ -7729,7 +7729,7 @@ function App() {
             user?.role?.toLowerCase() === 'student' ? (
               <ErrorBoundary>
               <div className="animation-slide-up" style={{ 
-                padding: '32px', 
+                padding: '0 32px 32px 32px', 
                 display: 'flex', 
                 gap: '24px', 
                 height: 'calc(100vh - 140px)', 
@@ -8120,7 +8120,7 @@ function App() {
           ) : (
             <ErrorBoundary>
               <div className="animation-slide-up" style={{  
-              padding: '32px', 
+              padding: '0 32px 32px 32px', 
               display: 'flex', 
               gap: '24px', 
               height: 'calc(100vh - 140px)', 
