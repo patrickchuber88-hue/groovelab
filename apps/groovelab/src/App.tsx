@@ -4974,8 +4974,13 @@ function App() {
       
     // Force a hard reload to absolutely guarantee that any lingering camera 
     // media streams from the browser are destroyed.
+    // If there are search parameters (like qr_token or teacher_qr_token), reload to the clean origin page to prevent infinite loops.
     setTimeout(() => {
-      window.location.reload();
+      if (window.location.search) {
+        window.location.replace(window.location.origin + window.location.pathname);
+      } else {
+        window.location.reload();
+      }
     }, 50);
   };
 

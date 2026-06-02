@@ -571,9 +571,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const qrToken = urlParams.get('qr_token');
+    const qrToken = urlParams.get('qr_token') || urlParams.get('teacher_qr_token');
     if (qrToken && !loading) {
-      console.log('[Login] Auto-logging in via URL qr_token:', qrToken);
+      console.log('[Login] Auto-logging in via URL qr_token/teacher_qr_token:', qrToken);
       handlePinLogin(qrToken);
     }
   }, [schoolData]);
@@ -1103,7 +1103,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     try {
       if (scannedValue.includes('?')) {
         const urlParams = new URLSearchParams(scannedValue.split('?')[1]);
-        const parsedToken = urlParams.get('qr_token');
+        const parsedToken = urlParams.get('qr_token') || urlParams.get('teacher_qr_token');
         if (parsedToken) {
           qrToken = parsedToken;
         }

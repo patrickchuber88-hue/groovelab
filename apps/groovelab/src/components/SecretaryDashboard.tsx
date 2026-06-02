@@ -11558,7 +11558,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               {/* QR Code Activation Link Section */}
               {(() => {
                 const token = manageTeacher.teacherQrToken || '';
-                const link = token ? `${window.location.origin}/?qr_token=${token}&email=${encodeURIComponent(manageTeacher.email)}` : '';
+                const isActive = manageTeacher.isActive || manageTeacher.is_active;
+                const link = isActive ? token : (token ? `${window.location.origin}/?qr_token=${token}&email=${encodeURIComponent(manageTeacher.email)}` : '');
+                const label = isActive ? 'Login-QR-Code (Ausweis)' : 'Aktivierungs-QR-Code';
                 return link ? (
                   <div style={{
                     padding: '20px',
@@ -11570,7 +11572,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     alignItems: 'center',
                     gap: '14px'
                   }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', alignSelf: 'flex-start', textTransform: 'uppercase' }}>Aktivierungs-QR-Code</span>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', alignSelf: 'flex-start', textTransform: 'uppercase' }}>{label}</span>
                     <div style={{ 
                       background: '#ffffff', 
                       padding: '16px', 

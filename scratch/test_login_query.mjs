@@ -7,7 +7,7 @@ const key = env.match(/VITE_SUPABASE_ANON_KEY=(.*)/)[1].trim();
 const supabase = createClient(url, key);
 
 async function testQuery() {
-  const qrToken = 't_x7oim3pz0x'; // A valid teacher_qr_token from our users list
+  const qrToken = 't_9k0oj3prkl'; // Patrick Huber's teacher_qr_token
   
   let query = supabase.from('users').select('*, schools(*)');
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(qrToken);

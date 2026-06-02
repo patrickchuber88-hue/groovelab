@@ -4375,17 +4375,17 @@ export function TeacherDashboard({
                             let dotComponent = null;
  
                             if (isBreak) {
-                              slotBg = '#f5ebe0';
-                              slotBorder = '1.5px solid #e2d1c3';
-                              slotBorderLeft = '5px solid #b45309';
-                              titleColor = '#78350f';
+                              slotBg = 'rgba(254, 243, 199, 0.4)';
+                              slotBorder = '1.5px dashed rgba(245, 158, 11, 0.25)';
+                              slotBorderLeft = '5px solid #f59e0b';
+                              titleColor = '#b45309';
                               dotComponent = (
                                 <div style={{
                                   width: '12px',
                                   height: '12px',
                                   borderRadius: '50%',
-                                  border: '3px solid #b45309',
-                                  background: isFinished ? '#b45309' : '#ffffff',
+                                  border: '3px solid #f59e0b',
+                                  background: isFinished ? '#f59e0b' : '#ffffff',
                                   boxSizing: 'border-box'
                                 }} />
                               );

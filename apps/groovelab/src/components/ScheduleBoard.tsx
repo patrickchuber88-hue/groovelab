@@ -1063,7 +1063,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             marginBottom: '4px'
           }}>
             <span style={{ fontSize: '1rem' }}>💡</span>
-            <span>Ziehe Schüler aus dem Pool direkt in deine Unterrichtstage. Pausen & Slots berechnen sich automatisch.</span>
+            <span>Ziehe Schüler aus dem Pool direkt in deine Unterrichtstage. Pausen & Slots berechnen sich automatisch. <strong>Tipp: Die blaue Startzeit unter dem Wochentag kann durch Anklicken manuell angepasst werden.</strong></span>
           </div>
 
           {/* Form to Add Day Board */}
@@ -1207,12 +1207,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   handleDropOnBoard(board.id, index);
                                 }}
                                 style={{ 
-                                  background: '#fee8d6', 
-                                  border: '1px solid rgba(249, 115, 22, 0.15)', 
-                                  borderLeft: '3px solid #f97316', 
+                                  background: 'rgba(254, 243, 199, 0.5)', 
+                                  border: '1.5px dashed rgba(245, 158, 11, 0.25)', 
+                                  borderLeft: '4px solid #f59e0b', 
                                   borderRadius: '10px', 
                                   padding: '6px 8px', 
-                                  boxShadow: '0 2px 8px rgba(249, 115, 22, 0.03)', 
+                                  boxShadow: '0 2px 8px rgba(245, 158, 11, 0.02)', 
                                   cursor: 'grab', 
                                   display: 'flex', 
                                   flexDirection: 'column', 
@@ -1223,7 +1223,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                     <span style={{ fontSize: '0.8rem' }}>☕</span>
-                                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#c2410c', letterSpacing: '-0.01em' }}>
+                                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#b45309', letterSpacing: '-0.01em' }}>
                                       Pause
                                     </span>
                                   </div>
@@ -1231,9 +1231,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   <button
                                     type="button"
                                     onClick={() => handleRemoveStudentFromBoard(board.id, bs.id)}
-                                    style={{ background: 'transparent', border: 'none', color: '#ea580c', height: '16px', width: '16px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
-                                    onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(254, 215, 170, 0.8)'; e.currentTarget.style.color = '#c2410c'; }}
-                                    onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#ea580c'; }}
+                                    style={{ background: 'transparent', border: 'none', color: '#d97706', height: '16px', width: '16px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
+                                    onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(254, 243, 199, 0.9)'; e.currentTarget.style.color = '#b45309'; }}
+                                    onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#d97706'; }}
                                     title="Pause löschen"
                                   >
                                     <X size={11} strokeWidth={2.5} />
@@ -1242,8 +1242,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px', width: '100%' }}>
                                   {/* Merged Uhrzeit: Clock Icon + Time picker */}
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'rgba(255, 255, 255, 0.6)', border: '1px solid rgba(249, 115, 22, 0.2)', borderRadius: '6px', padding: '2px 4px', flex: '0 0 66px', minWidth: '66px' }}>
-                                    <Clock size={9} strokeWidth={2.5} style={{ color: '#c2410c', flexShrink: 0 }} />
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'rgba(255, 255, 255, 0.6)', border: '1px solid rgba(245, 158, 11, 0.2)', borderRadius: '6px', padding: '2px 4px', flex: '0 0 66px', minWidth: '66px' }}>
+                                    <Clock size={9} strokeWidth={2.5} style={{ color: '#b45309', flexShrink: 0 }} />
                                     <input
                                       type="time"
                                       value={bs.customStartTime || bs.assignedTime}
@@ -1257,7 +1257,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                           return recalculateBoardTimes({ ...b, students: nextStudents });
                                         }));
                                       }}
-                                      style={{ width: '40px', background: 'transparent', border: 'none', fontSize: '0.68rem', fontWeight: 700, color: '#c2410c', outline: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' }}
+                                      style={{ width: '40px', background: 'transparent', border: 'none', fontSize: '0.68rem', fontWeight: 700, color: '#b45309', outline: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' }}
                                       title="Startzeit bearbeiten"
                                     />
                                   </div>
@@ -1284,7 +1284,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                             }));
                                           }
                                         }}
-                                        style={{ background: 'rgba(255, 255, 255, 0.6)', border: '1px solid rgba(249, 115, 22, 0.2)', borderRadius: '6px', padding: '2px 4px', fontSize: '0.68rem', fontWeight: 700, color: '#c2410c', outline: 'none', cursor: 'pointer' }}
+                                        style={{ background: 'rgba(255, 255, 255, 0.6)', border: '1px solid rgba(245, 158, 11, 0.2)', borderRadius: '6px', padding: '2px 4px', fontSize: '0.68rem', fontWeight: 700, color: '#b45309', outline: 'none', cursor: 'pointer' }}
                                       >
                                         <option value={5}>5m</option>
                                         <option value={10}>10m</option>
@@ -1296,7 +1296,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                         <option value="custom">...</option>
                                       </select>
                                     ) : (
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '1px', background: 'rgba(255, 255, 255, 0.6)', border: '1px solid rgba(249, 115, 22, 0.2)', borderRadius: '6px', padding: '1px 3px' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '1px', background: 'rgba(255, 255, 255, 0.6)', border: '1px solid rgba(245, 158, 11, 0.2)', borderRadius: '6px', padding: '1px 3px' }}>
                                         <input
                                           type="number"
                                           min={1}
@@ -1310,9 +1310,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                               return recalculateBoardTimes({ ...b, students: nextStudents });
                                             }));
                                           }}
-                                          style={{ width: '22px', background: 'transparent', border: 'none', fontSize: '0.68rem', fontWeight: 700, color: '#c2410c', outline: 'none', textAlign: 'center', padding: 0 }}
+                                          style={{ width: '22px', background: 'transparent', border: 'none', fontSize: '0.68rem', fontWeight: 700, color: '#b45309', outline: 'none', textAlign: 'center', padding: 0 }}
                                         />
-                                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#c2410c' }}>m</span>
+                                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#b45309' }}>m</span>
                                       </div>
                                     )}
                                   </div>
@@ -1411,7 +1411,15 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                       <div style={{ borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: '6px', marginTop: 'auto', display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', color: '#86868b' }}>
                         <span>Dauer:</span>
                         <span style={{ color: '#1d1d1f', fontWeight: 800 }}>
-                          {board.students.reduce((acc, curr) => acc + curr.duration, 0)} Min
+                          {(() => {
+                            const total = board.students.reduce((acc, curr) => acc + curr.duration, 0);
+                            const hrs = Math.floor(total / 60);
+                            const mins = total % 60;
+                            if (hrs > 0) {
+                              return `${hrs} h ${mins} m`;
+                            }
+                            return `${mins} m`;
+                          })()}
                         </span>
                       </div>
                     )}
