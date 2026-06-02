@@ -4786,59 +4786,7 @@ export function TeacherDashboard({
                           </div>
                         )}
  
-                        {/* Centered Schönen Feierabend success banner at the very end of the slots list */}
-                        {(() => {
-                          if (!briefingData.timeline || briefingData.timeline.length === 0) return null;
-                          const lastSlot = briefingData.timeline[briefingData.timeline.length - 1];
-                          const [lh, lm] = lastSlot.timeSlot.split(':').map(Number);
-                          const totalMin = lh * 60 + lm + 30;
-                          const lastSlotEndStr = `${String(Math.floor(totalMin / 60) % 24).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')}`;
-                          const isDayCompleted = currentTimeStr >= lastSlotEndStr;
- 
-                          if (!isDayCompleted) return null;
- 
-                          return (
-                            <div style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '12px',
-                              position: 'relative',
-                              width: '100%',
-                              marginTop: '12px'
-                            }}>
-                              {/* Timeline Dot on the left */}
-                              <div style={{ width: '20px', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2, flexShrink: 0 }}>
-                                <div style={{
-                                  width: '12px',
-                                  height: '12px',
-                                  borderRadius: '50%',
-                                  border: '3px solid #22c55e',
-                                  background: '#22c55e',
-                                  boxSizing: 'border-box'
-                                }} />
-                              </div>
- 
-                              {/* Success banner card on the right */}
-                              <div style={{
-                                flex: 1,
-                                background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                                border: '1.5px solid #bbf7d0',
-                                borderRadius: '16px',
-                                padding: '16px 20px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '4px',
-                                boxShadow: '0 4px 14px rgba(34, 197, 94, 0.06)',
-                                textAlign: 'center'
-                              }}>
-                                <h4 style={{ margin: 0, fontWeight: 900, color: '#15803d', fontSize: '0.95rem', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Schönen Feierabend</h4>
-                                <p style={{ margin: 0, fontSize: '0.78rem', color: '#166534', fontWeight: 650, lineHeight: 1.4 }}>
-                                  Alle Unterrichtsstunden für heute sind erfolgreich beendet. Hab einen wohlverdienten, erholsamen Feierabend.
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        })()}
+
                       </div>
                     </div>
                   )}
