@@ -7733,7 +7733,8 @@ function App() {
                 display: 'flex', 
                 gap: '24px', 
                 height: 'calc(100vh - 140px)', 
-                minHeight: '700px' 
+                minHeight: '700px',
+                marginTop: '14px'
               }}>
                 {/* Left Column: Inbox Message List (1/3rd width) */}
                 <div className="glass-panel" style={{ 
@@ -8123,7 +8124,8 @@ function App() {
               display: 'flex', 
               gap: '24px', 
               height: 'calc(100vh - 140px)', 
-              minHeight: '700px' 
+              minHeight: '700px',
+              marginTop: '14px' 
             }}>
               
               {/* Left Column: Inbox Message List (1/3rd width) */}
