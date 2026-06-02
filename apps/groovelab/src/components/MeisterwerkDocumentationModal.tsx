@@ -298,10 +298,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         const filtered = parsedAssigned.filter((item: any) => item.studentId === student.id);
         setAssignedLehrwerke(filtered);
         
-        // Auto-select first assigned textbook if none selected
+        // Textbook items are now collapsed by default, so we do not auto-select the first textbook here.
+        /*
         if (filtered.length > 0 && !activeLehrwerkId) {
           setActiveLehrwerkId(filtered[0].lehrwerkId);
         }
+        */
       } else {
         setAssignedLehrwerke([]);
       }
