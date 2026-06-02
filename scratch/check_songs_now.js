@@ -7,16 +7,15 @@ const key = env.match(/VITE_SUPABASE_ANON_KEY=(.*)/)[1].trim();
 const supabase = createClient(url, key);
 
 async function run() {
-  const { data: magdalena, error } = await supabase
-    .from('users')
-    .select('*')
-    .eq('first_name', 'Magdalena')
-    .single();
+  const { data: songs, error } = await supabase
+    .from('songs')
+    .select('id, title, artist, school_id, teacher_id, is_groovelab_active, is_campus_active');
     
   if (error) {
-    console.error("Error fetching Magdalena:", error);
+    console.error("Error fetching songs:", error);
   } else {
-    console.log("Magdalena details:", JSON.stringify(magdalena, null, 2));
+    console.log("Songs count:", songs.length);
+    console.log("Songs:", JSON.stringify(songs, null, 2));
   }
 }
 

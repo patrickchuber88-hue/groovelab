@@ -7,16 +7,16 @@ const key = env.match(/VITE_SUPABASE_ANON_KEY=(.*)/)[1].trim();
 const supabase = createClient(url, key);
 
 async function run() {
-  const { data: magdalena, error } = await supabase
+  const { data: user, error } = await supabase
     .from('users')
-    .select('*')
-    .eq('first_name', 'Magdalena')
+    .select('id, first_name, last_name, email, role')
+    .eq('id', '9c629cb8-9241-4d5e-9151-da1fd6f4cde4')
     .single();
     
   if (error) {
-    console.error("Error fetching Magdalena:", error);
+    console.error("Error fetching user:", error);
   } else {
-    console.log("Magdalena details:", JSON.stringify(magdalena, null, 2));
+    console.log("User details:", user);
   }
 }
 
