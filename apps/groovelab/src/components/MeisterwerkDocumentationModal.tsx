@@ -1596,7 +1596,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               }}
             >
               <Book size={13} style={{ opacity: 0.8 }} />
-              <span>{useNotebookLayout ? 'Modernes Design' : 'Leder-Design'}</span>
+              <span>{useNotebookLayout ? 'Modernes Design' : 'Notizbuch-Design'}</span>
             </button>
           </div>
 
