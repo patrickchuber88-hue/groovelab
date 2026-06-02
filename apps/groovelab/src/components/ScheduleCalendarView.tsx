@@ -74,6 +74,20 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
   } | null>(null);
 
   const [sickUntil, setSickUntil] = useState<string | null>(null);
+  const [rooms, setRooms] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchRooms = async () => {
+      const { data } = await supabase
+        .from('rooms')
+        .select('id, name')
+        .eq('school_id', schoolId);
+      if (data) {
+        setRooms(data);
+      }
+    };
+    fetchRooms();
+  }, [schoolId]);
 
   const occurrences: ScheduleOccurrence[] = useMemo(() => {
     const merged = baseOccurrences.filter(o => !pendingChanges[o.id]);
@@ -456,6 +470,12 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                     first_name: '☕️ Pause',
                     last_name: '',
                     instrument: ''
+                  },
+                  schedules: {
+                    room_id: board.roomId || null,
+                    room: {
+                      name: rooms.find(r => r.id === board.roomId)?.name || ''
+                    }
                   }
                 });
               }
@@ -485,6 +505,12 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                       first_name: '❇️ Freier Slot', 
                       last_name: `(zuvor: ${student.first_name})`, 
                       instrument: student.instrument || ''
+                    },
+                    schedules: {
+                      room_id: board.roomId || null,
+                      room: {
+                        name: rooms.find(r => r.id === board.roomId)?.name || ''
+                      }
                     }
                   });
                 } else if (!dbRecord && !isSlotOccupied) {
@@ -501,6 +527,12 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                       first_name: student.first_name || 'Pause', 
                       last_name: student.last_name || '', 
                       instrument: student.instrument || 'Allgemein' 
+                    },
+                    schedules: {
+                      room_id: board.roomId || null,
+                      room: {
+                        name: rooms.find(r => r.id === board.roomId)?.name || ''
+                      }
                     }
                   });
                 }
