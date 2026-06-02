@@ -2857,6 +2857,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           ))}
                           
                           {/* List of separate homework notes with delete buttons */}
+                          {/* List of separate homework notes */}
                           {hasNotes && (
                             <div style={{ 
                               display: 'flex', 
@@ -2869,7 +2870,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               {homeworkNotesList.map((note, nIdx) => (
                                 <div key={`note-${nIdx}`} style={{ 
                                   display: 'flex', 
-                                  justifyContent: 'space-between', 
                                   alignItems: 'flex-start',
                                   fontSize: '0.72rem', 
                                   color: '#475569', 
@@ -2879,13 +2879,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   gap: '8px'
                                 }}>
                                   <span style={{ whiteSpace: 'pre-line' }}>{note}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteNote(nIdx)}
-                                    style={{ border: 'none', background: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.72rem', padding: '0 4px', fontWeight: 800, marginTop: '1px' }}
-                                  >
-                                    ✕
-                                  </button>
                                 </div>
                               ))}
                             </div>
