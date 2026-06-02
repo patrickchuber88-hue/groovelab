@@ -6315,7 +6315,7 @@ function App() {
         {/* Live Lab Tab for Students */}
         {user.role?.toLowerCase() === 'student' && activeStudentTab === 'live' && (
           <ErrorBoundary>
-            <div className="animation-slide-up" style={{ width: '100%', padding: '0px 16px 16px 16px', display: 'flex', flexDirection: 'column', flex: 1, height: '100%' }}>
+            <div className="animation-slide-up" style={{ width: '100%', padding: '24px 16px 16px 16px', display: 'flex', flexDirection: 'column', flex: 1, height: '100%' }}>
               <TeacherDashboard 
                 key={activePlatform}
                 userId={user.id} 
