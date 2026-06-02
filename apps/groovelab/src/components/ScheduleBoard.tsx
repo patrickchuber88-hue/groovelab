@@ -1178,17 +1178,6 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           />
                           <span style={{ fontSize: '0.65rem', fontWeight: 600, marginLeft: '1px', color: '#007aff' }}>Uhr</span>
                         </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteBoard(board.id)}
-                          style={{ background: 'transparent', border: 'none', color: '#86868b', cursor: 'pointer', padding: '4px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
-                          onMouseOver={e => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.04)'; e.currentTarget.style.color = '#ef4444'; }}
-                          onMouseOut={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#86868b'; }}
-                          title="Unterrichtstag löschen"
-                        >
-                          <Trash2 size={13} />
-                        </button>
                       </div>
                     </div>
 
