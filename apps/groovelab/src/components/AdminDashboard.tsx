@@ -80,6 +80,26 @@ const getInstrumentAvatarUrl = (instrument: string | null | undefined): string =
   return '/avatars/gitarre_avatar_new.png';
 };
 
+const resolveCampusAvatar = (u: any): string => {
+  if (!u) return '/avatar_ghost.jpg';
+  const role = (u.role || '').toLowerCase();
+  
+  if (role === 'student') {
+    const studentInstrument = u.instrument || 'Allgemein';
+    const inst = studentInstrument.toLowerCase().trim();
+    if (inst.includes('guitar') || inst.includes('gitarre')) {
+      if (u.photo_url && (u.photo_url.includes('egitarre_avatar') || u.photo_url.includes('gitarre_avatar_new'))) {
+        return u.photo_url;
+      }
+      return '/avatars/gitarre_avatar_new.png';
+    }
+    return getInstrumentAvatarUrl(studentInstrument);
+  } else {
+    // Teachers / Admins
+    return getInstrumentAvatarUrl(u.instrument);
+  }
+};
+
 const getInstrumentTypeKey = (instrument: string | null | undefined): string => {
   if (!instrument) return 'guitarist';
   const inst = instrument.toLowerCase().trim();
@@ -778,6 +798,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         let sq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
         if (activePlatform === 'campus') sq = sq.eq('is_campus_active', true);
         else sq = sq.eq('is_groovelab_active', true);
+        if (adminData.role === 'teacher') sq = sq.eq('teacher_id', adminData.id);
         const { data: studentsData } = await sq.order('first_name');
         if (studentsData) {
           // --- AUTO-CLEANUP DELETED/ARCHIVED STUDENTS ---
@@ -3363,7 +3384,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                       }}>
                         <span style={{ fontSize: '1rem', fontWeight: 900, color: brandColor, position: 'absolute', zIndex: 0 }}>{s.first_name?.[0]}</span>
                         <img 
-                          src={s.photo_url || '/avatar_ghost.jpg'} 
+                          src={activePlatform === 'campus' ? resolveCampusAvatar(s) : (s.photo_url || '/avatar_ghost.jpg')} 
                           style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'relative', zIndex: 1 }}
                           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                         />
@@ -4182,12 +4203,21 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             gap: '16px' 
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
             <div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>
-                {admin?.role === 'teacher' ? '📚 Meine Mediathek: Lehrwerke verwalten' : '📚 Lehrwerke verwalten'}
-              </h3>
-              <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '6px 0 0 0', fontWeight: 600 }}>
+              <h2 style={{ fontSize: '1.75rem', color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                <div style={{ background: `${brandColor}15`, color: brandColor, padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
+                  <Library size={16} />
+                </div>
+                {admin?.role === 'teacher' ? (
+                  <span style={{ fontWeight: 400 }}>
+                    <strong style={{ fontWeight: 900 }}>Meine Mediathek:</strong> Lehrwerke verwalten
+                  </span>
+                ) : (
+                  <span style={{ fontWeight: 900 }}>Lehrwerke</span>
+                )}
+              </h2>
+              <p style={{ color: '#64748b', fontSize: '0.8rem', margin: '6px 0 0 0', fontWeight: 600 }}>
                 {admin?.role === 'teacher' 
                   ? 'Hier siehst du nur Lehrwerke, die du persönlich angelegt hast.' 
                   : 'Erstelle und pflege Schulbücher für den Campus.'}
@@ -4476,11 +4506,17 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
                 <div>
-                  <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                  <h2 style={{ fontSize: '1.75rem', color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                     <div style={{ background: `${brandColor}15`, color: brandColor, padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
                       <Library size={16} />
                     </div>
-                    {admin?.role === 'teacher' ? 'Meine Mediathek: Songs verwalten' : 'Songs'}
+                    {admin?.role === 'teacher' ? (
+                      <span style={{ fontWeight: 400 }}>
+                        <strong style={{ fontWeight: 900 }}>Meine Mediathek:</strong> Songs verwalten
+                      </span>
+                    ) : (
+                      <span style={{ fontWeight: 900 }}>Songs</span>
+                    )}
                   </h2>
                   <p style={{ color: '#64748b', fontSize: '0.8rem', margin: '6px 0 0 0', fontWeight: 600 }}>
                     {admin?.role === 'teacher' 

@@ -171,8 +171,8 @@ function MobileBriefingView({
       {/* TOP WELCOME CARD */}
       <div style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', position: 'relative' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ fontSize: '1.35rem', fontWeight: 900, margin: 0, color: '#1e293b', fontFamily: "'Urbanist', sans-serif" }}>
-            Hallo. <span style={{ color: '#16a34a' }}>{studentUser?.first_name || 'Schüler'} 👋</span>
+          <h2 style={{ fontSize: '28px', fontWeight: 900, margin: 0, color: '#1e293b', fontFamily: "'Urbanist', sans-serif" }}>
+            Briefing
           </h2>
           <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Music size={20} color="#0b57d0" strokeWidth={1.5} />
@@ -2054,7 +2054,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const strokeDashoffset = circleCircumference - (xpPercentage / 100) * circleCircumference;
 
   return (
-    <div style={{ fontFamily: '"Outfit", "Inter", sans-serif', maxWidth: '100%', margin: '0 auto', width: '100%' }}>
+    <div style={{ fontFamily: '"Outfit", "Inter", sans-serif', maxWidth: '100%', margin: '0 auto', width: '100%', paddingTop: '24px' }}>
       
       {/* Top Tab Switcher - Removed per user request */}
       <div style={{ display: 'none', gap: '8px', background: '#f1f3f4', padding: '6px', borderRadius: '100px', marginBottom: '24px' }}>
@@ -2198,7 +2198,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   <Clock size={18} />
                 </div>
                 <div>
-                  <h4 style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e293b', margin: 0 }}>[ ÜBE-BOARD ] Fokus-Timer</h4>
+                  <h4 style={{ fontWeight: 800, fontSize: '28px', color: '#1e293b', margin: 0 }}>Übe-Board</h4>
                   <p style={{ fontSize: '0.7rem', color: '#94a3b8', margin: '2px 0 0 0', fontWeight: 600 }}>Fokusmodus & Gyroskop-Steuerung</p>
                 </div>
               </div>
@@ -2471,7 +2471,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   <Music size={18} />
                 </div>
                 <div>
-                  <h4 style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e293b', margin: 0 }}>[ SONGS & MATERIAL ]</h4>
+                  <h4 style={{ fontWeight: 800, fontSize: '28px', color: '#1e293b', margin: 0 }}>Mediathek</h4>
                   <p style={{ fontSize: '0.7rem', color: '#94a3b8', margin: '2px 0 0 0', fontWeight: 600 }}>Deine Meilensteine & Hausaufgaben</p>
                 </div>
               </div>
@@ -2677,7 +2677,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   <Trophy size={18} />
                 </div>
                 <div>
-                  <h4 style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e293b', margin: 0 }}>[ CAMPUS-CUP ] Leaderboard</h4>
+                  <h4 style={{ fontWeight: 800, fontSize: '28px', color: '#1e293b', margin: 0 }}>Campus-Cup</h4>
                   <p style={{ fontSize: '0.7rem', color: '#94a3b8', margin: '2px 0 0 0', fontWeight: 600 }}>Globales Ranking aller Musikschulen (RFI Index)</p>
                 </div>
               </div>
@@ -2894,7 +2894,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     <Calendar size={18} />
                   </div>
                   <div>
-                    <h4 style={{ fontWeight: 700, fontSize: '1rem', color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>{schoolYearText}</h4>
+                    <h4 style={{ fontWeight: 700, fontSize: '28px', color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>Events</h4>
                     <p style={{ fontSize: '0.72rem', color: '#86868b', margin: '2px 0 0 0', fontWeight: 500, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>Deine geplanten Unterrichtsstunden & Konzerte des laufenden Schuljahres</p>
                   </div>
                 </div>
@@ -3387,8 +3387,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               
               {/* Welcome Block */}
               <div style={{ background: '#ffffff', borderRadius: '24px', padding: '18px 24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', position: 'relative', overflow: 'hidden' }}>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 900, margin: '0 0 10px 0', color: '#1e293b', fontFamily: "'Urbanist', sans-serif" }}>
-                  Hallo. <span style={{ color: '#16a34a' }}>{studentUser?.first_name || 'Schüler'} 👋</span>
+                <h2 style={{ fontSize: '28px', fontWeight: 900, margin: '0 0 10px 0', color: '#1e293b', fontFamily: "'Urbanist', sans-serif" }}>
+                  Briefing
                 </h2>
                 <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
                   <p style={{ fontSize: '0.9rem', color: '#475569', lineHeight: 1.5, margin: 0, flex: 1, fontWeight: 500 }}>
@@ -4098,8 +4098,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
             {/* Info Block */}
             <div style={{ marginTop: '8px' }}>
-              <h3 style={{ fontSize: '1.45rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>
-                {levelTitle.split(' (')[0]}
+              <h3 style={{ fontSize: '28px', fontWeight: 900, color: '#1e293b', margin: 0 }}>
+                Mein Held
               </h3>
               <span style={{ color: '#0b57d0', fontWeight: 700, fontSize: '0.78rem', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
                 <Award size={13} /> {levelTitle}
@@ -4209,8 +4209,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 </span>
               </div>
 
-              <h1 style={{ fontSize: '2.8rem', fontWeight: 950, color: '#0f172a', margin: '0 0 12px 0', letterSpacing: '-0.03em', fontFamily: "'Urbanist', sans-serif" }}>
-                {studentUser.first_name} {studentUser.last_name || ''}
+              <h1 style={{ fontSize: '28px', fontWeight: 950, color: '#0f172a', margin: '0 0 12px 0', letterSpacing: '-0.03em', fontFamily: "'Urbanist', sans-serif" }}>
+                Profil
               </h1>
 
               {/* Active Instruments Badge List */}

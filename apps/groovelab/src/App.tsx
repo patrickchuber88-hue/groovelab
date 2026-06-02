@@ -2387,7 +2387,7 @@ function App() {
   // we immediately redirect/correct them to 'briefing' to keep the modules strictly isolated.
   useEffect(() => {
     if (user && user.role?.toLowerCase() === 'student') {
-      if (activePlatform === 'campus' && !['briefing', 'mediathek', 'practice_board', 'campus_cup', 'flashback', 'events', 'profile', 'all_appointments'].includes(activeStudentTab)) {
+      if (activePlatform === 'campus' && !['briefing', 'mediathek', 'practice_board', 'campus_cup', 'flashback', 'events', 'profile', 'all_appointments', 'messages'].includes(activeStudentTab)) {
         console.log('[Safety Hook] Enforcing student Campus Briefing Board redirect from invalid tab:', activeStudentTab);
         setActiveStudentTab('briefing');
         localStorage.setItem('campus_active_tab', 'briefing');
@@ -3462,7 +3462,7 @@ function App() {
       // Fetch school users for both student and teacher to support direct messaging
       const { data: allUsers } = await supabase
         .from('users')
-        .select('id, first_name, last_name, role, photo_url')
+        .select('id, first_name, last_name, role, photo_url, teacher_id, instrument')
         .eq('school_id', schoolId)
         .order('first_name');
       if (allUsers) {
@@ -6300,7 +6300,7 @@ function App() {
               ? '#fbbc05'
               : '#0b57d0',
           flexShrink: 0,
-          marginBottom: '10px'
+          marginBottom: activePlatform === 'campus' && user.role?.toLowerCase() === 'student' ? '0px' : '10px'
         }} />
 
 
