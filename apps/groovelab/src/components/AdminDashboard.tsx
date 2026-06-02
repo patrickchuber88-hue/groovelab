@@ -2399,7 +2399,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   ];
 
   const renderLiveTab = () => (
-    <div style={{ marginTop: '14px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ marginTop: '0px', flex: 1, display: 'flex', flexDirection: 'column' }}>
       <TeacherDashboard 
         key={`${activePlatform}-${activeTab}`}
         userId={userId} 
@@ -2432,7 +2432,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     });
 
     return (
-      <div style={{ marginTop: '14px' }}>
+      <div style={{ marginTop: '0px' }}>
         <div 
           className="glass-panel" 
           style={{ 
@@ -2939,7 +2939,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const renderStudentsTab = () => {
     const brandColor = '#16a34a';
     return (
-      <div style={{ marginTop: '14px' }}>
+      <div style={{ marginTop: '0px' }}>
         <div 
           className="glass-panel" 
           style={{ 
@@ -3431,7 +3431,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   };
 
   const renderTeachersTab = () => (
-    <div style={{ marginTop: '14px' }}>
+    <div style={{ marginTop: '0px' }}>
       <div 
         className="glass-panel" 
         style={{ 
@@ -3678,7 +3678,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   );
 
   const renderRoomsTab = () => (
-    <div style={{ marginTop: '14px' }}>
+    <div style={{ marginTop: '0px' }}>
       <div 
         className="glass-panel" 
         style={{ 
@@ -4415,7 +4415,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     };
 
     return (
-      <div style={{ marginTop: '14px' }}>
+      <div style={{ marginTop: '0px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {activePlatform === 'campus' && (
             <div style={{ display: 'flex', background: '#f1f5f9', padding: '6px', borderRadius: '18px', width: 'fit-content', gap: '8px', marginBottom: '8px' }}>
@@ -4884,7 +4884,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       : null;
 
     return (
-      <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+      <div style={{ marginTop: '0px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
         {/* Top Header Card */}
         <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
@@ -5085,13 +5085,13 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   };
 
   const renderIDGalleryTab = () => (
-    <div style={{ marginTop: '14px' }}>
+    <div style={{ marginTop: '0px' }}>
       <IDGallery users={[...teachers, ...students]} brandColor={brandColor} onShowQR={setSelectedQRUser} />
     </div>
   );
 
   const renderSetupTab = () => (
-    <div style={{ marginTop: '14px' }}>
+    <div style={{ marginTop: '0px' }}>
       <DeviceSetupScreen 
         rooms={setupRooms} 
         stations={setupStations} 
@@ -6025,7 +6025,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   return (
     <div style={{ 
       flex: 1, 
-      padding: '0 10px 10px 10px', 
+      padding: '14px 10px 10px 10px', 
       overflowY: activeTab === 'live' ? 'hidden' : 'auto',
       height: activeTab === 'live' ? '100%' : 'auto',
       display: 'flex',
