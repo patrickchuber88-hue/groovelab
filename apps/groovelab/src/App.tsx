@@ -5472,7 +5472,7 @@ function App() {
       : valForAlpha.trim().toUpperCase().startsWith(libraryAlphaFilter);
       
     return matchesSearch && matchesAlpha;
-  });
+  }).sort((a: any, b: any) => (a.title || '').localeCompare(b.title || '', 'de-DE'));
 
   const getTeacherTheme = (name: string, userId: string) => {
     const nameLower = (name || '').toLowerCase();
@@ -8775,15 +8775,16 @@ function App() {
         {activeStudentTab === 'repertoire' && (
           <ErrorBoundary>
             <section className="exercises-section animation-slide-up" style={{ padding: '24px' }}>
-              <div style={{ marginBottom: '32px' }}>
-                <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ color: '#10b981' }}><Award size={32} /></div>
-                  Dein Repertoire
-                </h2>
-                <p style={{ color: '#64748b', fontSize: '1rem' }}>Hier sind deine Meisterleistungen. Du hast diese Songs zu 100% gemeistert!</p>
-              </div>
+              <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
+                <div style={{ marginBottom: '32px' }}>
+                  <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '12px', margin: 0 }}>
+                    <div style={{ color: '#10b981' }}><Award size={32} /></div>
+                    Dein Repertoire
+                  </h2>
+                  <p style={{ color: '#64748b', fontSize: '1rem', margin: '8px 0 0 0' }}>Hier sind deine Meisterleistungen. Du hast diese Songs zu 100% gemeistert!</p>
+                </div>
 
-              <div className="exercises-grid">
+                <div className="exercises-grid">
                 {groupedRepertoireSongs.length === 0 ? (
                   <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '80px 40px', background: 'white', borderRadius: '32px', color: '#94a3b8', border: '2px dashed #e2e8f0' }}>
                     <div style={{ fontSize: '3.5rem', marginBottom: '24px' }}>🏆</div>
@@ -8835,6 +8836,7 @@ function App() {
                   ))
                 )}
               </div>
+              </div>
             </section>
           </ErrorBoundary>
         )}
@@ -8843,14 +8845,14 @@ function App() {
         {/* Band Matching Tab (The Wall) */}
         {activeStudentTab === 'matching' && (
           <ErrorBoundary>
-            <section className="exercises-section animation-slide-up" style={{ padding: '24px' }}>
+            <section className="exercises-section glass-panel animation-slide-up" style={{ padding: '32px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap', gap: '20px' }}>
                   <div>
-                    <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '12px', margin: 0 }}>
                       <div style={{ color: '#f59e0b' }}><Users size={32} /></div>
                       Band Matching
                     </h2>
-                    <p style={{ color: '#64748b', fontSize: '1rem' }}>Finde deine Mitmusiker für deine 100% Songs!</p>
+                    <p style={{ color: '#64748b', fontSize: '1rem', margin: '8px 0 0 0' }}>Finde deine Mitmusiker für deine 100% Songs!</p>
                   </div>
 
                   {/* Level Switch */}
@@ -9302,11 +9304,11 @@ function App() {
         {/* Bands Tab (Only for Students) */}
         {activeStudentTab === 'bands' && user.role === 'student' && (
           <ErrorBoundary>
-            <section className="exercises-section animation-slide-up" style={{ padding: '24px' }}>
+            <section className="exercises-section glass-panel animation-slide-up" style={{ padding: '32px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
               <div style={{ marginBottom: '32px' }}>
-                <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+                <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '12px', margin: 0 }}>
                   <div style={{ color: '#3b82f6' }}><Box size={32} /></div>
-                  Band Projekte
+                  Bands
                 </h2>
               </div>
 
@@ -9670,13 +9672,14 @@ function App() {
         {activeStudentTab === 'library' && (
           <ErrorBoundary>
             <section className="exercises-section animation-slide-up" style={{ padding: '24px' }}>
-              <div style={{ marginBottom: '32px' }}>
-                <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <Library size={32} color={brandColor} />
-                  Songbibliothek
-                </h2>
-                <p style={{ color: '#64748b', fontSize: '1rem' }}>Entdecke neue Songs und füge sie deinem Üben-Board hinzu.</p>
-              </div>
+              <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
+                <div style={{ marginBottom: '32px' }}>
+                  <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '12px', margin: 0 }}>
+                    <Library size={32} color={brandColor} />
+                    Songbibliothek
+                  </h2>
+                  <p style={{ color: '#64748b', fontSize: '1rem', margin: '8px 0 0 0' }}>Entdecke neue Songs und füge sie deinem Üben-Board hinzu.</p>
+                </div>
 
               {/* Search and Alpha Filter Navigation */}
               <div style={{ marginBottom: '32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -9771,6 +9774,21 @@ function App() {
                       'pro': '#8b5cf6'
                     };
                     const levelColor = LEVEL_COLORS[String(song.level).toLowerCase()] || '#f59e0b';
+                    
+                    // Dynamic HSL coloring based on song title (A-Z)
+                    const firstLetter = (song.title || 'A').trim().toUpperCase().charAt(0);
+                    const code = firstLetter.charCodeAt(0);
+                    let pct = 0;
+                    if (code >= 65 && code <= 90) {
+                      pct = (code - 65) / (90 - 65);
+                    } else {
+                      pct = (code % 26) / 25;
+                    }
+                    const songHue = Math.floor(pct * 360);
+                    const iconBg = `hsl(${songHue}, 90%, 96%)`;
+                    const iconBorder = `hsl(${songHue}, 45%, 88%)`;
+                    const iconColor = `hsl(${songHue}, 65%, 45%)`;
+
                     return (
                       <div 
                         key={song.id} 
@@ -9795,14 +9813,14 @@ function App() {
                             width: '64px', 
                             height: '64px', 
                             borderRadius: '18px', 
-                            background: '#f8fafc', 
-                            border: '1px solid #e2e8f0', 
+                            background: iconBg, 
+                            border: `1px solid ${iconBorder}`, 
                             display: 'flex', 
                             alignItems: 'center', 
                             justifyContent: 'center',
                             flexShrink: 0
                           }}>
-                            <Music size={28} color="#94a3b8" />
+                            <Music size={28} color={iconColor} />
                           </div>
 
                           {/* Text Info */}
@@ -9904,6 +9922,7 @@ function App() {
                     );
                   })
              )}
+            </div>
             </div>
             </section>
           </ErrorBoundary>

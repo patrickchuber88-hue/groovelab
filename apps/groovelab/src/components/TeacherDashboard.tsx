@@ -2074,6 +2074,19 @@ export function TeacherDashboard({
           studentQuery = studentQuery.eq('is_groovelab_active', true);
         }
 
+        // Prepare dynamic matching board songs query
+        let wallSongsQuery = supabase.from('songs').select(`
+          id, artist, title, media_link, instrumentation,
+          user_song_skills (
+            id, song_id, progress_percent, instrument, part_number, difficulty_level, is_stage_ready, user_id, created_at, formation_group,
+            profiles:users!user_song_skills_user_id_fkey(first_name, photo_url, school_id)
+          )
+        `).eq('school_id', tData.school_id).eq('is_groovelab_active', true);
+
+        if (tData.role === 'teacher') {
+          wallSongsQuery = wallSongsQuery.eq('teacher_id', userId);
+        }
+
         // Concurrently query all school-based dashboard resources (11 queries in parallel)
         const [
           rRes,
@@ -2099,13 +2112,7 @@ export function TeacherDashboard({
             ? supabase.from('help_requests').select('*, users(*)').eq('school_id', tData.school_id).eq('status', 'pending').order('created_at', { ascending: false })
             : Promise.resolve({ data: null, error: null }),
           supabase.from('bands').select('*, band_members(*, profiles:users(id, first_name, last_name, photo_url, created_at, birth_date)), songs(*), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, last_name, photo_url, created_at, birth_date)))').eq('school_id', tData.school_id).in('status', ['forming', 'active']),
-          supabase.from('songs').select(`
-            id, artist, title, media_link, instrumentation,
-            user_song_skills (
-              id, song_id, progress_percent, instrument, part_number, difficulty_level, is_stage_ready, user_id, created_at, formation_group,
-              profiles:users!user_song_skills_user_id_fkey(first_name, photo_url, school_id)
-            )
-          `).eq('school_id', tData.school_id).eq('is_campus_active', false),
+          wallSongsQuery,
           supabase.from('band_song_slots').select('user_id, band_songs(song_id)')
         ]);
 
