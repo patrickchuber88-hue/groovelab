@@ -2877,15 +2877,24 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               {homeworkNotesList.map((note, nIdx) => (
                                 <div key={`note-${nIdx}`} style={{ 
                                   display: 'flex', 
+                                  justifyContent: 'space-between',
                                   alignItems: 'flex-start',
                                   fontSize: '0.72rem', 
                                   color: '#475569', 
                                   fontWeight: 500, 
                                   fontStyle: 'italic',
                                   lineHeight: '1.35',
-                                  gap: '8px'
+                                  gap: '8px',
+                                  width: '100%'
                                 }}>
-                                  <span style={{ whiteSpace: 'pre-line' }}>{note}</span>
+                                  <span style={{ whiteSpace: 'pre-line', flex: 1 }}>{note}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteNote(nIdx)}
+                                    style={{ border: 'none', background: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.72rem', padding: '0 4px', fontWeight: 800, marginTop: '1px', flexShrink: 0 }}
+                                  >
+                                    ✕
+                                  </button>
                                 </div>
                               ))}
                             </div>
