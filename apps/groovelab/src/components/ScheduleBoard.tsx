@@ -88,6 +88,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   // Submission tracking states
   const [hasSubmittedSchedule, setHasSubmittedSchedule] = useState(false);
   const [lastSubmittedTime, setLastSubmittedTime] = useState<string | null>(null);
+  const [scheduleStatus, setScheduleStatus] = useState<'none' | 'pending' | 'approved'>('none');
 
   useEffect(() => {
     loadInitialData();
@@ -184,6 +185,24 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
       if (schedData && schedData.length > 0) {
         setHasSubmittedSchedule(true);
+        // Determine schedule review/approval status by looking at non-break schedules
+        const nonBreakSchedules = schedData.filter(s => s.student_id !== null);
+        if (nonBreakSchedules.length > 0) {
+          const allApproved = nonBreakSchedules.every(s => s.status === 'approved');
+          const hasPending = nonBreakSchedules.some(s => s.status === 'ready_for_admin_review');
+          if (allApproved) {
+            setScheduleStatus('approved');
+          } else if (hasPending) {
+            setScheduleStatus('pending');
+          } else {
+            setScheduleStatus('pending');
+          }
+        } else {
+          setScheduleStatus('approved');
+        }
+      } else {
+        setHasSubmittedSchedule(false);
+        setScheduleStatus('none');
       }
 
       // Reconstruct boards based on database planned_boards OR localStorage OR existing schedules
@@ -891,6 +910,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       // 5. Show success animation
       setShowCelebration(true);
       setHasSubmittedSchedule(true);
+      setScheduleStatus('pending');
       setLastSubmittedTime(new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }));
     } catch (err: any) {
       console.error('Error saving schedule:', err);
@@ -1002,9 +1022,15 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end', marginLeft: 'auto' }}>
-              {hasSubmittedSchedule && (
+              {hasSubmittedSchedule && scheduleStatus === 'approved' && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(209, 250, 229, 0.5)', border: '1px solid rgba(16, 185, 129, 0.15)', color: '#065f46', padding: '6px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700 }}>
                   <span style={{ color: '#10b981', fontSize: '0.8rem' }}>✓</span> 
+                  <span>Freigegeben</span>
+                </div>
+              )}
+              {hasSubmittedSchedule && scheduleStatus === 'pending' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(254, 243, 199, 0.5)', border: '1px solid rgba(245, 158, 11, 0.15)', color: '#92400e', padding: '6px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700 }}>
+                  <span style={{ color: '#d97706', fontSize: '0.8rem' }}>⏳</span> 
                   <span>Eingereicht {lastSubmittedTime ? `(um ${lastSubmittedTime} Uhr)` : '(Wartet auf Freigabe)'}</span>
                 </div>
               )}
