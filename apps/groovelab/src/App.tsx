@@ -8152,8 +8152,8 @@ function App() {
                       setSelectedMailMessage(null);
                     }}
                     style={{ 
-                      background: '#3b82f6', 
-                      color: 'white', 
+                      background: '#fbbc05', 
+                      color: '#1e293b', 
                       border: 'none', 
                       width: '40px', 
                       height: '40px', 
@@ -8162,7 +8162,7 @@ function App() {
                       alignItems: 'center', 
                       justifyContent: 'center', 
                       cursor: 'pointer',
-                      boxShadow: '0 4px 12px rgba(59,130,246,0.2)'
+                      boxShadow: '0 4px 12px rgba(251, 188, 5, 0.2)'
                     }}
                     className="hover-scale"
                     title="Neue Mitteilung schreiben"
@@ -8310,7 +8310,7 @@ function App() {
                           }}
                           style={{ 
                             background: 'transparent', 
-                            color: '#0071e3', 
+                            color: '#64748b', 
                             border: 'none', 
                             padding: '10px 20px', 
                             borderRadius: '20px', 
@@ -8324,17 +8324,17 @@ function App() {
                         <button 
                           type="submit" 
                           style={{ 
-                            background: '#0071e3', 
-                            color: 'white', 
+                            background: '#fbbc05', 
+                            color: '#1e293b', 
                             border: 'none', 
                             padding: '10px 24px', 
                             borderRadius: '20px', 
-                            fontWeight: 600, 
+                            fontWeight: 700, 
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '8px',
-                            boxShadow: '0 4px 12px rgba(0, 113, 227, 0.2)'
+                            boxShadow: '0 4px 12px rgba(251, 188, 5, 0.2)'
                           }}
                           className="hover-scale-mini"
                         >
