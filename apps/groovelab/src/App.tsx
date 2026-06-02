@@ -8615,7 +8615,7 @@ function App() {
         {/* Practice Tab */}
         {activeStudentTab === 'practice' && (
           <ErrorBoundary>
-            <section className="exercises-section animation-slide-up" style={{ padding: '20px' }}>
+            <section className="exercises-section animation-slide-up" style={{ padding: '24px' }}>
               {/* Progress Summary Bar */}
               <div className="glass-panel" style={{ 
                 background: 'white', 
@@ -8845,7 +8845,7 @@ function App() {
         {/* Band Matching Tab (The Wall) */}
         {activeStudentTab === 'matching' && (
           <ErrorBoundary>
-            <section className="exercises-section glass-panel animation-slide-up" style={{ padding: '32px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
+            <section className="exercises-section glass-panel animation-slide-up" style={{ margin: '24px', padding: '32px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap', gap: '20px' }}>
                   <div>
                     <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '12px', margin: 0 }}>
@@ -9304,7 +9304,7 @@ function App() {
         {/* Bands Tab (Only for Students) */}
         {activeStudentTab === 'bands' && user.role === 'student' && (
           <ErrorBoundary>
-            <section className="exercises-section glass-panel animation-slide-up" style={{ padding: '32px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
+            <section className="exercises-section glass-panel animation-slide-up" style={{ margin: '24px', padding: '32px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
               <div style={{ marginBottom: '32px' }}>
                 <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '12px', margin: 0 }}>
                   <div style={{ color: '#3b82f6' }}><Box size={32} /></div>
@@ -9933,8 +9933,8 @@ function App() {
         {/* Team Tab */}
         {user.role?.toLowerCase() === 'student' && activeStudentTab === 'team' && (
           <ErrorBoundary>
-            <div className="tab-content animation-slide-up" style={{ padding: '20px 0' }}>
-              <div className="stats-panel-premium" style={{ background: 'transparent', boxShadow: 'none', padding: 0 }}>
+            <section className="exercises-section animation-slide-up" style={{ padding: '24px' }}>
+              <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
                   <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: `${brandColor}15`, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Users size={24} />
@@ -10030,7 +10030,7 @@ function App() {
                   )}
                 </div>
               </div>
-            </div>
+            </section>
           </ErrorBoundary>
         )}
       </main>
