@@ -1,0 +1,820 @@
+diff --git a/apps/groovelab/src/components/AdminDashboard.tsx b/apps/groovelab/src/components/AdminDashboard.tsx
+index 1901050..562031b 100644
+--- a/apps/groovelab/src/components/AdminDashboard.tsx
++++ b/apps/groovelab/src/components/AdminDashboard.tsx
+@@ -3673,7 +3673,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
+           </form>
+         )}
+ 
+-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '24px' }}>
++        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(440px, 1fr))', gap: '28px' }}>
+           {rooms.map((room, idx) => {
+             const isSelected = draggedRoomId === room.id;
+             const isDragOver = dragOverRoomId === room.id;
+@@ -3686,19 +3686,22 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
+                 onDragLeave={handleRoomDragLeave}
+                 onDrop={(e) => handleRoomDrop(e, room.id)}
+                 style={{ 
+-                  padding: '24px', 
++                  padding: '24px 28px', 
+                   background: isDragOver ? 'rgba(99, 102, 241, 0.03)' : 'white', 
+                   borderRadius: '24px', 
+-                  border: isDragOver ? `2px dashed ${brandColor}` : (isSelected ? '2px dashed #94a3b8' : '1px solid #f1f5f9'),
++                  border: isDragOver ? `2px dashed ${brandColor}` : (isSelected ? '2px dashed #94a3b8' : '1px solid #e8e8ed'),
+                   opacity: isSelected ? 0.5 : 1,
+                   cursor: 'default',
+                   transition: 'all 0.2s ease',
+                   boxShadow: isDragOver ? `0 12px 24px -10px ${brandColor}30` : 'none',
+-                  position: 'relative'
++                  position: 'relative',
++                  display: 'flex',
++                  flexDirection: 'column',
++                  gap: '20px'
+                 }}
+               >
+-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
++                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
++                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0 }}>
+                     {/* Drag Handle */}
+                     <div 
+                       draggable="true"
+@@ -3706,34 +3709,50 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
+                       onDragEnd={handleRoomDragEnd}
+                       style={{ 
+                         cursor: 'grab', 
+-                        padding: '6px', 
+-                        borderRadius: '10px',
++                        padding: '8px', 
++                        borderRadius: '12px',
+                         display: 'flex',
+                         alignItems: 'center',
+                         justifyContent: 'center',
+                         color: '#94a3b8',
+-                        background: '#f8fafc',
+-                        border: '1px solid #e2e8f0',
++                        background: '#f4f4f5',
++                        border: 'none',
+                         transition: 'all 0.15s ease',
+-                        marginRight: '4px'
++                        flexShrink: 0,
++                        width: '44px',
++                        height: '44px'
+                       }}
+                       className="hover-scale-mini"
+                       title="Raum verschieben"
+                     >
+-                      <GripVertical size={16} />
++                      <GripVertical size={20} />
+                     </div>
+ 
+-                    <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: idx === 0 ? '#f59e0b15' : `${brandColor}10`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+-                      {idx === 0 ? <Box size={20} color="#f59e0b" /> : <Box size={20} color={brandColor} />}
++                    {/* Numeric Index Badge */}
++                    <div style={{ 
++                      width: '44px', 
++                      height: '44px', 
++                      borderRadius: '50%', 
++                      background: '#f4f4f5', 
++                      display: 'flex', 
++                      alignItems: 'center', 
++                      justifyContent: 'center', 
++                      fontSize: '1.15rem', 
++                      fontWeight: 800, 
++                      color: '#18181b',
++                      flexShrink: 0
++                    }}>
++                      {idx + 1}
+                     </div>
+-                    <div>
++
++                    <div style={{ minWidth: 0 }}>
+                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                         <span style={{ 
+-                          fontSize: '0.7rem', 
++                          fontSize: '0.8rem', 
+                           fontWeight: 900, 
+                           color: idx === 0 ? '#d97706' : '#64748b', 
+                           background: idx === 0 ? '#fef3c7' : '#f1f5f9', 
+-                          padding: '3px 8px', 
++                          padding: '4px 10px', 
+                           borderRadius: '8px',
+                           textTransform: 'uppercase',
+                           letterSpacing: '0.05em'
+@@ -3741,400 +3760,345 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
+                           {idx === 0 ? '👑 Hauptraum' : 'Nebenraum'}
+                         </span>
+                       </div>
+-                    {editingRoomId === room.id ? (
+-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+-                        <input 
+-                          autoFocus
+-                          value={editingRoomName}
+-                          onChange={e => setEditingRoomName(e.target.value)}
+-                          onKeyDown={e => {
+-                            if (e.key === 'Enter') handleUpdateRoomName(room.id);
+-                            if (e.key === 'Escape') setEditingRoomId(null);
+-                          }}
+-                          style={{ 
+-                            fontSize: '1rem', 
+-                            fontWeight: 700, 
+-                            padding: '4px 12px', 
+-                            borderRadius: '10px', 
+-                            border: `2px solid ${brandColor}`,
+-                            outline: 'none',
+-                            width: '200px'
+-                          }}
+-                        />
+-                        <button 
+-                          onClick={() => handleUpdateRoomName(room.id)}
+-                          style={{ 
+-                            background: brandColor, 
+-                            color: 'white', 
+-                            border: 'none', 
+-                            borderRadius: '8px', 
+-                            width: '32px', 
+-                            height: '32px', 
+-                            display: 'flex', 
+-                            alignItems: 'center', 
+-                            justifyContent: 'center', 
+-                            cursor: 'pointer' 
+-                          }}
+-                        >
+-                          <Check size={16} strokeWidth={3} />
+-                        </button>
+-                        <button 
+-                          onClick={() => setEditingRoomId(null)}
+-                          style={{ 
+-                            background: '#f1f5f9', 
+-                            color: '#64748b', 
+-                            border: 'none', 
+-                            borderRadius: '8px', 
+-                            width: '32px', 
+-                            height: '32px', 
+-                            display: 'flex', 
+-                            alignItems: 'center', 
+-                            justifyContent: 'center', 
+-                            cursor: 'pointer' 
+-                          }}
+-                        >
+-                          <X size={16} />
+-                        </button>
+-                      </div>
+-                    ) : (
+-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => { setEditingRoomId(room.id); setEditingRoomName(room.name); }}>
+-                        <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>{cleanRoomName(room.name)}</h3>
+-                        <Pencil size={14} color="#94a3b8" />
++                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
++                        <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{cleanRoomName(room.name)}</h3>
+                       </div>
+-                    )}
+-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
+-                      {(room.geofence_points || []).map((pt: any, idx: number) => (
+-                        <div key={idx} style={{ 
+-                          background: '#f0fdf4', 
+-                          border: '1px solid #bbf7d0', 
+-                          borderRadius: '8px', 
+-                          padding: '6px 10px', 
+-                          display: 'flex', 
+-                          alignItems: 'center', 
+-                          gap: '8px',
+-                          fontSize: '0.7rem',
+-                          color: '#166534',
+-                          fontWeight: 700
+-                        }}>
+-                          <MapPin size={10} /> Punkt {idx + 1}
+-                          <button 
+-                            onClick={() => handleDeleteGeofencePoint(room.id, idx)}
+-                            style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
+-                            title="Punkt löschen"
+-                          >
+-                            <X size={12} />
+-                          </button>
+-                        </div>
+-                      ))}
+-                      
++                    </div>
++                  </div>
++                </div>
++
++                {/* Geofence coordinate badges */}
++                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '4px' }}>
++                  {(room.geofence_points || []).map((pt: any, gidx: number) => (
++                    <div key={gidx} style={{ 
++                      background: '#f0fdf4', 
++                      border: '1px solid #bbf7d0', 
++                      borderRadius: '9999px', 
++                      padding: '6px 16px', 
++                      display: 'flex', 
++                      alignItems: 'center', 
++                      gap: '8px',
++                      fontSize: '0.85rem',
++                      color: '#166534',
++                      fontWeight: 700,
++                      height: '36px'
++                    }}>
++                      <MapPin size={14} /> Punkt {gidx + 1}
+                       <button 
+-                        onClick={() => handleAddGeofencePoint(room.id)}
+-                        style={{ 
+-                          background: '#fffbeb', 
+-                          border: '1px dashed #fcd34d', 
+-                          borderRadius: '8px', 
+-                          padding: '6px 10px', 
+-                          color: '#92400e', 
+-                          fontSize: '0.7rem', 
+-                          fontWeight: 800, 
+-                          cursor: 'pointer',
+-                          display: 'flex',
+-                          alignItems: 'center',
+-                          gap: '4px'
+-                        }}
+-                        title="Aktuellen Standort scannen"
++                        onClick={() => handleDeleteGeofencePoint(room.id, gidx)}
++                        style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
++                        title="Punkt löschen"
+                       >
+-                        <MapPin size={12} /> Scan
++                        <X size={14} />
+                       </button>
++                    </div>
++                  ))}
++                  
++                  <button 
++                    onClick={() => handleAddGeofencePoint(room.id)}
++                    style={{ 
++                      background: '#fffbeb', 
++                      border: 'none', 
++                      borderRadius: '9999px', 
++                      padding: '6px 18px', 
++                      color: '#92400e', 
++                      fontSize: '0.85rem', 
++                      fontWeight: 800, 
++                      cursor: 'pointer',
++                      display: 'flex',
++                      alignItems: 'center',
++                      gap: '6px',
++                      height: '44px'
++                    }}
++                    title="Aktuellen Standort scannen"
++                  >
++                    <MapPin size={14} /> Scan
++                  </button>
++
++                  <button 
++                    onClick={() => setShowManualInput(showManualInput === room.id ? null : room.id)}
++                    style={{ 
++                      background: '#f4f4f5', 
++                      border: 'none', 
++                      borderRadius: '9999px', 
++                      padding: '6px 18px', 
++                      color: '#52525b', 
++                      fontSize: '0.85rem', 
++                      fontWeight: 800, 
++                      cursor: 'pointer',
++                      display: 'flex',
++                      alignItems: 'center',
++                      gap: '6px',
++                      height: '44px'
++                    }}
++                  >
++                    <Plus size={14} /> Manuell
++                  </button>
+ 
++                  {showManualInput === room.id && (
++                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', animation: 'fadeIn 0.2s' }}>
++                      <input 
++                        placeholder="Lat, Lng" 
++                        value={manualCoords[room.id] || ''} 
++                        onChange={e => setManualCoords({...manualCoords, [room.id]: e.target.value})}
++                        style={{ padding: '8px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '0.85rem', width: '130px', height: '44px' }} 
++                      />
+                       <button 
+-                        onClick={() => setShowManualInput(showManualInput === room.id ? null : room.id)}
+-                        style={{ 
+-                          background: '#f8fafc', 
+-                          border: '1px dashed #cbd5e1', 
+-                          borderRadius: '8px', 
+-                          padding: '6px 10px', 
+-                          color: '#64748b', 
+-                          fontSize: '0.7rem', 
+-                          fontWeight: 800, 
+-                          cursor: 'pointer',
+-                          display: 'flex',
+-                          alignItems: 'center',
+-                          gap: '4px'
++                        onClick={() => {
++                          const parts = manualCoords[room.id]?.split(',').map(s => s.trim());
++                          if (parts?.length === 2 && !isNaN(Number(parts[0])) && !isNaN(Number(parts[1]))) {
++                            handleAddGeofencePoint(room.id, Number(parts[0]), Number(parts[1]));
++                            setManualCoords({...manualCoords, [room.id]: ''});
++                            setShowManualInput(null);
++                          } else {
++                            alert('Format: 47.123, 7.456');
++                          }
+                         }}
++                        style={{ background: brandColor, color: 'white', border: 'none', borderRadius: '12px', padding: '8px 16px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', height: '44px' }}
+                       >
+-                        <Plus size={12} /> Manuell
++                        Set
+                       </button>
+-
+-                      {showManualInput === room.id && (
+-                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', animation: 'fadeIn 0.2s' }}>
+-                          <input 
+-                            placeholder="Lat, Lng" 
+-                            value={manualCoords[room.id] || ''} 
+-                            onChange={e => setManualCoords({...manualCoords, [room.id]: e.target.value})}
+-                            style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.7rem', width: '140px' }} 
+-                          />
+-                          <button 
+-                            onClick={() => {
+-                              const parts = manualCoords[room.id]?.split(',').map(s => s.trim());
+-                              if (parts?.length === 2 && !isNaN(Number(parts[0])) && !isNaN(Number(parts[1]))) {
+-                                handleAddGeofencePoint(room.id, Number(parts[0]), Number(parts[1]));
+-                                setManualCoords({...manualCoords, [room.id]: ''});
+-                                setShowManualInput(null);
+-                              } else {
+-                                alert('Format: 47.123, 7.456');
+-                              }
+-                            }}
+-                            style={{ background: brandColor, color: 'white', border: 'none', borderRadius: '8px', padding: '6px 10px', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer' }}
+-                          >
+-                            Set
+-                          </button>
+-                        </div>
+-                      )}
+-
+-                      {(room.geofence_points?.length > 0 || room.latitude) && (
+-                        <button 
+-                          onClick={() => handleClearGeofencePoints(room.id)}
+-                          style={{ background: 'transparent', border: 'none', color: '#cbd5e1', fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer', padding: '6px' }}
+-                        >
+-                          Alle löschen
+-                        </button>
+-                      )}
+                     </div>
+-                  </div>
++                  )}
++
++                  {(room.geofence_points?.length > 0 || room.latitude) && (
++                    <button 
++                      onClick={() => handleClearGeofencePoints(room.id)}
++                      style={{ background: 'transparent', border: 'none', color: '#cbd5e1', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', padding: '8px', height: '44px', display: 'flex', alignItems: 'center' }}
++                    >
++                      Alle löschen
++                    </button>
++                  )}
+                 </div>
+-                <div style={{ display: 'flex', gap: '8px' }}>
+-                  <button onClick={() => setCustomizingRoom(room)} style={{ padding: '8px 12px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569', cursor: 'pointer', fontWeight: 700, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+-                    <MapPin size={14} /> Layout
++
++                {/* Primary Card action buttons (Layout, iPad, Delete) */}
++                <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
++                  <button onClick={() => setCustomizingRoom(room)} style={{ flex: 1, padding: '12px 20px', borderRadius: '9999px', background: '#f4f4f5', border: 'none', color: '#475569', cursor: 'pointer', fontWeight: 800, fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', height: '44px' }}>
++                    <MapPin size={16} /> Layout
+                   </button>
+-                  <button onClick={() => setShowAddStationForRoom(room.id)} style={{ padding: '8px 12px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', color: brandColor, cursor: 'pointer', fontWeight: 700, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+-                    <Plus size={14} /> iPad
++                  <button onClick={() => setShowAddStationForRoom(room.id)} style={{ flex: 1, padding: '12px 20px', borderRadius: '9999px', background: '#f4f4f5', border: 'none', color: brandColor, cursor: 'pointer', fontWeight: 800, fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', height: '44px' }}>
++                    <Plus size={16} /> iPad
+                   </button>
+-                  <button onClick={() => handleDeleteRoom(room.id)} style={{ padding: '8px', borderRadius: '10px', background: '#fff1f2', border: '1px solid #fecaca', color: '#ef4444', cursor: 'pointer' }}>
+-                    <Trash2 size={14} />
++                  <button onClick={() => handleDeleteRoom(room.id)} style={{ padding: '12px', borderRadius: '9999px', background: '#fef2f2', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '44px', width: '44px', flexShrink: 0 }}>
++                    <Trash2 size={16} />
+                   </button>
+                 </div>
+-              </div>
+ 
+-              {showAddStationForRoom === room.id && (
+-                <form onSubmit={(e) => handleAddStation(e, room.id)} style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', marginBottom: '16px', animation: 'fadeIn 0.3s' }}>
+-                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>Neues iPad hinzufügen</span>
+-                  <div style={{ display: 'flex', gap: '8px' }}>
+-                    <input required placeholder="iPad Name (z.B. iPad 1)" value={newStationName} onChange={e => setNewStationName(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.875rem' }} />
+-                    <button type="submit" style={{ background: brandColor, color: 'white', border: 'none', padding: '10px 16px', borderRadius: '10px', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer' }}>OK</button>
+-                  </div>
+-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
+-                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8' }}>Farbe wählen:</span>
+-                    <div style={{ display: 'flex', gap: '6px' }}>
+-                      {[
+-                        { hex: '#3b82f6', label: 'Blau' },
+-                        { hex: '#eab308', label: 'Gelb' },
+-                        { hex: '#64748b', label: 'Grau' },
+-                        { hex: '#22c55e', label: 'Grün' },
+-                        { hex: '#a855f7', label: 'Lila' },
+-                        { hex: '#ef4444', label: 'Rot' }
+-                      ].map(c => {
+-                        const isSelected = newStationColor === c.hex;
+-                        return (
+-                          <button
+-                            type="button"
+-                            key={c.hex}
+-                            title={c.label}
+-                            onClick={() => setNewStationColor(c.hex)}
+-                            style={{
+-                              width: '20px',
+-                              height: '20px',
+-                              borderRadius: '50%',
+-                              background: c.hex,
+-                              border: isSelected ? '2px solid #1e293b' : '2px solid transparent',
+-                              outline: 'none',
+-                              cursor: 'pointer',
+-                              padding: 0,
+-                              transform: isSelected ? 'scale(1.15)' : 'none',
+-                              transition: 'all 0.15s ease',
+-                              boxShadow: isSelected 
+-                                ? `0 0 0 2px white, 0 4px 8px ${c.hex}40` 
+-                                : '0 2px 4px rgba(0,0,0,0.04)'
+-                            }}
+-                          />
+-                        );
+-                      })}
++                {showAddStationForRoom === room.id && (
++                  <form onSubmit={(e) => handleAddStation(e, room.id)} style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: '#f9f9fb', padding: '18px', borderRadius: '20px', border: '1px solid #e2e8f0', marginTop: '12px', animation: 'fadeIn 0.3s' }}>
++                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#64748b' }}>Neues iPad hinzufügen</span>
++                    <div style={{ display: 'flex', gap: '10px' }}>
++                      <input required placeholder="iPad Name (z.B. iPad 1)" value={newStationName} onChange={e => setNewStationName(e.target.value)} style={{ flex: 1, padding: '10px 16px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.9rem', height: '44px' }} />
++                      <button type="submit" style={{ background: brandColor, color: 'white', border: 'none', padding: '10px 20px', borderRadius: '12px', fontWeight: 800, fontSize: '0.9rem', cursor: 'pointer', height: '44px' }}>OK</button>
+                     </div>
+-                  </div>
+-                </form>
+-              )}
+-
+-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+-                {stations.filter(s => s.room_id === room.id).map(station => {
+-                  const activeColor = station.color && station.color !== '#e5e7eb' && station.color !== '#e2e8f0' ? station.color : getStationColor(station.name);
+-                  return (
+-                    <div
+-                      key={station.id}
+-                      draggable
+-                      onDragStart={(e) => handleStationDragStart(e, station.id)}
+-                      onDragOver={(e) => handleStationDragOver(e, station.id)}
+-                      onDragEnd={() => {
+-                        setDraggedStationId(null);
+-                        setDragOverStationId(null);
+-                      }}
+-                      onDrop={(e) => handleStationDrop(e, room.id)}
+-                      style={{
+-                        display: 'flex',
+-                        justifyContent: 'space-between',
+-                        alignItems: 'center',
+-                        padding: '14px',
+-                        background: draggedStationId === station.id 
+-                          ? '#f1f5f9' 
+-                          : dragOverStationId === station.id 
+-                          ? '#e2e8f0' 
+-                          : '#f8fafc',
+-                        borderRadius: '14px',
+-                        border: dragOverStationId === station.id ? `2px dashed ${brandColor}` : '1px solid #f1f5f9',
+-                        transition: 'all 0.2s',
+-                        position: 'relative',
+-                        cursor: 'grab',
+-                        opacity: draggedStationId === station.id ? 0.5 : 1
+-                      }}
+-                    >
+-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 700, color: '#475569' }}>
+-                        <GripVertical size={16} style={{ color: '#94a3b8', cursor: 'grab' }} />
+-                        <Tablet size={16} color={activeColor} /> {station.name}
++                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px' }}>
++                      <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#94a3b8' }}>Farbe:</span>
++                      <div style={{ display: 'flex', gap: '10px' }}>
++                        {[
++                          { hex: '#3b82f6', label: 'Blau' },
++                          { hex: '#eab308', label: 'Gelb' },
++                          { hex: '#64748b', label: 'Grau' },
++                          { hex: '#22c55e', label: 'Grün' },
++                          { hex: '#a855f7', label: 'Lila' },
++                          { hex: '#ef4444', label: 'Rot' }
++                        ].map(c => {
++                          const isSelected = newStationColor === c.hex;
++                          return (
++                            <button
++                              type="button"
++                              key={c.hex}
++                              title={c.label}
++                              onClick={() => setNewStationColor(c.hex)}
++                              style={{
++                                width: '32px',
++                                height: '32px',
++                                borderRadius: '50%',
++                                background: c.hex,
++                                border: isSelected ? '3px solid #1e293b' : '3px solid transparent',
++                                outline: 'none',
++                                cursor: 'pointer',
++                                padding: 0,
++                                transform: isSelected ? 'scale(1.1)' : 'none',
++                                transition: 'all 0.15s ease',
++                                boxShadow: isSelected 
++                                  ? `0 0 0 2px white, 0 4px 8px ${c.hex}40` 
++                                  : '0 2px 4px rgba(0,0,0,0.04)'
++                              }}
++                            />
++                          );
++                        })}
+                       </div>
+-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+-                        <div style={{ position: 'relative' }}>
+-                          <button
+-                            type="button"
+-                            onClick={(e) => {
+-                              e.stopPropagation();
+-                              setActiveColorMenuStationId(activeColorMenuStationId === station.id ? null : station.id);
+-                            }}
+-                            style={{
+-                              display: 'flex',
+-                              alignItems: 'center',
+-                              gap: '6px',
+-                              padding: '5px 10px',
+-                              borderRadius: '20px',
+-                              border: '1.5px solid #cbd5e1',
+-                              background: '#ffffff',
+-                              cursor: 'pointer',
+-                              fontSize: '0.75rem',
+-                              fontWeight: 700,
+-                              color: '#475569',
+-                              boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+-                              transition: 'all 0.15s ease',
+-                              outline: 'none'
+-                            }}
+-                            
+-                            
+-                          >
+-                            <span style={{
+-                              width: '10px',
+-                              height: '10px',
+-                              borderRadius: '50%',
+-                              background: activeColor,
+-                              display: 'inline-block',
+-                              boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.1)'
+-                            }} />
+-                            <span>Farbe</span>
+-                            <span style={{ fontSize: '0.6rem', color: '#94a3b8' }}>▼</span>
+-                          </button>
++                    </div>
++                  </form>
++                )}
+ 
+-                          {activeColorMenuStationId === station.id && (
+-                            <>
+-                              <div 
+-                                onClick={() => setActiveColorMenuStationId(null)}
+-                                style={{
+-                                  position: 'fixed',
+-                                  inset: 0,
+-                                  zIndex: 999,
+-                                  background: 'transparent'
+-                                }}
+-                              />
+-                              <div style={{
+-                                position: 'absolute',
+-                                right: 0,
+-                                top: '30px',
+-                                background: '#ffffff',
+-                                borderRadius: '14px',
+-                                border: '1px solid #cbd5e1',
+-                                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
+-                                padding: '8px',
++                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
++                  {stations.filter(s => s.room_id === room.id).map(station => {
++                    const activeColor = station.color && station.color !== '#e5e7eb' && station.color !== '#e2e8f0' ? station.color : getStationColor(station.name);
++                    return (
++                      <div
++                        key={station.id}
++                        draggable
++                        onDragStart={(e) => handleStationDragStart(e, station.id)}
++                        onDragOver={(e) => handleStationDragOver(e, station.id)}
++                        onDragEnd={() => {
++                          setDraggedStationId(null);
++                          setDragOverStationId(null);
++                        }}
++                        onDrop={(e) => handleStationDrop(e, room.id)}
++                        style={{
++                          display: 'flex',
++                          justifyContent: 'space-between',
++                          alignItems: 'center',
++                          padding: '16px 20px',
++                          background: draggedStationId === station.id 
++                            ? '#f4f4f5' 
++                            : dragOverStationId === station.id 
++                            ? '#e4e4e7' 
++                            : '#f9f9fb',
++                          borderRadius: '16px',
++                          border: dragOverStationId === station.id ? `2px dashed ${brandColor}` : '1px solid rgba(0, 0, 0, 0.04)',
++                          transition: 'all 0.2s',
++                          position: 'relative',
++                          cursor: 'grab',
++                          opacity: draggedStationId === station.id ? 0.5 : 1
++                        }}
++                      >
++                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 800, color: '#475569', fontSize: '0.95rem' }}>
++                          <GripVertical size={18} style={{ color: '#a1a1aa', cursor: 'grab' }} />
++                          <Tablet size={18} color={activeColor} /> {station.name}
++                        </div>
++                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
++                          <div style={{ position: 'relative' }}>
++                            <button
++                              type="button"
++                              onClick={(e) => {
++                                e.stopPropagation();
++                                setActiveColorMenuStationId(activeColorMenuStationId === station.id ? null : station.id);
++                              }}
++                              style={{
+                                 display: 'flex',
+-                                flexDirection: 'column',
+-                                gap: '4px',
+-                                zIndex: 1000,
+-                                minWidth: '120px',
+-                                animation: 'fadeIn 0.15s ease'
+-                              }}>
+-                                {[
+-                                  { hex: '#3b82f6', label: 'Blau' },
+-                                  { hex: '#eab308', label: 'Gelb' },
+-                                  { hex: '#64748b', label: 'Grau' },
+-                                  { hex: '#22c55e', label: 'Grün' },
+-                                  { hex: '#a855f7', label: 'Lila' },
+-                                  { hex: '#ef4444', label: 'Rot' }
+-                                ].map(c => {
+-                                  const isSelected = activeColor === c.hex;
+-                                  return (
+-                                    <button
+-                                      type="button"
+-                                      key={c.hex}
+-                                      onClick={async (e) => {
+-                                        e.stopPropagation();
+-                                        setStations(prev => prev.map(s => s.id === station.id ? { ...s, color: c.hex } : s));
+-                                        setActiveColorMenuStationId(null);
+-                                        const { error } = await supabase.from('stations').update({ color: c.hex }).eq('id', station.id);
+-                                        if (error) alert('Fehler: ' + error.message);
+-                                      }}
+-                                      style={{
+-                                        display: 'flex',
+-                                        alignItems: 'center',
+-                                        gap: '8px',
+-                                        width: '100%',
+-                                        padding: '6px 10px',
+-                                        border: 'none',
+-                                        borderRadius: '8px',
+-                                        background: isSelected ? '#f1f5f9' : 'transparent',
+-                                        cursor: 'pointer',
+-                                        textAlign: 'left',
+-                                        fontSize: '0.75rem',
+-                                        fontWeight: isSelected ? 800 : 600,
+-                                        color: isSelected ? '#1e293b' : '#475569',
+-                                        transition: 'all 0.15s',
+-                                        outline: 'none'
+-                                      }}
+-                                      
+-                                      
+-                                    >
+-                                      <span style={{
+-                                        width: '10px',
+-                                        height: '10px',
+-                                        borderRadius: '50%',
+-                                        background: c.hex,
+-                                        boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.1)'
+-                                      }} />
+-                                      <span>{c.label}</span>
+-                                      {isSelected && <span style={{ marginLeft: 'auto', color: brandColor, fontSize: '0.75rem' }}>✓</span>}
+-                                    </button>
+-                                  );
+-                                })}
+-                              </div>
+-                            </>
+-                          )}
++                                alignItems: 'center',
++                                gap: '8px',
++                                padding: '8px 16px',
++                                borderRadius: '24px',
++                                border: '1px solid #cbd5e1',
++                                background: '#ffffff',
++                                cursor: 'pointer',
++                                fontSize: '0.85rem',
++                                fontWeight: 800,
++                                color: '#475569',
++                                boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
++                                transition: 'all 0.15s ease',
++                                outline: 'none',
++                                height: '44px'
++                              }}
++                            >
++                              <span style={{
++                                width: '12px',
++                                height: '12px',
++                                borderRadius: '50%',
++                                background: activeColor,
++                                display: 'inline-block',
++                                boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.1)'
++                              }} />
++                              <span>Farbe</span>
++                            </button>
++
++                            {activeColorMenuStationId === station.id && (
++                              <>
++                                <div 
++                                  onClick={() => setActiveColorMenuStationId(null)}
++                                  style={{
++                                    position: 'fixed',
++                                    inset: 0,
++                                    zIndex: 999,
++                                    background: 'transparent'
++                                  }}
++                                />
++                                <div style={{
++                                  position: 'absolute',
++                                  right: 0,
++                                  top: '46px',
++                                  background: '#ffffff',
++                                  borderRadius: '16px',
++                                  border: '1px solid #cbd5e1',
++                                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
++                                  padding: '8px',
++                                  display: 'flex',
++                                  flexDirection: 'column',
++                                  gap: '6px',
++                                  zIndex: 1000,
++                                  minWidth: '130px',
++                                  animation: 'fadeIn 0.15s ease'
++                                }}>
++                                  {[
++                                    { hex: '#3b82f6', label: 'Blau' },
++                                    { hex: '#eab308', label: 'Gelb' },
++                                    { hex: '#64748b', label: 'Grau' },
++                                    { hex: '#22c55e', label: 'Grün' },
++                                    { hex: '#a855f7', label: 'Lila' },
++                                    { hex: '#ef4444', label: 'Rot' }
++                                  ].map(c => {
++                                    const isSelected = activeColor === c.hex;
++                                    return (
++                                      <button
++                                        type="button"
++                                        key={c.hex}
++                                        onClick={async (e) => {
++                                          e.stopPropagation();
++                                          setStations(prev => prev.map(s => s.id === station.id ? { ...s, color: c.hex } : s));
++                                          setActiveColorMenuStationId(null);
++                                          const { error } = await supabase.from('stations').update({ color: c.hex }).eq('id', station.id);
++                                          if (error) alert('Fehler: ' + error.message);
++                                        }}
++                                        style={{
++                                          display: 'flex',
++                                          alignItems: 'center',
++                                          gap: '8px',
++                                          width: '100%',
++                                          padding: '10px 14px',
++                                          border: 'none',
++                                          borderRadius: '10px',
++                                          background: isSelected ? '#f1f5f9' : 'transparent',
++                                          cursor: 'pointer',
++                                          textAlign: 'left',
++                                          fontSize: '0.85rem',
++                                          fontWeight: isSelected ? 800 : 600,
++                                          color: isSelected ? '#1e293b' : '#475569',
++                                          transition: 'all 0.15s',
++                                          outline: 'none'
++                                        }}
++                                      >
++                                        <span style={{
++                                          width: '12px',
++                                          height: '12px',
++                                          borderRadius: '50%',
++                                          background: c.hex,
++                                          boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.1)'
++                                        }} />
++                                        <span>{c.label}</span>
++                                        {isSelected && <span style={{ marginLeft: 'auto', color: brandColor, fontSize: '0.85rem' }}>✓</span>}
++                                      </button>
++                                    );
++                                  })}
++                                </div>
++                              </>
++                            )}
++                          </div>
++                          <button onClick={() => handleDeleteStation(station.id)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '8px', display: 'flex', alignItems: 'center', height: '44px', width: '44px', justifyContent: 'center' }}  >
++                            <Trash2 size={18} />
++                          </button>
+                         </div>
+-                        <button onClick={() => handleDeleteStation(station.id)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}  >
+-                          <Trash2 size={14} />
+-                        </button>
+                       </div>
+-                    </div>
+-                  );
+-                })}
+-                {stations.filter(s => s.room_id === room.id).length === 0 && (
+-                  <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8', fontSize: '0.8125rem', border: '1px dashed #e2e8f0', borderRadius: '14px' }}>Keine Übeplätze definiert.</div>
+-                )}
++                    );
++                  })}
++                  {stations.filter(s => s.room_id === room.id).length === 0 && (
++                    <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8', fontSize: '0.9rem', border: '1px dashed #cbd5e1', borderRadius: '16px', background: '#f9f9fb' }}>Keine Übeplätze definiert.</div>
++                  )}
++                </div>
+               </div>
+-            </div>
+-          )})}
++            )})}
+         </div>
+       </div>
+     </div>
