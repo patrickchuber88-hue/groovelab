@@ -2606,10 +2606,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 <div key={idx} style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}>
                   <div style={{
                     width: '40px',
-                    height: '8px',
-                    borderRadius: '4px',
+                    height: '4px',
+                    borderRadius: '2px',
                     background: 'linear-gradient(180deg, #ffd54f 0%, #ff9100 100%)',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.25)',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.25)',
                     zIndex: 35,
                     position: 'absolute',
                     left: '-17px'
