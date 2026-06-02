@@ -8581,7 +8581,7 @@ function App() {
                       boxShadow: '0 10px 25px rgba(0,0,0,0.03)',
                       marginBottom: '24px'
                     }}>
-                      <Mail size={36} style={{ strokeWidth: 1.5, color: '#3b82f6' }} />
+                      <Mail size={36} style={{ strokeWidth: 1.5, color: '#fbbc05' }} />
                     </div>
                     <h3 style={{ fontSize: '1.3rem', fontWeight: 900, color: '#1e293b', marginBottom: '8px' }}>Willkommen im Postfach</h3>
                     <p style={{ fontSize: '0.95rem', color: '#64748b', maxWidth: '360px', lineHeight: 1.6, margin: '0 0 24px 0' }}>
@@ -8590,8 +8590,8 @@ function App() {
                     <button
                       onClick={() => setIsMailComposing(true)}
                       style={{
-                        background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                        color: 'white',
+                        background: '#fbbc05',
+                        color: '#1e293b',
                         border: 'none',
                         padding: '12px 24px',
                         borderRadius: '12px',
@@ -8600,7 +8600,7 @@ function App() {
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
-                        boxShadow: '0 4px 12px rgba(59,130,246,0.2)'
+                        boxShadow: '0 4px 12px rgba(251, 188, 5, 0.2)'
                       }}
                       className="hover-scale"
                     >
