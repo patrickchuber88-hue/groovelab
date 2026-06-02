@@ -2399,7 +2399,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   ];
 
   const renderLiveTab = () => (
-    <div style={{ marginTop: '0', flex: 1, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ marginTop: '24px', flex: 1, display: 'flex', flexDirection: 'column' }}>
       <TeacherDashboard 
         key={`${activePlatform}-${activeTab}`}
         userId={userId} 
