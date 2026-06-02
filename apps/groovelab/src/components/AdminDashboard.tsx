@@ -2447,7 +2447,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+            <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
               <div style={{ background: `${brandColor}15`, color: brandColor, padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
                 <Award size={16} />
               </div>
@@ -2939,7 +2939,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const renderStudentsTab = () => {
     const brandColor = '#16a34a';
     return (
-      <div style={{ marginTop: '16px' }}>
+      <div style={{ marginTop: '24px' }}>
         <div 
           className="glass-panel" 
           style={{ 
@@ -2954,7 +2954,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+            <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
               <div style={{ background: `${brandColor}15`, color: brandColor, padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
                 <Users size={16} />
               </div>
@@ -3431,7 +3431,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   };
 
   const renderTeachersTab = () => (
-    <div style={{ marginTop: '16px' }}>
+    <div style={{ marginTop: '24px' }}>
       <div 
         className="glass-panel" 
         style={{ 
@@ -3446,7 +3446,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
             <div style={{ background: `${brandColor}15`, color: brandColor, padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
               <Shield size={16} />
             </div>
@@ -3678,7 +3678,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   );
 
   const renderRoomsTab = () => (
-    <div style={{ marginTop: '16px' }}>
+    <div style={{ marginTop: '24px' }}>
       <div 
         className="glass-panel" 
         style={{ 
@@ -3693,7 +3693,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
             <div style={{ background: `${brandColor}15`, color: brandColor, padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
               <Box size={16} />
             </div>
@@ -4476,7 +4476,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
                 <div>
-                  <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                  <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                     <div style={{ background: `${brandColor}15`, color: brandColor, padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
                       <Library size={16} />
                     </div>
@@ -5091,19 +5091,21 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   );
 
   const renderSetupTab = () => (
-    <DeviceSetupScreen 
-      rooms={setupRooms} 
-      stations={setupStations} 
-      brandColor={brandColor} 
-      activeSessions={activeSessions}
-      students={students}
-      school={admin?.schools}
-      admin={admin}
-      kiosks={kiosks || []}
-      onUpdate={() => fetchData()}
-      onCleanupPlanning={handleCleanupPlanning}
-      onResetPlanning={handleResetAllPlanning}
-    />
+    <div style={{ marginTop: '24px' }}>
+      <DeviceSetupScreen 
+        rooms={setupRooms} 
+        stations={setupStations} 
+        brandColor={brandColor} 
+        activeSessions={activeSessions}
+        students={students}
+        school={admin?.schools}
+        admin={admin}
+        kiosks={kiosks || []}
+        onUpdate={() => fetchData()}
+        onCleanupPlanning={handleCleanupPlanning}
+        onResetPlanning={handleResetAllPlanning}
+      />
+    </div>
   );
 
   const renderBatchiPadModal = () => {
@@ -6023,7 +6025,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   return (
     <div style={{ 
       flex: 1, 
-      padding: '10px', 
+      padding: '0 10px 10px 10px', 
       overflowY: activeTab === 'live' ? 'hidden' : 'auto',
       height: activeTab === 'live' ? '100%' : 'auto',
       display: 'flex',
@@ -6291,7 +6293,7 @@ function IDGallery({ users, brandColor, onShowQR }: { users: any[], brandColor: 
       <div className="glass-panel" style={{ padding: '40px', background: 'rgba(255, 255, 255, 0.4)', backdropFilter: 'blur(20px)', borderRadius: '32px', border: '1px solid rgba(255, 255, 255, 0.3)', boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.07)' }}>
          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '48px' }}>
           <div>
-            <h2 style={{ fontSize: '2rem', fontWeight: 1000, color: '#1e293b', marginBottom: '8px', letterSpacing: '-0.03em' }}>ID Gallerie</h2>
+            <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', marginBottom: '8px', letterSpacing: '-0.03em' }}>ID Gallerie</h2>
             <p style={{ color: '#64748b', fontWeight: 500 }}>Vollständige Galerie aller Lehrer und Schüler im Event-Stil.</p>
           </div>
           
@@ -6848,7 +6850,7 @@ function DeviceSetupScreen({
         <div className="glass-panel" style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Räumliche Kiosk-Übersicht</h2>
+              <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Räumliche Kiosk-Übersicht</h2>
               <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '2px 0 0 0' }}>Manuelle Umbuchungen & Echtzeit-iPad-Platzierungen vornehmen.</p>
             </div>
             
@@ -7060,7 +7062,7 @@ function DeviceSetupScreen({
               <Shield size={20} />
             </div>
             <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Einstellungen</h2>
+              <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Einstellungen</h2>
               <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '2px 0 0 0' }}>Betriebszeiten und Sicherheitseinstellungen für dein Groovelab.</p>
             </div>
           </div>
