@@ -6031,41 +6031,31 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       display: 'flex',
       flexDirection: 'column'
     }}>
-      {activeTab !== 'live' && activeTab !== 'schedule' && (
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', marginTop: '16px', gap: '20px', flexWrap: 'wrap' }}>
-          {activeTab !== 'students' && activeTab !== 'rooms' && activeTab !== 'team' && activeTab !== 'songs' && activeTab !== 'bands' && activeTab !== 'stats' && activeTab !== 'gallery' && activeTab !== 'setup' && (
-            <div>
-              <h1 style={{ fontSize: '2rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.03em', margin: 0 }}>
-                {sidebarItems.find(i => i.id === activeTab)?.label}
-              </h1>
-            </div>
-          )}
-
+      {activeTab !== 'live' && activeTab !== 'schedule' && (admin as any)?.schools?.limits_enabled && (
+        <header style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', marginBottom: '24px', marginTop: '16px', gap: '20px', flexWrap: 'wrap' }}>
           {/* Quota Progress Indicators */}
-          {(admin as any)?.schools?.limits_enabled && (
-            <div style={{ display: 'flex', gap: '20px', background: '#ffffff', padding: '12px 20px', borderRadius: '18px', border: '1.5px solid #f1f5f9', boxShadow: '0 2px 8px rgba(0,0,0,0.01)', flexWrap: 'wrap' }}>
-              {[
-                { label: 'Lehrkräfte', cur: teachers.length, max: (admin as any).schools.max_teachers ?? 2, color: '#3b82f6' },
-                { label: 'Schüler', cur: students.length, max: (admin as any).schools.max_students ?? 6, color: '#22c55e' },
-                { label: 'Songs', cur: songs.length, max: (admin as any).schools.max_songs ?? 5, color: '#eab308' }
-              ].map((item, i) => {
-                const pct = Math.min(100, (item.cur / item.max) * 100);
-                const isClose = pct >= 90;
-                const barColor = isClose ? '#ef4444' : item.color;
-                return (
-                  <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '100px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', fontWeight: 800, color: isClose ? '#ef4444' : '#64748b' }}>
-                      <span>{item.label}</span>
-                      <span>{item.cur}/{item.max}</span>
-                    </div>
-                    <div style={{ width: '100%', height: '6px', borderRadius: '3px', background: '#f1f5f9', overflow: 'hidden' }}>
-                      <div style={{ width: `${pct}%`, height: '100%', background: barColor, borderRadius: '3px', transition: 'width 0.3s ease' }}></div>
-                    </div>
+          <div style={{ display: 'flex', gap: '20px', background: '#ffffff', padding: '12px 20px', borderRadius: '18px', border: '1.5px solid #f1f5f9', boxShadow: '0 2px 8px rgba(0,0,0,0.01)', flexWrap: 'wrap' }}>
+            {[
+              { label: 'Lehrkräfte', cur: teachers.length, max: (admin as any).schools.max_teachers ?? 2, color: '#3b82f6' },
+              { label: 'Schüler', cur: students.length, max: (admin as any).schools.max_students ?? 6, color: '#22c55e' },
+              { label: 'Songs', cur: songs.length, max: (admin as any).schools.max_songs ?? 5, color: '#eab308' }
+            ].map((item, i) => {
+              const pct = Math.min(100, (item.cur / item.max) * 100);
+              const isClose = pct >= 90;
+              const barColor = isClose ? '#ef4444' : item.color;
+              return (
+                <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '100px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', fontWeight: 800, color: isClose ? '#ef4444' : '#64748b' }}>
+                    <span>{item.label}</span>
+                    <span>{item.cur}/{item.max}</span>
                   </div>
-                );
-              })}
-            </div>
-          )}
+                  <div style={{ width: '100%', height: '6px', borderRadius: '3px', background: '#f1f5f9', overflow: 'hidden' }}>
+                    <div style={{ width: `${pct}%`, height: '100%', background: barColor, borderRadius: '3px', transition: 'width 0.3s ease' }}></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </header>
       )}
 
