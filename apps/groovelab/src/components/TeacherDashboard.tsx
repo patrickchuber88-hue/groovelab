@@ -1412,17 +1412,77 @@ export function TeacherDashboard({
     return () => clearInterval(interval);
   }, []);
 
-  const isWithinActiveHours = useMemo(() => {
-    if (!briefingData?.timeline || briefingData.timeline.length === 0) return false;
-    const sorted = [...briefingData.timeline].sort((a: any, b: any) => a.timeSlot.localeCompare(b.timeSlot));
+  const isWeekend = useMemo(() => {
+    const today = new Date();
+    const day = today.getDay();
+    return day === 0 || day === 6;
+  }, []);
+
+  const firstLessonStartMin = useMemo(() => {
+    if (!briefingData?.timeline || briefingData.timeline.length === 0) return null;
+    const sorted = [...briefingData.timeline]
+      .filter((slot: any) => slot.student && slot.status !== 'canceled_by_student' && slot.status !== 'teacher_sick' && slot.status !== 'cancelled' && slot.status !== 'canceled_by_teacher_sick')
+      .sort((a: any, b: any) => a.timeSlot.localeCompare(b.timeSlot));
+    
+    if (sorted.length === 0) return null;
     const firstSlotStart = sorted[0].timeSlot;
+    const [h, m] = firstSlotStart.split(':').map(Number);
+    return h * 60 + m;
+  }, [briefingData?.timeline]);
+
+  const lastLessonEndMin = useMemo(() => {
+    if (!briefingData?.timeline || briefingData.timeline.length === 0) return null;
+    const sorted = [...briefingData.timeline]
+      .filter((slot: any) => slot.student && slot.status !== 'canceled_by_student' && slot.status !== 'teacher_sick' && slot.status !== 'cancelled' && slot.status !== 'canceled_by_teacher_sick')
+      .sort((a: any, b: any) => a.timeSlot.localeCompare(b.timeSlot));
+
+    if (sorted.length === 0) return null;
     const lastSlot = sorted[sorted.length - 1];
     const lastSlotStart = lastSlot.timeSlot;
-    const [lh, lm] = lastSlotStart.split(':').map(Number);
-    const totalMin = lh * 60 + lm + (lastSlot.duration || 30);
-    const lastSlotEnd = `${String(Math.floor(totalMin / 60) % 24).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')}`;
-    return currentTimeStr >= firstSlotStart && currentTimeStr <= lastSlotEnd;
-  }, [briefingData?.timeline, currentTimeStr]);
+    const [h, m] = lastSlotStart.split(':').map(Number);
+    return h * 60 + m + (lastSlot.duration || 30);
+  }, [briefingData?.timeline]);
+
+  const currentTimeMin = useMemo(() => {
+    if (!currentTimeStr) return 0;
+    const [h, m] = currentTimeStr.split(':').map(Number);
+    return h * 60 + m;
+  }, [currentTimeStr]);
+
+  const firstSlotStartStr = useMemo(() => {
+    if (!briefingData?.timeline || briefingData.timeline.length === 0) return '';
+    const sorted = [...briefingData.timeline]
+      .filter((slot: any) => slot.student && slot.status !== 'canceled_by_student' && slot.status !== 'teacher_sick' && slot.status !== 'cancelled' && slot.status !== 'canceled_by_teacher_sick')
+      .sort((a: any, b: any) => a.timeSlot.localeCompare(b.timeSlot));
+    return sorted.length > 0 ? sorted[0].timeSlot : '';
+  }, [briefingData?.timeline]);
+
+  const prepCutoffTimeStr = useMemo(() => {
+    if (firstLessonStartMin === null) return '';
+    const cutoffMin = firstLessonStartMin - 15;
+    const h = Math.floor(cutoffMin / 60) % 24;
+    const m = cutoffMin % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  }, [firstLessonStartMin]);
+
+  const widgetState = useMemo(() => {
+    if (isWeekend) return 'WEEKEND';
+    if (firstLessonStartMin === null || lastLessonEndMin === null) return 'FEIERABEND';
+    
+    const prepCutoffMin = firstLessonStartMin - 15;
+    
+    if (currentTimeMin < prepCutoffMin) {
+      return 'VORBEREITUNG';
+    } else if (currentTimeMin >= prepCutoffMin && currentTimeMin < lastLessonEndMin) {
+      return 'ACTIVE';
+    } else {
+      return 'FEIERABEND';
+    }
+  }, [isWeekend, firstLessonStartMin, lastLessonEndMin, currentTimeMin]);
+
+  const isWithinActiveHours = useMemo(() => {
+    return widgetState === 'ACTIVE';
+  }, [widgetState]);
 
   // Stable daily choices (hellos, subtitles) based on date-based seed
   const dailyBriefingStableChoices = useMemo(() => {
@@ -3762,107 +3822,137 @@ export function TeacherDashboard({
 
                       {/* Schüler Notizen (former Prep Mirror) */}
                       {!teacher?.sick_until && (
-                        <div className="google-card" style={{ width: '100%', borderLeft: '4px solid #10b981', opacity: loadingPrepMirror ? 0.6 : 1, transition: 'opacity 0.2s', boxSizing: 'border-box' }}>
-                          {isWithinActiveHours && (dynamicPrepMirror || briefingData.prepMirror) ? (() => {
-                            const prep = dynamicPrepMirror || briefingData.prepMirror;
-                            return (
-                              <>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-                                  <div style={{ background: '#e6f4ea', color: '#137333', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <Award size={18} />
-                                  </div>
-                                  <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#1e293b' }}>
-                                    {activeStudent?.id === prep.studentId ? 'Schüler Notizen' : 'Schüler Notizen (Nächste)'}
-                                  </h4>
-                                </div>
+                        <div className="google-card" style={{ 
+                          width: '100%', 
+                          borderLeft: widgetState === 'VORBEREITUNG' 
+                            ? '4px solid #007aff' 
+                            : widgetState === 'ACTIVE' 
+                            ? '4px solid #10b981' 
+                            : widgetState === 'WEEKEND' 
+                            ? '4px solid #8b5cf6' 
+                            : '4px solid #f59e0b', 
+                          opacity: loadingPrepMirror ? 0.6 : 1, 
+                          transition: 'opacity 0.2s', 
+                          boxSizing: 'border-box' 
+                        }}>
+                          {(() => {
+                            if (widgetState === 'VORBEREITUNG') {
+                              const activeLessonsCount = briefingData?.timeline 
+                                ? briefingData.timeline.filter((s: any) => s.student && s.status !== 'canceled_by_student' && s.status !== 'teacher_sick' && s.status !== 'cancelled' && s.status !== 'canceled_by_teacher_sick').length 
+                                : 0;
+                              const cancellations = briefingData?.timeline 
+                                ? briefingData.timeline.filter((s: any) => s.student && (s.status === 'canceled_by_student' || s.status === 'teacher_sick' || s.status === 'cancelled' || s.status === 'canceled_by_teacher_sick')) 
+                                : [];
 
+                              return (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                  <div 
-                                    style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
-                                    onClick={() => {
-                                      setDocStudent({
-                                        id: prep.studentId,
-                                        first_name: prep.studentName.split(' ')[0],
-                                        last_name: prep.studentName.split(' ').slice(1).join(' '),
-                                        photo_url: '/avatar_ghost.jpg'
-                                      });
-                                    }}
-                                  >
-                                    <div style={{
-                                      width: '44px',
-                                      height: '44px',
-                                      borderRadius: '12px',
-                                      background: '#34a853',
-                                      color: 'white',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      fontSize: '1.25rem',
-                                      fontWeight: 800
-                                    }}>
-                                      {prep.studentName.charAt(0)}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    <div style={{ background: '#e8f0fe', color: '#1a73e8', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <Calendar size={18} />
                                     </div>
-                                    <div>
-                                      <div style={{ fontWeight: 900, color: '#0f172a' }}>{prep.studentName}</div>
-                                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
-                                        Slot: {prep.timeSlot} Uhr • Level {prep.evolutionLevel}
+                                    <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#1e293b' }}>
+                                      Vorbereitung
+                                    </h4>
+                                  </div>
+
+                                  <div style={{
+                                    background: 'linear-gradient(135deg, #e8f0fe 0%, #d2e3fc 100%)',
+                                    border: '1.5px solid #aecbfa',
+                                    borderRadius: '16px',
+                                    padding: '16px',
+                                    color: '#185abc',
+                                    boxShadow: '0 4px 12px rgba(26, 115, 232, 0.06)',
+                                    fontSize: '0.88rem',
+                                    fontWeight: 700
+                                  }}>
+                                    Heute stehen <strong style={{ fontSize: '0.98rem', fontWeight: 900 }}>{activeLessonsCount} Termine</strong> auf dem Fahrplan.
+                                  </div>
+
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                      Änderungen & Ausfälle heute:
+                                    </span>
+                                    {cancellations.length > 0 ? (
+                                      <div style={{
+                                        background: '#fef2f2',
+                                        border: '1.5px solid #fca5a5',
+                                        borderRadius: '12px',
+                                        padding: '12px 14px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '8px'
+                                      }}>
+                                        {cancellations.map((slot: any, idx: number) => (
+                                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#991b1b', fontWeight: 700 }}>
+                                            <AlertCircle size={14} color="#dc2626" />
+                                            <span>
+                                              <strong>{slot.student?.name}</strong> ({slot.timeSlot} Uhr) – Ausfall
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <div style={{
+                                        background: '#f0fdf4',
+                                        border: '1.5px solid #bbf7d0',
+                                        borderRadius: '12px',
+                                        padding: '12px 14px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        fontSize: '0.8rem',
+                                        color: '#15803d',
+                                        fontWeight: 700
+                                      }}>
+                                        <CheckCircle size={14} color="#16a34a" />
+                                        <span>Keine Änderungen – alles läuft wie geplant.</span>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {firstSlotStartStr && (
+                                    <div style={{ 
+                                      borderTop: '1px solid #f1f5f9', 
+                                      paddingTop: '14px',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '4px',
+                                      fontSize: '0.78rem',
+                                      color: '#64748b',
+                                      fontWeight: 600,
+                                      textAlign: 'center'
+                                    }}>
+                                      <div>
+                                        Erster Unterricht beginnt um <strong style={{ color: '#0f172a' }}>{firstSlotStartStr} Uhr</strong>.
+                                      </div>
+                                      <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                                        Das Schüler Notiz Widget aktiviert sich automatisch um {prepCutoffTimeStr} Uhr (15 Min. vorher).
                                       </div>
                                     </div>
-                                  </div>
-
-                                  {prep.streakCount > 0 && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fffbeb', border: '1px solid #fef3c7', padding: '10px 14px', borderRadius: '12px', color: '#b45309', fontSize: '0.85rem', fontWeight: 700 }}>
-                                      <Flame size={16} fill="#f59e0b" color="#f59e0b" />
-                                      <span>Premium-User Flammen-Streak: {prep.streakCount} Tage!</span>
-                                    </div>
                                   )}
+                                </div>
+                              );
+                            }
 
-                                  <div>
-                                    <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: '8px' }}>
-                                      Aktuelle Songs / Hausaufgaben
+                            if (widgetState === 'ACTIVE') {
+                              if (!dynamicPrepMirror && !briefingData?.prepMirror) {
+                                return <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Keine Unterrichtsdaten geladen.</div>;
+                              }
+                              const prep = dynamicPrepMirror || briefingData.prepMirror;
+                              return (
+                                <>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                                    <div style={{ background: '#e6f4ea', color: '#137333', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <Award size={18} />
                                     </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                      {prep.verifiedSongs && prep.verifiedSongs.length > 0 ? (
-                                        prep.verifiedSongs.map((song: any, idx: number) => (
-                                          <div key={idx} style={{
-                                            background: '#f8fafc',
-                                            padding: '10px 12px',
-                                            borderRadius: '12px',
-                                            border: '1px solid #e2e8f0',
-                                            fontSize: '0.85rem'
-                                          }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#1e293b' }}>
-                                              <span>{song.title}</span>
-                                              <span style={{
-                                                color: song.status === 'verifiziert' ? '#137333' : '#b45309',
-                                                fontSize: '0.75rem',
-                                                fontWeight: 800
-                                              }}>
-                                                {song.status === 'verifiziert' ? '✓ Verifiziert' : 'Übt gerade'}
-                                              </span>
-                                            </div>
-                                            {song.note && (
-                                              <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px', fontStyle: 'italic' }}>
-                                                "{song.note}"
-                                              </div>
-                                            )}
-                                          </div>
-                                        ))
-                                      ) : (
-                                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Keine aktiven Songs dokumentiert.</div>
-                                      )}
-                                    </div>
+                                    <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#1e293b' }}>
+                                      {activeStudent?.id === prep.studentId ? 'Schüler Notizen' : 'Schüler Notizen (Nächste)'}
+                                    </h4>
                                   </div>
 
-                                  {/* Premium Quick Actions */}
-                                  <div style={{ 
-                                    marginTop: '8px', 
-                                    paddingTop: '16px', 
-                                    borderTop: '1px solid #f1f5f9', 
-                                    display: 'flex', 
-                                    gap: '10px' 
-                                  }}>
-                                    <button
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                    <div 
+                                      style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
                                       onClick={() => {
                                         setDocStudent({
                                           id: prep.studentId,
@@ -3871,62 +3961,148 @@ export function TeacherDashboard({
                                           photo_url: '/avatar_ghost.jpg'
                                         });
                                       }}
-                                      style={{
-                                        flex: 1,
-                                        background: '#007aff',
+                                    >
+                                      <div style={{
+                                        width: '44px',
+                                        height: '44px',
+                                        borderRadius: '12px',
+                                        background: '#34a853',
                                         color: 'white',
-                                        border: 'none',
-                                        padding: '10px 14px',
-                                        borderRadius: '12px',
-                                        fontSize: '0.8rem',
-                                        fontWeight: 800,
-                                        cursor: 'pointer',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        gap: '6px',
-                                        boxShadow: '0 4px 12px rgba(0, 122, 255, 0.15)',
-                                        transition: 'all 0.2s'
-                                      }}
-                                      className="hover-scale"
-                                    >
-                                      <Edit3 size={14} />
-                                      <span>Hausaufgabe / Notiz</span>
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        setSelectedStudentProfile({
-                                          id: prep.studentId,
-                                          first_name: prep.studentName.split(' ')[0],
-                                          last_name: prep.studentName.split(' ').slice(1).join(' '),
-                                          photo_url: '/avatar_ghost.jpg'
-                                        });
-                                      }}
-                                      style={{
-                                        background: '#f1f5f9',
-                                        color: '#475569',
-                                        border: '1px solid #cbd5e1',
-                                        padding: '10px 14px',
-                                        borderRadius: '12px',
-                                        fontSize: '0.8rem',
-                                        fontWeight: 800,
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        gap: '6px',
-                                        transition: 'all 0.2s'
-                                      }}
-                                      className="hover-scale"
-                                    >
-                                      <User size={14} />
-                                      <span>Profil</span>
-                                    </button>
+                                        fontSize: '1.25rem',
+                                        fontWeight: 800
+                                      }}>
+                                        {prep.studentName.charAt(0)}
+                                      </div>
+                                      <div>
+                                        <div style={{ fontWeight: 900, color: '#0f172a' }}>{prep.studentName}</div>
+                                        <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                                          Slot: {prep.timeSlot} Uhr • Level {prep.evolutionLevel}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {prep.streakCount > 0 && (
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fffbeb', border: '1px solid #fef3c7', padding: '10px 14px', borderRadius: '12px', color: '#b45309', fontSize: '0.85rem', fontWeight: 700 }}>
+                                        <Flame size={16} fill="#f59e0b" color="#f59e0b" />
+                                        <span>Premium-User Flammen-Streak: {prep.streakCount} Tage!</span>
+                                      </div>
+                                    )}
+
+                                    <div>
+                                      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: '8px' }}>
+                                        Aktuelle Songs / Hausaufgaben
+                                      </div>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        {prep.verifiedSongs && prep.verifiedSongs.length > 0 ? (
+                                          prep.verifiedSongs.map((song: any, idx: number) => (
+                                            <div key={idx} style={{
+                                              background: '#f8fafc',
+                                              padding: '10px 12px',
+                                              borderRadius: '12px',
+                                              border: '1px solid #e2e8f0',
+                                              fontSize: '0.85rem'
+                                            }}>
+                                              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#1e293b' }}>
+                                                <span>{song.title}</span>
+                                                <span style={{
+                                                  color: song.status === 'verifiziert' ? '#137333' : '#b45309',
+                                                  fontSize: '0.75rem',
+                                                  fontWeight: 800
+                                                }}>
+                                                  {song.status === 'verifiziert' ? '✓ Verifiziert' : 'Übt gerade'}
+                                                </span>
+                                              </div>
+                                              {song.note && (
+                                                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px', fontStyle: 'italic' }}>
+                                                  "{song.note}"
+                                                </div>
+                                              )}
+                                            </div>
+                                          ))
+                                        ) : (
+                                          <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Keine aktiven Songs dokumentiert.</div>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Premium Quick Actions */}
+                                    <div style={{ 
+                                      marginTop: '8px', 
+                                      paddingTop: '16px', 
+                                      borderTop: '1px solid #f1f5f9', 
+                                      display: 'flex', 
+                                      gap: '10px' 
+                                    }}>
+                                      <button
+                                        onClick={() => {
+                                          setDocStudent({
+                                            id: prep.studentId,
+                                            first_name: prep.studentName.split(' ')[0],
+                                            last_name: prep.studentName.split(' ').slice(1).join(' '),
+                                            photo_url: '/avatar_ghost.jpg'
+                                          });
+                                        }}
+                                        style={{
+                                          flex: 1,
+                                          background: '#007aff',
+                                          color: 'white',
+                                          border: 'none',
+                                          padding: '10px 14px',
+                                          borderRadius: '12px',
+                                          fontSize: '0.8rem',
+                                          fontWeight: 800,
+                                          cursor: 'pointer',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          gap: '6px',
+                                          boxShadow: '0 4px 12px rgba(0, 122, 255, 0.15)',
+                                          transition: 'all 0.2s'
+                                        }}
+                                        className="hover-scale"
+                                      >
+                                        <Edit3 size={14} />
+                                        <span>Hausaufgabe / Notiz</span>
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setSelectedStudentProfile({
+                                            id: prep.studentId,
+                                            first_name: prep.studentName.split(' ')[0],
+                                            last_name: prep.studentName.split(' ').slice(1).join(' '),
+                                            photo_url: '/avatar_ghost.jpg'
+                                          });
+                                        }}
+                                        style={{
+                                          background: '#f1f5f9',
+                                          color: '#475569',
+                                          border: '1px solid #cbd5e1',
+                                          padding: '10px 14px',
+                                          borderRadius: '12px',
+                                          fontSize: '0.8rem',
+                                          fontWeight: 800,
+                                          cursor: 'pointer',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          gap: '6px',
+                                          transition: 'all 0.2s'
+                                        }}
+                                        className="hover-scale"
+                                      >
+                                        <User size={14} />
+                                        <span>Profil</span>
+                                      </button>
+                                    </div>
                                   </div>
-                                </div>
-                              </>
-                            );
-                          })() : (() => {
+                                </>
+                              );
+                            }
+
+                            // WEEKEND or FEIERABEND (fallback)
                             // 10 Seeded Feierabend wishes
                             const wishes = [
                               "Du hast heute Großartiges geleistet. Entspanne dich, tanke neue Energie und lass den Tag gemütlich ausklingen!",
@@ -3968,53 +4144,49 @@ export function TeacherDashboard({
                               { type: 'joke', text: "Warum klopft der Schlagzeuger immer an die Tür? Weil er nicht weiß, wann er einsetzen soll.", author: "Schlagzeuger-Witz" }
                             ];
 
-                             const today = new Date();
-                             const currentDayOfWeek = today.getDay(); // 0 = Sunday, 6 = Saturday
-                             const isWeekend = currentDayOfWeek === 0 || currentDayOfWeek === 6;
+                            const today = new Date();
+                            const dateSeed = today.getDate() + today.getMonth() * 31 + today.getFullYear();
+                            const dailyWishIndex = dateSeed % wishes.length;
+                            const dailyItemIndex = (dateSeed * 7 + 13) % materials.length;
 
-                             // Seeded selection based on calendar day to guarantee "one text per day" stability
-                             const dateSeed = today.getDate() + today.getMonth() * 31 + today.getFullYear();
-                             const dailyWishIndex = dateSeed % wishes.length;
-                             const dailyItemIndex = (dateSeed * 7 + 13) % materials.length;
+                            const dailyWish = wishes[dailyWishIndex];
+                            const dailyItem = materials[dailyItemIndex];
 
-                             const dailyWish = wishes[dailyWishIndex];
-                             const dailyItem = materials[dailyItemIndex];
+                            if (widgetState === 'WEEKEND') {
+                              return (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    <div style={{ background: '#e8f0fe', color: '#8b5cf6', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <Award size={18} />
+                                    </div>
+                                    <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#1e293b' }}>
+                                      Wochenende
+                                    </h4>
+                                  </div>
 
-                             if (isWeekend) {
-                               return (
-                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                     <div style={{ background: '#e6f4ea', color: '#137333', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                       <Award size={18} />
-                                     </div>
-                                     <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#1e293b' }}>
-                                       Wochenende
-                                     </h4>
-                                   </div>
-
-                                   {/* Premium Weekend Rest Card */}
-                                   <div style={{
-                                     background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
-                                     border: '1.5px solid #7dd3fc',
-                                     borderRadius: '16px',
-                                     padding: '20px 16px',
-                                     color: '#0369a1',
-                                     textAlign: 'center',
-                                     boxShadow: '0 4px 12px rgba(14, 165, 233, 0.08)'
-                                   }}>
-                                     <div style={{ fontSize: '1.25rem', fontWeight: 900, marginBottom: '6px' }}>☀️ Schönes Wochenende! ☀️</div>
-                                     <div style={{ fontSize: '0.85rem', fontWeight: 600, opacity: 0.9, lineHeight: '1.4' }}>
-                                       Genieße deine wohlverdiente Pause! Keine Termine, kein Schulstress. Erhole dich gut und tanke Kraft für neue musikalische Abenteuer in der kommenden Woche.
-                                     </div>
-                                   </div>
-                                 </div>
-                               );
-                             }
+                                  {/* Premium Weekend Rest Card */}
+                                  <div style={{
+                                    background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
+                                    border: '1.5px solid #ddd6fe',
+                                    borderRadius: '16px',
+                                    padding: '20px 16px',
+                                    color: '#6d28d9',
+                                    textAlign: 'center',
+                                    boxShadow: '0 4px 12px rgba(109, 40, 217, 0.08)'
+                                  }}>
+                                    <div style={{ fontSize: '1.25rem', fontWeight: 900, marginBottom: '6px' }}>☀️ Schönes Wochenende! ☀️</div>
+                                    <div style={{ fontSize: '0.85rem', fontWeight: 600, opacity: 0.9, lineHeight: '1.4' }}>
+                                      Genieße deine wohlverdiente Pause! Keine Termine, kein Schulstress. Erhole dich gut und tanke Kraft für neue musikalische Abenteuer in der kommenden Woche.
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
 
                             return (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                  <div style={{ background: '#e6f4ea', color: '#137333', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <div style={{ background: '#fef3c7', color: '#d97706', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <Award size={18} />
                                   </div>
                                   <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#1e293b' }}>
@@ -4024,13 +4196,13 @@ export function TeacherDashboard({
 
                                 {/* Premium Feierabend Wishing Card */}
                                 <div style={{
-                                  background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)',
-                                  border: '1.5px solid #a5d6a7',
+                                  background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+                                  border: '1.5px solid #fde68a',
                                   borderRadius: '16px',
                                   padding: '16px',
-                                  color: '#1b5e20',
+                                  color: '#92400e',
                                   textAlign: 'center',
-                                  boxShadow: '0 4px 12px rgba(76, 175, 80, 0.08)'
+                                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.08)'
                                 }}>
                                   <div style={{ fontSize: '1.2rem', fontWeight: 900, marginBottom: '4px' }}>✨ Schönen Feierabend! ✨</div>
                                   <div style={{ fontSize: '0.82rem', fontWeight: 600, opacity: 0.9 }}>

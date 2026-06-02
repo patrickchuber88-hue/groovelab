@@ -388,7 +388,8 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
     }}>
       {/* Premium Apple-Style Header Card */}
       <div style={{
-        maxWidth: '1200px',
+        maxWidth: '100%',
+        width: '100%',
         margin: '0 auto 40px auto',
         display: 'flex',
         justifyContent: 'space-between',
@@ -519,7 +520,8 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
         <>
           {/* KPI Stats Grid */}
           <div style={{
-        maxWidth: '1200px',
+        maxWidth: '100%',
+        width: '100%',
         margin: '0 auto 40px auto',
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
@@ -572,7 +574,8 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
 
       {/* Main Workspace Layout */}
       <div style={{
-        maxWidth: '1200px',
+        maxWidth: '100%',
+        width: '100%',
         margin: '0 auto',
         display: 'grid',
         gridTemplateColumns: '7fr 5fr',

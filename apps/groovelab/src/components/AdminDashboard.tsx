@@ -3927,12 +3927,12 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8' }}>Farbe wählen:</span>
                     <div style={{ display: 'flex', gap: '6px' }}>
                       {[
-                        { hex: '#ef4444', label: 'Rot' },
-                        { hex: '#a855f7', label: 'Lila' },
                         { hex: '#3b82f6', label: 'Blau' },
                         { hex: '#eab308', label: 'Gelb' },
+                        { hex: '#64748b', label: 'Grau' },
                         { hex: '#22c55e', label: 'Grün' },
-                        { hex: '#64748b', label: 'Grau' }
+                        { hex: '#a855f7', label: 'Lila' },
+                        { hex: '#ef4444', label: 'Rot' }
                       ].map(c => {
                         const isSelected = newStationColor === c.hex;
                         return (
@@ -4067,12 +4067,12 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                 animation: 'fadeIn 0.15s ease'
                               }}>
                                 {[
-                                  { hex: '#ef4444', label: 'Rot' },
-                                  { hex: '#a855f7', label: 'Lila' },
                                   { hex: '#3b82f6', label: 'Blau' },
                                   { hex: '#eab308', label: 'Gelb' },
+                                  { hex: '#64748b', label: 'Grau' },
                                   { hex: '#22c55e', label: 'Grün' },
-                                  { hex: '#64748b', label: 'Grau' }
+                                  { hex: '#a855f7', label: 'Lila' },
+                                  { hex: '#ef4444', label: 'Rot' }
                                 ].map(c => {
                                   const isSelected = activeColor === c.hex;
                                   return (
@@ -5514,7 +5514,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             50% { border-color: #ffedd5; box-shadow: 0 0 0 6px rgba(249, 115, 22, 0); }
           }
         `}} />
-        <div style={{ background: '#ffffff', width: '100%', maxWidth: '1200px', borderRadius: '32px', display: 'flex', flexDirection: 'column', maxHeight: '90vh', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', overflow: 'hidden' }}>
+        <div style={{ background: '#ffffff', width: '100%', maxWidth: '100%', borderRadius: '32px', display: 'flex', flexDirection: 'column', maxHeight: '90vh', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', overflow: 'hidden' }}>
           
           {/* Header */}
           <div style={{ padding: '24px 32px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
@@ -5791,12 +5791,12 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>iPad Rahmenfarbe</label>
                     <div style={{ display: 'flex', gap: '10px', marginTop: '6px', flexWrap: 'wrap' }}>
                       {[
-                        { hex: '#ef4444', label: 'Rot' },
-                        { hex: '#a855f7', label: 'Lila' },
                         { hex: '#3b82f6', label: 'Blau' },
                         { hex: '#eab308', label: 'Gelb' },
+                        { hex: '#64748b', label: 'Grau' },
                         { hex: '#22c55e', label: 'Grün' },
-                        { hex: '#64748b', label: 'Grau' }
+                        { hex: '#a855f7', label: 'Lila' },
+                        { hex: '#ef4444', label: 'Rot' }
                       ].map(colorOpt => {
                         const isColorSelected = editingStationColor === colorOpt.hex;
                         return (

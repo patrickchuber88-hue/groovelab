@@ -6345,7 +6345,7 @@ function App() {
           <ErrorBoundary>
             {activePlatform === 'campus' && (user.role === 'teacher' || user.role === 'admin') ? (
               /* --- WORLD-CLASS CAMPUS TEACHER PROFILE DESIGN --- */
-              <div className="animation-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '28px', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
+              <div className="animation-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '28px', maxWidth: '100%', margin: '0 auto', width: '100%' }}>
                 {/* Hero Header Card with Premium Glassmorphism & Overlapping Elements */}
                 <div style={{
                   background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.45) 100%)',
@@ -6660,7 +6660,7 @@ function App() {
             ) : (
               /* --- GROOVELAB PROFILE LOOK (ORIGINAL) --- */
               <>
-                <div className="animation-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1200px', margin: '0 auto' }}>
+                <div className="animation-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '100%', margin: '0 auto', width: '100%' }}>
               {/* Top: Massive Hero Card */}
               <div className="glass-panel" style={{ background: 'white', borderRadius: '32px', display: 'flex', overflow: 'hidden', minHeight: '340px' }}>
                 <div style={{ flex: '0 0 40%', background: '#f8fafc', position: 'relative', overflow: 'hidden' }}>
@@ -11484,7 +11484,7 @@ function App() {
       {/* Fullscreen Avatar Selection Gallery */}
       {showAvatarPicker && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 8000, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(30px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
-           <div className="animation-scale-up" style={{ width: '100%', maxWidth: '1200px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', gap: '40px' }}>
+           <div className="animation-scale-up" style={{ width: '100%', maxWidth: '100%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', gap: '40px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                  <div>
                     <h2 style={{ fontSize: '2.5rem', fontWeight: 950, color: 'white', margin: 0 }}>

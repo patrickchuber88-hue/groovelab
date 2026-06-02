@@ -4124,7 +4124,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       )}
 
       {activeTab === 'profile' && studentUser && (
-        <div className="animation-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '28px', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
+        <div className="animation-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '28px', maxWidth: '100%', margin: '0 auto', width: '100%' }}>
           {/* Header Card with Premium Glassmorphism */}
           <div style={{
             background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.45) 100%)',

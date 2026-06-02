@@ -642,6 +642,17 @@ interface SecretaryDashboardProps {
   onLogout?: () => void;
 }
 
+const getAlphabeticalColor = (name: string) => {
+  const trimmed = (name || '').trim();
+  const firstChar = trimmed.charAt(0).toUpperCase();
+  const charCode = firstChar.charCodeAt(0) || 65;
+  const clampedCode = Math.max(65, Math.min(90, charCode));
+  const hue = Math.round(((clampedCode - 65) / 25) * 360);
+  const avatarBg = `linear-gradient(135deg, hsl(${hue}, 85%, 94%) 0%, hsl(${hue}, 80%, 84%) 100%)`;
+  const avatarColor = `hsl(${hue}, 90%, 25%)`;
+  return { avatarBg, avatarColor };
+};
+
 export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDashboardProps) {
   // Navigation
   const [activeTab, setActiveTab] = useState<'secretary' | 'campus' | 'groovelab'>(() => {
@@ -650,7 +661,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     return 'secretary';
   });
   const [secretarySubTab, setSecretarySubTab] = useState<'briefing' | 'employees' | 'linking' | 'licenses' | 'setup' | 'rooms' | 'equipment' | 'crisis'>('briefing');
-  const [campusSubTab, setCampusSubTab] = useState<'briefing' | 'onboarding' | 'students' | 'schedules' | 'status'>('briefing');
+  const [campusSubTab, setCampusSubTab] = useState<'briefing' | 'subjects' | 'onboarding' | 'students' | 'cooperations' | 'schedules' | 'status'>('briefing');
   const [schedulesRoomsViewMode, setSchedulesRoomsViewMode] = useState<'designer' | 'live'>('live');
   const [liveViewDay, setLiveViewDay] = useState<number>(1);
   const [showAdHocBooking, setShowAdHocBooking] = useState<boolean>(false);
@@ -887,6 +898,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   // Redesigned Teacher Onboarding & Search states
   const [teacherSearchQuery, setTeacherSearchQuery] = useState<string>('');
   const [teacherStatusTab, setTeacherStatusTab] = useState<'all' | 'active' | 'inactive'>('all');
+  const [teacherFilterInstrument, setTeacherFilterInstrument] = useState<string>('All');
   
   // Manual Teacher Creation Form States
   const [showAddTeacherModal, setShowAddTeacherModal] = useState<boolean>(false);
@@ -898,6 +910,39 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [newTeacherContractEndsAt, setNewTeacherContractEndsAt] = useState<string>('');
   const [showCsvImportModal, setShowCsvImportModal] = useState<boolean>(false);
   const [isCsvExpanded, setIsCsvExpanded] = useState<boolean>(false);
+
+  // Subjects (Unterrichtsfächer) states
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const activeSubjectsList = useMemo(() => {
+    const activeSubs = subjects.filter((s: any) => s.is_active).map((s: any) => s.name);
+    return activeSubs.length > 0 ? activeSubs : INSTRUMENT_TAGS;
+  }, [subjects]);
+  const [subjectSearchQuery, setSubjectSearchQuery] = useState<string>('');
+  const [subjectFilterCategory, setSubjectFilterCategory] = useState<string>('All');
+  const [showAddSubjectModal, setShowAddSubjectModal] = useState<boolean>(false);
+  const [newSubjectName, setNewSubjectName] = useState<string>('');
+  const [newSubjectDescription, setNewSubjectDescription] = useState<string>('');
+  const [newSubjectCategory, setNewSubjectCategory] = useState<string>('Allgemein');
+  const [isSubjectCsvExpanded, setIsSubjectCsvExpanded] = useState<boolean>(false);
+  const [subjectCsvText, setSubjectCsvText] = useState<string>('');
+
+  // Cooperations states
+  const [cooperations, setCooperations] = useState<any[]>([]);
+  const [cooperationSearchQuery, setCooperationSearchQuery] = useState<string>('');
+  const [cooperationFilterStatus, setCooperationFilterStatus] = useState<string>('All');
+  const [showAddCooperationModal, setShowAddCooperationModal] = useState<boolean>(false);
+  const [newCooperationName, setNewCooperationName] = useState<string>('');
+  const [newCooperationContactPerson, setNewCooperationContactPerson] = useState<string>('');
+  const [newCooperationEmail, setNewCooperationEmail] = useState<string>('');
+  const [newCooperationPhone, setNewCooperationPhone] = useState<string>('');
+  const [newCooperationStatus, setNewCooperationStatus] = useState<string>('active');
+  const [isCooperationCsvExpanded, setIsCooperationCsvExpanded] = useState<boolean>(false);
+  const [cooperationCsvText, setCooperationCsvText] = useState<string>('');
+
+  // Drag and drop hovered states
+  const [dragHoveredInstrument, setDragHoveredInstrument] = useState<string | null>(null);
+  const [dragHoveredTeacher, setDragHoveredTeacher] = useState<string | null>(null);
+  const [dragHoveredCoopStatus, setDragHoveredCoopStatus] = useState<string | null>(null);
 
   // UI states
   const [loading, setLoading] = useState(true);
@@ -1391,6 +1436,22 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         setTickets(ticketsData);
       }
 
+      // Fetch subjects
+      const { data: subjectsData } = await supabase
+        .from('subjects')
+        .select('*')
+        .eq('school_id', schoolId)
+        .order('name');
+      setSubjects(subjectsData || []);
+
+      // Fetch cooperations
+      const { data: cooperationsData } = await supabase
+        .from('cooperations')
+        .select('*')
+        .eq('school_id', schoolId)
+        .order('name');
+      setCooperations(cooperationsData || []);
+
     } catch (err: any) {
       console.error('Error fetching secretary dashboard data:', err);
     } finally {
@@ -1703,7 +1764,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         const firstName = parts[0]?.trim();
         const lastName = parts[1]?.trim();
         const email = parts[2]?.trim();
-        const instrument = parts[3]?.trim() || 'Allgemein';
+        const instrument = parts[3]?.trim() || (teacherFilterInstrument !== 'All' ? teacherFilterInstrument : 'Allgemein');
         const maxStudents = parseInt(parts[4]?.trim()) || 10;
         const pin = 'GL-' + Math.floor(1000 + Math.random() * 9000);
         const qrToken = 't_' + Math.random().toString(36).substring(2, 12);
@@ -1761,7 +1822,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           first_name: newTeacherFirstName.trim(),
           last_name: newTeacherLastName.trim(),
           email: newTeacherEmail.trim(),
-          instrument: newTeacherInstrument.trim() || 'Allgemein',
+          instrument: newTeacherInstrument.trim() || activeSubjectsList[0] || 'Allgemein',
           max_students: newTeacherLimit,
           ausweis_nummer: pin,
           teacher_qr_token: qrToken,
@@ -2092,6 +2153,830 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     fetchDashboardData();
   };
 
+  const renderSubjectsBoard = () => {
+    const filtered = subjects.filter(s => {
+      const name = (s.name || '').toLowerCase();
+      const desc = (s.description || '').toLowerCase();
+      const cat = (s.category || '').toLowerCase();
+      const query = subjectSearchQuery.toLowerCase().trim();
+
+      const matchesSearch = !query || name.includes(query) || desc.includes(query) || cat.includes(query);
+      const matchesCategory = subjectFilterCategory === 'All' || s.category === subjectFilterCategory;
+
+      return matchesSearch && matchesCategory;
+    });
+
+    const uniqueCategories = Array.from(new Set(subjects.map(s => s.category || 'Allgemein'))).sort((a, b) => a.localeCompare(b));
+
+    return (
+      <div style={{ width: '100%' }}>
+        <div className="google-card" style={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '24px', 
+          padding: '24px',
+          borderRadius: '24px',
+          border: '1.5px solid #cbd5e1',
+          background: '#ffffff',
+          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)'
+        }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <BookOpen size={22} style={{ color: '#0f172a' }} />
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                Unterrichtsfächer
+              </h3>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => setIsSubjectCsvExpanded(!isSubjectCsvExpanded)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  borderRadius: '12px',
+                  padding: '8px 16px',
+                  fontSize: '0.8rem',
+                  fontWeight: 800,
+                  background: isSubjectCsvExpanded ? '#f1f5f9' : '#ffffff',
+                  color: '#475569',
+                  border: '1.5px solid #cbd5e1',
+                  cursor: 'pointer',
+                  fontFamily: 'Urbanist',
+                  transition: 'all 0.2s'
+                }}
+              >
+                📄 Sammel-Onboarding (CSV) {isSubjectCsvExpanded ? '▲' : '▼'}
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowAddSubjectModal(true);
+                  if (subjectFilterCategory && subjectFilterCategory !== 'All') {
+                    setNewSubjectCategory(subjectFilterCategory);
+                  }
+                }}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  borderRadius: '12px', 
+                  padding: '8px 16px', 
+                  fontSize: '0.8rem', 
+                  fontWeight: 800,
+                  background: '#34a853',
+                  color: '#ffffff',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontFamily: 'Urbanist',
+                  boxShadow: '0 4px 10px rgba(52,168,83,0.15)',
+                  transition: 'all 0.2s'
+                }}
+              >
+                ➕ Fach anlegen
+              </button>
+            </div>
+          </div>
+
+          {/* Collapsible CSV Box */}
+          {isSubjectCsvExpanded && (
+            <div style={{ background: '#f8fafc', borderRadius: '16px', border: '1px solid #cbd5e1', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#1e293b', fontWeight: 800 }}>📄 Sammel-Onboarding (CSV)</h4>
+              <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', lineHeight: '1.4' }}>
+                Gib eine Liste von Fächern ein (ein Fachname pro Zeile). Bereits vorhandene Fächer werden automatisch übersprungen.
+              </p>
+              <textarea
+                value={subjectCsvText}
+                onChange={(e) => setSubjectCsvText(e.target.value)}
+                placeholder="z.B.&#10;Gitarre&#10;Klavier&#10;Gesang&#10;Querflöte"
+                rows={5}
+                style={{ padding: '12px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontFamily: 'monospace', outline: 'none' }}
+              />
+              <button
+                onClick={handleImportSubjects}
+                style={{ background: '#475569', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '10px 16px', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', alignSelf: 'flex-start' }}
+              >
+                📥 Fächer importieren
+              </button>
+            </div>
+          )}
+
+          {/* Filters */}
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
+              <input
+                type="text"
+                value={subjectSearchQuery}
+                onChange={(e) => setSubjectSearchQuery(e.target.value)}
+                placeholder="Fach nach Name oder Beschreibung suchen..."
+                style={{
+                  width: '100%',
+                  padding: '10px 16px',
+                  borderRadius: '14px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.85rem',
+                  fontFamily: 'Urbanist',
+                  fontWeight: 600,
+                  outline: 'none'
+                }}
+              />
+            </div>
+
+            <select
+              value={subjectFilterCategory}
+              onChange={(e) => setSubjectFilterCategory(e.target.value)}
+              style={{
+                padding: '10px 16px',
+                borderRadius: '14px',
+                border: '1px solid #cbd5e1',
+                fontSize: '0.85rem',
+                fontFamily: 'Urbanist',
+                fontWeight: 600,
+                outline: 'none',
+                background: 'white',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="All">Alle Kategorien ({subjects.length})</option>
+              {uniqueCategories.map(cat => (
+                <option key={cat} value={cat}>{cat} ({subjects.filter(s => s.category === cat).length})</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Subjects List Rows */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowX: 'auto', width: '100%' }}>
+            {filtered.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '8px' }}>📖</span>
+                Keine Fächer gefunden. Lege ein neues Fach an oder ändere die Suchkriterien.
+              </div>
+            ) : (
+              filtered.map(s => {
+                const { avatarBg, avatarColor } = getAlphabeticalColor(s.name);
+
+                return (
+                  <div 
+                    key={s.id} 
+                    style={{ 
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 16px',
+                      borderRadius: '16px',
+                      border: '1px solid #f1f5f9',
+                      background: '#ffffff',
+                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.01)',
+                      transition: 'all 0.25s ease',
+                      minWidth: '850px'
+                    }}
+                    className="hover-scale"
+                  >
+                    {/* Icon & Title / Description */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: '2', minWidth: '220px' }}>
+                      <div style={{
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '50%',
+                        background: avatarBg,
+                        color: avatarColor,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '1rem',
+                        fontWeight: 900,
+                        fontFamily: 'Urbanist',
+                        flexShrink: 0
+                      }}>
+                        {s.name.trim().charAt(0).toUpperCase()}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                        <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1d1d1f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {s.name}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Delete Action */}
+                    <div style={{ flex: '0.5', minWidth: '60px', display: 'flex', justifyContent: 'flex-end' }}>
+                      <button
+                        onClick={() => handleDeleteSubject(s.id, s.name)}
+                        style={{
+                          padding: '6px',
+                          borderRadius: '10px',
+                          border: 'none',
+                          background: 'transparent',
+                          cursor: 'pointer',
+                          color: '#ef4444',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+
+
+        {/* Modal: Add Subject */}
+        {showAddSubjectModal && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <div style={{ background: '#ffffff', borderRadius: '24px', maxWidth: '520px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column' }}>
+              {/* Modal Header */}
+              <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                  ➕ Neues Unterrichtsfach anlegen
+                </h3>
+                <button 
+                  onClick={() => setShowAddSubjectModal(false)}
+                  style={{ border: 'none', background: 'transparent', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <form onSubmit={handleCreateSubject} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Name des Fachs *</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={newSubjectName}
+                    onChange={(e) => setNewSubjectName(e.target.value)}
+                    placeholder="z.B. Blockflöte"
+                    style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Beschreibung (optional)</label>
+                  <textarea 
+                    value={newSubjectDescription}
+                    onChange={(e) => setNewSubjectDescription(e.target.value)}
+                    placeholder="Optionale Beschreibung des Unterrichtsfachs..."
+                    rows={3}
+                    style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', resize: 'vertical' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Kategorie *</label>
+                  <select
+                    value={newSubjectCategory}
+                    onChange={(e) => setNewSubjectCategory(e.target.value)}
+                    style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
+                  >
+                    <option value="Allgemein">Allgemein</option>
+                    <option value="Saiteninstrumente">Saiteninstrumente</option>
+                    <option value="Tasteninstrumente">Tasteninstrumente</option>
+                    <option value="Schlagwerk">Schlagwerk</option>
+                    <option value="Blasinstrumente">Blasinstrumente</option>
+                    <option value="Gesang">Gesang</option>
+                    <option value="Theorie & Ensemble">Theorie & Ensemble</option>
+                  </select>
+                </div>
+
+                <button
+                  type="submit"
+                  style={{ background: '#34a853', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '12px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', marginTop: '8px', boxShadow: '0 4px 10px rgba(52,168,83,0.15)' }}
+                >
+                  Fach anlegen
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderCooperationsBoard = () => {
+    const filtered = cooperations.filter(c => {
+      const name = (c.name || '').toLowerCase();
+      const contact = (c.contact_person || '').toLowerCase();
+      const email = (c.email || '').toLowerCase();
+      const query = cooperationSearchQuery.toLowerCase().trim();
+
+      const matchesSearch = !query || name.includes(query) || contact.includes(query) || email.includes(query);
+      const matchesStatus = cooperationFilterStatus === 'All' || c.status === cooperationFilterStatus;
+
+      return matchesSearch && matchesStatus;
+    });
+
+    return (
+      <div style={{ display: 'flex', gap: '24px', width: '100%', alignItems: 'flex-start' }}>
+        
+        {/* Left Pane: Cooperations List */}
+        <div className="google-card" style={{ 
+          flex: 1,
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '24px', 
+          padding: '24px',
+          borderRadius: '24px',
+          border: '1.5px solid #cbd5e1',
+          background: '#ffffff',
+          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)',
+          minWidth: 0
+        }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Users size={22} style={{ color: '#0f172a' }} />
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                Kooperationen
+              </h3>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => setIsCooperationCsvExpanded(!isCooperationCsvExpanded)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  borderRadius: '12px',
+                  padding: '8px 16px',
+                  fontSize: '0.8rem',
+                  fontWeight: 800,
+                  background: isCooperationCsvExpanded ? '#f1f5f9' : '#ffffff',
+                  color: '#475569',
+                  border: '1.5px solid #cbd5e1',
+                  cursor: 'pointer',
+                  fontFamily: 'Urbanist',
+                  transition: 'all 0.2s'
+                }}
+              >
+                📄 Sammel-Onboarding (CSV) {isCooperationCsvExpanded ? '▲' : '▼'}
+              </button>
+
+              <button
+                onClick={() => setShowAddCooperationModal(true)}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  borderRadius: '12px', 
+                  padding: '8px 16px', 
+                  fontSize: '0.8rem', 
+                  fontWeight: 800,
+                  background: '#34a853',
+                  color: '#ffffff',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontFamily: 'Urbanist',
+                  boxShadow: '0 4px 10px rgba(52,168,83,0.15)',
+                  transition: 'all 0.2s'
+                }}
+              >
+                ➕ Kooperation anlegen
+              </button>
+            </div>
+          </div>
+
+          {/* Collapsible CSV Box */}
+          {isCooperationCsvExpanded && (
+            <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px dashed #cbd5e1', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                <strong style={{ fontSize: '0.88rem', color: '#0f172a', fontWeight: 900, fontFamily: 'Urbanist' }}>
+                  Sammel-Onboarding (Kooperationen)
+                </strong>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'Inter' }}>
+                  Format pro Zeile: <code>Kooperationsname; Ansprechpartner; E-Mail (optional); Telefon (optional); Status (optional)</code>
+                </span>
+              </div>
+
+              {cooperationFilterStatus && cooperationFilterStatus !== 'All' && (() => {
+                const statusMap: Record<string, { label: string; color: string; bg: string; border: string }> = {
+                  active: { label: 'Aktiv', color: '#166534', bg: '#e2f6ea', border: '#bbf7d0' },
+                  pending: { label: 'Ausstehend', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
+                  inactive: { label: 'Inaktiv', color: '#475569', bg: '#f1f5f9', border: '#cbd5e1' }
+                };
+                const statusItem = statusMap[cooperationFilterStatus];
+                if (!statusItem) return null;
+
+                return (
+                  <div style={{
+                    background: 'rgba(34, 197, 94, 0.03)',
+                    border: '1.5px solid rgba(34, 197, 94, 0.12)',
+                    borderRadius: '16px',
+                    padding: '12px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '16px',
+                    marginTop: '2px',
+                    marginBottom: '2px',
+                    flexWrap: 'wrap',
+                    transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flex: 1 }}>
+                      <span style={{ fontSize: '0.68rem', color: '#166534', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>
+                        ⚡ Smart Auto-Zuweisung:
+                      </span>
+
+                      {/* Status Pill */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: '#ffffff',
+                        border: `1.5px solid ${statusItem.border}`,
+                        padding: '4px 10px 4px 6px',
+                        borderRadius: '100px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                      }}>
+                        <div style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          background: statusItem.bg,
+                          color: statusItem.color,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '0.65rem',
+                          fontWeight: 900,
+                          fontFamily: 'Urbanist'
+                        }}>
+                          {statusItem.label[0]}
+                        </div>
+                        <span style={{ fontSize: '0.74rem', fontWeight: 800, color: statusItem.color, fontFamily: 'Urbanist' }}>
+                          {statusItem.label}
+                        </span>
+                        <span style={{ fontSize: '0.6rem', fontWeight: 900, background: '#f1f5f9', color: '#64748b', padding: '1px 6px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Status
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <span style={{ fontSize: '0.65rem', color: '#15803d', fontWeight: 900, background: '#d1fae5', padding: '4px 10px', borderRadius: '8px', letterSpacing: '0.02em', textTransform: 'uppercase', fontFamily: 'Urbanist' }}>
+                      Status wird automatisch zugewiesen!
+                    </span>
+                  </div>
+                );
+              })()}
+
+              <textarea
+                value={cooperationCsvText}
+                onChange={(e) => setCooperationCsvText(e.target.value)}
+                placeholder={
+                  cooperationFilterStatus && cooperationFilterStatus !== 'All'
+                    ? "Schubert-Gymnasium; Herr Weber; weber@schubert.de"
+                    : "Schubert-Gymnasium; Herr Weber; weber@schubert.de; 0172-12345; active\nMozart-Grundschule; Frau Becker; info@mozart.de; ; pending"
+                }
+                style={{
+                  width: '100%',
+                  height: '100px',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  padding: '10px',
+                  fontSize: '0.78rem',
+                  fontFamily: 'monospace',
+                  outline: 'none',
+                  resize: 'vertical'
+                }}
+              />
+              <button
+                onClick={handleImportCooperations}
+                className="google-btn-primary"
+                style={{ background: '#34a853', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, alignSelf: 'flex-start', cursor: 'pointer' }}
+              >
+                Kooperationen importieren
+              </button>
+            </div>
+          )}
+
+          {/* Filters */}
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
+              <input
+                type="text"
+                value={cooperationSearchQuery}
+                onChange={(e) => setCooperationSearchQuery(e.target.value)}
+                placeholder="Kooperation nach Name, Ansprechpartner oder E-Mail suchen..."
+                style={{
+                  width: '100%',
+                  padding: '10px 16px',
+                  borderRadius: '14px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.85rem',
+                  fontFamily: 'Urbanist',
+                  fontWeight: 600,
+                  outline: 'none'
+                }}
+              />
+            </div>
+
+            <select
+              value={cooperationFilterStatus}
+              onChange={(e) => setCooperationFilterStatus(e.target.value)}
+              style={{
+                padding: '10px 16px',
+                borderRadius: '14px',
+                border: '1px solid #cbd5e1',
+                fontSize: '0.85rem',
+                fontFamily: 'Urbanist',
+                fontWeight: 600,
+                outline: 'none',
+                background: 'white',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="All">Alle Statuspartner ({cooperations.length})</option>
+              <option value="active">Aktiv ({cooperations.filter(c => c.status === 'active').length})</option>
+              <option value="pending">Ausstehend ({cooperations.filter(c => c.status === 'pending').length})</option>
+              <option value="inactive">Inaktiv ({cooperations.filter(c => c.status === 'inactive').length})</option>
+            </select>
+          </div>
+
+          {/* Cooperations Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+            {filtered.length === 0 ? (
+              <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '8px' }}>🤝</span>
+                Keine Kooperationen gefunden. Lege einen neuen Partner an oder passe deine Suche an.
+              </div>
+            ) : (
+              filtered.map(c => (
+                <div 
+                  key={c.id} 
+                  className="google-card hover-scale-mini" 
+                  draggable={true}
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("cooperationId", c.id);
+                  }}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '14px',
+                    padding: '20px',
+                    borderRadius: '20px',
+                    background: '#ffffff',
+                    border: '1.5px solid #cbd5e1',
+                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.01)',
+                    transition: 'all 0.2s',
+                    cursor: 'grab'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                        🏫 {c.name}
+                      </span>
+                      <span style={{
+                        fontSize: '0.65rem',
+                        fontWeight: 800,
+                        textTransform: 'uppercase',
+                        padding: '2px 8px',
+                        borderRadius: '20px',
+                        alignSelf: 'flex-start',
+                        background: c.status === 'active' ? '#e2f6ea' : c.status === 'pending' ? '#fffbeb' : '#f5f5f7',
+                        color: c.status === 'active' ? '#137333' : c.status === 'pending' ? '#b45309' : '#86868b'
+                      }}>
+                        {c.status === 'active' ? 'Aktiv' : c.status === 'pending' ? 'Ausstehend' : 'Inaktiv'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.78rem', color: '#475569', flex: 1 }}>
+                    {c.contact_person && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>👤</span>
+                        <strong>{c.contact_person}</strong>
+                      </div>
+                    )}
+                    {c.email && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>✉️</span>
+                        <a href={`mailto:${c.email}`} style={{ color: '#2563eb', textDecoration: 'none' }}>{c.email}</a>
+                      </div>
+                    )}
+                    {c.phone && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>📞</span>
+                        <span>{c.phone}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '12px', marginTop: '4px' }}>
+                    <button
+                      onClick={() => handleToggleCooperationActive(c.id, c.is_active)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '10px',
+                        border: 'none',
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        background: c.is_active ? '#e2f6ea' : '#f5f5f7',
+                        color: c.is_active ? '#137333' : '#86868b',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {c.is_active ? 'Aktiviert' : 'Deaktiviert'}
+                    </button>
+
+                    <button
+                      onClick={() => handleDeleteCooperation(c.id, c.name)}
+                      style={{
+                        padding: '6px',
+                        borderRadius: '10px',
+                        border: 'none',
+                        background: 'transparent',
+                        cursor: 'pointer',
+                        color: '#ef4444',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Right Pane: Status Categories Drop Zones Sidebar */}
+        <div className="google-card" style={{
+          width: '300px',
+          flexShrink: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '18px',
+          padding: '24px',
+          borderRadius: '24px',
+          border: '1.5px solid #cbd5e1',
+          background: '#ffffff',
+          position: 'sticky',
+          top: '24px'
+        }}>
+          <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+            ⚡ Status per Drag &amp; Drop
+          </h4>
+          <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', fontWeight: 550, lineHeight: 1.4 }}>
+            Ziehe eine Kooperation und lasse sie auf einen Status fallen, um den Status direkt zu aktualisieren.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {[
+              { key: 'active', label: 'Aktiv', color: '#166534', bg: '#e2f6ea', border: '#bbf7d0' },
+              { key: 'pending', label: 'Ausstehend', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
+              { key: 'inactive', label: 'Inaktiv', color: '#475569', bg: '#f1f5f9', border: '#cbd5e1' }
+            ].map(statusItem => {
+              const isHovered = dragHoveredCoopStatus === statusItem.key;
+              const count = cooperations.filter(c => c.status === statusItem.key).length;
+              return (
+                <div
+                  key={statusItem.key}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragHoveredCoopStatus(statusItem.key);
+                  }}
+                  onDragLeave={() => setDragHoveredCoopStatus(null)}
+                  onDrop={(e) => {
+                    const cooperationId = e.dataTransfer.getData("cooperationId");
+                    if (cooperationId) {
+                      handleUpdateCooperationStatus(cooperationId, statusItem.key);
+                    }
+                    setDragHoveredCoopStatus(null);
+                  }}
+                  onClick={() => {
+                    setCooperationFilterStatus(cooperationFilterStatus === statusItem.key ? 'All' : statusItem.key);
+                  }}
+                  style={{
+                    padding: '12px 14px',
+                    borderRadius: '16px',
+                    background: isHovered ? statusItem.bg : '#ffffff',
+                    border: isHovered ? `2px dashed ${statusItem.color}` : `1.5px solid ${cooperationFilterStatus === statusItem.key ? statusItem.color : '#cbd5e1'}`,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    cursor: 'pointer',
+                    transform: isHovered ? 'scale(1.03)' : 'scale(1)',
+                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                    boxShadow: isHovered ? `0 4px 12px ${statusItem.color}20` : 'none'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 800, color: statusItem.color, fontSize: '0.82rem' }}>
+                      {statusItem.label}
+                    </span>
+                    <span style={{ background: statusItem.bg, color: statusItem.color, fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px' }}>
+                      {count}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Modal: Add Cooperation */}
+        {showAddCooperationModal && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <div style={{ background: '#ffffff', borderRadius: '24px', maxWidth: '520px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column' }}>
+              {/* Modal Header */}
+              <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                  ➕ Neue Kooperation anlegen
+                </h3>
+                <button 
+                  onClick={() => setShowAddCooperationModal(false)}
+                  style={{ border: 'none', background: 'transparent', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <form onSubmit={handleCreateCooperation} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Name des Kooperationspartners *</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={newCooperationName}
+                    onChange={(e) => setNewCooperationName(e.target.value)}
+                    placeholder="z.B. Grundschule Bad Säckingen"
+                    style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Ansprechpartner (optional)</label>
+                  <input 
+                    type="text" 
+                    value={newCooperationContactPerson}
+                    onChange={(e) => setNewCooperationContactPerson(e.target.value)}
+                    placeholder="z.B. Frau Müller"
+                    style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>E-Mail (optional)</label>
+                    <input 
+                      type="email" 
+                      value={newCooperationEmail}
+                      onChange={(e) => setNewCooperationEmail(e.target.value)}
+                      placeholder="kontakt@schule.de"
+                      style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Telefon (optional)</label>
+                    <input 
+                      type="text" 
+                      value={newCooperationPhone}
+                      onChange={(e) => setNewCooperationPhone(e.target.value)}
+                      placeholder="07761 / 12345"
+                      style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Status *</label>
+                  <select
+                    value={newCooperationStatus}
+                    onChange={(e) => setNewCooperationStatus(e.target.value)}
+                    style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
+                  >
+                    <option value="active">Aktiv</option>
+                    <option value="pending">Ausstehend</option>
+                    <option value="inactive">Inaktiv</option>
+                  </select>
+                </div>
+
+                <button
+                  type="submit"
+                  style={{ background: '#34a853', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '12px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', marginTop: '8px', boxShadow: '0 4px 10px rgba(52,168,83,0.15)' }}
+                >
+                  Kooperation anlegen
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderCompactStudentBoard = () => {
     const isBadSaeckingen = schoolName.toLowerCase().includes('bad säckingen') || 
                             schoolName.toLowerCase().includes('bad saeckingen') || 
@@ -2144,33 +3029,24 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     const activeCampusCount = campusStudentsOnly.filter(s => s.is_campus_active).length;
     const activeGroovelabCount = campusStudentsOnly.filter(s => s.is_groovelab_active).length;
 
-    // Helper for beautiful pastel background based on student name
-    const getAvatarGradient = (name: string) => {
-      const charCode = name.charCodeAt(0) || 65;
-      const hue = (charCode * 23) % 360;
-      return `linear-gradient(135deg, hsl(${hue}, 85%, 94%) 0%, hsl(${hue}, 80%, 84%) 100%)`;
-    };
-    const getAvatarTextColor = (name: string) => {
-      const charCode = name.charCodeAt(0) || 65;
-      const hue = (charCode * 23) % 360;
-      return `hsl(${hue}, 90%, 25%)`;
-    };
+    // Helper for beautiful pastel background based on student name (A-Z alphabetical color)
+    const getAvatarGradient = (name: string) => getAlphabeticalColor(name).avatarBg;
+    const getAvatarTextColor = (name: string) => getAlphabeticalColor(name).avatarColor;
 
     return (
       <>
-        <div style={{ display: 'flex', gap: '24px', width: '100%', alignItems: 'flex-start' }}>
-          <div className="google-card" style={{ 
-            flex: 1.8,
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: '24px', 
-            padding: '24px',
-            borderRadius: '24px',
-            border: '1.5px solid #cbd5e1',
-            background: '#ffffff',
-            boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)',
-            minWidth: 0
-          }}>
+        <div className="google-card" style={{ 
+          width: '100%',
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '24px', 
+          padding: '24px',
+          borderRadius: '24px',
+          border: '1.5px solid #cbd5e1',
+          background: '#ffffff',
+          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)',
+          minWidth: 0
+        }}>
             {/* TITLE BLOCK */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -2228,22 +3104,127 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             {/* CSV BOX */}
             {isStudentCsvExpanded && (
               <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px dashed #cbd5e1', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <strong style={{ fontSize: '0.85rem', color: '#1e293b' }}>
-                  Sammel-Onboarding via CSV (Schüler)
-                  {studentFilterTeacher && studentFilterTeacher !== 'All' && ` — Auto-Zuweisung für Lehrer: ${
-                    (() => {
-                      const selectedT = allUniqueTeachers.find(t => t.id === studentFilterTeacher);
-                      return selectedT ? `${selectedT.firstName || selectedT.first_name} ${selectedT.lastName || selectedT.last_name}` : '';
-                    })()
-                  }`}
-                </strong>
-                <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                  {studentFilterTeacher && studentFilterTeacher !== 'All' ? (
-                    <span><strong>Hinweis:</strong> Da ein Lehrer ausgewählt ist, reicht es aus, nur den Namen einzutragen (z.B. <code>Vorname Nachname</code>). Lehrer und Instrument werden automatisch verknüpft! Ansonsten Format: <code>Vorname Nachname; Instrument; E-Mail (optional)</code></span>
-                  ) : (
-                    <span>Geben Sie eine Schülerliste ein. Format pro Zeile: <code>Vorname Nachname; Instrument; E-Mail (optional); Lehrer-Name (optional)</code></span>
-                  )}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  <strong style={{ fontSize: '0.88rem', color: '#0f172a', fontWeight: 900, fontFamily: 'Urbanist' }}>
+                    Sammel-Onboarding (Schüler)
+                  </strong>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'Inter' }}>
+                    Format pro Zeile: <code>Vorname Nachname; Instrument; E-Mail (optional)</code>
+                  </span>
+                </div>
+
+                {studentFilterTeacher && studentFilterTeacher !== 'All' && (() => {
+                  const selectedT = allUniqueTeachers.find(t => t.id === studentFilterTeacher);
+                  if (!selectedT) return null;
+                  const teacherName = `${selectedT.firstName || selectedT.first_name || ''} ${selectedT.lastName || selectedT.last_name || ''}`.trim();
+                  const instName = selectedT.instrument || 'Gitarre';
+                  const tInitials = `${selectedT.firstName?.[0] || selectedT.first_name?.[0] || ''}${selectedT.lastName?.[0] || selectedT.last_name?.[0] || ''}`.toUpperCase() || 'D';
+                  const tAvatarBg = getAvatarGradient(teacherName);
+                  const tAvatarColor = getAvatarTextColor(teacherName);
+                  
+                  // Seed HSL color for the instrument avatar
+                  const hash = instName.split('').reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0);
+                  const hue = (hash * 43) % 360;
+                  const instAvatarBg = `linear-gradient(135deg, hsl(${hue}, 85%, 94%) 0%, hsl(${hue}, 80%, 86%) 100%)`;
+                  const instAvatarColor = `hsl(${hue}, 90%, 25%)`;
+
+                  return (
+                    <div style={{
+                      background: 'rgba(34, 197, 94, 0.03)',
+                      border: '1.5px solid rgba(34, 197, 94, 0.12)',
+                      borderRadius: '16px',
+                      padding: '12px 16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '16px',
+                      marginTop: '2px',
+                      marginBottom: '2px',
+                      flexWrap: 'wrap',
+                      transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flex: 1 }}>
+                        <span style={{ fontSize: '0.68rem', color: '#166534', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>
+                          ⚡ Smart Auto-Zuweisung:
+                        </span>
+                        
+                        {/* Teacher Pill */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          background: '#ffffff',
+                          border: '1.5px solid #cbd5e1',
+                          padding: '4px 10px 4px 6px',
+                          borderRadius: '100px',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                        }}>
+                          <div style={{
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            background: tAvatarBg,
+                            color: tAvatarColor,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.65rem',
+                            fontWeight: 900,
+                            fontFamily: 'Urbanist'
+                          }}>
+                            {tInitials}
+                          </div>
+                          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                            {teacherName}
+                          </span>
+                          <span style={{ fontSize: '0.6rem', fontWeight: 900, background: '#f1f5f9', color: '#64748b', padding: '1px 6px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            Lehrer
+                          </span>
+                        </div>
+
+                        {/* Arrow */}
+                        <span style={{ fontSize: '0.8rem', color: '#166534', fontWeight: 900 }}>&rarr;</span>
+
+                        {/* Instrument Pill */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          background: '#ffffff',
+                          border: '1.5px solid #cbd5e1',
+                          padding: '4px 10px 4px 6px',
+                          borderRadius: '100px',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                        }}>
+                          <div style={{
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            background: instAvatarBg,
+                            color: instAvatarColor,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.65rem',
+                            fontWeight: 900,
+                            fontFamily: 'Urbanist'
+                          }}>
+                            {instName[0]?.toUpperCase() || 'I'}
+                          </div>
+                          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                            {instName}
+                          </span>
+                          <span style={{ fontSize: '0.6rem', fontWeight: 900, background: '#f1f5f9', color: '#64748b', padding: '1px 6px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            Instrument
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <span style={{ fontSize: '0.65rem', color: '#15803d', fontWeight: 900, background: '#d1fae5', padding: '4px 10px', borderRadius: '8px', letterSpacing: '0.02em', textTransform: 'uppercase', fontFamily: 'Urbanist' }}>
+                        Nur Name nötig!
+                      </span>
+                    </div>
+                  );
+                })()}
                 <textarea
                   value={studentCsvText}
                   onChange={(e) => setStudentCsvText(e.target.value)}
@@ -2375,9 +3356,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             </div>
 
             {/* LIST ROW VIEW CONTAINER */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowX: 'auto', width: '100%' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowX: 'auto', overflowY: 'scroll', maxHeight: '550px', paddingRight: '6px', width: '100%' }}>
               {paginatedStudents.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b', fontSize: '0.88rem', fontWeight: 700 }}>
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b', fontSize: '0.88rem', fontWeight: 700, minWidth: '850px' }}>
                   Keine Schüler mit diesen Filtereinstellungen gefunden.
                 </div>
               ) : (
@@ -2385,6 +3366,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   return (
                     <div 
                       key={student.id} 
+                      draggable={true}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData("studentId", student.id);
+                      }}
                       style={{ 
                         display: 'flex',
                         alignItems: 'center',
@@ -2395,7 +3380,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         border: '1px solid #f1f5f9',
                         boxShadow: '0 1px 2px rgba(0, 0, 0, 0.01)',
                         minWidth: '850px',
-                        transition: 'all 0.25s ease'
+                        transition: 'all 0.25s ease',
+                        cursor: 'grab'
                       }}
                       className="hover-scale"
                     >
@@ -2643,11 +3629,23 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         {/* Delete Button */}
                         <button
                           onClick={() => handleDeleteStudentCampus(student.id, `${student.first_name} ${student.last_name}`)}
-                          style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '0.85rem', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.15s' }}
+                          style={{ 
+                            background: 'transparent', 
+                            border: 'none', 
+                            color: '#ea4335', 
+                            fontSize: '0.9rem', 
+                            fontWeight: 800, 
+                            cursor: 'pointer', 
+                            padding: '2px 6px',
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            transition: 'transform 0.15s' 
+                          }}
                           className="hover-scale-mini"
                           title="Schüler unwiderruflich löschen"
                         >
-                          🗑️
+                          ❌
                         </button>
                       </div>
                     </div>
@@ -2756,213 +3754,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             )}
           </div>
 
-          {/* Right Side: Dozenten Sidebar */}
-          <div className="google-card" style={{
-            width: '330px',
-            flexShrink: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px',
-            padding: '24px',
-            borderRadius: '24px',
-            border: '1px solid #f2f2f7',
-            background: '#ffffff',
-            boxShadow: '0 4px 24px rgba(0, 0, 0, 0.02)',
-            position: 'sticky',
-            top: '24px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Users size={18} style={{ color: '#1d1d1f' }} />
-              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#1d1d1f', fontFamily: 'Urbanist, -apple-system, BlinkMacSystemFont, sans-serif' }}>
-                Lehrer
-              </h3>
-            </div>
-            <p style={{ margin: 0, fontSize: '0.74rem', color: '#86868b', fontWeight: 500, lineHeight: 1.4 }}>
-              Klicke auf einen Lehrer, um das Sammel-Onboarding zu öffnen und direkt Schüler für ihn zu erfassen.
-            </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '500px', overflowY: 'auto', paddingRight: '4px' }}>
-              
-              {/* Option / Slot für Alle Lehrer */}
-              <div
-                onClick={() => {
-                  setStudentFilterTeacher('All');
-                  setStudentCurrentPage(1);
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '10px 12px',
-                  borderRadius: '14px',
-                  border: studentFilterTeacher === 'All' ? '1.5px solid #34a853' : 'none',
-                  background: studentFilterTeacher === 'All' ? '#e2f6ea' : '#f5f5f7',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  boxShadow: studentFilterTeacher === 'All' ? '0 4px 12px rgba(52, 168, 83, 0.08)' : 'none'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                  <div style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)',
-                    color: '#475569',
-                    border: '1px solid rgba(0, 0, 0, 0.05)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.85rem',
-                    fontWeight: 800,
-                    flexShrink: 0
-                  }}>
-                    👥
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                    <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#1d1d1f' }}>
-                      Alle Lehrer anzeigen
-                    </span>
-                    <span style={{ fontSize: '0.74rem', color: '#86868b', fontWeight: 500, marginTop: '1px' }}>
-                      Gesamtübersicht
-                    </span>
-                  </div>
-                </div>
-                <div style={{
-                  background: 'rgba(0, 0, 0, 0.04)',
-                  color: '#1d1d1f',
-                  fontSize: '0.7rem',
-                  fontWeight: 600,
-                  padding: '4px 10px',
-                  borderRadius: '20px',
-                }}>
-                  {students.filter(s => s.is_campus_active).length} Schüler
-                </div>
-              </div>
-
-              {allUniqueTeachers.map((t: any) => {
-                const teacherName = `${t.firstName || t.first_name || ''} ${t.lastName || t.last_name || ''}`.trim();
-                const teacherLastName = t.lastName || t.last_name || '';
-                const assignedCount = students.filter(s => s.teacher_id === t.id && s.is_campus_active).length;
-                const initials = `${t.firstName?.[0] || t.first_name?.[0] || ''}${t.lastName?.[0] || t.last_name?.[0] || ''}`.toUpperCase() || 'D';
-                const isSelected = studentFilterTeacher === t.id;
-
-                return (
-                  <div
-                    key={t.id}
-                    onClick={() => {
-                      setStudentFilterTeacher(t.id);
-                      setStudentCurrentPage(1);
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '10px 12px',
-                      borderRadius: '14px',
-                      border: isSelected ? '1.5px solid #34a853' : 'none',
-                      background: isSelected ? '#e2f6ea' : '#f5f5f7',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      boxShadow: isSelected ? '0 4px 12px rgba(52, 168, 83, 0.08)' : 'none'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isSelected) e.currentTarget.style.background = '#e8e8ed';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isSelected) e.currentTarget.style.background = '#f5f5f7';
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                      <div style={{
-                        width: '36px',
-                        height: '36px',
-                        borderRadius: '50%',
-                        background: getAvatarGradient(teacherName),
-                        color: getAvatarTextColor(teacherName),
-                        border: '1px solid rgba(0, 0, 0, 0.05)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '0.8rem',
-                        fontWeight: 700,
-                        flexShrink: 0
-                      }}>
-                        {initials}
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                        <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1d1d1f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {teacherName}
-                        </span>
-                        <span style={{ fontSize: '0.74rem', color: '#86868b', fontWeight: 500, marginTop: '1px' }}>
-                          {t.instrument || 'Lehrer'}
-                        </span>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
-                      <div style={{
-                        background: 'rgba(0, 0, 0, 0.04)',
-                        color: '#1d1d1f',
-                        fontSize: '0.7rem',
-                        fontWeight: 600,
-                        padding: '4px 10px',
-                        borderRadius: '20px',
-                      }}>
-                        {assignedCount} Schüler
-                      </div>
-                      
-                      <button
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          if (confirm(`Möchtest du alle nicht zugeordneten Schüler dem Lehrer ${teacherName} zuweisen?`)) {
-                            const campusStudents = students.filter(s => s.is_campus_active);
-                            const unassignedIds = campusStudents.filter(s => !s.teacher_id).map(s => s.id);
-                            if (unassignedIds.length === 0) {
-                              alert('Es gibt keine nicht-zugeordneten Schüler.');
-                              return;
-                            }
-                            
-                            const { error } = await supabase
-                              .from('users')
-                              .update({ teacher_id: t.id })
-                              .in('id', unassignedIds);
-                            
-                            if (error) {
-                              alert(error.message);
-                            } else {
-                              alert(`${unassignedIds.length} Schüler wurden ${teacherName} erfolgreich zugewiesen.`);
-                              fetchDashboardData();
-                            }
-                          }
-                        }}
-                        style={{
-                          background: 'none',
-                          color: '#0066cc',
-                          border: 'none',
-                          padding: 0,
-                          fontSize: '0.68rem',
-                          fontWeight: 500,
-                          cursor: 'pointer',
-                          transition: 'color 0.15s'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.color = '#0044b3';
-                          e.currentTarget.style.textDecoration = 'underline';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.color = '#0066cc';
-                          e.currentTarget.style.textDecoration = 'none';
-                        }}
-                      >
-                        Alle zuweisen
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
 
         {/* MANAGE STUDENT MODAL */}
         {showAddStudentModal && (
@@ -3213,6 +4005,280 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       const { error } = await supabase
         .from('users')
         .delete()
+        .eq('id', id);
+      if (error) throw error;
+      fetchDashboardData();
+    } catch (err: any) {
+      alert('Fehler: ' + err.message);
+    }
+  };
+
+  // Drag and Drop Helpers
+  const handleUpdateTeacherInstrument = async (teacherId: string, newInstrument: string) => {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ instrument: newInstrument })
+        .eq('id', teacherId);
+      if (error) throw error;
+      fetchDashboardData();
+    } catch (err: any) {
+      alert("Fehler beim Zuweisen des Unterrichtsfachs: " + err.message);
+    }
+  };
+
+  const handleUpdateStudentTeacher = async (studentId: string, teacherId: string | null) => {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ teacher_id: teacherId })
+        .eq('id', studentId);
+      if (error) throw error;
+      fetchDashboardData();
+    } catch (err: any) {
+      alert("Fehler beim Zuweisen der Lehrkraft: " + err.message);
+    }
+  };
+
+  const handleUpdateCooperationStatus = async (cooperationId: string, newStatus: string) => {
+    try {
+      const isActive = newStatus === 'active';
+      const { error } = await supabase
+        .from('cooperations')
+        .update({ status: newStatus, is_active: isActive })
+        .eq('id', cooperationId);
+      if (error) throw error;
+      fetchDashboardData();
+    } catch (err: any) {
+      alert("Fehler beim Zuweisen des Kooperationsstatus: " + err.message);
+    }
+  };
+
+  // Subjects Board Handlers
+  const handleCreateSubject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSubjectName.trim()) return;
+
+    try {
+      // Case-insensitive duplicate check
+      const dup = subjects.find(s => s.name.toLowerCase().trim() === newSubjectName.toLowerCase().trim());
+      if (dup) {
+        alert(`Das Fach "${newSubjectName}" existiert bereits.`);
+        return;
+      }
+
+      const { error } = await supabase
+        .from('subjects')
+        .insert({
+          school_id: schoolId,
+          name: newSubjectName.trim(),
+          description: newSubjectDescription.trim() || null,
+          category: newSubjectCategory || 'Allgemein'
+        });
+
+      if (error) throw error;
+
+      alert(`Fach "${newSubjectName}" wurde erfolgreich angelegt.`);
+      setNewSubjectName('');
+      setNewSubjectDescription('');
+      setNewSubjectCategory('Allgemein');
+      setShowAddSubjectModal(false);
+      fetchDashboardData();
+    } catch (err: any) {
+      alert('Fehler beim Anlegen des Fachs: ' + err.message);
+    }
+  };
+
+  const handleDeleteSubject = async (id: string, name: string) => {
+    if (!window.confirm(`Möchtest du das Fach "${name}" wirklich unwiderruflich löschen?`)) return;
+    try {
+      const { error } = await supabase
+        .from('subjects')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      alert(`Fach "${name}" wurde gelöscht.`);
+      fetchDashboardData();
+    } catch (err: any) {
+      alert('Fehler beim Löschen des Fachs: ' + err.message);
+    }
+  };
+
+  const handleToggleSubjectActive = async (id: string, currentVal: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('subjects')
+        .update({ is_active: !currentVal })
+        .eq('id', id);
+      if (error) throw error;
+      fetchDashboardData();
+    } catch (err: any) {
+      alert('Fehler: ' + err.message);
+    }
+  };
+
+  const handleImportSubjects = async () => {
+    if (!subjectCsvText.trim()) {
+      alert("Bitte gib CSV-Daten ein.");
+      return;
+    }
+
+    const lines = subjectCsvText.split('\n');
+    let successCount = 0;
+    let failCount = 0;
+    const errors: string[] = [];
+
+    for (let line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      // Case-insensitive duplicate check against currently loaded subjects
+      const isDuplicate = subjects.some(s => s.name.toLowerCase().trim() === trimmed.toLowerCase());
+      if (isDuplicate) {
+        errors.push(`Fach "${trimmed}" existiert bereits (Übersprungen).`);
+        failCount++;
+        continue;
+      }
+
+      try {
+        const { error } = await supabase
+          .from('subjects')
+          .insert({
+            school_id: schoolId,
+            name: trimmed,
+            description: null,
+            category: 'Allgemein'
+          });
+
+        if (error) throw error;
+        successCount++;
+      } catch (err: any) {
+        console.error('Import error for line:', line, err);
+        errors.push(`Zeile "${line}": ${err.message || err}`);
+        failCount++;
+      }
+    }
+
+    if (errors.length > 0) {
+      alert(`Import abgeschlossen: ${successCount} Fächer erfolgreich angelegt, ${failCount} Übersprungen/Fehler.\n\nDetails:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? '\n...weitere Details in der Konsole.' : ''}`);
+    } else {
+      alert(`Import abgeschlossen: ${successCount} Fächer erfolgreich angelegt.`);
+    }
+
+    setSubjectCsvText('');
+    setIsSubjectCsvExpanded(false);
+    fetchDashboardData();
+  };
+
+  // Cooperations Board Handlers
+  const handleCreateCooperation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCooperationName.trim()) return;
+
+    try {
+      const { error } = await supabase
+        .from('cooperations')
+        .insert({
+          school_id: schoolId,
+          name: newCooperationName.trim(),
+          contact_person: newCooperationContactPerson.trim() || null,
+          email: newCooperationEmail.trim() || null,
+          phone: newCooperationPhone.trim() || null,
+          status: newCooperationStatus || 'active',
+          is_active: newCooperationStatus === 'active'
+        });
+
+      if (error) throw error;
+
+      alert(`Kooperation "${newCooperationName}" wurde erfolgreich angelegt.`);
+      setNewCooperationName('');
+      setNewCooperationContactPerson('');
+      setNewCooperationEmail('');
+      setNewCooperationPhone('');
+      setNewCooperationStatus('active');
+      setShowAddCooperationModal(false);
+      fetchDashboardData();
+    } catch (err: any) {
+      alert('Fehler beim Anlegen der Kooperation: ' + err.message);
+    }
+  };
+
+  const handleImportCooperations = async () => {
+    if (!cooperationCsvText.trim()) return;
+    try {
+      const lines = cooperationCsvText.split('\n');
+      let successCount = 0;
+      let skippedCount = 0;
+
+      for (let line of lines) {
+        line = line.trim();
+        if (!line || line.toLowerCase().includes('name')) continue;
+
+        const parts = line.split(/[;,]/);
+        if (parts.length < 1) {
+          skippedCount++;
+          continue;
+        }
+
+        const name = parts[0]?.trim();
+        if (!name) {
+          skippedCount++;
+          continue;
+        }
+        
+        const contactPerson = parts[1]?.trim() || null;
+        const email = parts[2]?.trim() || null;
+        const phone = parts[3]?.trim() || null;
+        const status = parts[4]?.trim() || (cooperationFilterStatus !== 'All' ? cooperationFilterStatus : 'active');
+
+        const { error } = await supabase
+          .from('cooperations')
+          .insert({
+            school_id: schoolId,
+            name: name,
+            contact_person: contactPerson,
+            email: email,
+            phone: phone,
+            status: status,
+            is_active: status === 'active'
+          });
+
+        if (error) {
+          console.error("Error inserting cooperation during import:", error);
+          skippedCount++;
+        } else {
+          successCount++;
+        }
+      }
+
+      alert(`Import abgeschlossen: ${successCount} Kooperationen angelegt.`);
+      setCooperationCsvText('');
+      fetchDashboardData();
+    } catch (err: any) {
+      alert('Fehler beim Import: ' + err.message);
+    }
+  };
+
+  const handleDeleteCooperation = async (id: string, name: string) => {
+    if (!window.confirm(`Möchtest du die Kooperation "${name}" wirklich unwiderruflich löschen?`)) return;
+    try {
+      const { error } = await supabase
+        .from('cooperations')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      alert(`Kooperation "${name}" wurde gelöscht.`);
+      fetchDashboardData();
+    } catch (err: any) {
+      alert('Fehler beim Löschen der Kooperation: ' + err.message);
+    }
+  };
+
+  const handleToggleCooperationActive = async (id: string, currentVal: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('cooperations')
+        .update({ is_active: !currentVal })
         .eq('id', id);
       if (error) throw error;
       fetchDashboardData();
@@ -3886,8 +4952,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           {/* If activeTab is Campus */}
           {activeTab === 'campus' && [
             { id: 'briefing', label: 'Startseite', icon: LayoutDashboard },
+            { id: 'subjects', label: 'Unterrichtsfächer', icon: BookOpen },
             { id: 'onboarding', label: 'Lehrer', icon: UserPlus },
             { id: 'students', label: 'Schüler', icon: Users },
+            { id: 'cooperations', label: 'Kooperationen', icon: Users },
             { id: 'schedules', label: `Stundenpläne`, count: pendingSchedules.length, icon: Calendar },
             { id: 'status', label: 'Status & API', icon: Sliders }
           ].map((item) => {
@@ -4229,7 +5297,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         }} />
 
         {/* Main scrollable body content */}
-        <div style={{ padding: '36px 40px', display: 'flex', flexDirection: 'column', gap: '32px', flex: 1, overflowY: 'auto' }}>
+        <div style={{ padding: '36px 40px', display: 'flex', flexDirection: 'column', gap: '32px', flex: 1, overflowY: 'scroll', scrollbarGutter: 'stable' }}>
 
           {/* Active Tab Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -5095,10 +6163,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
         {/* TAB 2: CAMPUS */}
         {activeTab === 'campus' && (
-          <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start' }}>
+          <div className="campus-grid">
             
             {/* Left Content Pane (Main Board Content) */}
-            <div style={{ flex: campusSubTab === 'onboarding' ? '1' : '1.6', display: 'flex', flexDirection: 'column', gap: '24px', width: campusSubTab === 'onboarding' ? '100%' : 'auto' }}>
+            <div style={{ flex: (campusSubTab === 'onboarding' || campusSubTab === 'students') ? '1' : '1.6', display: 'flex', flexDirection: 'column', gap: '24px', width: (campusSubTab === 'onboarding' || campusSubTab === 'students') ? '100%' : 'auto', minWidth: 0 }}>
               
               {/* Subtab: Startseite (Briefing) */}
               {campusSubTab === 'briefing' && (
@@ -5151,7 +6219,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         <span style={{ fontSize: '1.25rem' }}>📢</span>
                         <div>
                           <strong style={{ display: 'block', fontSize: '0.88rem', color: '#1f2937' }}>Stundenplan-Reviews:</strong>
-                          <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Es stehen aktuell {pendingSchedules.length} Stundenpläne zur Review bereit. Bitte prüfe die Belegung, um Konflikte zu vermeiden.</span>
+                        <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Es stehen aktuell {pendingSchedules.length} Stundenpläne zur Review bereit. Bitte prüfe die Belegung, um Konflikte zu vermeiden.</span>
                         </div>
                       </div>
 
@@ -5177,6 +6245,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   return acc;
                 }, []);
 
+                const uniqueInstruments = Array.from(new Set(allUniqueTeachers.map(t => t.instrument || 'Allgemein')));
+
                 const filteredTeachers = allUniqueTeachers.filter((t: any) => {
                   const firstName = (t.firstName || t.first_name || '').toLowerCase();
                   const lastName = (t.lastName || t.last_name || '').toLowerCase();
@@ -5190,453 +6260,446 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   const matchesStatus = teacherStatusTab === 'all' ||
                     (teacherStatusTab === 'active' && isCampus && isActive) ||
                     (teacherStatusTab === 'inactive' && !isActive);
-                    
-                  return matchesSearch && matchesStatus;
-                });
 
-                const totalStudentsSum = allUniqueTeachers.reduce((sum, t) => sum + (t.studentCount || 0), 0);
+                  const instrument = (t.instrument || 'Allgemein').toLowerCase();
+                  const filterInst = teacherFilterInstrument.toLowerCase();
+                  const matchesInstrument = teacherFilterInstrument === 'All' || instrument === filterInst;
+                    
+                  return matchesSearch && matchesStatus && matchesInstrument;
+                });
 
                 return (
                   <div className="google-card" style={{ 
                     display: 'flex', 
                     flexDirection: 'column', 
-                    gap: '28px', 
+                    gap: '24px', 
                     width: '100%',
-                    padding: '32px',
+                    padding: '24px',
                     borderRadius: '24px',
                     border: '1.5px solid #cbd5e1',
                     background: '#ffffff',
-                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.02)'
+                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)'
                   }}>
-                    {/* TITLE BLOCK */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <Users size={22} style={{ color: '#0f172a' }} />
-                      <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                        Lehrerverwaltung
-                      </h3>
+                    {/* TITLE BLOCK & ACTIONS */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Users size={22} style={{ color: '#0f172a' }} />
+                        <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                          Lehrerverwaltung
+                        </h3>
+                      </div>
+                      
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          onClick={() => setIsCsvExpanded(!isCsvExpanded)}
+                          style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '6px', 
+                            borderRadius: '12px', 
+                            padding: '8px 16px', 
+                            fontSize: '0.8rem', 
+                            fontWeight: 800,
+                            background: isCsvExpanded ? '#f1f5f9' : '#ffffff',
+                            color: '#475569',
+                            border: '1.5px solid #cbd5e1',
+                            cursor: 'pointer',
+                            fontFamily: 'Urbanist',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          📄 Sammel-Onboarding (CSV) ▼
+                        </button>
+
+                        <button
+                          onClick={() => setShowAddTeacherModal(true)}
+                          style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '6px', 
+                            borderRadius: '12px', 
+                            padding: '8px 16px', 
+                            fontSize: '0.8rem', 
+                            fontWeight: 800,
+                            background: '#22c55e',
+                            color: '#ffffff',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontFamily: 'Urbanist',
+                            boxShadow: '0 4px 10px rgba(34,197,94,0.15)',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          ➕ Lehrkraft anlegen
+                        </button>
+                      </div>
                     </div>
 
-                    {/* ONBOARDING ACTION BAR */}
-                    <div style={{ 
-                      display: 'flex', 
-                      gap: '16px', 
-                      alignItems: 'center', 
-                      marginTop: '24px', 
-                      marginBottom: isCsvExpanded ? '8px' : '24px',
-                      flexWrap: 'wrap',
-                      width: '100%'
-                    }}>
-                      <button
-                        onClick={() => setIsCsvExpanded(!isCsvExpanded)}
-                        className="google-btn-secondary"
-                        style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '8px', 
-                          borderRadius: '16px', 
-                          padding: '12px 24px', 
-                          fontSize: '0.88rem', 
-                          fontWeight: 800,
-                          background: isCsvExpanded ? '#f1f5f9' : '#ffffff',
-                          border: '1.5px solid #cbd5e1',
-                          cursor: 'pointer',
-                          fontFamily: 'Urbanist',
-                          transition: 'all 0.2s',
-                          flex: 3,
-                          justifyContent: 'center',
-                          minWidth: '320px'
-                        }}
-                      >
-                        📄 Sammel-Onboarding via CSV {isCsvExpanded ? '▲' : '▼'}
-                      </button>
-
-                      <button
-                        onClick={() => setShowAddTeacherModal(true)}
-                        className="google-btn-primary"
-                        style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '8px', 
-                          borderRadius: '16px', 
-                          padding: '12px 24px', 
-                          fontSize: '0.88rem', 
-                          fontWeight: 800,
-                          background: '#10b981',
-                          color: '#ffffff',
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontFamily: 'Urbanist',
-                          transition: 'all 0.2s',
-                          boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.2)',
-                          flex: 1,
-                          justifyContent: 'center',
-                          minWidth: '180px'
-                        }}
-                      >
-                        ➕ Lehrkraft hinzufügen
-                      </button>
-                    </div>
-
-                    {/* Collapsible CSV Onboarding Card */}
+                    {/* Collapsible CSV Box */}
                     {isCsvExpanded && (
-                      <div className="google-card" style={{ 
-                        padding: '28px', 
-                        borderRadius: '24px', 
-                        border: '1px solid #e2e8f0', 
-                        background: '#ffffff',
-                        boxShadow: '0 10px 15px -3px rgba(0,0,0,0.02)',
-                        marginTop: '16px',
-                        marginBottom: '24px',
-                        width: '100%',
-                        animation: 'modalFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
-                      }}>
-                        <h4 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'Urbanist' }}>
-                          📄 Sammel-Onboarding via CSV
-                        </h4>
-                        
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          <p style={{ margin: 0, fontSize: '0.78rem', color: '#475569', fontWeight: 700 }}>
-                            Formatvorlage kopieren oder Lehrkräfte eintragen:
-                          </p>
-                          <p style={{ margin: 0, fontSize: '0.72rem', color: '#000000', fontFamily: 'monospace', background: '#f8fafc', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', fontWeight: 'bold' }}>
-                            Vorname; Nachname; E-Mail; Hauptinstrument
-                          </p>
-                          <textarea
-                            placeholder="Markus; Weber; markus@schule.de; Gitarre&#10;Anna; Becker; anna@schule.de; Gesang"
-                            value={csvText}
-                            onChange={(e) => setCsvText(e.target.value)}
-                            style={{
-                              width: '100%',
-                              boxSizing: 'border-box',
-                              height: '144px',
-                              borderRadius: '12px',
-                              border: '1.5px solid #cbd5e1',
-                              padding: '12px',
-                              fontSize: '0.82rem',
-                              fontFamily: 'monospace',
-                              background: '#f8fafc',
-                              outline: 'none',
-                              color: '#334155',
-                              transition: 'border-color 0.2s',
-                              resize: 'none'
-                            }}
-                            onFocus={(e) => e.target.style.borderColor = '#0b57d0'}
-                            onBlur={(e) => e.target.style.borderColor = '#cbd5e1'}
-                          />
-                          {importStatus && (
-                            <div style={{ padding: '10px 14px', borderRadius: '8px', background: '#e8f0fe', border: '1px solid #bfdbfe', color: '#0b57d0', fontSize: '0.78rem', fontWeight: 650 }}>
-                              {importStatus.message}
-                            </div>
-                          )}
-
-                          <div style={{ display: 'flex', marginTop: '4px' }}>
-                            <button
-                              type="button"
-                              onClick={handleImportTeachers}
-                              className="google-btn-primary"
-                              style={{ background: '#000000', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '11px 20px', fontSize: '0.82rem', fontWeight: 700, width: '100%', cursor: 'pointer' }}
-                            >
-                              Import starten
-                            </button>
-                          </div>
+                      <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px dashed #cbd5e1', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                          <strong style={{ fontSize: '0.88rem', color: '#0f172a', fontWeight: 900, fontFamily: 'Urbanist' }}>
+                            Sammel-Onboarding (Lehrer)
+                          </strong>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'Inter' }}>
+                            Format pro Zeile: <code>Vorname; Nachname; E-Mail; Hauptinstrument (optional)</code>
+                          </span>
                         </div>
-                      </div>
-                    )}
 
-                    {/* REDESIGNED CONTROLS PANEL */}
-                    <div className="google-card" style={{ 
-                      padding: '24px', 
-                      borderRadius: '24px', 
-                      border: '1px solid #e2e8f0', 
-                      background: '#ffffff',
-                      boxShadow: '0 10px 15px -3px rgba(0,0,0,0.02)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '20px'
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-                        {/* Search field */}
-                        <div style={{ position: 'relative', flex: 1, minWidth: '280px' }}>
-                          <input
-                            type="text"
-                            placeholder="Lehrkraft nach Name oder E-Mail suchen..."
-                            value={teacherSearchQuery}
-                            onChange={(e) => setTeacherSearchQuery(e.target.value)}
-                            style={{
-                              width: '100%',
-                              padding: '12px 16px 12px 42px',
+                        {teacherFilterInstrument && teacherFilterInstrument !== 'All' && (() => {
+                          const instName = teacherFilterInstrument;
+                          const { avatarBg: instAvatarBg, avatarColor: instAvatarColor } = getAlphabeticalColor(instName);
+
+                          return (
+                            <div style={{
+                              background: 'rgba(34, 197, 94, 0.03)',
+                              border: '1.5px solid rgba(34, 197, 94, 0.12)',
                               borderRadius: '16px',
-                              border: '1.5px solid #e2e8f0',
-                              fontSize: '0.88rem',
-                              outline: 'none',
-                              background: '#f8fafc',
-                              color: '#334155',
-                              transition: 'all 0.2s'
-                            }}
-                            onFocus={(e) => {
-                              e.target.style.borderColor = '#0b57d0';
-                              e.target.style.background = '#ffffff';
-                            }}
-                            onBlur={(e) => {
-                              e.target.style.borderColor = '#e2e8f0';
-                              e.target.style.background = '#f8fafc';
-                            }}
-                          />
-                          <span style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}>🔍</span>
-                        </div>
+                              padding: '12px 16px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '16px',
+                              marginTop: '2px',
+                              marginBottom: '2px',
+                              flexWrap: 'wrap',
+                              transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flex: 1 }}>
+                                <span style={{ fontSize: '0.68rem', color: '#166534', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>
+                                  ⚡ Smart Auto-Zuweisung:
+                                </span>
 
-                        {/* Category Status Filters */}
-                        <div style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '16px', gap: '4px' }}>
-                          <button
-                            onClick={() => setTeacherStatusTab('all')}
-                            style={{
-                              padding: '8px 16px',
-                              borderRadius: '12px',
-                              border: 'none',
-                              fontSize: '0.8rem',
-                              fontWeight: 700,
-                              background: teacherStatusTab === 'all' ? '#ffffff' : 'transparent',
-                              color: teacherStatusTab === 'all' ? '#0f172a' : '#64748b',
-                              boxShadow: teacherStatusTab === 'all' ? '0 4px 6px -1px rgba(0,0,0,0.05)' : 'none',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            Alle
-                          </button>
-                          <button
-                            onClick={() => setTeacherStatusTab('active')}
-                            style={{
-                              padding: '8px 16px',
-                              borderRadius: '12px',
-                              border: 'none',
-                              fontSize: '0.8rem',
-                              fontWeight: 700,
-                              background: teacherStatusTab === 'active' ? '#ffffff' : 'transparent',
-                              color: teacherStatusTab === 'active' ? '#166534' : '#64748b',
-                              boxShadow: teacherStatusTab === 'active' ? '0 4px 6px -1px rgba(0,0,0,0.05)' : 'none',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            Aktiv (Campus)
-                          </button>
-                          <button
-                            onClick={() => setTeacherStatusTab('inactive')}
-                            style={{
-                              padding: '8px 16px',
-                              borderRadius: '12px',
-                              border: 'none',
-                              fontSize: '0.8rem',
-                              fontWeight: 700,
-                              background: teacherStatusTab === 'inactive' ? '#ffffff' : 'transparent',
-                              color: teacherStatusTab === 'inactive' ? '#854d0e' : '#64748b',
-                              boxShadow: teacherStatusTab === 'inactive' ? '0 4px 6px -1px rgba(0,0,0,0.05)' : 'none',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            Inaktiv (Bypass)
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* DYNAMIC TEACHER GRID */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.88rem', color: '#64748b', fontWeight: 600 }}>
-                          Suchtreffer: {filteredTeachers.length} {filteredTeachers.length === 1 ? 'Lehrkraft' : 'Lehrkräfte'}
-                        </span>
-                        {(teacherSearchQuery || teacherStatusTab !== 'all') && (
-                          <button
-                            onClick={() => {
-                              setTeacherSearchQuery('');
-                              setTeacherStatusTab('all');
-                            }}
-                            style={{ border: 'none', background: 'transparent', color: '#0b57d0', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700 }}
-                          >
-                            Filter zurücksetzen
-                          </button>
-                        )}
-                      </div>
-
-                      {filteredTeachers.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '48px 24px', borderRadius: '24px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                          <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '12px' }}>👥</span>
-                          <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#475569' }}>Keine Lehrkräfte gefunden</h3>
-                          <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#94a3b8' }}>Passe deine Filterkriterien an oder lege eine neue Lehrkraft an.</p>
-                        </div>
-                      ) : (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
-                          {filteredTeachers.map((t: any) => {
-                            const isCampus = t.isCampusActive || t.is_campus_active;
-                            const isActive = t.isActive ?? t.is_active;
-                            
-                            // Visual HSL avatar color seed
-                            const hash = (t.lastName || t.last_name || '').charCodeAt(0) || 65;
-                            const hue = (hash * 13) % 360;
-                            const avatarBg = `hsl(${hue}, 70%, 92%)`;
-                            const avatarColor = `hsl(${hue}, 80%, 25%)`;
-
-                            return (
-                              <div
-                                key={t.id}
-                                onClick={() => setManageTeacher({
-                                  id: t.id,
-                                  firstName: t.firstName || t.first_name || '',
-                                  lastName: t.lastName || t.last_name || '',
-                                  email: t.email || '',
-                                  instrument: t.instrument || '',
-                                  ausweisNummer: t.ausweisNummer || t.ausweis_nummer || '',
-                                  isCampusActive: t.isCampusActive ?? t.is_campus_active ?? false,
-                                  isGroovelabActive: t.isGroovelabActive ?? t.is_groovelab_active ?? false,
-                                  isActive: t.isActive ?? t.is_active ?? false,
-                                  role: t.role || 'teacher',
-                                  teacherQrToken: t.teacherQrToken || t.teacher_qr_token || '',
-                                  studentCount: t.studentCount || 0,
-                                  contractEndsAt: t.contractEndsAt || t.contract_ends_at || null
-                                })}
-                                style={{
-                                  padding: '24px',
-                                  borderRadius: '24px',
-                                  border: '1px solid #e2e8f0',
-                                  background: '#ffffff',
-                                  cursor: 'pointer',
-                                  position: 'relative',
-                                  transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.01)',
+                                {/* Instrument Pill */}
+                                <div style={{
                                   display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: '16px'
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.transform = 'translateY(-3px)';
-                                  e.currentTarget.style.boxShadow = '0 12px 20px -8px rgba(15, 23, 42, 0.08)';
-                                  e.currentTarget.style.borderColor = '#10b981';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.transform = 'translateY(0)';
-                                  e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.01)';
-                                  e.currentTarget.style.borderColor = '#e2e8f0';
-                                }}
-                              >
-                                <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                                  {/* Avatar with dynamic initials */}
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  background: '#ffffff',
+                                  border: '1.5px solid #cbd5e1',
+                                  padding: '4px 10px 4px 6px',
+                                  borderRadius: '100px',
+                                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                                }}>
                                   <div style={{
-                                    width: '46px',
-                                    height: '46px',
-                                    borderRadius: '16px',
-                                    background: avatarBg,
-                                    color: avatarColor,
+                                    width: '24px',
+                                    height: '24px',
+                                    borderRadius: '50%',
+                                    background: instAvatarBg,
+                                    color: instAvatarColor,
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
+                                    fontSize: '0.65rem',
                                     fontWeight: 900,
-                                    fontSize: '1.05rem',
                                     fontFamily: 'Urbanist'
                                   }}>
-                                    {(t.firstName || t.first_name || 'S')?.[0]}{(t.lastName || t.last_name || 'L')?.[0]}
+                                    {instName[0]?.toUpperCase() || 'I'}
                                   </div>
-
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <h4 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 800, color: '#0f172a', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                                      {(t.firstName || t.first_name || '')} {(t.lastName || t.last_name || '')}
-                                    </h4>
-                                    <span style={{ fontSize: '0.78rem', color: '#64748b', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', display: 'block' }}>
-                                      {t.email || 'Keine E-Mail'}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                  <span style={{ fontSize: '0.66rem', background: '#f1f5f9', color: '#475569', padding: '4px 10px', borderRadius: '100px', fontWeight: 800 }}>
-                                    🎸 {t.instrument || 'Allgemein'}
+                                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                                    {instName}
                                   </span>
-                                  {isCampus && isActive ? (
-                                    <span style={{ fontSize: '0.66rem', background: '#dcfce7', color: '#15803d', padding: '4px 10px', borderRadius: '100px', fontWeight: 800 }}>
-                                      🎓 Campus Aktiv
-                                    </span>
-                                  ) : (
-                                    <span style={{ fontSize: '0.66rem', background: '#fef3c7', color: '#b45309', padding: '4px 10px', borderRadius: '100px', fontWeight: 800 }}>
-                                      🔑 Bypass (Bereit)
-                                    </span>
-                                  )}
-                                  {(t.contractEndsAt || t.contract_ends_at) && (
-                                    <span style={{ fontSize: '0.66rem', background: '#fee2e2', color: '#ef4444', padding: '4px 10px', borderRadius: '100px', fontWeight: 800 }}>
-                                      📅 Bis {new Date(t.contractEndsAt || t.contract_ends_at).toLocaleDateString('de-DE')}
-                                    </span>
-                                  )}
+                                  <span style={{ fontSize: '0.6rem', fontWeight: 900, background: '#f1f5f9', color: '#64748b', padding: '1px 6px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                    Instrument
+                                  </span>
                                 </div>
-
-
                               </div>
-                            );
-                          })}
+                              
+                              <span style={{ fontSize: '0.65rem', color: '#15803d', fontWeight: 900, background: '#d1fae5', padding: '4px 10px', borderRadius: '8px', letterSpacing: '0.02em', textTransform: 'uppercase', fontFamily: 'Urbanist' }}>
+                                Hauptinstrument wird automatisch verknüpft!
+                              </span>
+                            </div>
+                          );
+                        })()}
+
+                        <textarea
+                          value={csvText}
+                          onChange={(e) => setCsvText(e.target.value)}
+                          placeholder={
+                            teacherFilterInstrument && teacherFilterInstrument !== 'All'
+                              ? "Markus; Weber; markus@schule.de\nAnna; Becker; anna@schule.de"
+                              : "Markus; Weber; markus@schule.de; Gitarre\nAnna; Becker; anna@schule.de; Gesang"
+                          }
+                          style={{
+                            width: '100%',
+                            height: '100px',
+                            borderRadius: '10px',
+                            border: '1px solid #cbd5e1',
+                            padding: '10px',
+                            fontSize: '0.78rem',
+                            fontFamily: 'monospace',
+                            outline: 'none',
+                            resize: 'vertical'
+                          }}
+                        />
+                        <button
+                          onClick={handleImportTeachers}
+                          className="google-btn-primary"
+                          style={{ background: '#34a853', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, alignSelf: 'flex-start', cursor: 'pointer' }}
+                        >
+                          Lehrer importieren
+                        </button>
+                      </div>
+                    )}
+
+                    {/* FILTERS ROW */}
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <div style={{ position: 'relative', flex: 1.5, minWidth: '240px' }}>
+                        <input
+                          type="text"
+                          value={teacherSearchQuery}
+                          onChange={(e) => setTeacherSearchQuery(e.target.value)}
+                          placeholder="Lehrkraft nach Name oder E-Mail suchen..."
+                          style={{
+                            width: '100%',
+                            padding: '10px 16px 10px 38px',
+                            borderRadius: '14px',
+                            border: '1px solid #cbd5e1',
+                            fontSize: '0.85rem',
+                            fontFamily: 'Urbanist',
+                            fontWeight: 600,
+                            outline: 'none',
+                            background: '#ffffff'
+                          }}
+                        />
+                        <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '0.85rem' }}>🔍</span>
+                      </div>
+
+                      <select
+                        value={teacherFilterInstrument}
+                        onChange={(e) => setTeacherFilterInstrument(e.target.value)}
+                        style={{
+                          padding: '10px 16px',
+                          borderRadius: '14px',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '0.85rem',
+                          fontFamily: 'Urbanist',
+                          fontWeight: 600,
+                          outline: 'none',
+                          background: 'white',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="All">🎸 Alle Instrumente</option>
+                        {uniqueInstruments.map(inst => (
+                          <option key={inst} value={inst}>{inst}</option>
+                        ))}
+                      </select>
+
+                      <select
+                        value={teacherStatusTab}
+                        onChange={(e) => setTeacherStatusTab(e.target.value as any)}
+                        style={{
+                          padding: '10px 16px',
+                          borderRadius: '14px',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '0.85rem',
+                          fontFamily: 'Urbanist',
+                          fontWeight: 600,
+                          outline: 'none',
+                          background: 'white',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="all">⚡ Alle</option>
+                        <option value="active">Aktiv (Campus)</option>
+                        <option value="inactive">Inaktiv (Bypass)</option>
+                      </select>
+                    </div>
+
+                    {/* DYNAMIC TEACHER LIST (HORIZONTAL ROWS) */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowX: 'auto', width: '100%' }}>
+                      {filteredTeachers.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                          Keine Lehrkräfte gefunden. Lege ein neues Profil an oder passe deine Filter an.
                         </div>
+                      ) : (
+                        filteredTeachers.map((t: any) => {
+                          const isCampus = t.isCampusActive || t.is_campus_active;
+                          const isGroove = t.isGroovelabActive || t.is_groovelab_active;
+                          const teacherName = `${t.firstName || t.first_name || ''} ${t.lastName || t.last_name || ''}`.trim();
+                          const { avatarBg, avatarColor } = getAlphabeticalColor(teacherName);
+
+                          return (
+                            <div
+                              key={t.id}
+                              draggable={true}
+                              onDragStart={(e) => {
+                                e.dataTransfer.setData("teacherId", t.id);
+                              }}
+                              onClick={() => setManageTeacher(t)}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '10px 16px',
+                                borderRadius: '16px',
+                                border: '1px solid #f1f5f9',
+                                background: '#ffffff',
+                                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.01)',
+                                transition: 'all 0.25s ease',
+                                minWidth: '850px',
+                                cursor: 'pointer'
+                              }}
+                              className="hover-scale"
+                            >
+                              {/* Avatar & Name Info */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: '1.6', minWidth: '180px' }}>
+                                <div style={{
+                                  width: '42px',
+                                  height: '42px',
+                                  borderRadius: '50%',
+                                  background: avatarBg,
+                                  color: avatarColor,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontWeight: 800,
+                                  fontSize: '0.88rem',
+                                  fontFamily: 'Urbanist',
+                                  flexShrink: 0
+                                }}>
+                                  {(t.firstName?.[0] || t.first_name?.[0] || 'L')}{(t.lastName?.[0] || t.last_name?.[0] || 'L')}
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                  <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1d1d1f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {teacherName}
+                                  </span>
+                                  <span style={{ fontSize: '0.74rem', color: '#86868b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {t.email || 'Keine E-Mail'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Instrument Badge */}
+                              <div style={{ flex: '1', minWidth: '100px' }}>
+                                <span style={{
+                                  display: 'inline-block',
+                                  padding: '6px 12px',
+                                  borderRadius: '10px',
+                                  background: '#f5f5f7',
+                                  color: '#3a3a3c',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 700,
+                                  textAlign: 'center',
+                                  width: '100%',
+                                  boxSizing: 'border-box'
+                                }}>
+                                  {t.instrument || 'Allgemein'}
+                                </span>
+                              </div>
+
+                              {/* Status Badges (Campus & Groove) */}
+                              <div style={{ flex: '1.25', minWidth: '130px', display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                                <span style={{
+                                  padding: '5px 12px',
+                                  borderRadius: '10px',
+                                  background: isCampus ? '#e2f6ea' : '#f5f5f7',
+                                  color: isCampus ? '#137333' : '#86868b',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 700,
+                                  minWidth: '55px',
+                                  textAlign: 'center'
+                                }}>
+                                  Campus
+                                </span>
+                                <span style={{
+                                  padding: '5px 12px',
+                                  borderRadius: '10px',
+                                  background: isGroove ? '#fce8e6' : '#f5f5f7',
+                                  color: isGroove ? '#c5221f' : '#86868b',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 700,
+                                  minWidth: '55px',
+                                  textAlign: 'center'
+                                }}>
+                                  Groove
+                                </span>
+                              </div>
+
+                              {/* Pupil Count */}
+                              <div style={{ flex: '1', minWidth: '100px', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', fontSize: '0.78rem', fontWeight: 700, color: '#3a3a3c' }}>
+                                <span>👥</span>
+                                <span>{t.studentCount || 0} Schüler</span>
+                              </div>
+
+                              {/* Action Buttons */}
+                              <div style={{ flex: '1.2', minWidth: '120px', display: 'flex', gap: '14px', alignItems: 'center', justifyContent: 'flex-end' }}>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setManageTeacher(t);
+                                  }}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: '#1a73e8',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    fontFamily: 'Urbanist'
+                                  }}
+                                >
+                                  Pass teilen
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteUser(t.id);
+                                  }}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: '#ea4335',
+                                    fontSize: '0.9rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    padding: '2px 6px'
+                                  }}
+                                >
+                                  ❌
+                                </button>
+                              </div>
+
+                            </div>
+                          );
+                        })
                       )}
                     </div>
 
-                    {/* NEW MANUAL TEACHER CREATION MODAL */}
+                    {/* Manual Add Teacher Modal */}
                     {showAddTeacherModal && (
-                      <div style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        width: '100vw',
-                        height: '100vh',
-                        background: 'rgba(15, 23, 42, 0.4)',
-                        backdropFilter: 'blur(8px)',
-                        zIndex: 1000,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontFamily: 'Inter, sans-serif'
-                      }}>
-                        <div style={{
-                          background: '#ffffff',
-                          borderRadius: '24px',
-                          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-                          width: '500px',
-                          maxHeight: '90vh',
-                          overflowY: 'auto',
-                          border: '1px solid #e2e8f0',
-                          animation: 'modalFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
-                        }}>
+                      <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                        <div style={{ background: '#ffffff', borderRadius: '24px', maxWidth: '520px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column' }}>
                           {/* Modal Header */}
                           <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>➕ Neue Lehrkraft anlegen</h3>
-                              <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>Erstellt ein inaktives Bypass-Profil. Bereit zur Aktivierung.</p>
-                            </div>
-                            <button
+                            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                              ➕ Neue Lehrkraft hinzufügen
+                            </h3>
+                            <button 
                               onClick={() => setShowAddTeacherModal(false)}
-                              style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '6px', borderRadius: '50%' }}
+                              style={{ border: 'none', background: 'transparent', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}
                             >
-                              <X size={20} />
+                              ✕
                             </button>
                           </div>
 
-                          {/* Modal Form */}
+                          {/* Modal Body */}
                           <form onSubmit={handleCreateTeacher}>
                             <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                              <div style={{ display: 'flex', gap: '16px' }}>
-                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                   <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Vorname *</label>
                                   <input
                                     type="text"
                                     required
                                     value={newTeacherFirstName}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      setNewTeacherFirstName(val);
-                                      setNewTeacherEmail(`${val.toLowerCase().trim().replace(/\s+/g, '')}.${newTeacherLastName.toLowerCase().trim().replace(/\s+/g, '')}@musaek.de`);
-                                    }}
-                                    placeholder="z.B. Sebastian"
+                                    onChange={(e) => setNewTeacherFirstName(e.target.value)}
+                                    placeholder="z.B. Johann"
                                     style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
                                   />
                                 </div>
-                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                   <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Nachname *</label>
                                   <input
                                     type="text"
@@ -5645,6 +6708,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                     onChange={(e) => {
                                       const val = e.target.value;
                                       setNewTeacherLastName(val);
+                                      // Suggest email
                                       setNewTeacherEmail(`${newTeacherFirstName.toLowerCase().trim().replace(/\s+/g, '')}.${val.toLowerCase().trim().replace(/\s+/g, '')}@musaek.de`);
                                     }}
                                     placeholder="z.B. Bach"
@@ -5652,7 +6716,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   />
                                 </div>
                               </div>
-
+                              
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                 <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>E-Mail-Adresse *</label>
                                 <input
@@ -5660,22 +6724,25 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   required
                                   value={newTeacherEmail}
                                   onChange={(e) => setNewTeacherEmail(e.target.value)}
-                                  placeholder="z.B. bach@musikschule.de"
+                                  placeholder="z.B. bach@musaek.de"
                                   style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
                                 />
                               </div>
 
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Hauptinstrument / Fach</label>
-                                <input
-                                  type="text"
-                                  value={newTeacherInstrument}
+                                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Hauptinstrument / Fach *</label>
+                                <select
+                                  value={newTeacherInstrument || (activeSubjectsList[0] || '')}
                                   onChange={(e) => setNewTeacherInstrument(e.target.value)}
-                                  placeholder="z.B. Klavier, Gitarre, Violine"
-                                  style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
-                                />
+                                  style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white', color: '#1e293b' }}
+                                >
+                                  {activeSubjectsList.map((subName) => (
+                                    <option key={subName} value={subName}>
+                                      {subName}
+                                    </option>
+                                  ))}
+                                </select>
                               </div>
-
 
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                 <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Endzeit / Vertragsende (Zugriff erlischt automatisch)</label>
@@ -5693,8 +6760,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               <button
                                 type="button"
                                 onClick={() => setShowAddTeacherModal(false)}
-                                className="google-btn-secondary"
-                                style={{ borderRadius: '12px', fontSize: '0.82rem' }}
+                                style={{ background: 'transparent', border: 'none', color: '#64748b', fontWeight: 800, cursor: 'pointer', fontSize: '0.82rem' }}
                               >
                                 Abbrechen
                               </button>
@@ -5714,8 +6780,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 );
               })()}
 
+              {/* Subtab: Unterrichtsfächer */}
+              {campusSubTab === 'subjects' && renderSubjectsBoard()}
+              
               {/* Subtab: Schülerboard (Campus-Schülerverwaltung) */}
               {campusSubTab === 'students' && renderCompactStudentBoard()}
+
+              {/* Subtab: Kooperationen */}
+              {campusSubTab === 'cooperations' && renderCooperationsBoard()}
 
               {/* Subtab: Schedules – Hybride Raumplanungs-Zentrale */}
               {campusSubTab === 'schedules' && (
@@ -6483,38 +7555,463 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               )}
 
               {/* Onboarding Sidebar */}
-              {campusSubTab === 'onboarding' && (
-                <div className="google-card" style={{ padding: '20px' }}>
-                  <h4 style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 800, color: '#137333', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    📈 Onboarding-Hilfe
-                  </h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '0.82rem' }}>
-                    <div style={{ background: '#f6fbf7', border: '1px solid #e6f4ea', padding: '12px', borderRadius: '12px' }}>
-                      <strong style={{ display: 'block', marginBottom: '4px', color: '#137333' }}>Bypass-Aktivierung:</strong>
-                      <p style={{ margin: 0, color: '#5f6368', lineHeight: '1.4' }}>
-                        Inaktive Profile (Bypass) erlauben es dir, Lehrer vorab anzulegen. Kopiere den Aktivierungslink oder gib ihnen die 6-stellige PIN zur Freischaltung.
+              {campusSubTab === 'onboarding' && (() => {
+                const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
+                  if (!acc.some(existing => existing.id === t.id)) {
+                    acc.push(t);
+                  }
+                  return acc;
+                }, []);
+
+                const instrumentCounts = allUniqueTeachers.reduce((acc: Record<string, number>, t: any) => {
+                  const inst = t.instrument || 'Allgemein';
+                  acc[inst] = (acc[inst] || 0) + 1;
+                  return acc;
+                }, {});
+
+                const sortedInstruments = [...activeSubjectsList].sort((a, b) => a.localeCompare(b, 'de'));
+
+                return (
+                  <div className="google-card" style={{ 
+                    padding: '24px', 
+                    borderRadius: '24px', 
+                    border: '1.5px solid #cbd5e1', 
+                    background: '#ffffff',
+                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '20px'
+                  }}>
+                    {/* Header */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Music size={20} style={{ color: '#0f172a' }} />
+                        <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                          Instrumente
+                        </h4>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', lineHeight: '1.45', fontFamily: 'Inter' }}>
+                        Klicke auf ein Instrument, um das Sammel-Onboarding zu filtern und Lehrer direkt dafür anzulegen.
                       </p>
                     </div>
 
-                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '12px', borderRadius: '12px' }}>
-                      <strong style={{ display: 'block', marginBottom: '4px', color: '#475569' }}>CSV-Vorgaben:</strong>
-                      <ul style={{ margin: '4px 0 0 16px', padding: 0, color: '#5f6368', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <li>Trennzeichen: Semikolon (;)</li>
-                        <li>Spalten: Vorname; Nachname; Email; Instrument</li>
-                      </ul>
-                    </div>
+                    {/* Instrument List */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      
+                      {/* "Alle Instrumente anzeigen" Row */}
+                      {(() => {
+                        const isActive = teacherFilterInstrument === 'All';
+                        const isHovered = dragHoveredInstrument === 'All';
+                        return (
+                          <div
+                            onClick={() => setTeacherFilterInstrument('All')}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              setDragHoveredInstrument('All');
+                            }}
+                            onDragLeave={() => setDragHoveredInstrument(null)}
+                            onDrop={(e) => {
+                              const teacherId = e.dataTransfer.getData("teacherId");
+                              if (teacherId) {
+                                handleUpdateTeacherInstrument(teacherId, 'Allgemein');
+                              }
+                              setDragHoveredInstrument(null);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '12px 16px',
+                              borderRadius: '16px',
+                              border: isHovered 
+                                ? '2px dashed #22c55e' 
+                                : isActive 
+                                  ? '1.5px solid #22c55e' 
+                                  : '1.5px solid #cbd5e1',
+                              background: isHovered 
+                                ? '#f0fdf4' 
+                                : isActive 
+                                  ? '#f0fdf4' 
+                                  : '#ffffff',
+                              cursor: 'pointer',
+                              transform: isHovered ? 'scale(1.02)' : 'scale(1)',
+                              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                              boxShadow: isActive ? '0 4px 12px rgba(34,197,150,0.06)' : 'none'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              {/* Circle Icon */}
+                              <div style={{
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '50%',
+                                background: '#e2f6ea',
+                                color: '#137333',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '1rem',
+                                flexShrink: 0
+                              }}>
+                                🎸
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                                  Alle Instrumente anzeigen
+                                </span>
+                                <span style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'Inter' }}>
+                                  Gesamtübersicht
+                                </span>
+                              </div>
+                            </div>
+                            
+                            {/* Badge */}
+                            <span style={{
+                              padding: '4px 10px',
+                              borderRadius: '10px',
+                              background: isActive ? '#d1fae5' : '#f1f5f9',
+                              color: isActive ? '#065f46' : '#64748b',
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              fontFamily: 'Urbanist',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {allUniqueTeachers.length} Lehrer
+                            </span>
+                          </div>
+                        );
+                      })()}
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: '12px', fontSize: '0.78rem' }}>
-                      <span style={{ color: '#64748b' }}>Inaktive Lehrer:</span>
-                      <strong style={{ color: '#b45309' }}>{bypassTeachers.length} Profile</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem' }}>
-                      <span style={{ color: '#64748b' }}>Aktive Lehrer:</span>
-                      <strong style={{ color: '#137333' }}>{campusTeachers.length} Profile</strong>
+                      {/* Individual Instrument Rows */}
+                      {sortedInstruments.map((instName) => {
+                        const isActive = teacherFilterInstrument === instName;
+                        const isHovered = dragHoveredInstrument === instName;
+                        const count = instrumentCounts[instName] || 0;
+                        
+                        const { avatarBg, avatarColor } = getAlphabeticalColor(instName);
+
+                        return (
+                          <div
+                            key={instName}
+                            onClick={() => setTeacherFilterInstrument(isActive ? 'All' : instName)}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              setDragHoveredInstrument(instName);
+                            }}
+                            onDragLeave={() => setDragHoveredInstrument(null)}
+                            onDrop={(e) => {
+                              const teacherId = e.dataTransfer.getData("teacherId");
+                              if (teacherId) {
+                                handleUpdateTeacherInstrument(teacherId, instName);
+                              }
+                              setDragHoveredInstrument(null);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '12px 16px',
+                              borderRadius: '16px',
+                              border: isHovered 
+                                ? '2px dashed #22c55e' 
+                                : isActive 
+                                  ? '1.5px solid #22c55e' 
+                                  : '1.5px solid #f1f5f9',
+                              background: isHovered 
+                                ? '#f0fdf4' 
+                                : isActive 
+                                  ? '#f0fdf4' 
+                                  : '#ffffff',
+                              cursor: 'pointer',
+                              transform: isHovered ? 'scale(1.02)' : 'scale(1)',
+                              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              {/* Circle Icon with first letter */}
+                              <div style={{
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '50%',
+                                background: avatarBg,
+                                color: avatarColor,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.85rem',
+                                fontWeight: 900,
+                                fontFamily: 'Urbanist',
+                                flexShrink: 0
+                              }}>
+                                {instName[0]?.toUpperCase() || 'I'}
+                              </div>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                                {instName}
+                              </span>
+                            </div>
+                            
+                            {/* Badge */}
+                            <span style={{
+                              padding: '4px 10px',
+                              borderRadius: '10px',
+                              background: isActive ? '#d1fae5' : '#f1f5f9',
+                              color: isActive ? '#065f46' : '#64748b',
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              fontFamily: 'Urbanist',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {count} Lehrer
+                            </span>
+                          </div>
+                        );
+                      })}
+
                     </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
+
+              {/* Student Board Sidebar */}
+              {campusSubTab === 'students' && (() => {
+                const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
+                  if (!acc.some(existing => existing.id === t.id)) {
+                    acc.push(t);
+                  }
+                  return acc;
+                }, []);
+
+                const getAvatarGradient = (name: string) => getAlphabeticalColor(name).avatarBg;
+                const getAvatarTextColor = (name: string) => getAlphabeticalColor(name).avatarColor;
+
+                return (
+                  <div className="google-card" style={{
+                    width: '340px',
+                    flexShrink: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '20px',
+                    padding: '24px',
+                    borderRadius: '24px',
+                    border: '1.5px solid #cbd5e1',
+                    background: '#ffffff',
+                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Users size={20} style={{ color: '#0f172a' }} />
+                      <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                        Lehrer
+                      </h3>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.45, fontFamily: 'Inter' }}>
+                      Klicke auf einen Lehrer, um das Sammel-Onboarding zu filtern und direkt Schüler für ihn zu erfassen.
+                    </p>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '500px', overflowY: 'auto', paddingRight: '4px' }}>
+                      
+                      {/* Option / Slot für Alle Lehrer */}
+                      {(() => {
+                        const isActive = studentFilterTeacher === 'All';
+                        return (
+                          <div
+                            onClick={() => {
+                              setStudentFilterTeacher('All');
+                              setStudentCurrentPage(1);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '12px 16px',
+                              borderRadius: '16px',
+                              border: isActive 
+                                ? '1.5px solid #22c55e' 
+                                : '1.5px solid #f1f5f9',
+                              background: isActive 
+                                ? '#f0fdf4' 
+                                : '#ffffff',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                              boxShadow: isActive ? '0 4px 12px rgba(34,197,150,0.06)' : 'none'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                              <div style={{
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '50%',
+                                background: '#e2f6ea',
+                                color: '#137333',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '1rem',
+                                flexShrink: 0
+                              }}>
+                                👥
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                                  Alle Lehrer anzeigen
+                                </span>
+                                <span style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'Inter' }}>
+                                  Gesamtübersicht
+                                </span>
+                              </div>
+                            </div>
+                            <span style={{
+                              padding: '4px 10px',
+                              borderRadius: '10px',
+                              background: isActive ? '#d1fae5' : '#f1f5f9',
+                              color: isActive ? '#065f46' : '#64748b',
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              fontFamily: 'Urbanist',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {students.filter(s => s.is_campus_active).length} Schüler
+                            </span>
+                          </div>
+                        );
+                      })()}
+
+                      {allUniqueTeachers.map((t: any) => {
+                        const teacherName = `${t.firstName || t.first_name || ''} ${t.lastName || t.last_name || ''}`.trim();
+                        const assignedCount = students.filter(s => s.teacher_id === t.id && s.is_campus_active).length;
+                        const initials = `${t.firstName?.[0] || t.first_name?.[0] || ''}${t.lastName?.[0] || t.last_name?.[0] || ''}`.toUpperCase() || 'D';
+                        const isSelected = studentFilterTeacher === t.id;
+                        const isHovered = dragHoveredTeacher === t.id;
+
+                        const avatarBg = getAvatarGradient(teacherName);
+                        const avatarColor = getAvatarTextColor(teacherName);
+
+                        return (
+                          <div
+                            key={t.id}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              setDragHoveredTeacher(t.id);
+                            }}
+                            onDragLeave={() => setDragHoveredTeacher(null)}
+                            onDrop={(e) => {
+                              const studentId = e.dataTransfer.getData("studentId");
+                              if (studentId) {
+                                handleUpdateStudentTeacher(studentId, t.id);
+                              }
+                              setDragHoveredTeacher(null);
+                            }}
+                            onClick={() => {
+                              setStudentFilterTeacher(t.id);
+                              setStudentCurrentPage(1);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '12px 16px',
+                              borderRadius: '16px',
+                              border: isHovered 
+                                ? '2px dashed #22c55e' 
+                                : isSelected 
+                                  ? '1.5px solid #22c55e' 
+                                  : '1.5px solid #f1f5f9',
+                              background: isHovered 
+                                ? '#f0fdf4' 
+                                : isSelected 
+                                  ? '#f0fdf4' 
+                                  : '#ffffff',
+                              cursor: 'pointer',
+                              transform: isHovered ? 'scale(1.02)' : 'scale(1)',
+                              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+                              <div style={{
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '50%',
+                                background: avatarBg,
+                                color: avatarColor,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.85rem',
+                                fontWeight: 900,
+                                fontFamily: 'Urbanist',
+                                flexShrink: 0
+                              }}>
+                                {initials}
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {teacherName}
+                                </span>
+                                <span style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'Inter', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {t.instrument || 'Lehrer'}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
+                              <span style={{
+                                padding: '4px 10px',
+                                borderRadius: '10px',
+                                background: isSelected ? '#d1fae5' : '#f1f5f9',
+                                color: isSelected ? '#065f46' : '#64748b',
+                                fontSize: '0.68rem',
+                                fontWeight: 800,
+                                fontFamily: 'Urbanist',
+                                whiteSpace: 'nowrap'
+                              }}>
+                                {assignedCount} Schüler
+                              </span>
+                              
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (confirm(`Möchtest du alle nicht zugeordneten Schüler dem Lehrer ${teacherName} zuweisen?`)) {
+                                    const campusStudents = students.filter(s => s.is_campus_active);
+                                    const unassignedIds = campusStudents.filter(s => !s.teacher_id).map(s => s.id);
+                                    if (unassignedIds.length === 0) {
+                                      alert('Es gibt keine nicht-zugeordneten Schüler.');
+                                      return;
+                                    }
+                                    
+                                    const { error } = await supabase
+                                      .from('users')
+                                      .update({ teacher_id: t.id })
+                                      .in('id', unassignedIds);
+                                    
+                                    if (error) {
+                                      alert(error.message);
+                                    } else {
+                                      alert(`${unassignedIds.length} Schüler wurden ${teacherName} erfolgreich zugewiesen.`);
+                                      fetchDashboardData();
+                                    }
+                                  }
+                                }}
+                                style={{
+                                  background: 'none',
+                                  color: '#1a73e8',
+                                  border: 'none',
+                                  padding: 0,
+                                  fontSize: '0.65rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  fontFamily: 'Urbanist',
+                                  transition: 'color 0.15s'
+                                }}
+                              >
+                                Alle zuweisen
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Schedules Sidebar – Live Stats */}
               {campusSubTab === 'schedules' && (

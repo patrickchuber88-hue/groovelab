@@ -548,6 +548,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const inviteSchoolId = urlParams.get('invite_school_id');
   const inviteRole = urlParams.get('role') || 'teacher';
   const schoolIdParam = urlParams.get('school_id');
+  const schoolParam = urlParams.get('school') || urlParams.get('subdomain');
   
   const [schoolName, setSchoolName] = useState<string>('');
   const [schoolData, setSchoolData] = useState<any>(null);
@@ -684,7 +685,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       }
     }
     loadSchoolInfo();
-  }, [inviteSchoolId, effectiveStationId]);
+  }, [inviteSchoolId, effectiveStationId, schoolIdParam, schoolParam]);
 
   const finalizeLogin = async (user: any, stationId: string | null, isWithinAnyRoom: boolean, hidePresence = false) => {
     try {
