@@ -7751,7 +7751,7 @@ function App() {
                   <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', gap: '16px', background: '#f8fafc' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
-                        <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: '0' }}>Nachrichten</h3>
+                        <h3 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: '0' }}>Nachrichten</h3>
                         <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>
                           {studentMessages.filter(m => !deletedMessageIds.includes(m.id)).length} Mitteilungen
                         </div>
@@ -8141,7 +8141,7 @@ function App() {
                 {/* Header of Mailbox */}
                 <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
                   <div>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: '0' }}>Nachrichten</h3>
+                    <h3 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: '0' }}>Nachrichten</h3>
                     <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>{announcements.length} Mitteilungen</div>
                   </div>
                   <button 
