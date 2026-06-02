@@ -7846,7 +7846,7 @@ function App() {
                   <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }} className="custom-scrollbar">
                     {studentMessagesLoading ? (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '200px', gap: '12px', color: '#94a3b8' }}>
-                        <div className="animate-spin" style={{ width: '28px', height: '28px', border: '3px solid #e2e8f0', borderTopColor: '#3b82f6', borderRadius: '50%' }}></div>
+                        <div className="animate-spin" style={{ width: '28px', height: '28px', border: '3px solid #e2e8f0', borderTopColor: '#fbbc05', borderRadius: '50%' }}></div>
                         <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>Lade Nachrichten...</div>
                       </div>
                     ) : (() => {
@@ -7886,8 +7886,8 @@ function App() {
                             style={{
                               padding: '16px',
                               borderRadius: '16px',
-                              background: isSelected ? 'linear-gradient(135deg, #eff6ff, #dbeafe)' : 'transparent',
-                              border: isSelected ? '1px solid #bfdbfe' : '1px solid transparent',
+                              background: isSelected ? 'linear-gradient(135deg, #fefce8, #fef3c7)' : 'transparent',
+                              border: isSelected ? '1px solid #fde047' : '1px solid transparent',
                               cursor: 'pointer',
                               marginBottom: '8px',
                               transition: 'all 0.2s',
@@ -7905,8 +7905,8 @@ function App() {
                                 width: '8px',
                                 height: '8px',
                                 borderRadius: '50%',
-                                background: '#3b82f6',
-                                boxShadow: '0 0 8px #3b82f6'
+                                background: '#fbbc05',
+                                boxShadow: '0 0 8px #fbbc05'
                               }} />
                             )}
 
@@ -7931,7 +7931,7 @@ function App() {
                             <h4 style={{
                               fontSize: '0.9rem',
                               fontWeight: isRead ? 700 : 900,
-                              color: isSelected ? '#1e3a8a' : '#1e293b',
+                              color: isSelected ? '#b45309' : '#1e293b',
                               margin: '0',
                               whiteSpace: 'nowrap',
                               overflow: 'hidden',
@@ -7961,7 +7961,7 @@ function App() {
                                 alt=""
                                 style={{ width: '18px', height: '18px', borderRadius: '50%', objectFit: 'cover' }}
                               />
-                              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: isSelected ? '#1d4ed8' : '#475569' }}>
+                              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: isSelected ? '#b45309' : '#475569' }}>
                                 {msg.sender?.first_name} {msg.sender?.last_name || ''}
                               </span>
                             </div>
@@ -8210,7 +8210,7 @@ function App() {
                             setIsMailComposing(false);
                           }}
                           style={{
-                            background: isSelected ? '#e8f0fe' : '#ffffff',
+                            background: isSelected ? '#fefbeb' : '#ffffff',
                             border: 'none',
                             borderRadius: '16px',
                             padding: '18px',
@@ -8227,7 +8227,7 @@ function App() {
                           className="hover-scale-mini"
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', gap: '8px' }}>
-                            <div style={{ fontWeight: 700, fontSize: '1rem', color: isSelected ? '#0071e3' : '#1d1d1f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                            <div style={{ fontWeight: 700, fontSize: '1rem', color: isSelected ? '#b45309' : '#1d1d1f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                               {parsed.title}
                             </div>
                             <div style={{ fontSize: '0.75rem', fontWeight: 500, color: '#86868b', flexShrink: 0 }}>
