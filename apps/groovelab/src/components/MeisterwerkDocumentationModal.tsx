@@ -482,9 +482,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   const handleRemoveHomeworkItem = async (itemId: string, bookTitle?: string, pageNum?: number) => {
     try {
+      // If it's a textbook page, we update its status to 'IN_PROGRESS' in progress_matrix
+      // to make it turn red (unbearbeitet/in progress) when removed from active homework.
+      let updatePayload: any = { is_current_homework: false };
+      if (bookTitle && pageNum !== undefined) {
+        updatePayload.status = 'IN_PROGRESS';
+      }
+
       const { error } = await supabase
         .from('progress_matrix')
-        .update({ is_current_homework: false })
+        .update(updatePayload)
         .eq('id', itemId);
 
       if (error) throw error;
