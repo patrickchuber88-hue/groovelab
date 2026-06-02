@@ -30,6 +30,12 @@ interface ScheduleOccurrence {
     last_name: string;
     instrument: string;
   };
+  schedules?: {
+    room_id: string | null;
+    room?: {
+      name: string;
+    } | null;
+  } | null;
 }
 
 interface ScheduleCalendarViewProps {
@@ -370,7 +376,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
       try {
         const { data, error } = await supabase
           .from('schedule_occurrences')
-          .select('*, student:users!schedule_occurrences_student_id_fkey(first_name, last_name, instrument)')
+          .select('*, student:users!schedule_occurrences_student_id_fkey(first_name, last_name, instrument), schedules!schedule_occurrences_schedule_id_fkey(room_id, room:rooms(name))')
           .eq('teacher_id', userId)
           .or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`)
           .order('date')
@@ -1152,6 +1158,11 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <span style={{ fontSize: '0.75rem', fontWeight: 800, color: finalColors.text, background: 'rgba(0,0,0,0.04)', padding: '2px 4px', borderRadius: '4px' }}>
                             {occ.start_time.substring(0, 5)}
+                            {occ.schedules?.room?.name && (
+                              <span style={{ marginLeft: '4px', fontWeight: 600, opacity: 0.8, fontSize: '0.7rem' }}>
+                                ({occ.schedules.room.name})
+                              </span>
+                            )}
                           </span>
                           {isSick && (
                             <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid #fecaca' }}>
