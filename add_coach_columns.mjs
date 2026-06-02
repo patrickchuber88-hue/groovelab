@@ -1,8 +1,9 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://msyxlqljswpertszbotf.supabase.co';
-const supabaseKey = 'sb_publishable_GF8tj3-jMPuOUGMC5tDamA_NUrNyGh4';
+// Local self-hosted database settings
+const supabaseUrl = 'https://supabase.178.105.10.2.sslip.io';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzc5NTUzODQzLCJleHAiOjE5MzcyMzM4NDN9.NPFKhuj3WiiJ7pqG7w91QAEy1V696kfTcEunScUAAoI';
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -24,7 +25,7 @@ async function addCoachColumns() {
     if (error) {
       console.error('Error adding columns via RPC:', error.message);
       console.log('\n--- MANUAL ACTION REQUIRED ---');
-      console.log('Please copy and run the following SQL in your Supabase SQL Editor (https://supabase.com/dashboard):');
+      console.log('Please copy and run the following SQL in your Database SQL Editor:');
       console.log(sql);
       console.log('------------------------------\n');
     } else {
@@ -33,7 +34,7 @@ async function addCoachColumns() {
   } catch (err) {
     console.error('Execution failed:', err);
     console.log('\n--- MANUAL ACTION REQUIRED ---');
-    console.log('Please copy and run the following SQL in your Supabase SQL Editor:');
+    console.log('Please copy and run the following SQL in your Database SQL Editor:');
     console.log(sql);
     console.log('------------------------------\n');
   }

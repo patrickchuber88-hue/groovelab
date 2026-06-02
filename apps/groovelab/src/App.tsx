@@ -8,16 +8,16 @@ import { DeviceSetupScreen } from './components/DeviceSetupScreen';
 import { TeacherDetailModal } from './components/TeacherDetailModal';
 import { StudentDetailModal } from './components/StudentDetailModal';
 
-const TeacherDashboard = lazy(() => import('./components/TeacherDashboard').then(m => ({ default: m.TeacherDashboard })));
-const AdminDashboard = lazy(() => import('./components/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
-const MasterAdminDashboard = lazy(() => import('./components/MasterAdminDashboard').then(m => ({ default: m.MasterAdminDashboard })));
-const SecretaryDashboard = lazy(() => import('./components/SecretaryDashboard').then(m => ({ default: m.SecretaryDashboard })));
-const StudentAvatarDashboard = lazy(() => import('./components/StudentAvatarDashboard').then(m => ({ default: m.StudentAvatarDashboard })));
-const BandProfileContent = lazy(() => import('./components/BandProfileContent'));
-const ArtistGateway = lazy(() => import('./components/ArtistGateway').then(m => ({ default: m.ArtistGateway })));
-const StudentRadarChart = lazy(() => import('./components/StudentRadarChart'));
-const ConfettiModal = lazy(() => import('./components/ConfettiModal'));
-const CampusDirectMessages = lazy(() => import('./components/CampusDirectMessages'));
+import { TeacherDashboard } from './components/TeacherDashboard';
+import { AdminDashboard } from './components/AdminDashboard';
+import { MasterAdminDashboard } from './components/MasterAdminDashboard';
+import { SecretaryDashboard } from './components/SecretaryDashboard';
+import { StudentAvatarDashboard } from './components/StudentAvatarDashboard';
+import BandProfileContent from './components/BandProfileContent';
+import { ArtistGateway } from './components/ArtistGateway';
+import StudentRadarChart from './components/StudentRadarChart';
+import ConfettiModal from './components/ConfettiModal';
+import CampusDirectMessages from './components/CampusDirectMessages';
 import { normalizeInstrument, renderInstrumentIcon } from './utils/instruments';
 import { getDistanceFromLatLonInM } from './utils/geo';
 import './App.css';
@@ -443,6 +443,31 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode, fallbac
 
   componentDidCatch(error: any, errorInfo: any) {
     console.error("Dashboard ErrorBoundary caught an error:", error, errorInfo);
+    
+    // Auto-recover from dynamic module script/chunk loading errors
+    const errorMessage = String(error?.message || error || "");
+    const isChunkError = 
+      errorMessage.includes("Importing a module script failed") ||
+      errorMessage.includes("Failed to fetch dynamically imported module") ||
+      errorMessage.includes("chunk") ||
+      errorMessage.includes("loading-error") ||
+      errorMessage.includes("dynamically imported");
+
+    if (isChunkError) {
+      const lastReload = sessionStorage.getItem("last_chunk_error_reload");
+      const now = Date.now();
+      
+      // Auto-reload to load the fresh code bundle if we haven't reloaded in the last 15 seconds
+      if (!lastReload || now - parseInt(lastReload) > 15000) {
+        sessionStorage.setItem("last_chunk_error_reload", String(now));
+        console.warn("Dynamic chunk loading failure detected. Triggering automatic hard reload to fetch the latest application bundle...");
+        
+        // Append a cache-busting parameter and reload
+        const url = new URL(window.location.href);
+        url.searchParams.set("reload_cb", String(now));
+        window.location.href = url.toString();
+      }
+    }
   }
 
   render() {
@@ -480,7 +505,12 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode, fallbac
             </pre>
           )}
           <button 
-            onClick={() => window.location.reload()}
+            onClick={() => {
+              // Perform a hard cache-busting reload
+              const url = new URL(window.location.href);
+              url.searchParams.set("reload_manual", String(Date.now()));
+              window.location.href = url.toString();
+            }}
             style={{ 
               padding: '16px 32px', 
               background: 'var(--primary-color)', 
@@ -1775,6 +1805,8 @@ function App() {
   const [bandSearchLetter, setBandSearchLetter] = useState<string | null>(null);
   const [expandedMatchingSong, setExpandedMatchingSong] = useState<string | null>(null);
   const [showQR, setShowQR] = useState(false);
+  const [publicPassUser, setPublicPassUser] = useState<any>(null);
+  const [loadingPublicPass, setLoadingPublicPass] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ text: string, type: 'success' | 'error' | 'info' } | null>(null);
   
   useEffect(() => {
@@ -2243,6 +2275,7 @@ function App() {
     const urlParams = new URLSearchParams(window.location.search);
     const urlBandId = urlParams.get('band');
     const isShared = urlParams.get('view') === 'shared';
+    const urlCampusPassToken = urlParams.get('campus_pass');
     
     if (urlBandId) {
       if (isShared) setIsSharedView(true);
@@ -2271,6 +2304,36 @@ function App() {
         }
       };
       fetchPublicBand();
+    }
+
+    if (urlCampusPassToken) {
+      console.log(`[PublicPassView] Detected campus pass token in URL: ${urlCampusPassToken}`);
+      const fetchPublicPass = async () => {
+        try {
+          setLoadingPublicPass(true);
+          const { data, error } = await supabase
+            .from('users')
+            .select('id, first_name, last_name, role, email, instrument, qr_token, photo_url, school_id, ausweis_id, ausweis_nummer')
+            .eq('qr_token', urlCampusPassToken)
+            .single();
+            
+          if (error) {
+            console.error('[PublicPassView] Supabase error fetching user for pass:', error);
+            return;
+          }
+          
+          if (data) {
+            console.log('[PublicPassView] User pass loaded successfully:', data.first_name);
+            setPublicPassUser(data);
+            document.title = `Campus Pass | ${data.first_name} ${data.last_name}`;
+          }
+        } catch (err) {
+          console.error('[PublicPassView] Unexpected crash during fetch:', err);
+        } finally {
+          setLoadingPublicPass(false);
+        }
+      };
+      fetchPublicPass();
     }
   }, []);
 
@@ -5040,6 +5103,53 @@ function App() {
     return (
       <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div className="animate-spin" style={{ width: '24px', height: '24px', border: '2px solid #e2e8f0', borderTopColor: '#eab308', borderRadius: '50%' }}></div>
+      </div>
+    );
+  }
+
+  // 1.5 PUBLIC CAMPUS PASS VIEW
+  const urlCampusPassToken = urlParams.get('campus_pass');
+  if (urlCampusPassToken) {
+    if (publicPassUser) {
+      return (
+        <div style={{ 
+          position: 'fixed', 
+          inset: 0, 
+          zIndex: 6000, 
+          background: '#09090b', 
+          display: 'flex', 
+          flexDirection: 'column',
+          alignItems: 'center', 
+          justifyContent: 'center',
+          padding: '24px',
+          overflowY: 'auto'
+        }}>
+          {/* Brand header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+            <div style={{ width: '32px', height: '32px', background: '#e8f5e9', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ color: '#2e7d32', fontWeight: 900, fontSize: '1.2rem' }}>C</span>
+            </div>
+            <div style={{ color: 'white', fontWeight: 900, fontSize: '1rem', letterSpacing: '0.05em' }}>CAMPUS PASS</div>
+          </div>
+          
+          {/* Standing credit-card style layout */}
+          <div style={{ maxWidth: '380px', width: '100%' }}>
+            <QRCodeModal 
+              user={publicPassUser} 
+              activePlatform="campus" 
+              onClose={() => {
+                window.close();
+              }} 
+            />
+          </div>
+        </div>
+      );
+    }
+    // Show a minimalist loading state for public visitors
+    return (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
+        <div className="animate-spin" style={{ width: '24px', height: '24px', border: '2px solid #e2e8f0', borderTopColor: '#34a853', borderRadius: '50%' }}></div>
+        <div style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>Lade Campus Pass...</div>
       </div>
     );
   }

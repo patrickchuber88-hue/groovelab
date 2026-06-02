@@ -651,6 +651,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   });
   const [secretarySubTab, setSecretarySubTab] = useState<'briefing' | 'employees' | 'linking' | 'licenses' | 'setup' | 'rooms' | 'equipment' | 'crisis'>('briefing');
   const [campusSubTab, setCampusSubTab] = useState<'briefing' | 'onboarding' | 'students' | 'schedules' | 'status'>('briefing');
+  const [schedulesRoomsViewMode, setSchedulesRoomsViewMode] = useState<'designer' | 'live'>('live');
+  const [liveViewDay, setLiveViewDay] = useState<number>(1);
+  const [showAdHocBooking, setShowAdHocBooking] = useState<boolean>(false);
+  const [adHocRoomId, setAdHocRoomId] = useState<string | null>(null);
+  const [adHocTeacherId, setAdHocTeacherId] = useState<string>('');
+  const [adHocStudentName, setAdHocStudentName] = useState<string>('');
+  const [adHocStartTime, setAdHocStartTime] = useState<string>('14:00');
+  const [adHocDuration, setAdHocDuration] = useState<number>(45);
   const [groovelabSubTab, setGroovelabSubTab] = useState<'briefing' | 'live' | 'students' | 'coaches' | 'kiosk' | 'status'>('briefing');
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
   const [liveSearchQuery, setLiveSearchQuery] = useState<string>('');
@@ -660,6 +668,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [manageTeacher, setManageTeacher] = useState<any | null>(null);
   const [selectedCrisisTeacherId, setSelectedCrisisTeacherId] = useState<string | null>(null);
   const [activeContextMenu, setActiveContextMenu] = useState<string | null>(null);
+  const [copiedStudentId, setCopiedStudentId] = useState<string | null>(null);
+  const [copiedSchoolLink, setCopiedSchoolLink] = useState<boolean>(false);
 
   // Visual Live Lab states & refs
   const [helpRequests, setHelpRequests] = useState<any[]>([]);
@@ -1060,7 +1070,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       // Fetch all users
       const { data: allUsers, error: usersErr } = await supabase
         .from('users')
-        .select('id, first_name, last_name, role, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at')
+        .select('id, first_name, last_name, role, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token')
         .eq('school_id', schoolId);
 
       if (usersErr) throw usersErr;
@@ -1084,6 +1094,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       }
 
       const map: Record<string, string> = {};
+      const userInstrumentMap: Record<string, string> = {};
       const coachesList: GrooveLabCoach[] = [];
       const campusTeachersList: any[] = [];
       const bypassList: BypassTeacher[] = [];
@@ -1093,6 +1104,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       allUsers?.forEach(u => {
         const fullName = `${u.first_name} ${u.last_name}`;
         map[u.id] = fullName;
+        userInstrumentMap[u.id] = u.instrument || '';
 
         if (u.role === 'admin' || u.role === 'secretary') {
           employeesList.push(u);
@@ -1266,7 +1278,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         const [teacherId, dayOfWeekStr] = key.split('_');
         const dayOfWeek = parseInt(dayOfWeekStr);
 
-        const sortedSlots = [...slots].sort((a, b) => (a.time_slot || '').localeCompare(b.time_slot || ''));
+        const sortedSlots = [...slots]
+          .map(s => ({
+            ...s,
+            student_name: s.student_id ? map[s.student_id] || 'Unbekannter Schüler' : 'Pause',
+            student_instrument: s.student_id ? userInstrumentMap[s.student_id] || '' : ''
+          }))
+          .sort((a, b) => (a.time_slot || '').localeCompare(b.time_slot || ''));
         const startTime = sortedSlots[0]?.time_slot || '14:00';
         
         const addMins = (t: string, m: number) => {
@@ -1288,7 +1306,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
         const teacherProfile = campusTeachersList.find(t => t.id === teacherId);
         const teacherName = map[teacherId] || 'Unbekannte Lehrkraft';
-        const instrument = teacherProfile?.instrument || 'Instrument';
+        const instrument = userInstrumentMap[teacherId] || teacherProfile?.instrument || 'Gitarre';
 
         return {
           id: key,
@@ -1990,7 +2008,21 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
       // Try matching associated teacher name
       let teacherId: string | null = null;
-      if (teacherNamePart) {
+      let finalInstrument = instrument;
+
+      // If a specific teacher is selected on the sidebar, auto-fill teacher and instrument
+      if (studentFilterTeacher && studentFilterTeacher !== 'All') {
+        const foundSelected = allUniqueTeachers.find(t => t.id === studentFilterTeacher);
+        if (foundSelected) {
+          teacherId = foundSelected.id;
+          // Auto-inject instrument if not explicitly typed or is default/placeholder
+          if (!parts[1]?.trim()) {
+            finalInstrument = foundSelected.instrument || 'Allgemein';
+          }
+        }
+      }
+
+      if (!teacherId && teacherNamePart) {
         const found = allUniqueTeachers.find(t => {
           const fName = (t.firstName || t.first_name || '').toLowerCase();
           const lName = (t.lastName || t.last_name || '').toLowerCase();
@@ -2018,7 +2050,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             first_name: firstName,
             last_name: lastName,
             email: finalEmail,
-            instrument: instrument || 'Allgemein',
+            instrument: finalInstrument || 'Allgemein',
             avatar_url: defaultAvatarUrl,
             is_active: true,
             is_campus_active: true,
@@ -2095,6 +2127,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       else if (studentFilterStatus === 'inactive') matchesStatus = !s.is_campus_active && !s.is_groovelab_active;
 
       return matchesSearch && matchesInstrument && matchesTeacher && matchesStatus;
+    }).sort((a: any, b: any) => {
+      const nameA = `${a.first_name || ''} ${a.last_name || ''}`.toLowerCase().trim();
+      const nameB = `${b.first_name || ''} ${b.last_name || ''}`.toLowerCase().trim();
+      return nameA.localeCompare(nameB, 'de');
     });
 
     // Pagination calculation
@@ -2192,12 +2228,30 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             {/* CSV BOX */}
             {isStudentCsvExpanded && (
               <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px dashed #cbd5e1', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <strong style={{ fontSize: '0.85rem', color: '#1e293b' }}>Sammel-Onboarding via CSV (Schüler)</strong>
-                <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Geben Sie eine Schülerliste ein. Format pro Zeile: <code>Vorname Nachname; Instrument; E-Mail (optional); Dozent-Name (optional)</code></span>
+                <strong style={{ fontSize: '0.85rem', color: '#1e293b' }}>
+                  Sammel-Onboarding via CSV (Schüler)
+                  {studentFilterTeacher && studentFilterTeacher !== 'All' && ` — Auto-Zuweisung für Lehrer: ${
+                    (() => {
+                      const selectedT = allUniqueTeachers.find(t => t.id === studentFilterTeacher);
+                      return selectedT ? `${selectedT.firstName || selectedT.first_name} ${selectedT.lastName || selectedT.last_name}` : '';
+                    })()
+                  }`}
+                </strong>
+                <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                  {studentFilterTeacher && studentFilterTeacher !== 'All' ? (
+                    <span><strong>Hinweis:</strong> Da ein Lehrer ausgewählt ist, reicht es aus, nur den Namen einzutragen (z.B. <code>Vorname Nachname</code>). Lehrer und Instrument werden automatisch verknüpft! Ansonsten Format: <code>Vorname Nachname; Instrument; E-Mail (optional)</code></span>
+                  ) : (
+                    <span>Geben Sie eine Schülerliste ein. Format pro Zeile: <code>Vorname Nachname; Instrument; E-Mail (optional); Lehrer-Name (optional)</code></span>
+                  )}
+                </span>
                 <textarea
                   value={studentCsvText}
                   onChange={(e) => setStudentCsvText(e.target.value)}
-                  placeholder={"Max Mustermann; Klavier; max@familie.de; Weber\nLisa Schmidt; E-Gitarre; ; Becker"}
+                  placeholder={
+                    studentFilterTeacher && studentFilterTeacher !== 'All'
+                      ? "Max Mustermann\nLisa Schmidt"
+                      : "Max Mustermann; Klavier; max@familie.de; Weber\nLisa Schmidt; E-Gitarre; ; Becker"
+                  }
                   style={{
                     width: '100%',
                     height: '100px',
@@ -2296,7 +2350,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   }}
                   style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: 'white', fontWeight: 700 }}
                 >
-                  <option value="All">👥 Alle Dozenten</option>
+                  <option value="All">👥 Alle Lehrer</option>
                   {allUniqueTeachers.map(t => (
                     <option key={t.id} value={t.id}>{t.lastName || t.last_name}</option>
                   ))}
@@ -2334,36 +2388,62 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       style={{ 
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '12px',
-                        padding: '8px 14px',
-                        borderRadius: '12px',
-                        background: '#f8fafc',
-                        border: '1.5px solid #cbd5e1',
-                        minWidth: '850px'
+                        gap: '16px',
+                        padding: '10px 16px',
+                        borderRadius: '16px',
+                        background: '#ffffff',
+                        border: '1px solid #f1f5f9',
+                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.01)',
+                        minWidth: '850px',
+                        transition: 'all 0.25s ease'
                       }}
+                      className="hover-scale"
                     >
                       {/* Avatar & Name */}
-                      <div style={{ flex: '1.5', display: 'flex', alignItems: 'center', gap: '10px', minWidth: '160px' }}>
+                      <div 
+                        onClick={() => setSelectedStudentForDetail(student)}
+                        style={{ 
+                          flex: '1.6', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '14px', 
+                          minWidth: '180px',
+                          cursor: 'pointer'
+                        }}
+                        className="student-name-hover"
+                      >
                         <div style={{
-                          width: '36px',
-                          height: '36px',
+                          width: '42px',
+                          height: '42px',
                           borderRadius: '50%',
                           background: getAvatarGradient(`${student.first_name || ''} ${student.last_name || ''}`),
                           color: getAvatarTextColor(`${student.first_name || ''} ${student.last_name || ''}`),
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          fontSize: '0.82rem',
-                          fontWeight: 800
+                          fontSize: '0.88rem',
+                          fontWeight: 800,
+                          flexShrink: 0
                         }}>
                           {(student.first_name?.[0] || '') + (student.last_name?.[0] || '')}
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0f172a' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                          <span 
+                            style={{ 
+                              fontSize: '0.92rem', 
+                              fontWeight: 800, 
+                              color: '#1d1d1f', 
+                              whiteSpace: 'nowrap', 
+                              overflow: 'hidden', 
+                              textOverflow: 'ellipsis',
+                              transition: 'color 0.15s ease'
+                            }}
+                            className="student-title-text"
+                          >
                             {student.first_name} {student.last_name}
                           </span>
                           {student.nickname && (
-                            <span style={{ fontSize: '0.68rem', color: '#64748b', fontStyle: 'italic' }}>
+                            <span style={{ fontSize: '0.72rem', color: '#86868b', fontStyle: 'italic', marginTop: '1px' }}>
                               „{student.nickname}“
                             </span>
                           )}
@@ -2374,23 +2454,22 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       <div style={{ flex: '1', minWidth: '100px' }}>
                         <span style={{ 
                           display: 'inline-block',
-                          padding: '4px 8px', 
-                          borderRadius: '6px', 
-                          background: '#ffffff', 
-                          color: '#475569', 
-                          fontSize: '0.7rem', 
-                          fontWeight: 800,
-                          border: '1px solid #e2e8f0',
+                          padding: '6px 12px', 
+                          borderRadius: '10px', 
+                          background: '#f5f5f7', 
+                          color: '#3a3a3c', 
+                          fontSize: '0.78rem', 
+                          fontWeight: 700,
                           textAlign: 'center',
                           width: '100%',
                           boxSizing: 'border-box'
                         }}>
-                          🎸 {student.instrument || 'Allgemein'}
+                          {student.instrument || 'Allgemein'}
                         </span>
                       </div>
 
                       {/* Teacher Select */}
-                      <div style={{ flex: '1.2', minWidth: '120px' }}>
+                      <div style={{ flex: '1.25', minWidth: '120px' }}>
                         <select
                           value={student.teacher_id || ''}
                           onChange={async (e) => {
@@ -2403,18 +2482,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           }}
                           style={{ 
                             width: '100%', 
-                            padding: '4px 6px', 
-                            borderRadius: '6px', 
-                            border: '1px solid #cbd5e1', 
-                            fontSize: '0.72rem', 
+                            padding: '7px 12px', 
+                            borderRadius: '10px', 
+                            fontSize: '0.78rem', 
                             fontWeight: 700, 
-                            color: '#334155',
-                            background: '#ffffff',
+                            color: '#1d1d1f',
+                            background: '#f5f5f7',
+                            border: 'none',
                             outline: 'none',
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            WebkitAppearance: 'none'
                           }}
                         >
-                          <option value="">Kein Dozent</option>
+                          <option value="">Kein Lehrer</option>
                           {allUniqueTeachers.map((t: any) => (
                             <option key={t.id} value={t.id}>{t.lastName || t.last_name}</option>
                           ))}
@@ -2422,7 +2502,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       </div>
 
                       {/* Duration Select */}
-                      <div style={{ flex: '0.7', minWidth: '70px' }}>
+                      <div style={{ flex: '0.75', minWidth: '70px' }}>
                         <select
                           value={student.lesson_duration || 30} // Default to 30 Min
                           onChange={async (e) => {
@@ -2435,15 +2515,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           }}
                           style={{ 
                             width: '100%', 
-                            padding: '4px 6px', 
-                            borderRadius: '6px', 
-                            border: '1px solid #cbd5e1', 
-                            fontSize: '0.72rem', 
+                            padding: '7px 12px', 
+                            borderRadius: '10px', 
+                            fontSize: '0.78rem', 
                             fontWeight: 700, 
-                            color: '#334155',
-                            background: '#ffffff',
+                            color: '#1d1d1f',
+                            background: '#f5f5f7',
+                            border: 'none',
                             outline: 'none',
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            WebkitAppearance: 'none'
                           }}
                         >
                           <option value={30}>30 Min</option>
@@ -2454,7 +2535,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       </div>
 
                       {/* Micro status toggles */}
-                      <div style={{ flex: '1.4', display: 'flex', gap: '4px', minWidth: '140px' }}>
+                      <div style={{ flex: '1.5', display: 'flex', gap: '6px', minWidth: '150px' }}>
                         {/* Campus Toggle */}
                         <button
                           onClick={async () => {
@@ -2468,19 +2549,20 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           }}
                           style={{
                             flex: 1,
-                            padding: '3px 4px',
-                            borderRadius: '6px',
+                            padding: '7px 10px',
+                            borderRadius: '10px',
                             border: 'none',
-                            fontSize: '0.68rem',
+                            fontSize: '0.75rem',
                             fontWeight: 800,
                             cursor: 'pointer',
-                            background: student.is_campus_active ? '#34a853' : '#e2e8f0',
-                            color: student.is_campus_active ? '#ffffff' : '#475569',
-                            transition: 'all 0.1s ease',
+                            background: student.is_campus_active ? '#e2f6ea' : '#f5f5f7',
+                            color: student.is_campus_active ? '#137333' : '#86868b',
+                            transition: 'all 0.15s ease',
                             whiteSpace: 'nowrap'
                           }}
+                          className="hover-scale-mini"
                         >
-                          🎓 Campus
+                          Campus
                         </button>
 
                         {/* Groove Toggle */}
@@ -2496,80 +2578,73 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           }}
                           style={{
                             flex: 1,
-                            padding: '3px 4px',
-                            borderRadius: '6px',
+                            padding: '7px 10px',
+                            borderRadius: '10px',
                             border: 'none',
-                            fontSize: '0.68rem',
+                            fontSize: '0.75rem',
                             fontWeight: 800,
                             cursor: 'pointer',
-                            background: student.is_groovelab_active ? '#ea4335' : '#e2e8f0',
-                            color: student.is_groovelab_active ? '#ffffff' : '#475569',
-                            transition: 'all 0.1s ease',
+                            background: student.is_groovelab_active ? '#fde8e8' : '#f5f5f7',
+                            color: student.is_groovelab_active ? '#c53030' : '#86868b',
+                            transition: 'all 0.15s ease',
                             whiteSpace: 'nowrap'
                           }}
+                          className="hover-scale-mini"
                         >
-                          🎸 Groove
+                          Groove
                         </button>
                       </div>
 
-                      {/* Access / Copy Parent Link */}
-                      <div style={{ flex: '1', minWidth: '120px', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
-                        {student.is_app_user ? (
+                      {/* Access / Copy Shareable Campus Pass Link */}
+                      <div style={{ flex: '1.2', minWidth: '130px', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end' }}>
+                        {student.is_app_user && (
                           <span style={{ 
-                            fontSize: '0.65rem', 
-                            fontWeight: 800, 
-                            color: '#475569',
-                            background: '#f1f5f9',
-                            padding: '3px 6px',
-                            borderRadius: '6px',
-                            border: '1px solid #cbd5e1',
+                            fontSize: '0.68rem', 
+                            fontWeight: 700, 
+                            color: '#515154',
+                            background: '#f5f5f7',
+                            padding: '4px 8px',
+                            borderRadius: '8px',
                             fontFamily: 'monospace'
                           }}>
-                            📱 PIN: {student.ausweis_nummer || 'Keine'}
+                            PIN: {student.ausweis_nummer || 'Keine'}
                           </span>
-                        ) : (() => {
-                          const parentLink = `${window.location.origin}/register-student?token=${student.qr_token || 'no-token'}`;
+                        )}
+                        {(() => {
+                          const passLink = `${window.location.origin}/?campus_pass=${student.qr_token || 'no-token'}`;
                           return (
                             <button
                               onClick={() => {
-                                navigator.clipboard.writeText(parentLink);
-                                alert('Registrierungslink für Eltern wurde kopiert!');
+                                navigator.clipboard.writeText(passLink);
+                                setCopiedStudentId(student.id);
+                                setTimeout(() => setCopiedStudentId(null), 2000);
                               }}
                               style={{
-                                background: '#fff7ed',
-                                color: '#ea580c',
-                                border: '1px solid #ffedd5',
-                                borderRadius: '6px',
-                                padding: '3px 6px',
-                                fontSize: '0.65rem',
-                                fontWeight: 800,
+                                background: copiedStudentId === student.id ? '#e2f6ea' : '#f5f5f7',
+                                color: copiedStudentId === student.id ? '#137333' : '#0066cc',
+                                border: 'none',
+                                borderRadius: '8px',
+                                padding: '5px 10px',
+                                fontSize: '0.7rem',
+                                fontWeight: 700,
                                 cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '3px',
-                                transition: 'all 0.1s ease'
+                                transition: 'all 0.15s ease'
                               }}
-                              onMouseEnter={(e) => e.currentTarget.style.background = '#ffedd5'}
-                              onMouseLeave={(e) => e.currentTarget.style.background = '#fff7ed'}
+                              className="hover-scale-mini"
                             >
-                              🔗 Link
+                              {copiedStudentId === student.id ? '✓ Kopiert' : 'Pass teilen'}
                             </button>
                           );
                         })()}
 
-                        {/* Detail Profile Button */}
-                        <button
-                          onClick={() => setSelectedStudentForDetail(student)}
-                          style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                          title="Profil & Details"
-                        >
-                          🔍
-                        </button>
-
                         {/* Delete Button */}
                         <button
                           onClick={() => handleDeleteStudentCampus(student.id, `${student.first_name} ${student.last_name}`)}
-                          style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '0.85rem', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.15s' }}
+                          className="hover-scale-mini"
                           title="Schüler unwiderruflich löschen"
                         >
                           🗑️
@@ -2683,118 +2758,204 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
           {/* Right Side: Dozenten Sidebar */}
           <div className="google-card" style={{
-            width: '300px',
+            width: '330px',
             flexShrink: 0,
             display: 'flex',
             flexDirection: 'column',
             gap: '16px',
             padding: '24px',
             borderRadius: '24px',
-            border: '1.5px solid #cbd5e1',
+            border: '1px solid #f2f2f7',
             background: '#ffffff',
-            boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)',
+            boxShadow: '0 4px 24px rgba(0, 0, 0, 0.02)',
             position: 'sticky',
             top: '24px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Users size={20} style={{ color: '#0f172a' }} />
-              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                Dozenten
+              <Users size={18} style={{ color: '#1d1d1f' }} />
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#1d1d1f', fontFamily: 'Urbanist, -apple-system, BlinkMacSystemFont, sans-serif' }}>
+                Lehrer
               </h3>
             </div>
-            <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', fontWeight: 600, lineHeight: 1.4 }}>
-              Klicke auf einen Dozenten, um das Sammel-Onboarding zu öffnen und direkt Schüler für ihn zu erfassen.
+            <p style={{ margin: 0, fontSize: '0.74rem', color: '#86868b', fontWeight: 500, lineHeight: 1.4 }}>
+              Klicke auf einen Lehrer, um das Sammel-Onboarding zu öffnen und direkt Schüler für ihn zu erfassen.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '500px', overflowY: 'auto', paddingRight: '4px' }}>
+              
+              {/* Option / Slot für Alle Lehrer */}
+              <div
+                onClick={() => {
+                  setStudentFilterTeacher('All');
+                  setStudentCurrentPage(1);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 12px',
+                  borderRadius: '14px',
+                  border: studentFilterTeacher === 'All' ? '1.5px solid #34a853' : 'none',
+                  background: studentFilterTeacher === 'All' ? '#e2f6ea' : '#f5f5f7',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  boxShadow: studentFilterTeacher === 'All' ? '0 4px 12px rgba(52, 168, 83, 0.08)' : 'none'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)',
+                    color: '#475569',
+                    border: '1px solid rgba(0, 0, 0, 0.05)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.85rem',
+                    fontWeight: 800,
+                    flexShrink: 0
+                  }}>
+                    👥
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#1d1d1f' }}>
+                      Alle Lehrer anzeigen
+                    </span>
+                    <span style={{ fontSize: '0.74rem', color: '#86868b', fontWeight: 500, marginTop: '1px' }}>
+                      Gesamtübersicht
+                    </span>
+                  </div>
+                </div>
+                <div style={{
+                  background: 'rgba(0, 0, 0, 0.04)',
+                  color: '#1d1d1f',
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                  padding: '4px 10px',
+                  borderRadius: '20px',
+                }}>
+                  {students.filter(s => s.is_campus_active).length} Schüler
+                </div>
+              </div>
+
               {allUniqueTeachers.map((t: any) => {
                 const teacherName = `${t.firstName || t.first_name || ''} ${t.lastName || t.last_name || ''}`.trim();
                 const teacherLastName = t.lastName || t.last_name || '';
                 const assignedCount = students.filter(s => s.teacher_id === t.id && s.is_campus_active).length;
                 const initials = `${t.firstName?.[0] || t.first_name?.[0] || ''}${t.lastName?.[0] || t.last_name?.[0] || ''}`.toUpperCase() || 'D';
+                const isSelected = studentFilterTeacher === t.id;
 
                 return (
                   <div
                     key={t.id}
                     onClick={() => {
-                      setIsStudentCsvExpanded(true);
-                      // Prompt for student name
-                      const studentNamePrompt = prompt(`Name des Schülers für Dozent ${teacherLastName} eingeben:\n(Abbrechen für Musterzeile)`, "");
-                      if (studentNamePrompt !== null) {
-                        const finalName = studentNamePrompt.trim() || "Max Mustermann";
-                        const instrumentPrompt = prompt(`Instrument für ${finalName}:`, t.instrument || "Klavier");
-                        const finalInstrument = (instrumentPrompt || t.instrument || "Klavier").trim();
-                        const customLine = `${finalName}; ${finalInstrument}; ; ${teacherLastName}`;
-                        if (studentCsvText.trim()) {
-                          setStudentCsvText(prev => prev.trim() + `\n${customLine}`);
-                        } else {
-                          setStudentCsvText(customLine);
-                        }
-                      } else {
-                        // Template line fallback if cancelled
-                        const presetLine = `Max Mustermann; ${t.instrument || 'Klavier'}; ; ${teacherLastName}`;
-                        if (studentCsvText.trim()) {
-                          setStudentCsvText(prev => prev.trim() + `\n${presetLine}`);
-                        } else {
-                          setStudentCsvText(presetLine);
-                        }
-                      }
+                      setStudentFilterTeacher(t.id);
+                      setStudentCurrentPage(1);
                     }}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: '10px 12px',
-                      borderRadius: '12px',
-                      border: '1px solid #cbd5e1',
-                      background: '#f8fafc',
+                      borderRadius: '14px',
+                      border: isSelected ? '1.5px solid #34a853' : 'none',
+                      background: isSelected ? '#e2f6ea' : '#f5f5f7',
                       cursor: 'pointer',
-                      transition: 'all 0.2s ease'
+                      transition: 'all 0.2s ease',
+                      boxShadow: isSelected ? '0 4px 12px rgba(52, 168, 83, 0.08)' : 'none'
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#f0fdf4';
-                      e.currentTarget.style.borderColor = '#bbf7d0';
+                      if (!isSelected) e.currentTarget.style.background = '#e8e8ed';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = '#f8fafc';
-                      e.currentTarget.style.borderColor = '#cbd5e1';
+                      if (!isSelected) e.currentTarget.style.background = '#f5f5f7';
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                       <div style={{
-                        width: '32px',
-                        height: '32px',
+                        width: '36px',
+                        height: '36px',
                         borderRadius: '50%',
                         background: getAvatarGradient(teacherName),
                         color: getAvatarTextColor(teacherName),
+                        border: '1px solid rgba(0, 0, 0, 0.05)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: '0.72rem',
-                        fontWeight: 800,
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
                         flexShrink: 0
                       }}>
                         {initials}
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1d1d1f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {teacherName}
                         </span>
-                        <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 650 }}>
-                          {t.instrument || 'Dozent'}
+                        <span style={{ fontSize: '0.74rem', color: '#86868b', fontWeight: 500, marginTop: '1px' }}>
+                          {t.instrument || 'Lehrer'}
                         </span>
                       </div>
                     </div>
-                    <div style={{
-                      background: '#e0f2fe',
-                      color: '#0369a1',
-                      fontSize: '0.65rem',
-                      fontWeight: 850,
-                      padding: '3px 8px',
-                      borderRadius: '20px',
-                      flexShrink: 0
-                    }}>
-                      {assignedCount} Schüler
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
+                      <div style={{
+                        background: 'rgba(0, 0, 0, 0.04)',
+                        color: '#1d1d1f',
+                        fontSize: '0.7rem',
+                        fontWeight: 600,
+                        padding: '4px 10px',
+                        borderRadius: '20px',
+                      }}>
+                        {assignedCount} Schüler
+                      </div>
+                      
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (confirm(`Möchtest du alle nicht zugeordneten Schüler dem Lehrer ${teacherName} zuweisen?`)) {
+                            const campusStudents = students.filter(s => s.is_campus_active);
+                            const unassignedIds = campusStudents.filter(s => !s.teacher_id).map(s => s.id);
+                            if (unassignedIds.length === 0) {
+                              alert('Es gibt keine nicht-zugeordneten Schüler.');
+                              return;
+                            }
+                            
+                            const { error } = await supabase
+                              .from('users')
+                              .update({ teacher_id: t.id })
+                              .in('id', unassignedIds);
+                            
+                            if (error) {
+                              alert(error.message);
+                            } else {
+                              alert(`${unassignedIds.length} Schüler wurden ${teacherName} erfolgreich zugewiesen.`);
+                              fetchDashboardData();
+                            }
+                          }
+                        }}
+                        style={{
+                          background: 'none',
+                          color: '#0066cc',
+                          border: 'none',
+                          padding: 0,
+                          fontSize: '0.68rem',
+                          fontWeight: 500,
+                          cursor: 'pointer',
+                          transition: 'color 0.15s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.color = '#0044b3';
+                          e.currentTarget.style.textDecoration = 'underline';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.color = '#0066cc';
+                          e.currentTarget.style.textDecoration = 'none';
+                        }}
+                      >
+                        Alle zuweisen
+                      </button>
                     </div>
                   </div>
                 );
@@ -3501,6 +3662,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           transform: translateY(-2px) scale(1.01) !important;
           box-shadow: 0 16px 48px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
         }
+        .student-name-hover:hover .student-title-text {
+          color: #34a853 !important;
+          text-decoration: underline;
+        }
         .google-btn-primary {
           background: #d81e05; /* Swiss Red */
           color: #ffffff;
@@ -4069,12 +4234,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           {/* Active Tab Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              {!(activeTab === 'campus' && campusSubTab === 'onboarding') && !(activeTab === 'secretary' && secretarySubTab === 'crisis') && (
+              {!((activeTab as any) === 'campus') && !((activeTab as any) === 'campus' && (campusSubTab === 'onboarding' || campusSubTab === 'schedules')) && !(activeTab === 'secretary' && secretarySubTab === 'crisis') && (
                 <>
-                  <h2 className="swiss-h1" style={{ margin: 0, color: activeTab === 'campus' ? '#10b981' : '#f59e0b' }}>
+                  <h2 className="swiss-h1" style={{ margin: 0, color: (activeTab as any) === 'campus' ? '#10b981' : '#f59e0b' }}>
                     {getTabTitle()}
                   </h2>
-                  <p style={{ color: activeTab === 'campus' ? '#64748b' : '#a1a1aa', fontWeight: 500, fontSize: '0.85rem', marginTop: '4px', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  <p style={{ color: (activeTab as any) === 'campus' ? '#64748b' : '#a1a1aa', fontWeight: 500, fontSize: '0.85rem', marginTop: '4px', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                     {currentUserProfile 
                       ? `${currentUserProfile.first_name} ${currentUserProfile.last_name || ''} • Schulsekretariat` 
                       : 'Schulsekretariat'
@@ -5559,158 +5724,646 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   {/* Action Toolbar */}
                   <div style={{ background: 'white', borderRadius: '24px', padding: '20px 24px', border: '1px solid rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)' }}>
                     <div>
-                      <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>🗓️ Raumplanungs- & Freigabe-Zentrale</h3>
-                      <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 550 }}>Weise Lehrkräfte direkt den Unterrichtstagen zu · Erkenne Konflikte · 1-Klick-Automatik</p>
+                      <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        🎓 Campus Raum-Koordinationsboard
+                      </h3>
+                      <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 550 }}>
+                        {schedulesRoomsViewMode === 'live' 
+                          ? 'Operativer Tages-Belegungsplan mit Belegungskurven & Ad-hoc-Spontanbuchung' 
+                          : 'Wochen-Matrix zur Semesterplanung: Weise Lehrkräfte per Drag & Drop Räumen zu'}
+                      </p>
                     </div>
-                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                      <button
-                        type="button"
-                        onClick={runAutoRoomAllocation}
-                        disabled={matrixAllocations.filter(p => !p.roomId).length === 0}
-                        style={{ background: 'white', border: '1.5px solid #cbd5e1', color: '#475569', fontWeight: 800, padding: '10px 18px', borderRadius: '12px', fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: matrixAllocations.filter(p => !p.roomId).length === 0 ? 0.5 : 1, transition: 'all 0.2s' }}
-                      >
-                        ⚡ Räume automatisch zuteilen
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleSaveAndApproveAll}
-                        style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', border: 'none', fontWeight: 800, padding: '11px 20px', borderRadius: '12px', fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(16,185,129,0.2)' }}
-                      >
-                        💾 Zuteilung speichern & freigeben
-                      </button>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                      {/* Segmented Switch for Modes */}
+                      <div style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
+                        <button
+                          type="button"
+                          onClick={() => setSchedulesRoomsViewMode('live')}
+                          style={{
+                            background: schedulesRoomsViewMode === 'live' ? '#34a853' : 'transparent',
+                            color: schedulesRoomsViewMode === 'live' ? 'white' : '#475569',
+                            border: 'none',
+                            padding: '6px 14px',
+                            borderRadius: '8px',
+                            fontSize: '0.75rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          Raumplan (Live)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSchedulesRoomsViewMode('designer')}
+                          style={{
+                            background: schedulesRoomsViewMode === 'designer' ? '#34a853' : 'transparent',
+                            color: schedulesRoomsViewMode === 'designer' ? 'white' : '#475569',
+                            border: 'none',
+                            padding: '6px 14px',
+                            borderRadius: '8px',
+                            fontSize: '0.75rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          Raumplan-Designer
+                        </button>
+                      </div>
+
+                      {schedulesRoomsViewMode === 'designer' && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={runAutoRoomAllocation}
+                            disabled={matrixAllocations.filter(p => !p.roomId).length === 0}
+                            style={{ background: 'white', border: '1.5px solid #cbd5e1', color: '#475569', fontWeight: 800, padding: '10px 18px', borderRadius: '12px', fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: matrixAllocations.filter(p => !p.roomId).length === 0 ? 0.5 : 1, transition: 'all 0.2s' }}
+                          >
+                            ⚡ Räume automatisch zuteilen
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleSaveAndApproveAll}
+                            style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', border: 'none', fontWeight: 800, padding: '11px 20px', borderRadius: '12px', fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(16,185,129,0.2)' }}
+                          >
+                            💾 Zuteilung speichern & freigeben
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
 
-                  {/* Full-width Matrix: Nicht-zugewiesen row + Rooms rows */}
-                  <div style={{ overflowX: 'auto', background: 'white', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', padding: '24px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)' }}>
-                    {rooms.length === 0 ? (
-                      <div style={{ padding: '48px 24px', textAlign: 'center', color: '#94a3b8' }}>
-                        <span style={{ fontSize: '2rem', display: 'block', marginBottom: '8px' }}>🏫</span>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>Keine Räume gefunden. Bitte zuerst Räume im System anlegen.</span>
+                  {/* ──────────────────────────────────────────────────────── */}
+                  {/* VIEW MODE 1: DYNAMISCHER LIVE-RAUMPLAN (TIMELINE VIEW) */}
+                  {/* ──────────────────────────────────────────────────────── */}
+                  {schedulesRoomsViewMode === 'live' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                      
+                      {/* Weekday Switcher (Apple-style Segmented Control) */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#8e8e93', letterSpacing: '-0.01em', textTransform: 'uppercase' }}>Tag auswählen</span>
+                          <span style={{ fontSize: '0.7rem', color: '#8e8e93', fontWeight: 600 }}>Semester-Belegungen</span>
+                        </div>
+                        <div style={{ 
+                          display: 'grid', 
+                          gridTemplateColumns: 'repeat(7, 1fr)', 
+                          gap: '2px', 
+                          background: '#f1f5f9', 
+                          padding: '3px', 
+                          borderRadius: '14px',
+                          border: '1px solid rgba(0,0,0,0.02)',
+                          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)'
+                        }}>
+                          {[1,2,3,4,5,6,7].map(d => {
+                            const isSelected = liveViewDay === d;
+                            const dayName = ['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'][d];
+                            const allocationCount = matrixAllocations.filter(p => p.dayOfWeek === d && p.roomId).length;
+                            return (
+                              <button
+                                key={d}
+                                type="button"
+                                onClick={() => setLiveViewDay(d)}
+                                style={{
+                                  background: isSelected ? '#ffffff' : 'transparent',
+                                  border: 'none',
+                                  color: isSelected ? '#1c1c1e' : '#636366',
+                                  padding: '10px 8px',
+                                  borderRadius: '11px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: isSelected ? 700 : 500,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '6px',
+                                  boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)' : 'none',
+                                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                                }}
+                              >
+                                <span>{dayName}</span>
+                                <span style={{ 
+                                  background: isSelected ? '#34a853' : 'rgba(0, 0, 0, 0.05)', 
+                                  color: isSelected ? 'white' : '#636366', 
+                                  fontSize: '0.65rem', 
+                                  fontWeight: 700, 
+                                  width: '18px',
+                                  height: '18px',
+                                  borderRadius: '50%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  transition: 'all 0.2s ease'
+                                }}>
+                                  {allocationCount}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
-                    ) : (
-                      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: '700px' }}>
-                        <colgroup>
-                          <col style={{ width: '130px' }} />
-                          {[1,2,3,4,5].map(d => <col key={d} />)}
-                        </colgroup>
 
-                        {/* Header */}
-                        <thead>
-                          <tr style={{ borderBottom: '2px solid #f1f5f9' }}>
-                            <th style={{ padding: '10px 12px', fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'left' }}>Raum</th>
-                            {[1,2,3,4,5].map(d => (
-                              <th key={d} style={{ padding: '10px 10px', fontSize: '0.75rem', fontWeight: 900, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'left' }}>
-                                {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag'][d]}
-                                {matrixAllocations.filter(p => !p.roomId && p.dayOfWeek === d).length > 0 && (
-                                  <span style={{ marginLeft: '6px', background: '#fef3c7', color: '#b45309', fontSize: '0.6rem', fontWeight: 900, padding: '1px 6px', borderRadius: '6px' }}>
-                                    {matrixAllocations.filter(p => !p.roomId && p.dayOfWeek === d).length} offen
-                                  </span>
-                                )}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-
-                        <tbody>
-                          {/* ── Nicht zugewiesen row ── */}
-                          <tr style={{ borderBottom: '2px solid #fef3c7', background: '#fffbeb' }}>
-                            <td style={{ padding: '10px 12px', verticalAlign: 'top' }}>
-                              <strong style={{ fontSize: '0.7rem', color: '#b45309', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>Kein Raum</strong>
-                              <span style={{ fontSize: '0.6rem', color: '#d97706', fontWeight: 700 }}>↓ in Raum ziehen</span>
-                            </td>
-                            {[1,2,3,4,5].map(dayNum => {
-                              const unassigned = matrixAllocations.filter(p => !p.roomId && p.dayOfWeek === dayNum);
-                              return (
-                                <td
-                                  key={dayNum}
-                                  onDragOver={(e) => e.preventDefault()}
-                                  onDrop={() => handleDropOnMatrix(null, dayNum)}
-                                  style={{ padding: '8px', verticalAlign: 'top', minHeight: '72px' }}
-                                >
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minHeight: '64px', borderRadius: '10px', border: draggedPlanDay === dayNum ? '2px dashed #fcd34d' : '2px dashed transparent', background: draggedPlanDay === dayNum ? 'rgba(253,211,77,0.06)' : draggedPlanId ? 'rgba(0,0,0,0.02)' : 'transparent', padding: draggedPlanDay === dayNum ? '4px' : '0', opacity: draggedPlanId && draggedPlanDay !== dayNum ? 0.4 : 1, transition: 'all 0.2s' }}>
-                                    {unassigned.map(plan => (
-                                      <div
-                                        key={plan.id}
-                                        draggable
-                                        onDragStart={() => handleDragStartMatrix(plan.id)}
-                                        onClick={() => setSelectedDayPlan(plan)}
-                                        style={{ background: 'white', border: '1px solid #fde68a', borderLeft: '4px solid #f59e0b', borderRadius: '10px', padding: '7px 9px', cursor: 'grab', display: 'flex', flexDirection: 'column', gap: '2px', boxShadow: '0 1px 4px rgba(245,158,11,0.08)', transition: 'all 0.15s' }}
-                                      >
-                                        <span style={{ fontSize: '0.73rem', fontWeight: 800, color: '#92400e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{plan.teacherName}</span>
-                                        <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#b45309' }}>{plan.instrument}</span>
-                                        <span style={{ fontSize: '0.62rem', fontWeight: 900, fontFamily: 'monospace', color: '#d97706' }}>⏱ {plan.startTime}–{plan.endTime}</span>
-                                      </div>
-                                    ))}
-                                    {unassigned.length === 0 && (
-                                      <div style={{ height: '40px' }} />
-                                    )}
+                      {/* Timeline Board */}
+                      <div style={{ background: 'white', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', padding: '24px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', overflowX: 'auto' }}>
+                        {rooms.length === 0 ? (
+                          <div style={{ padding: '48px 24px', textAlign: 'center', color: '#94a3b8' }}>
+                            <span style={{ fontSize: '2rem', display: 'block', marginBottom: '8px' }}>🏫</span>
+                            <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>Keine Räume gefunden. Bitte zuerst Räume im System anlegen.</span>
+                          </div>
+                        ) : (
+                          <div style={{ minWidth: '800px', position: 'relative' }}>
+                            
+                            {/* Hour Header Bar */}
+                            <div style={{ display: 'flex', marginBottom: '16px', borderBottom: '2px solid #f1f5f9', paddingBottom: '10px' }}>
+                              <div style={{ width: '180px', flexShrink: 0, fontSize: '0.72rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Raum</div>
+                              <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', paddingLeft: '20px', position: 'relative' }}>
+                                {['13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00'].map((hr, idx) => (
+                                  <div key={idx} style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textAlign: 'center', width: '40px', flexShrink: 0, position: 'relative' }}>
+                                    {hr}
                                   </div>
-                                </td>
-                              );
-                            })}
-                          </tr>
+                                ))}
+                              </div>
+                            </div>
 
-                          {/* ── Room rows ── */}
-                          {rooms.map((room, rIdx) => (
-                            <tr key={room.id} style={{ borderBottom: rIdx < rooms.length - 1 ? '1px solid #f8fafc' : 'none' }}>
-                              <td style={{ padding: '12px', verticalAlign: 'top' }}>
-                                <strong style={{ fontSize: '0.78rem', color: '#0f172a', fontWeight: 800, display: 'block' }}>{room.name}</strong>
-                                <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 600 }}>{room.equipment?.join(' · ') || '—'}</span>
-                              </td>
-                              {[1,2,3,4,5].map(dayNum => {
-                                const cellPlans = matrixAllocations.filter(p => p.roomId === room.id && p.dayOfWeek === dayNum);
-                                const isDragOver = !!draggedPlanId;
+                            {/* Room Timeline Rows */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                              {rooms.map(room => {
+                                const roomAllocations = matrixAllocations.filter(p => p.roomId === room.id && p.dayOfWeek === liveViewDay);
+                                
+                                // Conflict checker inside the timeline
+                                const hasConflicts = roomAllocations.some(p1 => 
+                                  roomAllocations.some(p2 => p1.id !== p2.id && p1.startTime < p2.endTime && p2.startTime < p1.endTime)
+                                );
+
                                 return (
-                                  <td
-                                    key={dayNum}
-                                    onDragOver={(e) => e.preventDefault()}
-                                    onDrop={() => handleDropOnMatrix(room.id, dayNum)}
-                                    style={{ padding: '8px', verticalAlign: 'top' }}
-                                  >
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minHeight: '64px', borderRadius: '10px', border: draggedPlanDay === dayNum ? '2px dashed #a7f3d0' : '2px dashed transparent', background: draggedPlanDay === dayNum ? 'rgba(16,185,129,0.04)' : 'transparent', opacity: draggedPlanId && draggedPlanDay !== dayNum ? 0.35 : 1, padding: draggedPlanDay === dayNum ? '4px' : '0', transition: 'all 0.2s', cursor: draggedPlanId && draggedPlanDay !== dayNum ? 'not-allowed' : 'default' }}>
-                                      {cellPlans.map(plan => {
-                                        const hasOverlap = cellPlans.some(p => p.id !== plan.id && p.startTime < plan.endTime && plan.startTime < p.endTime);
+                                  <div key={room.id} style={{ display: 'flex', alignItems: 'center', minHeight: '64px', paddingBottom: '8px', borderBottom: '1px solid #f8fafc' }}>
+                                    
+                                    {/* Left info box */}
+                                    <div style={{ width: '180px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <strong style={{ fontSize: '0.85rem', color: '#1e293b', fontWeight: 800 }}>{room.name}</strong>
+                                        {hasConflicts && (
+                                          <span style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#ef4444', fontSize: '0.58rem', fontWeight: 900, padding: '1px 5px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '2px' }} title="Zeitliche Überschneidung!">
+                                            ⚠️ KOLLISION
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span style={{ fontSize: '0.62rem', color: '#94a3b8', fontWeight: 700, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                                        🎸 {room.allowed_instruments?.join(' · ') || room.equipment?.join(' · ') || 'Alle Instrumente'}
+                                      </span>
+                                      
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setAdHocRoomId(room.id);
+                                          setShowAdHocBooking(true);
+                                        }}
+                                        style={{
+                                          alignSelf: 'flex-start',
+                                          background: 'rgba(52, 168, 83, 0.06)',
+                                          border: '1px dashed rgba(52, 168, 83, 0.25)',
+                                          color: '#137333',
+                                          fontSize: '0.62rem',
+                                          fontWeight: 800,
+                                          padding: '3px 8px',
+                                          borderRadius: '8px',
+                                          cursor: 'pointer',
+                                          marginTop: '2px',
+                                          transition: 'all 0.15s'
+                                        }}
+                                      >
+                                        ➕ Spontan buchen
+                                      </button>
+                                    </div>
+
+                                    {/* Right timeline grid area */}
+                                    <div style={{ flex: 1, height: '52px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #f1f5f9', position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)' }}>
+                                      
+                                      {/* Visual Hour Grid lines */}
+                                      <div style={{ position: 'absolute', inset: 0, display: 'flex', justifyContent: 'space-between', pointerEvents: 'none', paddingLeft: '20px', paddingRight: '20px' }}>
+                                        {[1,2,3,4,5,6,7,8,9].map(i => (
+                                          <div key={i} style={{ borderLeft: '1.5px dashed rgba(226, 232, 240, 0.7)', height: '100%' }} />
+                                        ))}
+                                      </div>
+
+                                      {/* Absolute Positioned Allocations */}
+                                      {roomAllocations.map(plan => {
+                                        // Conversion helper
+                                        const timeToMins = (t: string) => {
+                                          if (!t || !t.includes(':')) return 840; // Default 14:00
+                                          const [h, m] = t.split(':').map(Number);
+                                          return h * 60 + m;
+                                        };
+
+                                        const startMin = timeToMins(plan.startTime);
+                                        const endMin = timeToMins(plan.endTime);
+                                        
+                                        // Timeline starts 13:00 (780 mins), ends 21:00 (1260 mins). Duration 480 mins.
+                                        const leftPercent = Math.max(0, Math.min(100, ((startMin - 780) / 480) * 100));
+                                        const widthPercent = Math.max(8, Math.min(100 - leftPercent, ((endMin - startMin) / 480) * 100));
+
+                                        const isConflict = roomAllocations.some(p => 
+                                          p.id !== plan.id && p.startTime < plan.endTime && plan.startTime < p.endTime
+                                        );
+
+                                        // Beautiful pastel coloring depending on instrument
+                                        let themeBg = 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)';
+                                        let themeBorder = '#10b981';
+                                        let themeText = '#065f46';
+                                        
+                                        if (isConflict) {
+                                          themeBg = 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)';
+                                          themeBorder = '#ef4444';
+                                          themeText = '#991b1b';
+                                        } else if (plan.instrument?.toLowerCase().includes('schlagzeug') || plan.instrument?.toLowerCase().includes('drums')) {
+                                          themeBg = 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)';
+                                          themeBorder = '#3b82f6';
+                                          themeText = '#1e3a8a';
+                                        } else if (plan.instrument?.toLowerCase().includes('piano') || plan.instrument?.toLowerCase().includes('klavier') || plan.instrument?.toLowerCase().includes('keys')) {
+                                          themeBg = 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)';
+                                          themeBorder = '#a855f7';
+                                          themeText = '#581c87';
+                                        } else if (plan.id.startsWith('adhoc_')) {
+                                          themeBg = 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)';
+                                          themeBorder = '#f59e0b';
+                                          themeText = '#78350f';
+                                        }
+
                                         return (
                                           <div
                                             key={plan.id}
-                                            draggable
-                                            onDragStart={() => handleDragStartMatrix(plan.id)}
                                             onClick={() => setSelectedDayPlan(plan)}
-                                            style={{ background: hasOverlap ? '#fef2f2' : 'white', border: hasOverlap ? '2px dashed #ef4444' : '1px solid #e2e8f0', borderLeft: hasOverlap ? '4px solid #ef4444' : '4px solid #10b981', borderRadius: '10px', padding: '7px 9px', cursor: 'grab', display: 'flex', flexDirection: 'column', gap: '2px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', transition: 'all 0.15s' }}
+                                            style={{
+                                              position: 'absolute',
+                                              left: `${leftPercent}%`,
+                                              width: `${widthPercent}%`,
+                                              height: '38px',
+                                              background: themeBg,
+                                              border: `1.5px solid ${themeBorder}`,
+                                              borderLeft: `4.5px solid ${themeBorder}`,
+                                              borderRadius: '10px',
+                                              padding: '2px 8px',
+                                              cursor: 'pointer',
+                                              display: 'flex',
+                                              flexDirection: 'column',
+                                              justifyContent: 'center',
+                                              boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)',
+                                              zIndex: isConflict ? 10 : 2,
+                                              transition: 'all 0.2s',
+                                              overflow: 'hidden'
+                                            }}
+                                            className="hover-scale-mini"
+                                            title={`${plan.teacherName} (${plan.instrument}) : ${plan.startTime} - ${plan.endTime}`}
                                           >
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
-                                              <span style={{ fontSize: '0.73rem', fontWeight: 800, color: hasOverlap ? '#991b1b' : '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                              <span style={{ fontSize: '0.67rem', fontWeight: 900, color: themeText, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
                                                 {plan.teacherName}
                                               </span>
-                                              {hasOverlap && <span style={{ fontSize: '0.6rem', flexShrink: 0 }} title="Zeitkonflikt!">⚠️</span>}
+                                              <span style={{ fontSize: '0.58rem', fontWeight: 900, fontFamily: 'monospace', color: themeText, opacity: 0.85 }}>
+                                                {plan.startTime} - {plan.endTime}
+                                              </span>
                                             </div>
-                                            <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#94a3b8' }}>{plan.instrument}</span>
-                                            <span style={{ fontSize: '0.62rem', fontWeight: 900, fontFamily: 'monospace', color: hasOverlap ? '#ef4444' : '#059669' }}>
-                                              ⏱ {plan.startTime}–{plan.endTime}
+                                            <span style={{ fontSize: '0.55rem', fontWeight: 700, color: themeText, opacity: 0.75, textTransform: 'uppercase', letterSpacing: '0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                              {plan.id.startsWith('adhoc_') ? '⚡ Spontan' : plan.instrument}
                                             </span>
                                           </div>
                                         );
                                       })}
-                                      {cellPlans.length === 0 && <div style={{ height: '40px' }} />}
+
+                                      {roomAllocations.length === 0 && (
+                                        <div style={{ width: '100%', textAlign: 'center', fontSize: '0.67rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.02em' }}>
+                                          ☕ Frei · Keine Zuweisungen
+                                        </div>
+                                      )}
+                                    </div>
+
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                          </div>
+                        )}
+                      </div>
+
+                    </div>
+                  )}
+
+                  {/* ──────────────────────────────────────────────────────── */}
+                  {/* VIEW MODE 2: UPGRADED RAUMPLAN-DESIGNER (MATRIX GRID)    */}
+                  {/* ──────────────────────────────────────────────────────── */}
+                  {schedulesRoomsViewMode === 'designer' && (
+                    <div style={{ overflowX: 'auto', background: 'white', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', padding: '24px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)' }}>
+                      {rooms.length === 0 ? (
+                        <div style={{ padding: '48px 24px', textAlign: 'center', color: '#94a3b8' }}>
+                          <span style={{ fontSize: '2rem', display: 'block', marginBottom: '8px' }}>🏫</span>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>Keine Räume gefunden. Bitte zuerst Räume im System anlegen.</span>
+                        </div>
+                      ) : (
+                        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: '700px' }}>
+                          <colgroup>
+                            <col style={{ width: '130px' }} />
+                            {[1,2,3,4,5,6,7].map(d => <col key={d} />)}
+                          </colgroup>
+
+                          <thead>
+                            <tr style={{ borderBottom: '2px solid #f1f5f9' }}>
+                              <th style={{ padding: '10px 12px', fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'left' }}>Raum</th>
+                              {[1,2,3,4,5,6,7].map(d => (
+                                <th key={d} style={{ padding: '10px 10px', fontSize: '0.75rem', fontWeight: 900, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'left' }}>
+                                  {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'][d]}
+                                  {matrixAllocations.filter(p => !p.roomId && p.dayOfWeek === d).length > 0 && (
+                                    <span style={{ marginLeft: '6px', background: '#fef3c7', color: '#b45309', fontSize: '0.6rem', fontWeight: 900, padding: '1px 6px', borderRadius: '6px' }}>
+                                      {matrixAllocations.filter(p => !p.roomId && p.dayOfWeek === d).length} offen
+                                    </span>
+                                  )}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+
+                          <tbody>
+                            {/* ── Nicht zugewiesen row ── */}
+                            <tr style={{ borderBottom: '2px solid #fef3c7', background: '#fffbeb' }}>
+                              <td style={{ padding: '10px 12px', verticalAlign: 'top' }}>
+                                <strong style={{ fontSize: '0.7rem', color: '#b45309', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>Kein Raum</strong>
+                                <span style={{ fontSize: '0.6rem', color: '#d97706', fontWeight: 700 }}>↓ in Raum ziehen</span>
+                              </td>
+                              {[1,2,3,4,5,6,7].map(dayNum => {
+                                const unassigned = matrixAllocations.filter(p => !p.roomId && p.dayOfWeek === dayNum);
+                                return (
+                                  <td
+                                    key={dayNum}
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onDrop={() => handleDropOnMatrix(null, dayNum)}
+                                    style={{ padding: '8px', verticalAlign: 'top', minHeight: '72px' }}
+                                  >
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minHeight: '64px', borderRadius: '10px', border: draggedPlanDay === dayNum ? '2px dashed #fcd34d' : '2px dashed transparent', background: draggedPlanDay === dayNum ? 'rgba(253,211,77,0.06)' : draggedPlanId ? 'rgba(0,0,0,0.02)' : 'transparent', padding: draggedPlanDay === dayNum ? '4px' : '0', opacity: draggedPlanId && draggedPlanDay !== dayNum ? 0.4 : 1, transition: 'all 0.2s' }}>
+                                      {unassigned.map(plan => (
+                                        <div
+                                          key={plan.id}
+                                          draggable
+                                          onDragStart={() => handleDragStartMatrix(plan.id)}
+                                          onClick={() => setSelectedDayPlan(plan)}
+                                          style={{ background: 'white', border: '1px solid #fde68a', borderLeft: '4px solid #f59e0b', borderRadius: '10px', padding: '7px 9px', cursor: 'grab', display: 'flex', flexDirection: 'column', gap: '2px', boxShadow: '0 1px 4px rgba(245,158,11,0.08)', transition: 'all 0.15s' }}
+                                        >
+                                          <span style={{ fontSize: '0.73rem', fontWeight: 800, color: '#92400e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{plan.teacherName}</span>
+                                          <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#b45309' }}>{plan.instrument}</span>
+                                          <span style={{ fontSize: '0.62rem', fontWeight: 900, fontFamily: 'monospace', color: '#d97706' }}>⏱ {plan.startTime}–{plan.endTime}</span>
+                                        </div>
+                                      ))}
+                                      {unassigned.length === 0 && (
+                                        <div style={{ height: '40px' }} />
+                                      )}
                                     </div>
                                   </td>
                                 );
                               })}
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
 
-                  {/* Detail Drawer Panel */}
+                            {/* ── Room rows ── */}
+                            {rooms.map((room, rIdx) => {
+                              // Smart instrument compatibility check for visual highlighting
+                              const draggedPlan = draggedPlanId ? matrixAllocations.find(p => p.id === draggedPlanId) : null;
+                              
+                              let isCompatible = true;
+                              if (draggedPlan && draggedPlan.instrument) {
+                                const instrLower = draggedPlan.instrument.toLowerCase();
+                                const roomNameLower = room.name.toLowerCase();
+                                const eq = room.allowed_instruments || room.equipment || [];
+                                const eqLower = eq.map((e: string) => e.toLowerCase());
+
+                                if (instrLower.includes('schlagzeug') || instrLower.includes('drums') || instrLower.includes('drum')) {
+                                  isCompatible = eqLower.includes('drums') || eqLower.includes('schlagzeug') || eqLower.includes('drum') || 
+                                                 roomNameLower.includes('schlagzeug') || roomNameLower.includes('drums') || roomNameLower.includes('band') || roomNameLower.includes('drum');
+                                } else if (instrLower.includes('klavier') || instrLower.includes('piano') || instrLower.includes('flügel') || instrLower.includes('keys') || instrLower.includes('keyboard')) {
+                                  isCompatible = eqLower.includes('piano') || eqLower.includes('klavier') || eqLower.includes('keys') || eqLower.includes('keyboard') ||
+                                                 roomNameLower.includes('klavier') || roomNameLower.includes('piano') || roomNameLower.includes('flügel') || roomNameLower.includes('keyboard') || roomNameLower.includes('keys');
+                                }
+                              }
+
+                              return (
+                                <tr key={room.id} style={{ borderBottom: rIdx < rooms.length - 1 ? '1px solid #f8fafc' : 'none' }}>
+                                  <td style={{ padding: '12px', verticalAlign: 'top', background: draggedPlanId && !isCompatible ? '#fef2f2' : 'transparent', transition: 'background 0.25s' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                      <strong style={{ fontSize: '0.78rem', color: draggedPlanId && !isCompatible ? '#991b1b' : '#0f172a', fontWeight: 800 }}>
+                                        {room.name}
+                                      </strong>
+                                      <span style={{ fontSize: '0.6rem', color: draggedPlanId && !isCompatible ? '#ef4444' : '#94a3b8', fontWeight: 600 }}>
+                                        {draggedPlanId && !isCompatible ? '⚠️ Nicht Ideal' : (room.equipment?.join(' · ') || 'Alle Instrumente')}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  {[1,2,3,4,5,6,7].map(dayNum => {
+                                    const cellPlans = matrixAllocations.filter(p => p.roomId === room.id && p.dayOfWeek === dayNum);
+                                    
+                                    // Visual highlight styling based on compatibility
+                                    let borderStyle = '2px dashed transparent';
+                                    let cellBg = 'transparent';
+                                    if (draggedPlanId && draggedPlanDay === dayNum) {
+                                      if (isCompatible) {
+                                        borderStyle = '2px dashed #34a853';
+                                        cellBg = 'rgba(52, 168, 83, 0.03)';
+                                      } else {
+                                        borderStyle = '2px dashed #f59e0b';
+                                        cellBg = 'rgba(245, 158, 11, 0.03)';
+                                      }
+                                    }
+
+                                    return (
+                                      <td
+                                        key={dayNum}
+                                        onDragOver={(e) => e.preventDefault()}
+                                        onDrop={() => handleDropOnMatrix(room.id, dayNum)}
+                                        style={{ padding: '8px', verticalAlign: 'top' }}
+                                      >
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minHeight: '64px', borderRadius: '10px', border: borderStyle, background: cellBg, opacity: draggedPlanId && draggedPlanDay !== dayNum ? 0.35 : 1, padding: draggedPlanId && draggedPlanDay === dayNum ? '4px' : '0', transition: 'all 0.2s', cursor: draggedPlanId && draggedPlanDay !== dayNum ? 'not-allowed' : 'default' }}>
+                                          {cellPlans.map(plan => {
+                                            const hasOverlap = cellPlans.some(p => p.id !== plan.id && p.startTime < plan.endTime && plan.startTime < p.endTime);
+                                            return (
+                                              <div
+                                                key={plan.id}
+                                                draggable
+                                                onDragStart={() => handleDragStartMatrix(plan.id)}
+                                                onClick={() => setSelectedDayPlan(plan)}
+                                                style={{ background: hasOverlap ? '#fef2f2' : 'white', border: hasOverlap ? '2px dashed #ef4444' : '1px solid #e2e8f0', borderLeft: hasOverlap ? '4px solid #ef4444' : '4px solid #10b981', borderRadius: '10px', padding: '7px 9px', cursor: 'grab', display: 'flex', flexDirection: 'column', gap: '2px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', transition: 'all 0.15s' }}
+                                              >
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
+                                                  <span style={{ fontSize: '0.73rem', fontWeight: 800, color: hasOverlap ? '#991b1b' : '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    {plan.teacherName}
+                                                  </span>
+                                                  {hasOverlap && <span style={{ fontSize: '0.6rem', flexShrink: 0 }} title="Zeitkonflikt!">⚠️</span>}
+                                                </div>
+                                                <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#94a3b8' }}>{plan.instrument}</span>
+                                                <span style={{ fontSize: '0.62rem', fontWeight: 900, fontFamily: 'monospace', color: hasOverlap ? '#ef4444' : '#059669' }}>
+                                                  ⏱ {plan.startTime}–{plan.endTime}
+                                                </span>
+                                              </div>
+                                            );
+                                          })}
+                                          {cellPlans.length === 0 && <div style={{ height: '40px' }} />}
+                                        </div>
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ──────────────────────────────────────────────────────── */}
+                  {/* DIALOG POPUP: SPONTANE AD-HOC BELEGUNG BUCHEN            */}
+                  {/* ──────────────────────────────────────────────────────── */}
+                  {showAdHocBooking && (
+                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)', backdropFilter: 'blur(8px)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          if (!adHocTeacherId) {
+                            alert('Bitte wähle eine Lehrkraft.');
+                            return;
+                          }
+                          const chosenTeacher = campusTeachers.find(t => t.id === adHocTeacherId);
+                          const name = chosenTeacher ? `${chosenTeacher.firstName} ${chosenTeacher.lastName}` : 'Lehrkraft';
+                          const instrument = chosenTeacher ? chosenTeacher.instrument : 'Instrument';
+
+                          // Compute end time: startTime (e.g. "14:15") + duration (minutes)
+                          const [h, m] = adHocStartTime.split(':').map(Number);
+                          let totalMins = h * 60 + m + adHocDuration;
+                          const endH = Math.floor(totalMins / 60) % 24;
+                          const endM = totalMins % 60;
+                          const endTimeStr = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+
+                          const newPlanId = `adhoc_${Date.now()}`;
+                          const newPlanEntry = {
+                            id: newPlanId,
+                            teacherId: adHocTeacherId,
+                            teacherName: name,
+                            instrument: instrument,
+                            dayOfWeek: liveViewDay,
+                            startTime: adHocStartTime,
+                            endTime: endTimeStr,
+                            roomId: adHocRoomId,
+                            status: 'approved',
+                            slots: [
+                              {
+                                student_name: adHocStudentName.trim() || 'Spontane Buchung (Freies Üben)',
+                                time_slot: adHocStartTime,
+                                duration: adHocDuration,
+                                student_id: null
+                              }
+                            ]
+                          };
+
+                          setMatrixAllocations(prev => [...prev, newPlanEntry]);
+                          setShowAdHocBooking(false);
+                          setAdHocStudentName('');
+                          alert('Spontanbelegung erfolgreich eingebucht! ⚡');
+                        }}
+                        style={{ background: 'white', borderRadius: '28px', border: '1px solid rgba(255,255,255,0.5)', width: '100%', maxWidth: '440px', padding: '32px', display: 'flex', flexDirection: 'column', gap: '20px', boxShadow: '0 24px 64px rgba(15,23,42,0.18)', animation: 'modalFadeIn 0.3s cubic-bezier(0.16,1,0.3,1)' }}
+                      >
+                        <div>
+                          <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>⚡ Spontanbelegung buchen</h3>
+                          <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 550 }}>
+                            Buche ad-hoc freie Zeitkapazitäten für {rooms.find(r => r.id === adHocRoomId)?.name || 'diesen Raum'}.
+                          </p>
+                        </div>
+
+                        {/* Teacher Selector */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <label style={{ fontSize: '0.67rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Lehrkraft auswählen</label>
+                          <select
+                            required
+                            value={adHocTeacherId}
+                            onChange={(e) => setAdHocTeacherId(e.target.value)}
+                            style={{ padding: '12px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: '#f8fafc', fontSize: '0.82rem', fontWeight: 700, color: '#475569', cursor: 'pointer', outline: 'none' }}
+                          >
+                            <option value="">— Bitte Lehrkraft wählen —</option>
+                            {campusTeachers.map(t => (
+                              <option key={t.id} value={t.id}>{t.firstName} {t.lastName} ({t.instrument})</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Student Name input */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <label style={{ fontSize: '0.67rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Schüler / Zweck (Optional)</label>
+                          <input
+                            type="text"
+                            placeholder="z.B. Nachholstunde Max Muster, oder Freies Üben"
+                            value={adHocStudentName}
+                            onChange={(e) => setAdHocStudentName(e.target.value)}
+                            style={{ padding: '12px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: '#f8fafc', fontSize: '0.82rem', fontWeight: 700, outline: 'none' }}
+                          />
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                          {/* Start time */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '0.67rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Startzeit</label>
+                            <input
+                              type="time"
+                              required
+                              value={adHocStartTime}
+                              onChange={(e) => setAdHocStartTime(e.target.value)}
+                              style={{ padding: '12px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: '#f8fafc', fontSize: '0.82rem', fontWeight: 700, outline: 'none' }}
+                            />
+                          </div>
+
+                          {/* Duration selector */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '0.67rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Dauer</label>
+                            <select
+                              value={adHocDuration}
+                              onChange={(e) => setAdHocDuration(Number(e.target.value))}
+                              style={{ padding: '12px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: '#f8fafc', fontSize: '0.82rem', fontWeight: 700, color: '#475569', cursor: 'pointer', outline: 'none' }}
+                            >
+                              <option value={30}>30 Minuten</option>
+                              <option value={45}>45 Minuten</option>
+                              <option value={60}>60 Minuten</option>
+                              <option value={90}>90 Minuten</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Submit / Cancel Buttons */}
+                        <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+                          <button
+                            type="submit"
+                            style={{ flex: 2, background: '#34a853', color: 'white', border: 'none', padding: '14px', borderRadius: '14px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(52,168,83,0.2)' }}
+                          >
+                            Einbuchen & Reservieren
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowAdHocBooking(false);
+                              setAdHocStudentName('');
+                            }}
+                            style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '14px', borderRadius: '14px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            Abbrechen
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  )}
+
+                  {/* ──────────────────────────────────────────────────────── */}
+                  {/* DETAIL DRAWER PANEL (CLICK ON ANY PLAN BLOCK TO INSPECT) */}
+                  {/* ──────────────────────────────────────────────────────── */}
                   {selectedDayPlan && (
                     <div style={{ position: 'fixed', top: 0, right: 0, width: '400px', height: '100vh', background: 'white', boxShadow: '-12px 0 48px rgba(15,23,42,0.14)', borderLeft: '1px solid #e2e8f0', zIndex: 1050, display: 'flex', flexDirection: 'column', padding: '24px', animation: 'modalFadeIn 0.3s cubic-bezier(0.16,1,0.3,1)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px', marginBottom: '16px' }}>
                         <div>
                           <span style={{ fontSize: '0.63rem', fontWeight: 800, color: '#f59e0b', background: '#fffbeb', border: '1px solid rgba(245,158,11,0.2)', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', display: 'inline-block', marginBottom: '6px' }}>
-                            {['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'][selectedDayPlan.dayOfWeek]} Plan
+                            {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'][selectedDayPlan.dayOfWeek]} Plan
                           </span>
                           <h3 style={{ margin: '0 0 2px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>{selectedDayPlan.teacherName}</h3>
                           <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>🎸 {selectedDayPlan.instrument}</span>
@@ -5741,19 +6394,22 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           <option value="">— Kein Raum (zurücksetzen) —</option>
                           {rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                         </select>
-                        <button
-                          onClick={() => handleRejectTeacherDayPlan(selectedDayPlan)}
-                          style={{ background: 'rgba(239,68,68,0.05)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', padding: '9px 14px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', width: '100%' }}
-                        >
-                          ↩ Zur Überarbeitung zurückweisen
-                        </button>
+                        
+                        {!selectedDayPlan.id.startsWith('adhoc_') && (
+                          <button
+                            onClick={() => handleRejectTeacherDayPlan(selectedDayPlan)}
+                            style={{ background: 'rgba(239,68,68,0.05)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', padding: '9px 14px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', width: '100%' }}
+                          >
+                            ↩ Zur Überarbeitung zurückweisen
+                          </button>
+                        )}
                       </div>
 
                       {/* Slot list */}
                       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '7px' }}>
                         <h4 style={{ margin: '0 0 8px 0', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.06em' }}>Stundenliste</h4>
                         {selectedDayPlan.slots.map((slot: any, idx: number) => {
-                          const isBreak = !slot.student_id;
+                          const isBreak = !slot.student_id && !selectedDayPlan.id.startsWith('adhoc_');
                           return (
                             <div key={idx} style={{ padding: '9px 11px', borderRadius: '10px', border: '1px solid #f1f5f9', background: isBreak ? '#fffbeb' : '#f8fafc', borderLeft: isBreak ? '4px solid #f59e0b' : '4px solid #3b82f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <div>
@@ -5761,7 +6417,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   {isBreak ? '☕ Pause' : slot.student_name}
                                 </span>
                                 <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 650, display: 'block', marginTop: '1px' }}>
-                                  {isBreak ? 'Pause' : `Instrument: ${selectedDayPlan.instrument}`}
+                                  {isBreak ? 'Pause' : `Instrument: ${slot.student_instrument || selectedDayPlan.instrument || 'Instrument'}`}
                                 </span>
                               </div>
                               <div style={{ textAlign: 'right' }}>
@@ -6564,7 +7220,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       onChange={(e) => setBulkTxtInput(e.target.value)}
                       style={{ padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#1e293b', outline: 'none', fontFamily: 'monospace', fontSize: '0.8rem' }}
                     />
-                    <button type="submit" className="google-btn-primary" style={{ background: '#fbbc05', color: '#09090b', fontWeight: 900, alignSelf: 'flex-start' }}>Dozenten importieren</button>
+                    <button type="submit" className="google-btn-primary" style={{ background: '#fbbc05', color: '#09090b', fontWeight: 900, alignSelf: 'flex-start' }}>Lehrer importieren</button>
                   </form>
                 </div>
 
@@ -7320,7 +7976,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px', marginBottom: '16px' }}>
                     <div>
                       <span style={{ fontSize: '0.63rem', fontWeight: 800, color: '#f59e0b', background: '#fffbeb', border: '1px solid rgba(245,158,11,0.2)', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', display: 'inline-block', marginBottom: '6px' }}>
-                        {['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'][selectedDayPlan.dayOfWeek]} · Lese-Ansicht
+                        {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'][selectedDayPlan.dayOfWeek]} · Lese-Ansicht
                       </span>
                       <h3 style={{ margin: '0 0 2px 0', fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>{selectedDayPlan.teacherName}</h3>
                       <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>🎸 {selectedDayPlan.instrument}</span>
@@ -7335,7 +7991,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       const isBreak = !slot.student_id;
                       return (
                         <div key={idx} style={{ padding: '9px 11px', borderRadius: '10px', border: '1px solid #f1f5f9', background: isBreak ? '#fffbeb' : '#f8fafc', borderLeft: isBreak ? '4px solid #f59e0b' : '4px solid #3b82f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d1d1f' }}>{isBreak ? '☕ Pause' : slot.student_name}</span>
+                          <div>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d1d1f', display: 'block' }}>{isBreak ? '☕ Pause' : slot.student_name}</span>
+                            <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 650, display: 'block', marginTop: '1px' }}>
+                              {isBreak ? 'Pause' : `Instrument: ${slot.student_instrument || selectedDayPlan.instrument || 'Instrument'}`}
+                            </span>
+                          </div>
                           <span style={{ fontSize: '0.73rem', fontWeight: 900, fontFamily: 'monospace', color: isBreak ? '#b45309' : '#0f172a' }}>{slot.time_slot}</span>
                         </div>
                       );
@@ -7446,12 +8107,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   <button 
                     onClick={() => { 
                       navigator.clipboard.writeText(`${window.location.origin}/?school_id=${schoolId}`); 
-                      alert('Schul-Integrationslink kopiert!'); 
+                      setCopiedSchoolLink(true);
+                      setTimeout(() => setCopiedSchoolLink(false), 2000);
                     }} 
                     className="google-btn-primary" 
-                    style={{ padding: '10px 18px', fontSize: '0.8rem' }}
+                    style={{ 
+                      padding: '10px 18px', 
+                      fontSize: '0.8rem', 
+                      background: copiedSchoolLink ? '#34a853' : undefined,
+                      transition: 'all 0.2s ease'
+                    }}
                   >
-                    Link kopieren
+                    {copiedSchoolLink ? '✓ Kopiert!' : 'Link kopieren'}
                   </button>
                 </div>
               </div>

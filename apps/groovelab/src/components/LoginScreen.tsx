@@ -587,7 +587,16 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
         // Subdomain resolution logic
         const getSubdomain = () => {
-          const host = window.location.hostname;
+          let host = window.location.hostname;
+          
+          // If the hostname ends with the platform's main domain, strip it to isolate the subdomain
+          const mainDomains = ['.campus-groovelab.de', '.groovelab.de', '.campus-groovelab.com'];
+          for (const domain of mainDomains) {
+            if (host.endsWith(domain)) {
+              return host.substring(0, host.length - domain.length);
+            }
+          }
+          
           const parts = host.split('.');
           if (parts.length >= 3) {
             const first = parts[0];
@@ -625,7 +634,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 .replace(/^-+|-+$/g, '');
             };
 
-            const matchedSchool = allSchools.find(s => slugify(s.name) === subdomain);
+            const matchedSchool = allSchools.find(s => {
+              const slug = slugify(s.name);
+              const cleanSub = subdomain.toLowerCase().trim();
+              return slug === cleanSub || 
+                     slug.replace(/-/g, '') === cleanSub.replace(/-/g, '') ||
+                     slug.startsWith(cleanSub + '-') || 
+                     cleanSub.startsWith(slug + '-');
+            });
             if (matchedSchool) {
               setSchoolName(matchedSchool.name);
               setSchoolData(matchedSchool);

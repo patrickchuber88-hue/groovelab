@@ -130,10 +130,10 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   const [schedulesList, setSchedulesList] = useState<any[]>([]);
   const [avatar, setAvatar] = useState<any>(null);
   const [studentStats, setStudentStats] = useState<any>(null);
-  const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? false);
-  const [isGroovelabActive, setIsGroovelabActive] = useState<boolean>(student.is_groovelab_active ?? false);
+  const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? student.isCampusActive ?? false);
+  const [isGroovelabActive, setIsGroovelabActive] = useState<boolean>(student.is_groovelab_active ?? student.isGroovelabActive ?? false);
   const [isPremiumActive, setIsPremiumActive] = useState<boolean>(false);
-  const [lessonDuration, setLessonDuration] = useState<number>(student.lesson_duration ?? 45);
+  const [lessonDuration, setLessonDuration] = useState<number>(student.lesson_duration || 30);
   const [campusRequestSent, setCampusRequestSent] = useState<boolean>(() => {
     return localStorage.getItem(`req_campus_${student.id}`) === 'true';
   });
@@ -158,6 +158,47 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
   const [showTageskompassModal, setShowTageskompassModal] = useState(false);
   const [currentTeacherId, setCurrentTeacherId] = useState<string | undefined>(undefined);
+  const [schoolName, setSchoolName] = useState<string>('Campus Musikschule');
+
+  useEffect(() => {
+    const fetchSchool = async () => {
+      let resolvedSchoolId = student.school_id || student.schoolId || (student.schools?.id) || (Array.isArray(student.schools) ? student.schools[0]?.id : null);
+      
+      if (!resolvedSchoolId && student.id) {
+        try {
+          const { data, error } = await supabase
+            .from('users')
+            .select('school_id')
+            .eq('id', student.id)
+            .single();
+          if (data && data.school_id) {
+            resolvedSchoolId = data.school_id;
+          }
+        } catch (err) {
+          console.error('Error fetching student school_id:', err);
+        }
+      }
+
+      if (resolvedSchoolId) {
+        try {
+          const { data, error } = await supabase
+            .from('schools')
+            .select('name')
+            .eq('id', resolvedSchoolId)
+            .single();
+          if (data) {
+            setSchoolName(data.name || 'Campus Musikschule');
+          }
+        } catch (err) {
+          console.error('Error fetching school details:', err);
+        }
+      } else {
+        setSchoolName('Campus Musikschule');
+      }
+    };
+
+    fetchSchool();
+  }, [student.id, student.school_id, student.schools]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -166,6 +207,17 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       }
     });
   }, []);
+
+  useEffect(() => {
+    setIsCampusActive(student.is_campus_active ?? student.isCampusActive ?? false);
+    setIsGroovelabActive(student.is_groovelab_active ?? student.isGroovelabActive ?? false);
+    setLessonDuration(student.lesson_duration || 30);
+    setCampusRequestSent(localStorage.getItem(`req_campus_${student.id}`) === 'true');
+    setGroovelabRequestSent(localStorage.getItem(`req_groovelab_${student.id}`) === 'true');
+    setDurationRequestSent(localStorage.getItem(`req_duration_${student.id}`) !== null);
+    const val = localStorage.getItem(`req_duration_${student.id}`);
+    setRequestedDuration(val ? parseInt(val) : 45);
+  }, [student]);
 
   useEffect(() => {
     // Load global Lehrwerke
@@ -466,6 +518,18 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         .maybeSingle();
       setIsPremiumActive(premiumInfo?.is_premium_active ?? false);
 
+      // Fetch latest user details (e.g. is_campus_active, is_groovelab_active) directly to prevent stale dashboard props
+      const { data: latestUser } = await supabase
+        .from('users')
+        .select('is_campus_active, is_groovelab_active, lesson_duration')
+        .eq('id', student.id)
+        .single();
+      if (latestUser) {
+        setIsCampusActive(latestUser.is_campus_active ?? false);
+        setIsGroovelabActive(latestUser.is_groovelab_active ?? false);
+        setLessonDuration(latestUser.lesson_duration || 30);
+      }
+
       // Fetch avatar details
       const { data: avatarRecord } = await supabase
         .from('avatars')
@@ -632,7 +696,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           <X size={20} />
         </button>
 
-        {/* iOS-style Segmented Control Switch + Tageskompass Button */}
+        {/* iOS-style Segmented Control Switch + Schüler-Notizbuch Button */}
         <div style={{ 
           marginBottom: '24px', 
           display: 'grid', 
@@ -722,8 +786,8 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
               }}
               className="hover-scale"
             >
-              <span>🧭</span>
-              <span>Tageskompass öffnen</span>
+              <span>📓</span>
+              <span>Schüler-Notizbuch</span>
             </button>
           </div>
         </div>
@@ -1563,50 +1627,54 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                   pointerEvents: 'none'
                 }} />
 
-                {/* Top Info Section: Avatar left, Details right */}
-                <div style={{ display: 'flex', gap: '20px', alignItems: 'center', zIndex: 1 }}>
-                  {/* Left Side: Avatar Photo */}
-                  <img 
-                    src={displayAvatarSrc} 
-                    alt="Avatar" 
-                    style={{ 
-                      width: '96px', 
-                      height: '96px', 
-                      borderRadius: '24px', 
-                      objectFit: 'cover',
-                      border: '3px solid #fbbf24',
-                      boxShadow: '0 8px 24px rgba(251, 191, 36, 0.25)',
-                      flexShrink: 0
-                    }} 
-                  />
-                  
-                  {/* Right Side: Identity Details */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
-                    <span style={{ 
-                      fontSize: '0.68rem', 
-                      fontWeight: 900, 
-                      color: '#fbbf24', 
-                      textTransform: 'uppercase', 
-                      letterSpacing: '0.2em'
-                    }}>
-                      CAMPUS PASS
-                    </span>
-                    
-                    <div>
-                      <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Karteninhaber</span>
-                      <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', marginTop: '1px', fontFamily: "'Outfit', sans-serif", letterSpacing: '-0.02em' }}>
-                        {student.first_name} {student.last_name}
-                      </div>
-                    </div>
+                 {/* CAMPUS PASS Header */}
+                 <span style={{ 
+                   fontSize: '0.68rem', 
+                   fontWeight: 900, 
+                   color: '#fbbf24', 
+                   textTransform: 'uppercase', 
+                   letterSpacing: '0.2em',
+                   zIndex: 1,
+                   marginBottom: '-4px'
+                 }}>
+                   CAMPUS PASS
+                 </span>
 
-                    <div>
-                      <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Musikakademie</span>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ffffff', opacity: 0.95, marginTop: '1px' }}>
-                        Campus Musikschule
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                 {/* Top Info Section: Details left, Avatar right */}
+                 <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', zIndex: 1, flexDirection: 'row-reverse', width: '100%' }}>
+                   {/* Right Side: Avatar Photo */}
+                   <img 
+                     src={displayAvatarSrc} 
+                     alt="Avatar" 
+                     style={{ 
+                       width: '92px', 
+                       height: '92px', 
+                       borderRadius: '22px', 
+                       objectFit: 'cover',
+                       border: '3px solid #fbbf24',
+                       boxShadow: '0 8px 24px rgba(251, 191, 36, 0.25)',
+                       flexShrink: 0,
+                       marginTop: '2px'
+                     }} 
+                   />
+                   
+                   {/* Left Side: Identity Details */}
+                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
+                     <div>
+                       <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Name</span>
+                       <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', marginTop: '1px', fontFamily: "'Outfit', sans-serif", letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                         {student.first_name} {student.last_name}
+                       </div>
+                     </div>
+ 
+                     <div>
+                       <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Musikschule</span>
+                       <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ffffff', opacity: 0.95, marginTop: '1px', lineHeight: '1.2' }}>
+                         {schoolName}
+                       </div>
+                     </div>
+                   </div>
+                 </div>
 
                 {/* Dashed divider line */}
                 <div style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(251, 191, 36, 0.3) 50%, transparent 100%)', height: '1px', width: '100%', margin: '8px 0', zIndex: 1 }} />

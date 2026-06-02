@@ -2605,12 +2605,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               {Array.from({ length: 6 }).map((_, idx) => (
                 <div key={idx} style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}>
                   <div style={{
-                    width: '28px',
-                    height: '5px',
-                    borderRadius: '2.5px',
+                    width: '40px',
+                    height: '8px',
+                    borderRadius: '4px',
                     background: 'linear-gradient(180deg, #ffd54f 0%, #ff9100 100%)',
                     boxShadow: '0 2px 4px rgba(0,0,0,0.25)',
-                    zIndex: 35
+                    zIndex: 35,
+                    position: 'absolute',
+                    left: '-17px'
                   }} />
                 </div>
               ))}

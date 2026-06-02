@@ -411,6 +411,51 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   
   const [selectedQRUser, setSelectedQRUser] = useState<any>(null);
   const [qrAvatarDataUrl, setQrAvatarDataUrl] = useState<string | null>(null);
+  const [qrSchoolName, setQrSchoolName] = useState<string>('Campus Musikschule');
+
+  useEffect(() => {
+    if (!selectedQRUser) {
+      setQrSchoolName('Campus Musikschule');
+      return;
+    }
+    const fetchSchool = async () => {
+      let resolvedSchoolId = selectedQRUser.school_id || selectedQRUser.schoolId || (selectedQRUser.schools?.id) || (Array.isArray(selectedQRUser.schools) ? selectedQRUser.schools[0]?.id : null);
+      
+      if (!resolvedSchoolId && selectedQRUser.id) {
+        try {
+          const { data, error } = await supabase
+            .from('users')
+            .select('school_id')
+            .eq('id', selectedQRUser.id)
+            .single();
+          if (data && data.school_id) {
+            resolvedSchoolId = data.school_id;
+          }
+        } catch (err) {
+          console.error('Error fetching student school_id:', err);
+        }
+      }
+
+      if (resolvedSchoolId) {
+        try {
+          const { data, error } = await supabase
+            .from('schools')
+            .select('name')
+            .eq('id', resolvedSchoolId)
+            .single();
+          if (data) {
+            setQrSchoolName(data.name || 'Campus Musikschule');
+          }
+        } catch (err) {
+          console.error('Error fetching school details:', err);
+        }
+      } else {
+        setQrSchoolName('Campus Musikschule');
+      }
+    };
+
+    fetchSchool();
+  }, [selectedQRUser]);
 
   useEffect(() => {
     if (!selectedQRUser) {
@@ -5181,52 +5226,56 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   pointerEvents: 'none'
                 }} />
 
-                {/* Top Info Section: Avatar left, Details right */}
-                <div style={{ display: 'flex', gap: '20px', alignItems: 'center', zIndex: 1 }}>
-                  {/* Left Side: Avatar Photo */}
-                  <img 
-                    src={qrAvatarDataUrl || '/avatar_ghost.jpg'} 
-                    onLoad={handleQRImageLoad}
-                    crossOrigin="anonymous"
-                    alt="Avatar" 
-                    style={{ 
-                      width: '96px', 
-                      height: '96px', 
-                      borderRadius: '24px', 
-                      objectFit: 'cover',
-                      border: '3px solid #fbbf24',
-                      boxShadow: '0 8px 24px rgba(251, 191, 36, 0.25)',
-                      flexShrink: 0
-                    }} 
-                  />
-                  
-                  {/* Right Side: Identity Details */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
-                    <span style={{ 
-                      fontSize: '0.68rem', 
-                      fontWeight: 900, 
-                      color: '#fbbf24', 
-                      textTransform: 'uppercase', 
-                      letterSpacing: '0.2em'
-                    }}>
-                      CAMPUS PASS
-                    </span>
-                    
-                    <div>
-                      <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Karteninhaber</span>
-                      <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', marginTop: '1px', fontFamily: "'Outfit', sans-serif", letterSpacing: '-0.02em' }}>
-                        {selectedQRUser.first_name} {selectedQRUser.last_name}
-                      </div>
-                    </div>
+                 {/* CAMPUS PASS Header */}
+                 <span style={{ 
+                   fontSize: '0.68rem', 
+                   fontWeight: 900, 
+                   color: '#fbbf24', 
+                   textTransform: 'uppercase', 
+                   letterSpacing: '0.2em',
+                   zIndex: 1,
+                   marginBottom: '-4px'
+                 }}>
+                   CAMPUS PASS
+                 </span>
 
-                    <div>
-                      <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Musikakademie</span>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ffffff', opacity: 0.95, marginTop: '1px' }}>
-                        Campus Musikschule
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                 {/* Top Info Section: Details left, Avatar right */}
+                 <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', zIndex: 1, flexDirection: 'row-reverse', width: '100%' }}>
+                   {/* Right Side: Avatar Photo */}
+                   <img 
+                     src={qrAvatarDataUrl || '/avatar_ghost.jpg'} 
+                     onLoad={handleQRImageLoad}
+                     crossOrigin="anonymous"
+                     alt="Avatar" 
+                     style={{ 
+                       width: '92px', 
+                       height: '92px', 
+                       borderRadius: '22px', 
+                       objectFit: 'cover',
+                       border: '3px solid #fbbf24',
+                       boxShadow: '0 8px 24px rgba(251, 191, 36, 0.25)',
+                       flexShrink: 0,
+                       marginTop: '2px'
+                     }} 
+                   />
+                   
+                   {/* Left Side: Identity Details */}
+                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
+                     <div>
+                       <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Name</span>
+                       <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', marginTop: '1px', fontFamily: "'Outfit', sans-serif", letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                         {selectedQRUser.first_name} {selectedQRUser.last_name}
+                       </div>
+                     </div>
+ 
+                     <div>
+                       <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Musikschule</span>
+                       <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ffffff', opacity: 0.95, marginTop: '1px', lineHeight: '1.2' }}>
+                         {qrSchoolName}
+                       </div>
+                     </div>
+                   </div>
+                 </div>
 
                 {/* Dashed divider line */}
                 <div style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(251, 191, 36, 0.3) 50%, transparent 100%)', height: '1px', width: '100%', margin: '8px 0', zIndex: 1 }} />

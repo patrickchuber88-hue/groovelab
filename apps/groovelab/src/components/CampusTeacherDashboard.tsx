@@ -2169,7 +2169,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
             {/* Modal Header */}
             <div className="p-6 border-b border-slate-800 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-black text-white">Meisterwerk-Protokoll</h3>
+                <h3 className="text-lg font-black text-white">Schüler-Notizbuch</h3>
                 <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider mt-0.5">
                   {selectedStudentForDoc.first_name} {selectedStudentForDoc.last_name}
                 </p>

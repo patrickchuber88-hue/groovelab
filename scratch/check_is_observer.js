@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://msyxlqljswpertszbotf.supabase.co';
-const supabaseAnonKey = 'sb_publishable_GF8tj3-jMPuOUGMC5tDamA_NUrNyGh4';
+const supabaseUrl = 'https://supabase.178.105.10.2.sslip.io';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzc5NTUzODQzLCJleHAiOjE5MzcyMzM4NDN9.NPFKhuj3WiiJ7pqG7w91QAEy1V696kfTcEunScUAAoI';
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -16,10 +16,9 @@ async function applyMigration() {
 
     if (error) {
       if (error.message.includes('is_observer')) {
-        console.log('Column is_observer does NOT exist yet. Please run the SQL migration manually in Supabase Dashboard:');
+        console.log('Column is_observer does NOT exist yet. Please run the SQL migration manually in your database:');
         console.log('\nSQL to run:');
         console.log('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_observer BOOLEAN DEFAULT false;');
-        console.log('\nGo to: https://supabase.com/dashboard/project/msyxlqljswpertszbotf/sql/new');
       } else {
         console.error('Unexpected error:', error);
       }
