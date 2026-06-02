@@ -173,9 +173,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [useNotebookLayout, setUseNotebookLayout] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('meisterwerk_notebook_layout');
-      return saved === 'true';
+      return saved !== 'false'; // defaults to true if not explicitly set to 'false'
     }
-    return false;
+    return true;
   });
   const [pageUndoStack, setPageUndoStack] = useState<{ lehrwerkId: string, pageNum: number, prevStatus: any }[]>([]);
   const [hasChanges, setHasChanges] = useState<boolean>(false);
