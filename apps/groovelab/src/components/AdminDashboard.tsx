@@ -4103,7 +4103,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           title: newLehrwerk.title,
           author: newLehrwerk.author || null,
           total_pages: Number(newLehrwerk.totalPages) || 50,
-          school_id: adminData.school_id,
+          school_id: admin?.school_id,
           teacher_id: admin?.role === 'teacher' ? admin.id : null
         };
 
@@ -4583,87 +4583,91 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Cloud Link (Noten / Material)</label>
-                    <div style={{ position: 'relative' }}>
-                      <Box size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                      <input placeholder="https://cloud.folder.link..." value={newSong.media_link} onChange={e => setNewSong({...newSong, media_link: e.target.value})} style={{ width: '100%', padding: '10px 12px 10px 38px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>OneDrive/Dropbox PDF-Ordner</label>
-                      <input placeholder="Ordner-Link..." value={newSong.pdf_folder_url || ''} onChange={e => setNewSong({...newSong, pdf_folder_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>OneDrive Guitar Pro Link (.gp)</label>
-                      <input placeholder="ms-onedrive://..." value={newSong.guitar_pro_url || ''} onChange={e => setNewSong({...newSong, guitar_pro_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
-                    </div>
-                  </div>
-
-                  <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>📄</span> Instrumenten-spezifische PDF-Dateien
-                    </div>
-                    
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎸 E-Gitarre PDF Link</label>
-                        <input placeholder="Link..." value={newSong.pdf_guitar_url || ''} onChange={e => setNewSong({...newSong, pdf_guitar_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                  {activePlatform !== 'campus' && (
+                    <>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Cloud Link (Noten / Material)</label>
+                        <div style={{ position: 'relative' }}>
+                          <Box size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                          <input placeholder="https://cloud.folder.link..." value={newSong.media_link} onChange={e => setNewSong({...newSong, media_link: e.target.value})} style={{ width: '100%', padding: '10px 12px 10px 38px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎸 E-Bass PDF Link</label>
-                        <input placeholder="Link..." value={newSong.pdf_bass_url || ''} onChange={e => setNewSong({...newSong, pdf_bass_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                      </div>
-                    </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🥁 E-Drums PDF Link</label>
-                        <input placeholder="Link..." value={newSong.pdf_drums_url || ''} onChange={e => setNewSong({...newSong, pdf_drums_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>OneDrive/Dropbox PDF-Ordner</label>
+                          <input placeholder="Ordner-Link..." value={newSong.pdf_folder_url || ''} onChange={e => setNewSong({...newSong, pdf_folder_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>OneDrive Guitar Pro Link (.gp)</label>
+                          <input placeholder="ms-onedrive://..." value={newSong.guitar_pro_url || ''} onChange={e => setNewSong({...newSong, guitar_pro_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎹 E-Piano PDF Link</label>
-                        <input placeholder="Link..." value={newSong.pdf_keys_url || ''} onChange={e => setNewSong({...newSong, pdf_keys_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                      </div>
-                    </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎤 Gesang / Lyrics PDF Link</label>
-                        <input placeholder="Link..." value={newSong.pdf_vocals_url || ''} onChange={e => setNewSong({...newSong, pdf_vocals_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎵 Playback Audio-Track Link</label>
-                        <input placeholder="Link..." value={newSong.playalong_url || ''} onChange={e => setNewSong({...newSong, playalong_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: '#fffbeb', borderRadius: '12px', border: '1px solid #fef3c7' }}>
-                    <input type="checkbox" id="add-bypass-wlan" checked={!!newSong.bypass_wlan_check} onChange={e => setNewSong({...newSong, bypass_wlan_check: e.target.checked})} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: brandColor }} />
-                    <label htmlFor="add-bypass-wlan" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#b45309', cursor: 'pointer' }}>
-                      WLAN-Sperre ignorieren (Home-Testing Bypass)
-                    </label>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Arrangement / Instrumente</label>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px' }}>
-                      {['E-Gitarre', 'E-Drums', 'E-Piano', 'E-Bass'].map(inst => (
-                        <div key={inst} style={{ padding: '10px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                          <div style={{ fontSize: '1.2rem' }}>{ADMIN_INSTRUMENT_ICONS[inst] || '🎵'}</div>
-                          <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>{inst}</div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <button type="button" onClick={() => setNewSong({...newSong, instrumentation: {...newSong.instrumentation, [inst]: Math.max(0, (newSong.instrumentation[inst] || 0) - 1)}})} style={{ width: '22px', height: '22px', borderRadius: '6px', border: 'none', background: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', cursor: 'pointer', fontWeight: 900 }}>-</button>
-                            <span style={{ fontWeight: 900, fontSize: '0.9rem', minWidth: '14px', textAlign: 'center' }}>{newSong.instrumentation[inst] || 0}</span>
-                            <button type="button" onClick={() => setNewSong({...newSong, instrumentation: {...newSong.instrumentation, [inst]: (newSong.instrumentation[inst] || 0) + 1}})} style={{ width: '22px', height: '22px', borderRadius: '6px', border: 'none', background: brandColor, color: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', cursor: 'pointer', fontWeight: 900 }}>+</button>
+                      <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>📄</span> Instrumenten-spezifische PDF-Dateien
+                        </div>
+                        
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎸 E-Gitarre PDF Link</label>
+                            <input placeholder="Link..." value={newSong.pdf_guitar_url || ''} onChange={e => setNewSong({...newSong, pdf_guitar_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎸 E-Bass PDF Link</label>
+                            <input placeholder="Link..." value={newSong.pdf_bass_url || ''} onChange={e => setNewSong({...newSong, pdf_bass_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🥁 E-Drums PDF Link</label>
+                            <input placeholder="Link..." value={newSong.pdf_drums_url || ''} onChange={e => setNewSong({...newSong, pdf_drums_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎹 E-Piano PDF Link</label>
+                            <input placeholder="Link..." value={newSong.pdf_keys_url || ''} onChange={e => setNewSong({...newSong, pdf_keys_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎤 Gesang / Lyrics PDF Link</label>
+                            <input placeholder="Link..." value={newSong.pdf_vocals_url || ''} onChange={e => setNewSong({...newSong, pdf_vocals_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎵 Playback Audio-Track Link</label>
+                            <input placeholder="Link..." value={newSong.playalong_url || ''} onChange={e => setNewSong({...newSong, playalong_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: '#fffbeb', borderRadius: '12px', border: '1px solid #fef3c7' }}>
+                        <input type="checkbox" id="add-bypass-wlan" checked={!!newSong.bypass_wlan_check} onChange={e => setNewSong({...newSong, bypass_wlan_check: e.target.checked})} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: brandColor }} />
+                        <label htmlFor="add-bypass-wlan" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#b45309', cursor: 'pointer' }}>
+                          WLAN-Sperre ignorieren (Home-Testing Bypass)
+                        </label>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Arrangement / Instrumente</label>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px' }}>
+                          {['E-Gitarre', 'E-Drums', 'E-Piano', 'E-Bass'].map(inst => (
+                            <div key={inst} style={{ padding: '10px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                              <div style={{ fontSize: '1.2rem' }}>{ADMIN_INSTRUMENT_ICONS[inst] || '🎵'}</div>
+                              <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>{inst}</div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <button type="button" onClick={() => setNewSong({...newSong, instrumentation: {...newSong.instrumentation, [inst]: Math.max(0, (newSong.instrumentation[inst] || 0) - 1)}})} style={{ width: '22px', height: '22px', borderRadius: '6px', border: 'none', background: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', cursor: 'pointer', fontWeight: 900 }}>-</button>
+                                <span style={{ fontWeight: 900, fontSize: '0.9rem', minWidth: '14px', textAlign: 'center' }}>{newSong.instrumentation[inst] || 0}</span>
+                                <button type="button" onClick={() => setNewSong({...newSong, instrumentation: {...newSong.instrumentation, [inst]: (newSong.instrumentation[inst] || 0) + 1}})} style={{ width: '22px', height: '22px', borderRadius: '6px', border: 'none', background: brandColor, color: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', cursor: 'pointer', fontWeight: 900 }}>+</button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                   <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
                     <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer', boxShadow: `0 4px 12px ${brandColor}20` }}>In Bibliothek speichern</button>
@@ -4687,87 +4691,91 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Cloud Link (Noten / Material)</label>
-                    <div style={{ position: 'relative' }}>
-                      <Box size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                      <input placeholder="https://cloud.folder.link..." value={editingSong.media_link} onChange={e => setEditingSong({...editingSong, media_link: e.target.value})} style={{ width: '100%', padding: '10px 12px 10px 38px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>OneDrive/Dropbox PDF-Ordner</label>
-                      <input placeholder="Ordner-Link..." value={editingSong.pdf_folder_url || ''} onChange={e => setEditingSong({...editingSong, pdf_folder_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>OneDrive Guitar Pro Link (.gp)</label>
-                      <input placeholder="ms-onedrive://..." value={editingSong.guitar_pro_url || ''} onChange={e => setEditingSong({...editingSong, guitar_pro_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
-                    </div>
-                  </div>
-
-                  <div style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #bae6fd', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 900, color: '#0369a1', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>📄</span> Instrumenten-spezifische PDF-Dateien
-                    </div>
-                    
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎸 E-Gitarre PDF Link</label>
-                        <input placeholder="Link..." value={editingSong.pdf_guitar_url || ''} onChange={e => setEditingSong({...editingSong, pdf_guitar_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                  {activePlatform !== 'campus' && (
+                    <>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Cloud Link (Noten / Material)</label>
+                        <div style={{ position: 'relative' }}>
+                          <Box size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                          <input placeholder="https://cloud.folder.link..." value={editingSong.media_link} onChange={e => setEditingSong({...editingSong, media_link: e.target.value})} style={{ width: '100%', padding: '10px 12px 10px 38px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎸 E-Bass PDF Link</label>
-                        <input placeholder="Link..." value={editingSong.pdf_bass_url || ''} onChange={e => setEditingSong({...editingSong, pdf_bass_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                      </div>
-                    </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🥁 E-Drums PDF Link</label>
-                        <input placeholder="Link..." value={editingSong.pdf_drums_url || ''} onChange={e => setEditingSong({...editingSong, pdf_drums_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>OneDrive/Dropbox PDF-Ordner</label>
+                          <input placeholder="Ordner-Link..." value={editingSong.pdf_folder_url || ''} onChange={e => setEditingSong({...editingSong, pdf_folder_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>OneDrive Guitar Pro Link (.gp)</label>
+                          <input placeholder="ms-onedrive://..." value={editingSong.guitar_pro_url || ''} onChange={e => setEditingSong({...editingSong, guitar_pro_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎹 E-Piano PDF Link</label>
-                        <input placeholder="Link..." value={editingSong.pdf_keys_url || ''} onChange={e => setEditingSong({...editingSong, pdf_keys_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                      </div>
-                    </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎤 Gesang / Lyrics PDF Link</label>
-                        <input placeholder="Link..." value={editingSong.pdf_vocals_url || ''} onChange={e => setEditingSong({...editingSong, pdf_vocals_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎵 Playback Audio Link</label>
-                        <input placeholder="Link..." value={editingSong.playalong_url || ''} onChange={e => setEditingSong({...editingSong, playalong_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: '#fffbeb', borderRadius: '12px', border: '1px solid #fef3c7' }}>
-                    <input type="checkbox" id="edit-bypass-wlan" checked={!!editingSong.bypass_wlan_check} onChange={e => setEditingSong({...editingSong, bypass_wlan_check: e.target.checked})} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: brandColor }} />
-                    <label htmlFor="edit-bypass-wlan" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#b45309', cursor: 'pointer' }}>
-                      WLAN-Sperre ignorieren (Home-Testing Bypass)
-                    </label>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Arrangement / Instrumente</label>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px' }}>
-                      {['E-Gitarre', 'E-Drums', 'E-Piano', 'E-Bass'].map(inst => (
-                        <div key={inst} style={{ padding: '10px', borderRadius: '12px', background: 'white', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                          <div style={{ fontSize: '1.2rem' }}>{ADMIN_INSTRUMENT_ICONS[inst] || '🎵'}</div>
-                          <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>{inst}</div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <button type="button" onClick={() => setEditingSong({...editingSong, instrumentation: {...(editingSong.instrumentation || {}), [inst]: Math.max(0, ((editingSong.instrumentation || {})[inst] || 0) - 1)}})} style={{ width: '22px', height: '22px', borderRadius: '6px', border: 'none', background: '#f1f5f9', cursor: 'pointer', fontWeight: 900 }}>-</button>
-                            <span style={{ fontWeight: 900, fontSize: '0.9rem', minWidth: '14px', textAlign: 'center' }}>{(editingSong.instrumentation || {})[inst] || 0}</span>
-                            <button type="button" onClick={() => setEditingSong({...editingSong, instrumentation: {...(editingSong.instrumentation || {}), [inst]: ((editingSong.instrumentation || {})[inst] || 0) + 1}})} style={{ width: '22px', height: '22px', borderRadius: '6px', border: 'none', background: brandColor, color: 'white', cursor: 'pointer', fontWeight: 900 }}>+</button>
+                      <div style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #bae6fd', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 900, color: '#0369a1', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>📄</span> Instrumenten-spezifische PDF-Dateien
+                        </div>
+                        
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎸 E-Gitarre PDF Link</label>
+                            <input placeholder="Link..." value={editingSong.pdf_guitar_url || ''} onChange={e => setEditingSong({...editingSong, pdf_guitar_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎸 E-Bass PDF Link</label>
+                            <input placeholder="Link..." value={editingSong.pdf_bass_url || ''} onChange={e => setEditingSong({...editingSong, pdf_bass_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🥁 E-Drums PDF Link</label>
+                            <input placeholder="Link..." value={editingSong.pdf_drums_url || ''} onChange={e => setEditingSong({...editingSong, pdf_drums_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎹 E-Piano PDF Link</label>
+                            <input placeholder="Link..." value={editingSong.pdf_keys_url || ''} onChange={e => setEditingSong({...editingSong, pdf_keys_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎤 Gesang / Lyrics PDF Link</label>
+                            <input placeholder="Link..." value={editingSong.pdf_vocals_url || ''} onChange={e => setEditingSong({...editingSong, pdf_vocals_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎵 Playback Audio Link</label>
+                            <input placeholder="Link..." value={editingSong.playalong_url || ''} onChange={e => setEditingSong({...editingSong, playalong_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: '#fffbeb', borderRadius: '12px', border: '1px solid #fef3c7' }}>
+                        <input type="checkbox" id="edit-bypass-wlan" checked={!!editingSong.bypass_wlan_check} onChange={e => setEditingSong({...editingSong, bypass_wlan_check: e.target.checked})} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: brandColor }} />
+                        <label htmlFor="edit-bypass-wlan" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#b45309', cursor: 'pointer' }}>
+                          WLAN-Sperre ignorieren (Home-Testing Bypass)
+                        </label>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Arrangement / Instrumente</label>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px' }}>
+                          {['E-Gitarre', 'E-Drums', 'E-Piano', 'E-Bass'].map(inst => (
+                            <div key={inst} style={{ padding: '10px', borderRadius: '12px', background: 'white', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                              <div style={{ fontSize: '1.2rem' }}>{ADMIN_INSTRUMENT_ICONS[inst] || '🎵'}</div>
+                              <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>{inst}</div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <button type="button" onClick={() => setEditingSong({...editingSong, instrumentation: {...(editingSong.instrumentation || {}), [inst]: Math.max(0, ((editingSong.instrumentation || {})[inst] || 0) - 1)}})} style={{ width: '22px', height: '22px', borderRadius: '6px', border: 'none', background: '#f1f5f9', cursor: 'pointer', fontWeight: 900 }}>-</button>
+                                <span style={{ fontWeight: 900, fontSize: '0.9rem', minWidth: '14px', textAlign: 'center' }}>{(editingSong.instrumentation || {})[inst] || 0}</span>
+                                <button type="button" onClick={() => setEditingSong({...editingSong, instrumentation: {...(editingSong.instrumentation || {}), [inst]: ((editingSong.instrumentation || {})[inst] || 0) + 1}})} style={{ width: '22px', height: '22px', borderRadius: '6px', border: 'none', background: brandColor, color: 'white', cursor: 'pointer', fontWeight: 900 }}>+</button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                   <div style={{ display: 'flex', gap: '12px' }}>
                     <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer' }}>Aktualisieren</button>
@@ -4794,37 +4802,39 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                         <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '1.1rem', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.title}</div>
                       </div>
                       
-                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                        {(() => {
-                          const inst = song.instrumentation || {};
-                          const norm: Record<string, number> = {};
-                          Object.entries(inst).forEach(([k, v]) => {
-                            const lower = k.toLowerCase();
-                            let key = k;
-                            if (lower === 'guitar' || lower === 'e-gitarre') key = 'E-Gitarre';
-                            else if (lower === 'bass' || lower === 'e-bass') key = 'E-Bass';
-                            else if (lower === 'drums' || lower === 'e-drums') key = 'E-Drums';
-                            else if (lower === 'piano' || lower === 'keys' || lower === 'e-piano') key = 'E-Piano';
-                            else if (lower === 'vocals' || lower === 'gesang') key = 'Vocals';
-                            norm[key] = Math.max(norm[key] || 0, v as number);
-                          });
-                          
-                          return Object.entries(norm).map(([inst, count]) => (
-                            count > 0 && (
-                              <div key={inst} style={{ padding: '3px 8px', borderRadius: '6px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <span style={{ fontSize: '0.8rem' }}>{ADMIN_INSTRUMENT_ICONS[inst]}</span>
-                                <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b' }}>{count}</span>
-                              </div>
-                            )
-                          ));
-                        })()}
-                        {song.media_link && (
-                          <div style={{ padding: '3px 8px', borderRadius: '6px', background: `${brandColor}10`, border: `1px solid ${brandColor}20`, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Box size={10} color={brandColor} />
-                            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: brandColor }}>Cloud</span>
-                          </div>
-                        )}
-                      </div>
+                      {activePlatform !== 'campus' && (
+                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                          {(() => {
+                            const inst = song.instrumentation || {};
+                            const norm: Record<string, number> = {};
+                            Object.entries(inst).forEach(([k, v]) => {
+                              const lower = k.toLowerCase();
+                              let key = k;
+                              if (lower === 'guitar' || lower === 'e-gitarre') key = 'E-Gitarre';
+                              else if (lower === 'bass' || lower === 'e-bass') key = 'E-Bass';
+                              else if (lower === 'drums' || lower === 'e-drums') key = 'E-Drums';
+                              else if (lower === 'piano' || lower === 'keys' || lower === 'e-piano') key = 'E-Piano';
+                              else if (lower === 'vocals' || lower === 'gesang') key = 'Vocals';
+                              norm[key] = Math.max(norm[key] || 0, v as number);
+                            });
+                            
+                            return Object.entries(norm).map(([inst, count]) => (
+                              count > 0 && (
+                                <div key={inst} style={{ padding: '3px 8px', borderRadius: '6px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <span style={{ fontSize: '0.8rem' }}>{ADMIN_INSTRUMENT_ICONS[inst]}</span>
+                                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b' }}>{count}</span>
+                                </div>
+                              )
+                            ));
+                          })()}
+                          {song.media_link && (
+                            <div style={{ padding: '3px 8px', borderRadius: '6px', background: `${brandColor}10`, border: `1px solid ${brandColor}20`, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Box size={10} color={brandColor} />
+                              <span style={{ fontSize: '0.7rem', fontWeight: 800, color: brandColor }}>Cloud</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
                       <button onClick={() => {
