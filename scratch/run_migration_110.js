@@ -1,8 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 
 const supabaseUrl = 'https://supabase.campus-groovelab.de';
-// Using service role key for DDL operations
-const serviceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3Nzk1MDg4MDAsImV4cCI6MTk0NzI3MjAwMH0.bZkF36smSqnCxgLzpAlgAqfTR_XVBNQlnLbCQYxlhZk';
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzc5NTUzODQzLCJleHAiOjE5MzcyMzM4NDN9.NPFKhuj3WiiJ7pqG7w91QAEy1V696kfTcEunScUAAoI';
 
 const supabase = createClient(supabaseUrl, serviceKey);

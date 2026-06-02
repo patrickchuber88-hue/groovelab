@@ -940,7 +940,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         .select('*, schools(*)');
       
       const cleanPin = pin.trim();
-      if (cleanPin.includes('-') && cleanPin.length > 20) {
+      if (cleanPin.startsWith('t_')) {
+        query = query.eq('teacher_qr_token', cleanPin);
+      } else if (cleanPin.includes('-') && cleanPin.length > 20) {
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanPin);
         if (isUuid) {
           query = query.eq('qr_token', cleanPin);
