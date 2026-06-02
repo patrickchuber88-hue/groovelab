@@ -969,23 +969,19 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             border: '1px solid rgba(255, 255, 255, 0.5)', 
             boxShadow: '0 8px 32px rgba(0, 0, 0, 0.03)', 
             display: 'flex', 
-            justifyContent: 'space-between', 
             alignItems: 'center', 
-            flexWrap: 'wrap', 
-            gap: '16px', 
-            position: 'relative', 
-            overflow: 'hidden' 
+            gap: '16px'
           }}>
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-              <div style={{ height: '40px', width: '40px', borderRadius: '12px', background: 'rgba(254, 240, 138, 0.5)', color: '#a16207', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0, width: '264px' }}>
+              <div style={{ height: '40px', width: '40px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.15)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Calendar size={20} />
               </div>
-              <div>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em' }}>
+              <div style={{ minWidth: 0 }}>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
                   Stundenplan-Designer
                 </h2>
-                <p style={{ color: '#86868b', fontSize: '0.78rem', fontWeight: 500, marginTop: '1px' }}>
-                  Ziehe Schüler aus dem Pool direkt in deine Unterrichtstage. Pausen & Slots berechnen sich automatisch.
+                <p style={{ color: '#86868b', fontSize: '0.78rem', fontWeight: 500, marginTop: '1px', whiteSpace: 'nowrap', visibility: 'hidden', userSelect: 'none', margin: '1px 0 0 0' }}>
+                  Placeholder
                 </p>
               </div>
             </div>
@@ -1005,32 +1001,32 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               </button>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end', marginLeft: 'auto' }}>
               {hasSubmittedSchedule && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(209, 250, 229, 0.5)', border: '1px solid rgba(16, 185, 129, 0.15)', color: '#065f46', padding: '8px 12px', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 700 }}>
-                  <span style={{ color: '#10b981', fontSize: '0.9rem' }}>✓</span> 
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(209, 250, 229, 0.5)', border: '1px solid rgba(16, 185, 129, 0.15)', color: '#065f46', padding: '6px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700 }}>
+                  <span style={{ color: '#10b981', fontSize: '0.8rem' }}>✓</span> 
                   <span>Eingereicht {lastSubmittedTime ? `(um ${lastSubmittedTime} Uhr)` : '(Wartet auf Freigabe)'}</span>
                 </div>
               )}
               <button
                 type="button"
                 onClick={() => setShowAddBoardForm(true)}
-                style={{ background: 'rgba(255, 255, 255, 0.6)', color: '#1d1d1f', border: '1px solid rgba(0, 0, 0, 0.08)', fontWeight: 600, padding: '8px 14px', borderRadius: '12px', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
+                style={{ background: 'rgba(255, 255, 255, 0.6)', color: '#1d1d1f', border: '1px solid rgba(0, 0, 0, 0.08)', fontWeight: 600, padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', transition: 'all 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
                 onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.9)'}
                 onMouseOut={e => e.currentTarget.style.background = 'rgba(255,255,255,0.6)'}
               >
-                <Plus size={14} />
+                <Plus size={13} />
                 Tag anlegen
               </button>
               
               <label 
                 htmlFor="pdf-upload"
-                style={{ background: 'rgba(255, 255, 255, 0.6)', color: '#1d1d1f', border: '1px solid rgba(0, 0, 0, 0.08)', fontWeight: 600, padding: '8px 14px', borderRadius: '12px', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
+                style={{ background: 'rgba(255, 255, 255, 0.6)', color: '#1d1d1f', border: '1px solid rgba(0, 0, 0, 0.08)', fontWeight: 600, padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', transition: 'all 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
                 onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.9)'}
                 onMouseOut={e => e.currentTarget.style.background = 'rgba(255,255,255,0.6)'}
               >
-                <Upload size={14} />
-                Backup hochladen
+                <Upload size={13} />
+                Backup
               </label>
               <input 
                 id="pdf-upload" 
@@ -1044,12 +1040,30 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 type="button"
                 onClick={handleLockAndSend}
                 disabled={submitting || boards.length === 0}
-                style={{ background: 'linear-gradient(135deg, #eab308 0%, #d97706 100%)', color: 'white', border: 'none', fontWeight: 700, padding: '8px 18px', borderRadius: '12px', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: (submitting || boards.length === 0) ? 0.5 : 1, pointerEvents: (submitting || boards.length === 0) ? 'none' : 'auto', boxShadow: '0 6px 16px rgba(234, 179, 8, 0.15)', transition: 'all 0.2s' }}
+                style={{ background: 'linear-gradient(135deg, #eab308 0%, #d97706 100%)', color: 'white', border: 'none', fontWeight: 700, padding: '6px 14px', borderRadius: '10px', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', opacity: (submitting || boards.length === 0) ? 0.5 : 1, pointerEvents: (submitting || boards.length === 0) ? 'none' : 'auto', boxShadow: '0 6px 16px rgba(234, 179, 8, 0.15)', transition: 'all 0.2s' }}
               >
-                <Send size={14} />
+                <Send size={13} />
                 {submitting ? 'Wird gesendet...' : 'Einloggen & Senden'}
               </button>
             </div>
+          </div>
+
+          {/* Info/Guide banner beneath header */}
+          <div style={{
+            background: 'rgba(37, 99, 235, 0.06)',
+            border: '1px solid rgba(37, 99, 235, 0.12)',
+            borderRadius: '12px',
+            padding: '10px 14px',
+            fontSize: '0.78rem',
+            color: '#1d4ed8',
+            fontWeight: 500,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '4px'
+          }}>
+            <span style={{ fontSize: '1rem' }}>💡</span>
+            <span>Ziehe Schüler aus dem Pool direkt in deine Unterrichtstage. Pausen & Slots berechnen sich automatisch.</span>
           </div>
 
           {/* Form to Add Day Board */}
@@ -1193,14 +1207,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   handleDropOnBoard(board.id, index);
                                 }}
                                 style={{ 
-                                  background: 'rgba(254, 243, 199, 0.55)', 
-                                  backdropFilter: 'blur(12px)',
-                                  WebkitBackdropFilter: 'blur(12px)',
-                                  border: '1px solid rgba(245, 158, 11, 0.15)', 
-                                  borderLeft: `3px dashed #f59e0b`, 
+                                  background: '#fee8d6', 
+                                  border: '1px solid rgba(249, 115, 22, 0.15)', 
+                                  borderLeft: '3px solid #f97316', 
                                   borderRadius: '10px', 
                                   padding: '6px 8px', 
-                                  boxShadow: '0 2px 8px rgba(245, 158, 11, 0.03)', 
+                                  boxShadow: '0 2px 8px rgba(249, 115, 22, 0.03)', 
                                   cursor: 'grab', 
                                   display: 'flex', 
                                   flexDirection: 'column', 
@@ -1211,7 +1223,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                     <span style={{ fontSize: '0.8rem' }}>☕</span>
-                                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#b45309', letterSpacing: '-0.01em' }}>
+                                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#c2410c', letterSpacing: '-0.01em' }}>
                                       Pause
                                     </span>
                                   </div>
@@ -1219,9 +1231,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   <button
                                     type="button"
                                     onClick={() => handleRemoveStudentFromBoard(board.id, bs.id)}
-                                    style={{ background: 'transparent', border: 'none', color: '#d97706', height: '16px', width: '16px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
-                                    onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(254, 243, 199, 0.9)'; e.currentTarget.style.color = '#b45309'; }}
-                                    onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#d97706'; }}
+                                    style={{ background: 'transparent', border: 'none', color: '#ea580c', height: '16px', width: '16px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
+                                    onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(254, 215, 170, 0.8)'; e.currentTarget.style.color = '#c2410c'; }}
+                                    onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#ea580c'; }}
                                     title="Pause löschen"
                                   >
                                     <X size={11} strokeWidth={2.5} />
@@ -1230,8 +1242,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px', width: '100%' }}>
                                   {/* Merged Uhrzeit: Clock Icon + Time picker */}
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'rgba(255, 255, 255, 0.6)', border: '1px solid rgba(245, 158, 11, 0.2)', borderRadius: '6px', padding: '2px 4px', flex: '0 0 66px', minWidth: '66px' }}>
-                                    <Clock size={9} strokeWidth={2.5} style={{ color: '#b45309', flexShrink: 0 }} />
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'rgba(255, 255, 255, 0.6)', border: '1px solid rgba(249, 115, 22, 0.2)', borderRadius: '6px', padding: '2px 4px', flex: '0 0 66px', minWidth: '66px' }}>
+                                    <Clock size={9} strokeWidth={2.5} style={{ color: '#c2410c', flexShrink: 0 }} />
                                     <input
                                       type="time"
                                       value={bs.customStartTime || bs.assignedTime}
@@ -1245,7 +1257,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                           return recalculateBoardTimes({ ...b, students: nextStudents });
                                         }));
                                       }}
-                                      style={{ width: '40px', background: 'transparent', border: 'none', fontSize: '0.68rem', fontWeight: 700, color: '#b45309', outline: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' }}
+                                      style={{ width: '40px', background: 'transparent', border: 'none', fontSize: '0.68rem', fontWeight: 700, color: '#c2410c', outline: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' }}
                                       title="Startzeit bearbeiten"
                                     />
                                   </div>
@@ -1272,7 +1284,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                             }));
                                           }
                                         }}
-                                        style={{ background: 'rgba(255, 255, 255, 0.6)', border: '1px solid rgba(245, 158, 11, 0.2)', borderRadius: '6px', padding: '2px 4px', fontSize: '0.68rem', fontWeight: 700, color: '#b45309', outline: 'none', cursor: 'pointer' }}
+                                        style={{ background: 'rgba(255, 255, 255, 0.6)', border: '1px solid rgba(249, 115, 22, 0.2)', borderRadius: '6px', padding: '2px 4px', fontSize: '0.68rem', fontWeight: 700, color: '#c2410c', outline: 'none', cursor: 'pointer' }}
                                       >
                                         <option value={5}>5m</option>
                                         <option value={10}>10m</option>
@@ -1284,7 +1296,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                         <option value="custom">...</option>
                                       </select>
                                     ) : (
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '1px', background: 'rgba(255, 255, 255, 0.6)', border: '1px solid rgba(245, 158, 11, 0.2)', borderRadius: '6px', padding: '1px 3px' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '1px', background: 'rgba(255, 255, 255, 0.6)', border: '1px solid rgba(249, 115, 22, 0.2)', borderRadius: '6px', padding: '1px 3px' }}>
                                         <input
                                           type="number"
                                           min={1}
@@ -1298,9 +1310,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                               return recalculateBoardTimes({ ...b, students: nextStudents });
                                             }));
                                           }}
-                                          style={{ width: '22px', background: 'transparent', border: 'none', fontSize: '0.68rem', fontWeight: 700, color: '#b45309', outline: 'none', textAlign: 'center', padding: 0 }}
+                                          style={{ width: '22px', background: 'transparent', border: 'none', fontSize: '0.68rem', fontWeight: 700, color: '#c2410c', outline: 'none', textAlign: 'center', padding: 0 }}
                                         />
-                                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#b45309' }}>m</span>
+                                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#c2410c' }}>m</span>
                                       </div>
                                     )}
                                   </div>
@@ -1333,13 +1345,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   handleDropOnBoard(board.id, index);
                               }}
                               style={{ 
-                                background: 'rgba(255, 255, 255, 0.65)', 
-                                backdropFilter: 'blur(12px)',
-                                WebkitBackdropFilter: 'blur(12px)',
-                                borderTop: '1px solid rgba(255, 255, 255, 0.4)', 
-                                borderRight: '1px solid rgba(255, 255, 255, 0.4)', 
-                                borderBottom: '1px solid rgba(255, 255, 255, 0.4)', 
-                                borderLeft: `3px solid ${borderLeftColor}`, 
+                                background: '#dcfce7', 
+                                border: '1px solid rgba(16, 185, 129, 0.15)',
+                                borderLeft: '3px solid #10b981', 
                                 borderRadius: '10px', 
                                 padding: '8px 10px', 
                                 boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)', 
@@ -1353,19 +1361,19 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               {/* 1st Line: Time (in black) + Duration + Remove Button */}
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1d1d1f' }}>
+                                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#065f46' }}>
                                     {bs.assignedTime}
                                   </span>
-                                  <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#86868b' }}>
+                                  <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#047857' }}>
                                     {bs.duration} Min
                                   </span>
                                 </div>
                                 <button
                                   type="button"
                                   onClick={() => handleRemoveStudentFromBoard(board.id, bs.id)}
-                                  style={{ background: 'transparent', border: 'none', color: '#86868b', height: '16px', width: '16px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
+                                  style={{ background: 'transparent', border: 'none', color: '#047857', height: '16px', width: '16px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
                                   onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(254, 226, 226, 0.8)'; e.currentTarget.style.color = '#ef4444'; }}
-                                  onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#86868b'; }}
+                                  onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#047857'; }}
                                   title="Entfernen"
                                 >
                                   <X size={11} strokeWidth={2.5} />
@@ -1374,7 +1382,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
                               {/* 2nd Line: Student's Name */}
                               <div style={{ display: 'flex', alignItems: 'center' }}>
-                                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1d1d1f', display: 'block', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#065f46', display: 'block', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                   {bs.first_name} {bs.last_name}
                                 </span>
                               </div>

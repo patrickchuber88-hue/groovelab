@@ -909,20 +909,18 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
         border: '1px solid rgba(255, 255, 255, 0.5)', 
         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.03)', 
         display: 'flex', 
-        justifyContent: 'space-between', 
         alignItems: 'center',
-        flexWrap: 'wrap',
         gap: '16px'
       }}>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <div style={{ height: '40px', width: '40px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.15)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0, width: '264px' }}>
+          <div style={{ height: '40px', width: '40px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.15)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <CalendarIcon size={20} />
           </div>
-          <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em' }}>
+          <div style={{ minWidth: 0 }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
               KW {weekNumber}
             </h2>
-            <p style={{ color: '#86868b', fontSize: '0.78rem', fontWeight: 500, marginTop: '1px' }}>
+            <p style={{ color: '#86868b', fontSize: '0.78rem', fontWeight: 500, marginTop: '1px', whiteSpace: 'nowrap', margin: '1px 0 0 0' }}>
               {weekStart.toLocaleDateString('de-DE')} - {new Date(weekStart.getTime() + 6 * 86400000).toLocaleDateString('de-DE')}
             </p>
           </div>
@@ -932,20 +930,20 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
           <div className="app-segmented-switch" style={{ margin: 0 }}>
             <button 
               onClick={() => setActiveTab('calendar')}
-              className={`app-segmented-switch-btn ${activeTab === 'calendar' ? 'active' : ''}`}
+              className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`}
             >
               Stundenplan
             </button>
             <button 
               onClick={() => setActiveTab('designer')}
-              className={`app-segmented-switch-btn ${activeTab === 'designer' ? 'active' : ''}`}
+              className={`app-segmented-switch-btn ${(activeTab as string) === 'designer' ? 'active' : ''}`}
             >
               Stundenplan-Designer
             </button>
           </div>
         )}
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end', marginLeft: 'auto' }}>
           <button 
             onClick={handleResetWeek}
             style={{ background: 'transparent', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
