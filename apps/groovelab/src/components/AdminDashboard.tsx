@@ -6268,7 +6268,7 @@ function IDGallery({ users, brandColor, onShowQR }: { users: any[], brandColor: 
   });
 
   return (
-    <div style={{ marginTop: '24px' }}>
+    <div style={{ marginTop: '0px' }}>
       <style>{`
         .id-card-hover {
           transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
@@ -6770,7 +6770,7 @@ function DeviceSetupScreen({
   };
 
   return (
-    <div style={{ marginTop: '24px' }}>
+    <div style={{ marginTop: '0px' }}>
       {/* Premium sub-tab navigation */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', background: '#f1f5f9', padding: '6px', borderRadius: '16px', width: 'fit-content' }}>
         <button
