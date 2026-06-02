@@ -130,14 +130,32 @@ const getDefaultMusicianAvatarUrl = (instrument: string | null | undefined, role
 const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, activePlatform }: { src: string | null, style?: React.CSSProperties, className?: string, user?: any, userId?: string, onClick?: () => void, activePlatform?: string }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [resolvedInstrument, setResolvedInstrument] = useState<string | null>(user?.instrument || null);
+
+  useEffect(() => {
+    if (user && user.role === 'student' && (!user.instrument || user.instrument === 'Allgemein') && user.teacher_id) {
+      supabase
+        .from('users')
+        .select('instrument')
+        .eq('id', user.teacher_id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data?.instrument) {
+            setResolvedInstrument(data.instrument);
+          }
+        });
+    } else {
+      setResolvedInstrument(user?.instrument || null);
+    }
+  }, [user]);
 
   const displaySrc = useMemo(() => {
     const activePlat = activePlatform || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'groovelab');
     const targetUser = user;
     
     if (activePlat === 'campus') {
-      if (targetUser && (targetUser.instrument || targetUser.role === 'student' || targetUser.role === 'teacher' || targetUser.role === 'admin')) {
-        return getInstrumentAvatarUrl(targetUser.instrument);
+      if (targetUser && (resolvedInstrument || targetUser.role === 'student' || targetUser.role === 'teacher' || targetUser.role === 'admin')) {
+        return getInstrumentAvatarUrl(resolvedInstrument);
       }
       if (src && !src.includes('_avatar.png') && !src.includes('avatar_ghost')) {
         return '/avatars/gitarre_avatar_new.png';
@@ -180,12 +198,12 @@ const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, 
       );
       if (!src || isInstrumentAvatar || src === '/avatar_ghost.jpg') {
         // Fall back to student/teacher musician avatar
-        return getDefaultMusicianAvatarUrl(targetUser?.instrument, targetUser?.role);
+        return getDefaultMusicianAvatarUrl(resolvedInstrument, targetUser?.role);
       }
     }
     if (hasError || !src) return '/avatar_ghost.jpg';
     return src;
-  }, [src, hasError, user, activePlatform]);
+  }, [src, hasError, user, resolvedInstrument, activePlatform]);
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -2049,7 +2067,7 @@ export function TeacherDashboard({
 
       if (tData?.school_id) {
         // Prepare Student Query depending on platform
-        let studentQuery = supabase.from('users').select('*').eq('school_id', tData.school_id).eq('role', 'student');
+        let studentQuery = supabase.from('users').select('*').eq('school_id', tData.school_id).eq('role', 'student').eq('teacher_id', userId);
         if (activePlatform === 'campus') {
           studentQuery = studentQuery.eq('is_campus_active', true);
         } else {
@@ -2070,7 +2088,7 @@ export function TeacherDashboard({
           wallRes,
           occRes
         ] = await Promise.all([
-          supabase.from('rooms').select('*').eq('school_id', tData.school_id).order('sort_order', { ascending: true }),
+          supabase.from('rooms').select('*').eq('school_id', tData.school_id).eq('is_groovelab_active', true).order('sort_order', { ascending: true }),
           supabase.from('user_availability').select('*'),
           supabase.from('sessions').select('*, users!inner(*), stations(*)').is('check_out_time', null),
           supabase.from('users').select('*').in('role', ['teacher', 'admin']).eq('school_id', tData.school_id),
@@ -3101,7 +3119,8 @@ export function TeacherDashboard({
       trial_ends_at: newStudent.is_trial && newStudent.trial_ends_at ? newStudent.trial_ends_at : null,
       contract_ends_at: newStudent.contract_ends_at ? newStudent.contract_ends_at : null,
       is_campus_active: activePlatform === 'campus',
-      is_groovelab_active: activePlatform === 'groovelab'
+      is_groovelab_active: activePlatform === 'groovelab',
+      teacher_id: userId
     }).select().single();
     
     if (error) {
@@ -3218,7 +3237,8 @@ export function TeacherDashboard({
         status: 'invited',
         is_trial: true,
         is_campus_active: activePlatform === 'campus',
-        is_groovelab_active: activePlatform === 'groovelab'
+        is_groovelab_active: activePlatform === 'groovelab',
+        teacher_id: userId
       }).select().single();
       if (error) {
         alert('Fehler: ' + error.message);
@@ -5401,9 +5421,7 @@ export function TeacherDashboard({
                                 >
                                   {(() => {
                                     const cleanName = cleanRoomName(room.name);
-                                    return idx === 0
-                                      ? (cleanName.toLowerCase() === 'hauptraum' ? '👑 Hauptraum' : `👑 Hauptraum - ${cleanName}`)
-                                      : cleanName;
+                                    return `${idx + 1} - ${cleanName}`;
                                   })()}
                                 </button>
                               );
@@ -5548,12 +5566,10 @@ export function TeacherDashboard({
                                 }}
                                 className="hover-scale-mini"
                               >
-                                 {(() => {
-                                   const cleanName = cleanRoomName(room.name);
-                                   return idx === 0
-                                     ? (cleanName.toLowerCase() === 'hauptraum' ? '👑 Hauptraum' : `👑 Hauptraum - ${cleanName}`)
-                                     : cleanName;
-                                 })()}
+                                  {(() => {
+                                    const cleanName = cleanRoomName(room.name);
+                                    return `${idx + 1} - ${cleanName}`;
+                                  })()}
                               </button>
                             );
                           })}
@@ -5762,9 +5778,7 @@ export function TeacherDashboard({
                         >
                           {(() => {
                             const cleanName = cleanRoomName(room.name);
-                            return idx === 0
-                              ? (cleanName.toLowerCase() === 'hauptraum' ? '👑 Hauptraum' : `👑 Hauptraum - ${cleanName}`)
-                              : cleanName;
+                            return `${idx + 1} - ${cleanName}`;
                           })()}
                         </button>
                       );

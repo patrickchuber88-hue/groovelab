@@ -119,17 +119,36 @@ const getDefaultMusicianAvatarUrl = (instrument: string | null | undefined, role
 
 const StudioAvatar = React.memo(({ src, style, className, user, userId, onClick, activePlatform }: { src: string | null | undefined, style?: React.CSSProperties, className?: string, user?: any, userId?: string, onClick?: () => void, activePlatform?: string }) => {
   const [isLoaded, setIsLoaded] = useState(false);
+  const [resolvedInstrument, setResolvedInstrument] = useState<string | null>(user?.instrument || null);
   
   const activePlat = activePlatform || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'groovelab');
-  let displaySrc = src;
   
+  useEffect(() => {
+    if (user && user.role === 'student' && (!user.instrument || user.instrument === 'Allgemein') && user.teacher_id) {
+      supabase
+        .from('users')
+        .select('instrument')
+        .eq('id', user.teacher_id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data?.instrument) {
+            setResolvedInstrument(data.instrument);
+          }
+        });
+    } else {
+      setResolvedInstrument(user?.instrument || null);
+    }
+  }, [user]);
+
+  let displaySrc = src;
   const targetUser = user;
   
   if (activePlat === 'campus') {
     if (targetUser) {
       const role = (targetUser.role || '').toLowerCase();
       if (role === 'student') {
-        const inst = (targetUser.instrument || '').toLowerCase().trim();
+        const studentInstrument = resolvedInstrument || 'Allgemein';
+        const inst = studentInstrument.toLowerCase().trim();
         if (inst.includes('guitar') || inst.includes('gitarre')) {
           if (targetUser.photo_url && (targetUser.photo_url.includes('egitarre_avatar') || targetUser.photo_url.includes('gitarre_avatar_new'))) {
             displaySrc = targetUser.photo_url;
@@ -137,7 +156,7 @@ const StudioAvatar = React.memo(({ src, style, className, user, userId, onClick,
             displaySrc = '/avatars/gitarre_avatar_new.png';
           }
         } else {
-          displaySrc = getInstrumentAvatarUrl(targetUser.instrument);
+          displaySrc = getInstrumentAvatarUrl(studentInstrument);
         }
       } else if (role === 'teacher' || role === 'admin') {
         displaySrc = getInstrumentAvatarUrl(targetUser.instrument);
@@ -186,7 +205,7 @@ const StudioAvatar = React.memo(({ src, style, className, user, userId, onClick,
       src.includes('oboe_avatar')
     );
     if (!src || isInstrumentAvatar || src === '/avatar_ghost.jpg') {
-      displaySrc = getDefaultMusicianAvatarUrl(targetUser?.instrument, targetUser?.role);
+      displaySrc = getDefaultMusicianAvatarUrl(resolvedInstrument, targetUser?.role);
     }
   }
 
@@ -1686,7 +1705,9 @@ function App() {
   const [plannedSlots, setPlannedSlots] = useState<string[]>([]);
   const [globalPlannedSlots, setGlobalPlannedSlots] = useState<any[]>([]);
   const [activePlatform, setActivePlatformRaw] = useState<'campus' | 'groovelab'>(() => {
-    return (localStorage.getItem('groovelab_active_platform') as 'campus' | 'groovelab') || 'groovelab';
+    const isCampusDomain = typeof window !== 'undefined' && window.location.hostname.includes('campus');
+    const defaultPlat = isCampusDomain ? 'campus' : 'groovelab';
+    return (localStorage.getItem('groovelab_active_platform') as 'campus' | 'groovelab') || defaultPlat;
   });
   const setActivePlatform = React.useCallback((val: any) => {
     React.startTransition(() => {
@@ -4868,6 +4889,7 @@ function App() {
           .from('rooms')
           .select('id')
           .eq('school_id', schoolId)
+          .eq('is_groovelab_active', true)
           .order('sort_order', { ascending: true })
           .limit(1);
         if (roomData && roomData.length > 0) {

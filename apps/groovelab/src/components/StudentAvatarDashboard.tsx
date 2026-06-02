@@ -1664,6 +1664,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       if (userErr) throw userErr;
       if (!user) return;
 
+      let resolvedInst = user.instrument;
+      if ((!resolvedInst || resolvedInst === 'Allgemein') && user.teacher_id) {
+        const { data: teacherData } = await supabase
+          .from('users')
+          .select('instrument')
+          .eq('id', user.teacher_id)
+          .maybeSingle();
+        if (teacherData?.instrument) {
+          resolvedInst = teacherData.instrument;
+        }
+      }
+      user.resolved_instrument = resolvedInst;
+
       setStudentUser(user);
       setIsAppUser(user.is_app_user ?? false);
       setIsPremiumUser(user.is_premium_user ?? false);
@@ -4163,9 +4176,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 src={
                   studentUser.photo_url && (studentUser.photo_url.includes('egitarre_avatar') || studentUser.photo_url.includes('gitarre_avatar_new'))
                     ? studentUser.photo_url
-                    : ((studentUser.instrument || '').toLowerCase().trim().includes('guitar') || (studentUser.instrument || '').toLowerCase().trim().includes('gitarre'))
+                    : ((studentUser.resolved_instrument || studentUser.instrument || '').toLowerCase().trim().includes('guitar') || (studentUser.resolved_instrument || studentUser.instrument || '').toLowerCase().trim().includes('gitarre'))
                       ? '/avatars/gitarre_avatar_new.png'
-                      : getInstrumentAvatarUrl(studentUser.instrument)
+                      : getInstrumentAvatarUrl(studentUser.resolved_instrument || studentUser.instrument)
                 } 
                 alt="" 
                 style={{ width: '95%', height: '95%', objectFit: 'contain' }} 

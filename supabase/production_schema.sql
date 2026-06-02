@@ -971,4 +971,34 @@ CREATE INDEX IF NOT EXISTS users_teacher_id_idx ON public.users(teacher_id);
 COMMENT ON COLUMN public.users.teacher_id IS 'References the teacher who created and manages this student profile.';
 -- END: 53_add_teacher_id_to_users.sql
 
+-- START: 110_add_teacher_id_to_songs.sql
+-- Migration: Link songs explicitly to the teacher who created them.
+-- REGEL: Jeder Lehrer sieht in der Mediathek nur seine eigenen Songs.
+ALTER TABLE public.songs ADD COLUMN IF NOT EXISTS teacher_id UUID REFERENCES public.users(id) ON DELETE SET NULL;
+
+-- Index for fast teacher-based lookups
+CREATE INDEX IF NOT EXISTS idx_songs_teacher_id ON public.songs(teacher_id);
+
+COMMENT ON COLUMN public.songs.teacher_id IS 'References the teacher who created this song. NULL means it was created by an admin and is school-wide.';
+-- END: 110_add_teacher_id_to_songs.sql
+
+-- START: 111_create_lehrwerke_table.sql
+-- Migration: Create lehrwerke table linked to schools and teachers with simplified fields.
+CREATE TABLE IF NOT EXISTS public.lehrwerke (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  author TEXT,
+  total_pages INTEGER DEFAULT 50,
+  school_id UUID REFERENCES public.schools(id) ON DELETE CASCADE,
+  teacher_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_lehrwerke_school_id ON public.lehrwerke(school_id);
+CREATE INDEX IF NOT EXISTS idx_lehrwerke_teacher_id ON public.lehrwerke(teacher_id);
+
+ALTER TABLE public.lehrwerke DISABLE ROW LEVEL SECURITY;
+-- END: 111_create_lehrwerke_table.sql
+
 

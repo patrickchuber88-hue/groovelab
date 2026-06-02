@@ -89,10 +89,7 @@ export function TeacherStudentManagement({ teacherId, schoolId, maxStudents }: T
       return;
     }
 
-    if (students.length >= maxStudents) {
-      setError(`Slot-Limit erreicht. Sie können maximal ${maxStudents} Schüler verwalten.`);
-      return;
-    }
+
 
     setSubmitting(true);
     setError(null);
@@ -209,36 +206,21 @@ export function TeacherStudentManagement({ teacherId, schoolId, maxStudents }: T
   return (
     <div className="space-y-6 max-w-4xl mx-auto p-4 sm:p-6 bg-slate-900/10 rounded-3xl border border-slate-200/50 backdrop-blur-md shadow-sm">
       
-      {/* Header with Slot Status Card */}
+      {/* Header for Student Management */}
       <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
             <Users className="text-indigo-600 h-5 w-5" />
-            <h3 className="font-extrabold text-slate-800 text-lg">Schüler-Slots & Kapazität</h3>
+            <h3 className="font-extrabold text-slate-800 text-lg">Schüler-Verwaltung</h3>
           </div>
-          <p className="text-slate-500 text-sm font-medium mb-3">
-            Verwalte die Lizenzen und Accounts deiner Schüler. Du kannst bis zu <span className="font-bold text-slate-800">{maxStudents}</span> Schüler anlegen.
+          <p className="text-slate-500 text-sm font-medium">
+            Erstelle und verwalte die Accounts deiner Schüler für die GrooveLab App.
           </p>
-          
-          {/* Progress Bar */}
-          <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
-            <div 
-              style={{ width: `${percentage}%` }} 
-              className={`h-full rounded-full transition-all duration-500 ${isLimitReached ? 'bg-rose-500' : percentage >= 85 ? 'bg-amber-500' : 'bg-indigo-600'}`}
-            />
-          </div>
-          <div className="flex justify-between items-center mt-2 text-xs font-bold uppercase tracking-wider text-slate-400">
-            <span>Belegt</span>
-            <span className={isLimitReached ? 'text-rose-500' : 'text-indigo-600'}>
-              {usedSlots} von {maxStudents} Slots
-            </span>
-          </div>
         </div>
 
         <button
           onClick={() => setShowAddForm(true)}
-          disabled={isLimitReached}
-          className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-extrabold py-3 px-6 rounded-xl shadow-lg shadow-indigo-600/15 hover:shadow-indigo-600/25 transition-all text-sm h-fit cursor-pointer"
+          className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold py-3 px-6 rounded-xl shadow-lg shadow-indigo-600/15 hover:shadow-indigo-600/25 transition-all text-sm h-fit cursor-pointer"
         >
           <Plus size={18} />
           Schüler hinzufügen

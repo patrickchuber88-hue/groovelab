@@ -888,7 +888,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         
         const schoolId = (stationData?.rooms as any)?.school_id;
         if (schoolId) {
-          const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', schoolId).order('sort_order', { ascending: true });
+          const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', schoolId).eq('is_groovelab_active', true).order('sort_order', { ascending: true });
           setPrefetchedRooms(rooms);
           console.log(`[Login] Pre-fetched ${rooms?.length} rooms for school: ${schoolId}`);
         }
@@ -906,7 +906,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       try {
         setLoadingKioskData(true);
         const [roomsRes, stationsRes, sessionsRes] = await Promise.all([
-          supabase.from('rooms').select('*').eq('school_id', schoolData.id).order('sort_order', { ascending: true }),
+          supabase.from('rooms').select('*').eq('school_id', schoolData.id).eq('is_groovelab_active', true).order('sort_order', { ascending: true }),
           supabase.from('stations').select('*').order('name'),
           supabase.from('sessions').select('station_id').is('check_out_time', null)
         ]);
@@ -998,7 +998,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         }
 
         if (currentPos) {
-          const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', user.school_id).order('sort_order', { ascending: true });
+          const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', user.school_id).eq('is_groovelab_active', true).order('sort_order', { ascending: true });
           if (rooms) {
             for (const room of rooms) {
               const points = Array.isArray(room.geofence_points) ? room.geofence_points : [];
@@ -1197,7 +1197,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
         if (currentPos) {
           // 1. Check Rooms (Multi-Point)
-          const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', user.school_id).order('sort_order', { ascending: true });
+          const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', user.school_id).eq('is_groovelab_active', true).order('sort_order', { ascending: true });
           if (rooms) {
             for (const room of rooms) {
               const points = Array.isArray(room.geofence_points) ? room.geofence_points : [];
@@ -1895,7 +1895,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           
           {/* Room Selector */}
           <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
-            {kioskRooms.map((room) => (
+            {kioskRooms.map((room, idx) => (
               <button
                 key={room.id}
                 onClick={() => setKioskSelectedRoomId(room.id)}
@@ -1913,7 +1913,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   transition: 'all 0.2s'
                 }}
               >
-                {cleanRoomName(room.name)}
+                {`${idx + 1} - ${cleanRoomName(room.name)}`}
               </button>
             ))}
           </div>

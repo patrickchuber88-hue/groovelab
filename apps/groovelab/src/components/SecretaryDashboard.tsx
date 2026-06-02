@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   ShieldAlert, CheckCircle, Users, Settings, Bell, 
@@ -653,6 +653,241 @@ const getAlphabeticalColor = (name: string) => {
   return { avatarBg, avatarColor };
 };
 
+interface AppleStyleTokenFieldProps {
+  label: string;
+  selectedString: string;
+  onChange: (newValue: string) => void;
+  suggestions: string[];
+  placeholder?: string;
+}
+
+const AppleStyleTokenField: React.FC<AppleStyleTokenFieldProps> = ({
+  label,
+  selectedString,
+  onChange,
+  suggestions,
+  placeholder = 'Fach hinzufügen...'
+}) => {
+  const [inputValue, setInputValue] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const selectedTokens = selectedString
+    ? selectedString.split(',').map((s) => s.trim()).filter(Boolean)
+    : [];
+
+  const availableSuggestions = suggestions.filter(
+    (s) => !selectedTokens.includes(s) && s.toLowerCase().includes(inputValue.toLowerCase())
+  );
+
+  const handleSelectToken = (token: string) => {
+    const next = [...selectedTokens, token];
+    onChange(next.join(', '));
+    setInputValue('');
+    setActiveIndex(0);
+    inputRef.current?.focus();
+  };
+
+  const handleRemoveToken = (token: string) => {
+    const next = selectedTokens.filter((t) => t !== token);
+    onChange(next.join(', '));
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !inputValue && selectedTokens.length > 0) {
+      handleRemoveToken(selectedTokens[selectedTokens.length - 1]);
+    } else if (e.key === 'ArrowDown' && availableSuggestions.length > 0) {
+      e.preventDefault();
+      setActiveIndex((prev) => (prev + 1) % availableSuggestions.length);
+    } else if (e.key === 'ArrowUp' && availableSuggestions.length > 0) {
+      e.preventDefault();
+      setActiveIndex((prev) => (prev - 1 + availableSuggestions.length) % availableSuggestions.length);
+    } else if (e.key === 'Enter' && availableSuggestions.length > 0) {
+      e.preventDefault();
+      handleSelectToken(availableSuggestions[activeIndex]);
+    }
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsFocused(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div 
+      ref={containerRef}
+      style={{ 
+        position: 'relative', 
+        display: 'flex', 
+        flexDirection: 'column',
+        gap: '4px',
+        width: '100%' 
+      }}
+    >
+      <div 
+        onClick={() => inputRef.current?.focus()}
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '8px 12px',
+          borderRadius: '12px',
+          border: isFocused ? '1.5px solid #007aff' : '1.5px solid #cbd5e1',
+          background: '#ffffff',
+          boxShadow: isFocused ? '0 0 0 3px rgba(0, 122, 255, 0.15)' : 'none',
+          minHeight: '44px',
+          cursor: 'text',
+          transition: 'all 0.15s ease-in-out',
+          fontFamily: 'Urbanist, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        }}
+      >
+        {label && (
+          <span style={{ 
+            fontSize: '0.8rem', 
+            fontWeight: 700, 
+            color: '#8e8e93', 
+            marginRight: '4px',
+            userSelect: 'none'
+          }}>
+            {label}
+          </span>
+        )}
+
+        {selectedTokens.map((token) => (
+          <div
+            key={token}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              background: '#e5e5ea',
+              color: '#1c1c1e',
+              padding: '4px 8px',
+              borderRadius: '8px',
+              fontSize: '0.8rem',
+              fontWeight: 650,
+              userSelect: 'none',
+              transition: 'background 0.2s'
+            }}
+          >
+            <span>{token}</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRemoveToken(token);
+              }}
+              style={{
+                border: 'none',
+                background: 'transparent',
+                padding: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#8e8e93',
+                cursor: 'pointer',
+                borderRadius: '50%',
+                width: '14px',
+                height: '14px'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#d1d1d6';
+                e.currentTarget.style.color = '#555';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.color = '#8e8e93';
+              }}
+            >
+              <X size={10} strokeWidth={3} />
+            </button>
+          </div>
+        ))}
+
+        <input
+          ref={inputRef}
+          type="text"
+          value={inputValue}
+          onChange={(e) => {
+            setInputValue(e.target.value);
+            setActiveIndex(0);
+          }}
+          onFocus={() => setIsFocused(true)}
+          onKeyDown={handleKeyDown}
+          placeholder={selectedTokens.length === 0 ? placeholder : ''}
+          style={{
+            border: 'none',
+            outline: 'none',
+            flex: 1,
+            minWidth: '80px',
+            fontSize: '0.82rem',
+            fontWeight: 600,
+            padding: '2px 0',
+            color: '#1c1c1e',
+            background: 'transparent'
+          }}
+        />
+      </div>
+
+      {isFocused && availableSuggestions.length > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            marginTop: '6px',
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(0, 0, 0, 0.08)',
+            borderRadius: '12px',
+            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
+            zIndex: 9999,
+            maxHeight: '200px',
+            overflowY: 'auto',
+            padding: '4px'
+          }}
+        >
+          {availableSuggestions.map((suggestion, index) => {
+            const isSelected = index === activeIndex;
+            return (
+              <div
+                key={suggestion}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleSelectToken(suggestion);
+                }}
+                onMouseEnter={() => setActiveIndex(index)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: isSelected ? '#007aff' : 'transparent',
+                  color: isSelected ? '#ffffff' : '#1c1c1e',
+                  transition: 'background 0.05s ease, color 0.05s ease'
+                }}
+              >
+                {suggestion}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDashboardProps) {
   // Navigation
   const [activeTab, setActiveTab] = useState<'secretary' | 'campus' | 'groovelab'>(() => {
@@ -750,7 +985,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         .eq('id', updatedData.id);
 
       if (error) throw error;
-      alert('Lehrkraft erfolgreich aktualisiert.');
       setManageTeacher(null);
       fetchDashboardData();
     } catch (err: any) {
@@ -808,6 +1042,24 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [studentCsvText, setStudentCsvText] = useState<string>('');
   const [studentCurrentPage, setStudentCurrentPage] = useState<number>(1);
   const [studentPageSize, setStudentPageSize] = useState<number>(50);
+
+  // Overhauled Room Board States
+  const [roomSearchQuery, setRoomSearchQuery] = useState<string>('');
+  const [roomFilterFloor, setRoomFilterFloor] = useState<string>('All');
+  const [roomFilterStatus, setRoomFilterStatus] = useState<'all' | 'campus' | 'groovelab' | 'inactive'>('all');
+  const [addedFloors, setAddedFloors] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem(`groovelab_added_floors_${schoolId}`);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [dragHoveredFloor, setDragHoveredFloor] = useState<string | null>(null);
+  const [isRoomCsvExpanded, setIsRoomCsvExpanded] = useState<boolean>(false);
+  const [roomCsvText, setRoomCsvText] = useState<string>('');
+  const [roomCsvSaving, setRoomCsvSaving] = useState<boolean>(false);
+
 
   // Manual Student Creation Form States
   const [showAddStudentModal, setShowAddStudentModal] = useState<boolean>(false);
@@ -869,6 +1121,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [roomFormMaxTeachers, setRoomFormMaxTeachers] = useState(1);
   const [roomFormMaxStudents, setRoomFormMaxStudents] = useState(1);
   const [roomFormQm, setRoomFormQm] = useState(0);
+  const [roomFormIsCampusActive, setRoomFormIsCampusActive] = useState(true);
+  const [roomFormIsGroovelabActive, setRoomFormIsGroovelabActive] = useState(false);
+  const [roomFormFloor, setRoomFormFloor] = useState('Allgemein');
   const [roomSaving, setRoomSaving] = useState(false);
   const INSTRUMENT_TAGS = ['Schlagzeug', 'Piano', 'Gitarre', 'Gesang', 'Geige', 'Querflöte', 'Saxophon', 'Bass', 'Keyboard', 'Trompete'];
 
@@ -930,12 +1185,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [cooperations, setCooperations] = useState<any[]>([]);
   const [cooperationSearchQuery, setCooperationSearchQuery] = useState<string>('');
   const [cooperationFilterStatus, setCooperationFilterStatus] = useState<string>('All');
+  const [cooperationFilterSubject, setCooperationFilterSubject] = useState<string>('All');
+  const [cooperationFilterTeacher, setCooperationFilterTeacher] = useState<string>('All');
   const [showAddCooperationModal, setShowAddCooperationModal] = useState<boolean>(false);
   const [newCooperationName, setNewCooperationName] = useState<string>('');
   const [newCooperationContactPerson, setNewCooperationContactPerson] = useState<string>('');
   const [newCooperationEmail, setNewCooperationEmail] = useState<string>('');
   const [newCooperationPhone, setNewCooperationPhone] = useState<string>('');
   const [newCooperationStatus, setNewCooperationStatus] = useState<string>('active');
+  const [newCooperationSubject, setNewCooperationSubject] = useState<string>('');
+  const [newCooperationTeacherId, setNewCooperationTeacherId] = useState<string>('');
+  const [cooperationPageSize, setCooperationPageSize] = useState<number>(10);
+  const [cooperationCurrentPage, setCooperationCurrentPage] = useState<number>(1);
   const [isCooperationCsvExpanded, setIsCooperationCsvExpanded] = useState<boolean>(false);
   const [cooperationCsvText, setCooperationCsvText] = useState<string>('');
 
@@ -1160,7 +1421,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         }
 
         if (u.role === 'teacher' || u.role === 'admin') {
-          const currentStudentCount = teacherStudentMap[u.id]?.size || 0;
+          const currentStudentCount = allUsers?.filter(usr => usr.role === 'student' && usr.teacher_id === u.id).length || 0;
           if (!u.is_active) {
             bypassList.push({
               id: u.id,
@@ -1835,7 +2096,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
       if (error) throw error;
 
-      alert(`Lehrkraft ${newTeacherFirstName} ${newTeacherLastName} wurde erfolgreich angelegt.`);
       setNewTeacherFirstName('');
       setNewTeacherLastName('');
       setNewTeacherEmail('');
@@ -2461,6 +2721,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   };
 
   const renderCooperationsBoard = () => {
+    const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
+      if (!acc.some(existing => existing.id === t.id)) {
+        acc.push(t);
+      }
+      return acc;
+    }, []);
+
     const filtered = cooperations.filter(c => {
       const name = (c.name || '').toLowerCase();
       const contact = (c.contact_person || '').toLowerCase();
@@ -2469,16 +2736,37 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
       const matchesSearch = !query || name.includes(query) || contact.includes(query) || email.includes(query);
       const matchesStatus = cooperationFilterStatus === 'All' || c.status === cooperationFilterStatus;
+      const matchesSubject = cooperationFilterSubject === 'All' || (c.subject || 'Allgemein') === cooperationFilterSubject;
+      const matchesTeacher = cooperationFilterTeacher === 'All' || 
+        (cooperationFilterTeacher === 'none' ? !c.teacher_id : c.teacher_id === cooperationFilterTeacher);
 
-      return matchesSearch && matchesStatus;
+      return matchesSearch && matchesStatus && matchesSubject && matchesTeacher;
+    }).sort((a: any, b: any) => {
+      const nameA = (a.name || '').toLowerCase().trim();
+      const nameB = (b.name || '').toLowerCase().trim();
+      return nameA.localeCompare(nameB, 'de');
     });
 
+    // Pagination calculation
+    const totalCount = filtered.length;
+    const totalPages = Math.ceil(totalCount / cooperationPageSize) || 1;
+    const safeCurrentPage = Math.min(cooperationCurrentPage, totalPages);
+    const startIndex = (safeCurrentPage - 1) * cooperationPageSize;
+    const paginatedCooperations = filtered.slice(startIndex, startIndex + cooperationPageSize);
+
+    const totalCoops = cooperations.length;
+    const activeCoopsCount = cooperations.filter(c => c.status === 'active').length;
+    const pendingCoopsCount = cooperations.filter(c => c.status === 'pending').length;
+
+    const uniqueCoopSubjects = Array.from(new Set(cooperations.map(c => c.subject || 'Allgemein'))).sort((a, b) => a.localeCompare(b));
+
+    const getAvatarGradient = (name: string) => getAlphabeticalColor(name).avatarBg;
+    const getAvatarTextColor = (name: string) => getAlphabeticalColor(name).avatarColor;
+
     return (
-      <div style={{ display: 'flex', gap: '24px', width: '100%', alignItems: 'flex-start' }}>
-        
-        {/* Left Pane: Cooperations List */}
+      <div style={{ width: '100%' }}>
         <div className="google-card" style={{ 
-          flex: 1,
+          width: '100%',
           display: 'flex', 
           flexDirection: 'column', 
           gap: '24px', 
@@ -2489,7 +2777,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)',
           minWidth: 0
         }}>
-          {/* Header */}
+          {/* TITLE BLOCK */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Users size={22} style={{ color: '#0f172a' }} />
@@ -2498,20 +2786,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               </h3>
             </div>
             
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <button
                 onClick={() => setIsCooperationCsvExpanded(!isCooperationCsvExpanded)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  borderRadius: '12px',
-                  padding: '8px 16px',
-                  fontSize: '0.8rem',
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  borderRadius: '12px', 
+                  padding: '8px 16px', 
+                  fontSize: '0.8rem', 
                   fontWeight: 800,
                   background: isCooperationCsvExpanded ? '#f1f5f9' : '#ffffff',
-                  color: '#475569',
-                  border: '1.5px solid #cbd5e1',
+                  border: '1px solid #cbd5e1',
                   cursor: 'pointer',
                   fontFamily: 'Urbanist',
                   transition: 'all 0.2s'
@@ -2544,7 +2831,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             </div>
           </div>
 
-          {/* Collapsible CSV Box */}
+          {/* CSV BOX */}
           {isCooperationCsvExpanded && (
             <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px dashed #cbd5e1', display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
@@ -2552,18 +2839,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   Sammel-Onboarding (Kooperationen)
                 </strong>
                 <span style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'Inter' }}>
-                  Format pro Zeile: <code>Kooperationsname; Ansprechpartner; E-Mail (optional); Telefon (optional); Status (optional)</code>
+                  Format pro Zeile: <code>Kooperationsname; Ansprechpartner; E-Mail (optional); Telefon (optional); Fach (optional); Status (optional)</code>
                 </span>
               </div>
 
-              {cooperationFilterStatus && cooperationFilterStatus !== 'All' && (() => {
-                const statusMap: Record<string, { label: string; color: string; bg: string; border: string }> = {
-                  active: { label: 'Aktiv', color: '#166534', bg: '#e2f6ea', border: '#bbf7d0' },
-                  pending: { label: 'Ausstehend', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
-                  inactive: { label: 'Inaktiv', color: '#475569', bg: '#f1f5f9', border: '#cbd5e1' }
-                };
-                const statusItem = statusMap[cooperationFilterStatus];
-                if (!statusItem) return null;
+              {cooperationFilterTeacher && cooperationFilterTeacher !== 'All' && (() => {
+                const selectedT = allUniqueTeachers.find(t => t.id === cooperationFilterTeacher);
+                if (!selectedT) return null;
+                const teacherName = `${selectedT.firstName || selectedT.first_name || ''} ${selectedT.lastName || selectedT.last_name || ''}`.trim();
+                const tInitials = `${selectedT.firstName?.[0] || selectedT.first_name?.[0] || ''}${selectedT.lastName?.[0] || selectedT.last_name?.[0] || ''}`.toUpperCase() || 'D';
+                const tAvatarBg = getAvatarGradient(teacherName);
+                const tAvatarColor = getAvatarTextColor(teacherName);
 
                 return (
                   <div style={{
@@ -2583,14 +2869,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       <span style={{ fontSize: '0.68rem', color: '#166534', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>
                         ⚡ Smart Auto-Zuweisung:
                       </span>
-
-                      {/* Status Pill */}
+                      
+                      {/* Teacher Pill */}
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
                         background: '#ffffff',
-                        border: `1.5px solid ${statusItem.border}`,
+                        border: '1.5px solid #cbd5e1',
                         padding: '4px 10px 4px 6px',
                         borderRadius: '100px',
                         boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
@@ -2599,8 +2885,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           width: '24px',
                           height: '24px',
                           borderRadius: '50%',
-                          background: statusItem.bg,
-                          color: statusItem.color,
+                          background: tAvatarBg,
+                          color: tAvatarColor,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -2608,19 +2894,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           fontWeight: 900,
                           fontFamily: 'Urbanist'
                         }}>
-                          {statusItem.label[0]}
+                          {tInitials}
                         </div>
-                        <span style={{ fontSize: '0.74rem', fontWeight: 800, color: statusItem.color, fontFamily: 'Urbanist' }}>
-                          {statusItem.label}
+                        <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                          {teacherName}
                         </span>
                         <span style={{ fontSize: '0.6rem', fontWeight: 900, background: '#f1f5f9', color: '#64748b', padding: '1px 6px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          Status
+                          Kooperationslehrer
                         </span>
                       </div>
                     </div>
                     
                     <span style={{ fontSize: '0.65rem', color: '#15803d', fontWeight: 900, background: '#d1fae5', padding: '4px 10px', borderRadius: '8px', letterSpacing: '0.02em', textTransform: 'uppercase', fontFamily: 'Urbanist' }}>
-                      Status wird automatisch zugewiesen!
+                      Lehrer wird automatisch zugewiesen!
                     </span>
                   </div>
                 );
@@ -2630,9 +2916,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 value={cooperationCsvText}
                 onChange={(e) => setCooperationCsvText(e.target.value)}
                 placeholder={
-                  cooperationFilterStatus && cooperationFilterStatus !== 'All'
-                    ? "Schubert-Gymnasium; Herr Weber; weber@schubert.de"
-                    : "Schubert-Gymnasium; Herr Weber; weber@schubert.de; 0172-12345; active\nMozart-Grundschule; Frau Becker; info@mozart.de; ; pending"
+                  cooperationFilterTeacher && cooperationFilterTeacher !== 'All'
+                    ? "Schubert-Gymnasium; Herr Weber; weber@schubert.de; 0172-12345; Bläserklasse"
+                    : "Schubert-Gymnasium; Herr Weber; weber@schubert.de; 0172-12345; Bläserklasse; active\nMozart-Grundschule; Frau Becker; info@mozart.de; ; Cajon-Klasse; pending"
                 }
                 style={{
                   width: '100%',
@@ -2656,232 +2942,401 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             </div>
           )}
 
-          {/* Filters */}
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
-              <input
-                type="text"
+          {/* KPI ROW */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
+            <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: '10px 14px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <span style={{ fontSize: '0.62rem', color: '#1e40af', fontWeight: 800, textTransform: 'uppercase', fontFamily: 'Urbanist' }}>Kooperationen Gesamt</span>
+              <strong style={{ fontSize: '1.4rem', color: '#1e3a8a', fontWeight: 900, fontFamily: 'Urbanist' }}>{totalCoops}</strong>
+            </div>
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px 14px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <span style={{ fontSize: '0.62rem', color: '#166534', fontWeight: 800, textTransform: 'uppercase', fontFamily: 'Urbanist' }}>Aktiv</span>
+              <strong style={{ fontSize: '1.4rem', color: '#14532d', fontWeight: 900, fontFamily: 'Urbanist' }}>{activeCoopsCount}</strong>
+            </div>
+            <div style={{ background: '#feefe3', border: '1px solid #fed7aa', padding: '10px 14px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <span style={{ fontSize: '0.62rem', color: '#854d0e', fontWeight: 800, textTransform: 'uppercase', fontFamily: 'Urbanist' }}>Ausstehend</span>
+              <strong style={{ fontSize: '1.4rem', color: '#713f12', fontWeight: 900, fontFamily: 'Urbanist' }}>{pendingCoopsCount}</strong>
+            </div>
+          </div>
+
+          {/* FILTER & SEARCH */}
+          <div style={{ 
+            display: 'flex', 
+            gap: '12px', 
+            background: '#f8fafc', 
+            padding: '12px', 
+            borderRadius: '16px',
+            border: '1px solid #cbd5e1',
+            flexWrap: 'wrap',
+            alignItems: 'center'
+          }}>
+            <div style={{ flex: 1.5, minWidth: '200px', position: 'relative' }}>
+              <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', fontSize: '0.8rem' }}>🔍</span>
+              <input 
+                type="text" 
+                placeholder="Kooperation suchen..." 
                 value={cooperationSearchQuery}
-                onChange={(e) => setCooperationSearchQuery(e.target.value)}
-                placeholder="Kooperation nach Name, Ansprechpartner oder E-Mail suchen..."
+                onChange={(e) => {
+                  setCooperationSearchQuery(e.target.value);
+                  setCooperationCurrentPage(1);
+                }}
                 style={{
                   width: '100%',
-                  padding: '10px 16px',
-                  borderRadius: '14px',
+                  boxSizing: 'border-box',
+                  padding: '8px 12px 8px 34px',
+                  borderRadius: '8px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.85rem',
-                  fontFamily: 'Urbanist',
-                  fontWeight: 600,
-                  outline: 'none'
+                  fontSize: '0.78rem',
+                  outline: 'none',
+                  background: 'white',
+                  fontWeight: 700
                 }}
               />
             </div>
 
-            <select
-              value={cooperationFilterStatus}
-              onChange={(e) => setCooperationFilterStatus(e.target.value)}
-              style={{
-                padding: '10px 16px',
-                borderRadius: '14px',
-                border: '1px solid #cbd5e1',
-                fontSize: '0.85rem',
-                fontFamily: 'Urbanist',
-                fontWeight: 600,
-                outline: 'none',
-                background: 'white',
-                cursor: 'pointer'
-              }}
-            >
-              <option value="All">Alle Statuspartner ({cooperations.length})</option>
-              <option value="active">Aktiv ({cooperations.filter(c => c.status === 'active').length})</option>
-              <option value="pending">Ausstehend ({cooperations.filter(c => c.status === 'pending').length})</option>
-              <option value="inactive">Inaktiv ({cooperations.filter(c => c.status === 'inactive').length})</option>
-            </select>
+            <div style={{ flex: 1, minWidth: '130px' }}>
+              <select 
+                value={cooperationFilterSubject}
+                onChange={(e) => {
+                  setCooperationFilterSubject(e.target.value);
+                  setCooperationCurrentPage(1);
+                }}
+                style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: 'white', fontWeight: 700 }}
+              >
+                <option value="All">🎺 Alle Unterrichtsfächer</option>
+                {uniqueCoopSubjects.map(sub => (
+                  <option key={sub} value={sub}>{sub}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ flex: 1, minWidth: '130px' }}>
+              <select 
+                value={cooperationFilterTeacher}
+                onChange={(e) => {
+                  setCooperationFilterTeacher(e.target.value);
+                  setCooperationCurrentPage(1);
+                }}
+                style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: 'white', fontWeight: 700 }}
+              >
+                <option value="All">👥 Alle Lehrer</option>
+                <option value="none">⬜ Allgemein (kein Lehrer)</option>
+                {allUniqueTeachers.map(t => (
+                  <option key={t.id} value={t.id}>{t.lastName || t.last_name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ flex: 1, minWidth: '130px' }}>
+              <select
+                value={cooperationFilterStatus}
+                onChange={(e) => {
+                  setCooperationFilterStatus(e.target.value);
+                  setCooperationCurrentPage(1);
+                }}
+                style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: 'white', fontWeight: 700 }}
+              >
+                <option value="All">⚡ Alle Statuspartner</option>
+                <option value="active">🟢 Aktiv</option>
+                <option value="pending">🟡 Ausstehend</option>
+                <option value="inactive">⚪ Inaktiv</option>
+              </select>
+            </div>
           </div>
 
-          {/* Cooperations Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
-            {filtered.length === 0 ? (
-              <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '8px' }}>🤝</span>
-                Keine Kooperationen gefunden. Lege einen neuen Partner an oder passe deine Suche an.
+          {/* LIST ROW VIEW CONTAINER */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowX: 'auto', overflowY: 'scroll', maxHeight: '550px', paddingRight: '6px', width: '100%' }}>
+            {paginatedCooperations.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b', fontSize: '0.88rem', fontWeight: 700, minWidth: '850px' }}>
+                Keine Kooperationen mit diesen Filtereinstellungen gefunden.
               </div>
             ) : (
-              filtered.map(c => (
-                <div 
-                  key={c.id} 
-                  className="google-card hover-scale-mini" 
-                  draggable={true}
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData("cooperationId", c.id);
-                  }}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '14px',
-                    padding: '20px',
-                    borderRadius: '20px',
-                    background: '#ffffff',
-                    border: '1.5px solid #cbd5e1',
-                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.01)',
-                    transition: 'all 0.2s',
-                    cursor: 'grab'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                        🏫 {c.name}
-                      </span>
-                      <span style={{
-                        fontSize: '0.65rem',
-                        fontWeight: 800,
-                        textTransform: 'uppercase',
-                        padding: '2px 8px',
-                        borderRadius: '20px',
-                        alignSelf: 'flex-start',
-                        background: c.status === 'active' ? '#e2f6ea' : c.status === 'pending' ? '#fffbeb' : '#f5f5f7',
-                        color: c.status === 'active' ? '#137333' : c.status === 'pending' ? '#b45309' : '#86868b'
-                      }}>
-                        {c.status === 'active' ? 'Aktiv' : c.status === 'pending' ? 'Ausstehend' : 'Inaktiv'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.78rem', color: '#475569', flex: 1 }}>
-                    {c.contact_person && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>👤</span>
-                        <strong>{c.contact_person}</strong>
-                      </div>
-                    )}
-                    {c.email && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>✉️</span>
-                        <a href={`mailto:${c.email}`} style={{ color: '#2563eb', textDecoration: 'none' }}>{c.email}</a>
-                      </div>
-                    )}
-                    {c.phone && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>📞</span>
-                        <span>{c.phone}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '12px', marginTop: '4px' }}>
-                    <button
-                      onClick={() => handleToggleCooperationActive(c.id, c.is_active)}
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: '10px',
-                        border: 'none',
-                        fontSize: '0.72rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        background: c.is_active ? '#e2f6ea' : '#f5f5f7',
-                        color: c.is_active ? '#137333' : '#86868b',
-                        transition: 'all 0.15s ease'
+              paginatedCooperations.map((c: any) => {
+                return (
+                  <div 
+                    key={c.id} 
+                    draggable={true}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("cooperationId", c.id);
+                    }}
+                    style={{ 
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '16px',
+                      padding: '10px 16px',
+                      borderRadius: '16px',
+                      background: '#ffffff',
+                      border: '1px solid #f1f5f9',
+                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.01)',
+                      minWidth: '850px',
+                      transition: 'all 0.25s ease',
+                      cursor: 'grab'
+                    }}
+                    className="hover-scale"
+                  >
+                    {/* Avatar & Name */}
+                    <div 
+                      style={{ 
+                        flex: '1.6', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '14px', 
+                        minWidth: '180px'
                       }}
                     >
-                      {c.is_active ? 'Aktiviert' : 'Deaktiviert'}
-                    </button>
-
-                    <button
-                      onClick={() => handleDeleteCooperation(c.id, c.name)}
-                      style={{
-                        padding: '6px',
-                        borderRadius: '10px',
-                        border: 'none',
-                        background: 'transparent',
-                        cursor: 'pointer',
-                        color: '#ef4444',
+                      <div style={{
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '50%',
+                        background: getAvatarGradient(c.name || 'Kooperation'),
+                        color: getAvatarTextColor(c.name || 'Kooperation'),
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                        justifyContent: 'center',
+                        fontSize: '0.88rem',
+                        fontWeight: 800,
+                        flexShrink: 0
+                      }}>
+                        {c.name ? c.name.trim().substring(0, 2).toUpperCase() : 'KO'}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                        <span 
+                          style={{ 
+                            fontSize: '0.92rem', 
+                            fontWeight: 800, 
+                            color: '#1d1d1f', 
+                            whiteSpace: 'nowrap', 
+                            overflow: 'hidden', 
+                            textOverflow: 'ellipsis'
+                          }}
+                        >
+                          🏫 {c.name}
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.7rem', color: '#86868b', marginTop: '2px' }}>
+                          {c.contact_person && (
+                            <span>👤 {c.contact_person}</span>
+                          )}
+                          {c.phone && (
+                            <span>📞 {c.phone}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Subject Select */}
+                    <div style={{ flex: '1.2', minWidth: '130px' }}>
+                      <select
+                        value={c.subject || ''}
+                        onChange={async (e) => {
+                          const { error } = await supabase
+                            .from('cooperations')
+                            .update({ subject: e.target.value || null })
+                            .eq('id', c.id);
+                          if (error) alert(error.message);
+                          else fetchDashboardData();
+                        }}
+                        style={{ 
+                          width: '100%', 
+                          padding: '7px 12px', 
+                          borderRadius: '10px', 
+                          fontSize: '0.78rem', 
+                          fontWeight: 700, 
+                          color: '#1d1d1f',
+                          background: '#f5f5f7',
+                          border: 'none',
+                          outline: 'none',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="">📯 Unterrichtsfach wählen</option>
+                        {subjects.map(s => (
+                          <option key={s.id} value={s.name}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Teacher Select */}
+                    <div style={{ flex: '1.25', minWidth: '120px' }}>
+                      <select
+                        value={c.teacher_id || ''}
+                        onChange={async (e) => {
+                          const { error } = await supabase
+                            .from('cooperations')
+                            .update({ teacher_id: e.target.value || null })
+                            .eq('id', c.id);
+                          if (error) alert(error.message);
+                          else fetchDashboardData();
+                        }}
+                        style={{ 
+                          width: '100%', 
+                          padding: '7px 12px', 
+                          borderRadius: '10px', 
+                          fontSize: '0.78rem', 
+                          fontWeight: 700, 
+                          color: '#1d1d1f',
+                          background: '#f5f5f7',
+                          border: 'none',
+                          outline: 'none',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="">👥 Zuweisen...</option>
+                        {allUniqueTeachers.map(t => (
+                          <option key={t.id} value={t.id}>{t.firstName || t.first_name} {t.lastName || t.last_name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Status Badge Select */}
+                    <div style={{ flex: '0.8', minWidth: '80px' }}>
+                      <select
+                        value={c.status || 'active'}
+                        onChange={async (e) => {
+                          const newStatus = e.target.value;
+                          const { error } = await supabase
+                            .from('cooperations')
+                            .update({ 
+                              status: newStatus,
+                              is_active: newStatus === 'active'
+                            })
+                            .eq('id', c.id);
+                          if (error) alert(error.message);
+                          else fetchDashboardData();
+                        }}
+                        style={{ 
+                          width: '100%', 
+                          padding: '6px 8px', 
+                          borderRadius: '10px', 
+                          fontSize: '0.72rem', 
+                          fontWeight: 800, 
+                          color: c.status === 'active' ? '#137333' : c.status === 'pending' ? '#b45309' : '#86868b',
+                          background: c.status === 'active' ? '#e2f6ea' : c.status === 'pending' ? '#fffbeb' : '#f5f5f7',
+                          border: 'none',
+                          outline: 'none',
+                          cursor: 'pointer',
+                          textAlign: 'center'
+                        }}
+                      >
+                        <option value="active">🟢 Aktiv</option>
+                        <option value="pending">🟡 Ausstehend</option>
+                        <option value="inactive">⚪ Inaktiv</option>
+                      </select>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: '0.5', minWidth: '90px', justifyContent: 'flex-end' }}>
+                      {c.email && (
+                        <a 
+                          href={`mailto:${c.email}`} 
+                          style={{
+                            padding: '6px',
+                            borderRadius: '10px',
+                            background: '#f5f5f7',
+                            color: '#1d1d1f',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            textDecoration: 'none'
+                          }}
+                          title="E-Mail senden"
+                        >
+                          ✉️
+                        </a>
+                      )}
+                      
+                      <button
+                        onClick={() => handleDeleteCooperation(c.id, c.name)}
+                        style={{
+                          padding: '6px',
+                          borderRadius: '10px',
+                          border: 'none',
+                          background: 'transparent',
+                          cursor: 'pointer',
+                          color: '#ef4444',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        title="Kooperation löschen"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
-        </div>
 
-        {/* Right Pane: Status Categories Drop Zones Sidebar */}
-        <div className="google-card" style={{
-          width: '300px',
-          flexShrink: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '18px',
-          padding: '24px',
-          borderRadius: '24px',
-          border: '1.5px solid #cbd5e1',
-          background: '#ffffff',
-          position: 'sticky',
-          top: '24px'
-        }}>
-          <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
-            ⚡ Status per Drag &amp; Drop
-          </h4>
-          <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', fontWeight: 550, lineHeight: 1.4 }}>
-            Ziehe eine Kooperation und lasse sie auf einen Status fallen, um den Status direkt zu aktualisieren.
-          </p>
+          {/* PAGINATION FOOTER */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #f1f5f9', paddingTop: '16px', flexWrap: 'wrap', gap: '12px' }}>
+            <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 650 }}>
+              Zeige {startIndex + 1} bis {Math.min(startIndex + cooperationPageSize, totalCount)} von {totalCount} Partnern
+            </span>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {[
-              { key: 'active', label: 'Aktiv', color: '#166534', bg: '#e2f6ea', border: '#bbf7d0' },
-              { key: 'pending', label: 'Ausstehend', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
-              { key: 'inactive', label: 'Inaktiv', color: '#475569', bg: '#f1f5f9', border: '#cbd5e1' }
-            ].map(statusItem => {
-              const isHovered = dragHoveredCoopStatus === statusItem.key;
-              const count = cooperations.filter(c => c.status === statusItem.key).length;
-              return (
-                <div
-                  key={statusItem.key}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragHoveredCoopStatus(statusItem.key);
-                  }}
-                  onDragLeave={() => setDragHoveredCoopStatus(null)}
-                  onDrop={(e) => {
-                    const cooperationId = e.dataTransfer.getData("cooperationId");
-                    if (cooperationId) {
-                      handleUpdateCooperationStatus(cooperationId, statusItem.key);
-                    }
-                    setDragHoveredCoopStatus(null);
-                  }}
-                  onClick={() => {
-                    setCooperationFilterStatus(cooperationFilterStatus === statusItem.key ? 'All' : statusItem.key);
-                  }}
-                  style={{
-                    padding: '12px 14px',
-                    borderRadius: '16px',
-                    background: isHovered ? statusItem.bg : '#ffffff',
-                    border: isHovered ? `2px dashed ${statusItem.color}` : `1.5px solid ${cooperationFilterStatus === statusItem.key ? statusItem.color : '#cbd5e1'}`,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px',
-                    cursor: 'pointer',
-                    transform: isHovered ? 'scale(1.03)' : 'scale(1)',
-                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                    boxShadow: isHovered ? `0 4px 12px ${statusItem.color}20` : 'none'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 800, color: statusItem.color, fontSize: '0.82rem' }}>
-                      {statusItem.label}
-                    </span>
-                    <span style={{ background: statusItem.bg, color: statusItem.color, fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px' }}>
-                      {count}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                disabled={safeCurrentPage === 1}
+                onClick={() => setCooperationCurrentPage(safeCurrentPage - 1)}
+                style={{
+                  border: '1.5px solid #cbd5e1',
+                  background: 'white',
+                  borderRadius: '10px',
+                  padding: '6px 12px',
+                  fontSize: '0.75rem',
+                  fontWeight: 800,
+                  cursor: safeCurrentPage === 1 ? 'not-allowed' : 'pointer',
+                  opacity: safeCurrentPage === 1 ? 0.5 : 1,
+                  fontFamily: 'Urbanist'
+                }}
+              >
+                &larr; Zurück
+              </button>
+
+              <div style={{ display: 'flex', gap: '4px' }}>
+                {Array.from({ length: totalPages }).map((_, i) => {
+                  const pNum = i + 1;
+                  const isCurrent = pNum === safeCurrentPage;
+                  return (
+                    <button
+                      key={pNum}
+                      onClick={() => setCooperationCurrentPage(pNum)}
+                      style={{
+                        width: '28px',
+                        height: '28px',
+                        border: 'none',
+                        background: isCurrent ? '#34a853' : 'transparent',
+                        color: isCurrent ? '#ffffff' : '#64748b',
+                        borderRadius: '8px',
+                        fontSize: '0.75rem',
+                        fontWeight: 900,
+                        cursor: 'pointer',
+                        fontFamily: 'Urbanist'
+                      }}
+                    >
+                      {pNum}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                disabled={safeCurrentPage === totalPages}
+                onClick={() => setCooperationCurrentPage(safeCurrentPage + 1)}
+                style={{
+                  border: '1.5px solid #cbd5e1',
+                  background: 'white',
+                  borderRadius: '10px',
+                  padding: '6px 12px',
+                  fontSize: '0.75rem',
+                  fontWeight: 800,
+                  cursor: safeCurrentPage === totalPages ? 'not-allowed' : 'pointer',
+                  opacity: safeCurrentPage === totalPages ? 0.5 : 1,
+                  fontFamily: 'Urbanist'
+                }}
+              >
+                Weiter &rarr;
+              </button>
+            </div>
           </div>
         </div>
 
@@ -2950,6 +3405,35 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   </div>
                 </div>
 
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Unterrichtsfach</label>
+                    <select
+                      value={newCooperationSubject}
+                      onChange={(e) => setNewCooperationSubject(e.target.value)}
+                      style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
+                    >
+                      <option value="">📯 Fach wählen...</option>
+                      {subjects.map(s => (
+                        <option key={s.id} value={s.name}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Lehrkraft</label>
+                    <select
+                      value={newCooperationTeacherId}
+                      onChange={(e) => setNewCooperationTeacherId(e.target.value)}
+                      style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
+                    >
+                      <option value="">👥 Lehrkraft zuweisen...</option>
+                      {allUniqueTeachers.map(t => (
+                        <option key={t.id} value={t.id}>{t.firstName || t.first_name} {t.lastName || t.last_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Status *</label>
                   <select
@@ -3004,7 +3488,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       
       const matchesSearch = !query || firstName.includes(query) || lastName.includes(query) || nickname.includes(query);
       const matchesInstrument = studentFilterInstrument === 'All' || (s.instrument || 'Allgemein') === studentFilterInstrument;
-      const matchesTeacher = studentFilterTeacher === 'All' || s.teacher_id === studentFilterTeacher;
+      const matchesTeacher = studentFilterTeacher === 'All' || 
+        (studentFilterTeacher === 'none' ? !s.teacher_id : s.teacher_id === studentFilterTeacher);
       
       let matchesStatus = true;
       if (studentFilterStatus === 'campus') matchesStatus = s.is_campus_active;
@@ -3332,6 +3817,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: 'white', fontWeight: 700 }}
                 >
                   <option value="All">👥 Alle Lehrer</option>
+                  <option value="none">⬜ Allgemein (kein Lehrer)</option>
                   {allUniqueTeachers.map(t => (
                     <option key={t.id} value={t.id}>{t.lastName || t.last_name}</option>
                   ))}
@@ -3480,7 +3966,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             WebkitAppearance: 'none'
                           }}
                         >
-                          <option value="">Kein Lehrer</option>
+                          <option value="">Allgemein</option>
                           {allUniqueTeachers.map((t: any) => (
                             <option key={t.id} value={t.id}>{t.lastName || t.last_name}</option>
                           ))}
@@ -3570,14 +4056,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             fontSize: '0.75rem',
                             fontWeight: 800,
                             cursor: 'pointer',
-                            background: student.is_groovelab_active ? '#fde8e8' : '#f5f5f7',
-                            color: student.is_groovelab_active ? '#c53030' : '#86868b',
+                            background: student.is_groovelab_active ? '#fef3c7' : '#f5f5f7',
+                            color: student.is_groovelab_active ? '#b45309' : '#86868b',
                             transition: 'all 0.15s ease',
                             whiteSpace: 'nowrap'
                           }}
                           className="hover-scale-mini"
                         >
-                          Groove
+                          Groovelab
                         </button>
                       </div>
 
@@ -3848,7 +4334,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       onChange={(e) => setNewStudentTeacherId(e.target.value)}
                       style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
                     >
-                      <option value="">Keine Zuweisung</option>
+                      <option value="">Allgemein</option>
                       {allUniqueTeachers.map((t: any) => (
                         <option key={t.id} value={t.id}>{t.firstName || t.first_name} {t.lastName || t.last_name}</option>
                       ))}
@@ -4185,7 +4671,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           email: newCooperationEmail.trim() || null,
           phone: newCooperationPhone.trim() || null,
           status: newCooperationStatus || 'active',
-          is_active: newCooperationStatus === 'active'
+          is_active: newCooperationStatus === 'active',
+          subject: newCooperationSubject.trim() || null,
+          teacher_id: newCooperationTeacherId || null
         });
 
       if (error) throw error;
@@ -4196,6 +4684,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       setNewCooperationEmail('');
       setNewCooperationPhone('');
       setNewCooperationStatus('active');
+      setNewCooperationSubject('');
+      setNewCooperationTeacherId('');
       setShowAddCooperationModal(false);
       fetchDashboardData();
     } catch (err: any) {
@@ -4508,16 +4998,44 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     setRoomSaving(true);
     try {
       if (editingRoom) {
-        const { error } = await supabase.from('rooms').update({
+        // Update local mapping fallback first
+        try {
+          const mappings = JSON.parse(localStorage.getItem(`groovelab_room_floor_mappings_${schoolId}`) || '{}');
+          mappings[editingRoom.id] = roomFormFloor;
+          localStorage.setItem(`groovelab_room_floor_mappings_${schoolId}`, JSON.stringify(mappings));
+        } catch (err) {
+          console.error(err);
+        }
+
+        // Try updating including floor
+        let { error } = await supabase.from('rooms').update({
           name: roomFormName.trim(),
           allowed_instruments: roomFormEquipment,
           max_teachers: roomFormMaxTeachers,
           max_students: roomFormMaxStudents,
-          qm: roomFormQm
+          qm: roomFormQm,
+          is_campus_active: roomFormIsCampusActive,
+          is_groovelab_active: roomFormIsGroovelabActive,
+          floor: roomFormFloor
         }).eq('id', editingRoom.id);
         
-        if (error) throw error;
+        // Fallback: If floor column not found in schema cache, retry without it
+        if (error && (error.message.includes("floor") || error.message.includes("column"))) {
+          console.warn("Supabase floor column missing, retrying edit save without floor field...");
+          const { error: retryError } = await supabase.from('rooms').update({
+            name: roomFormName.trim(),
+            allowed_instruments: roomFormEquipment,
+            max_teachers: roomFormMaxTeachers,
+            max_students: roomFormMaxStudents,
+            qm: roomFormQm,
+            is_campus_active: roomFormIsCampusActive,
+            is_groovelab_active: roomFormIsGroovelabActive
+          }).eq('id', editingRoom.id);
+          error = retryError;
+        }
 
+        if (error) throw error;
+ 
         setRooms(prev => prev.map(r => r.id === editingRoom.id
           ? { 
               ...r, 
@@ -4526,11 +5044,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               equipment: roomFormEquipment, 
               max_teachers: roomFormMaxTeachers,
               max_students: roomFormMaxStudents,
-              qm: roomFormQm
+              qm: roomFormQm,
+              is_campus_active: roomFormIsCampusActive,
+              is_groovelab_active: roomFormIsGroovelabActive,
+              floor: roomFormFloor
             }
           : r));
       } else {
-        const { data, error } = await supabase.from('rooms').insert({
+        const insertPayload: any = {
           school_id: schoolId,
           name: roomFormName.trim(),
           allowed_instruments: roomFormEquipment,
@@ -4538,10 +5059,34 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           max_students: roomFormMaxStudents,
           qm: roomFormQm,
           sort_order: rooms.length,
-        }).select().single();
+          is_campus_active: roomFormIsCampusActive,
+          is_groovelab_active: roomFormIsGroovelabActive,
+          floor: roomFormFloor
+        };
+
+        let { data, error } = await supabase.from('rooms').insert(insertPayload).select().single();
         
+        // Fallback: If floor column not found in schema cache, retry without it
+        if (error && (error.message.includes("floor") || error.message.includes("column"))) {
+          console.warn("Supabase floor column missing, retrying insert save without floor field...");
+          const insertPayloadWithoutFloor = { ...insertPayload };
+          delete insertPayloadWithoutFloor.floor;
+          const { data: retryData, error: retryError } = await supabase.from('rooms').insert(insertPayloadWithoutFloor).select().single();
+          data = retryData;
+          error = retryError;
+        }
+
         if (error) throw error;
         if (data) {
+          // Update local mapping fallback for the new room ID
+          try {
+            const mappings = JSON.parse(localStorage.getItem(`groovelab_room_floor_mappings_${schoolId}`) || '{}');
+            mappings[data.id] = roomFormFloor;
+            localStorage.setItem(`groovelab_room_floor_mappings_${schoolId}`, JSON.stringify(mappings));
+          } catch (err) {
+            console.error(err);
+          }
+
           setRooms(prev => [...prev, {
             ...data,
             equipment: data.allowed_instruments || []
@@ -4554,6 +5099,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       setRoomFormMaxTeachers(1);
       setRoomFormMaxStudents(1);
       setRoomFormQm(0);
+      setRoomFormFloor('Allgemein');
       setRoomsSubView('overview');
     } catch (e: any) {
       console.error('Room save error:', e);
@@ -4580,6 +5126,105 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     }
   };
 
+  const handleBulkRoomImport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!roomCsvText.trim() || !schoolId) {
+      alert('Bitte geben Sie Raumdaten ein.');
+      return;
+    }
+
+    setRoomCsvSaving(true);
+    const lines = roomCsvText.split('\n');
+    let successCount = 0;
+    let failCount = 0;
+    const errors: string[] = [];
+
+    // Smarte-Auto-Zuweisung: If a floor is active/selected, assign that floor. Otherwise default to 'Allgemein'
+    const assignedFloor = roomFilterFloor !== 'All' ? roomFilterFloor : 'Allgemein';
+    const insertedRooms: any[] = [];
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      let parts = trimmed.split(';');
+      if (parts.length < 2) {
+        parts = trimmed.split(',');
+      }
+
+      const roomName = parts[0]?.trim();
+      if (!roomName) {
+        failCount++;
+        errors.push(`Fehlerhafte Zeile: "${trimmed}" (Kein Raumname angegeben)`);
+        continue;
+      }
+
+      const maxStudents = parseInt(parts[1]?.trim()) || 1;
+      const qmSize = parseFloat(parts[2]?.trim()) || 0;
+
+      try {
+        const insertPayload: any = {
+          school_id: schoolId,
+          name: roomName,
+          max_students: maxStudents,
+          max_teachers: 1,
+          allowed_instruments: [],
+          qm: qmSize,
+          sort_order: rooms.length + successCount,
+          is_campus_active: true, // Default to active for Campus
+          is_groovelab_active: false, // Default to inactive for GrooveLab
+          floor: assignedFloor
+        };
+
+        let { data, error } = await supabase.from('rooms').insert(insertPayload).select().single();
+
+        // Fallback: If floor column not found in schema cache, retry without it
+        if (error && (error.message.includes("floor") || error.message.includes("column"))) {
+          const insertPayloadWithoutFloor = { ...insertPayload };
+          delete insertPayloadWithoutFloor.floor;
+          const { data: retryData, error: retryError } = await supabase.from('rooms').insert(insertPayloadWithoutFloor).select().single();
+          data = retryData;
+          error = retryError;
+        }
+
+        if (error) throw error;
+        if (data) {
+          // Update local mapping fallback for the new room ID
+          try {
+            const mappings = JSON.parse(localStorage.getItem(`groovelab_room_floor_mappings_${schoolId}`) || '{}');
+            mappings[data.id] = assignedFloor;
+            localStorage.setItem(`groovelab_room_floor_mappings_${schoolId}`, JSON.stringify(mappings));
+          } catch (err) {
+            console.error(err);
+          }
+
+          insertedRooms.push({
+            ...data,
+            equipment: data.allowed_instruments || []
+          });
+          successCount++;
+        }
+      } catch (err: any) {
+        failCount++;
+        errors.push(`Fehler bei "${roomName}": ${err.message}`);
+      }
+    }
+
+    if (insertedRooms.length > 0) {
+      setRooms(prev => [...prev, ...insertedRooms]);
+    }
+
+    setRoomCsvText('');
+    setIsRoomCsvExpanded(false);
+    setRoomCsvSaving(false);
+
+    if (errors.length > 0) {
+      alert(`Onboarding abgeschlossen:\n- ${successCount} Räume erfolgreich angelegt\n- ${failCount} Fehler\n\nFehlerdetails:\n${errors.join('\n')}`);
+    } else {
+      alert(`${successCount} Räume erfolgreich angelegt (Smarte-Auto-Zuweisung an Stockwerk: „${assignedFloor}“).`);
+    }
+  };
+
   const openRoomEditor = (room?: any) => {
     if (room) {
       setEditingRoom(room);
@@ -4588,6 +5233,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       setRoomFormMaxTeachers(room.max_teachers || 1);
       setRoomFormMaxStudents(room.max_students || 1);
       setRoomFormQm(room.qm || 0);
+      setRoomFormIsCampusActive(room.is_campus_active !== false);
+      setRoomFormIsGroovelabActive(!!room.is_groovelab_active);
+      setRoomFormFloor(room.floor || 'Allgemein');
     } else {
       setEditingRoom(null);
       setRoomFormName('');
@@ -4595,6 +5243,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       setRoomFormMaxTeachers(1);
       setRoomFormMaxStudents(1);
       setRoomFormQm(0);
+      setRoomFormIsCampusActive(true);
+      setRoomFormIsGroovelabActive(false);
+      setRoomFormFloor('Allgemein');
     }
     setRoomsSubView('settings');
   };
@@ -5302,7 +5953,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           {/* Active Tab Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              {!((activeTab as any) === 'campus') && !((activeTab as any) === 'campus' && (campusSubTab === 'onboarding' || campusSubTab === 'schedules')) && !(activeTab === 'secretary' && secretarySubTab === 'crisis') && (
+              {!((activeTab as any) === 'campus') && !((activeTab as any) === 'campus' && (campusSubTab === 'onboarding' || campusSubTab === 'schedules')) && !(activeTab === 'secretary' && (secretarySubTab === 'crisis' || secretarySubTab === 'rooms')) && (
                 <>
                   <h2 className="swiss-h1" style={{ margin: 0, color: (activeTab as any) === 'campus' ? '#10b981' : '#f59e0b' }}>
                     {getTabTitle()}
@@ -6166,7 +6817,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           <div className="campus-grid">
             
             {/* Left Content Pane (Main Board Content) */}
-            <div style={{ flex: (campusSubTab === 'onboarding' || campusSubTab === 'students') ? '1' : '1.6', display: 'flex', flexDirection: 'column', gap: '24px', width: (campusSubTab === 'onboarding' || campusSubTab === 'students') ? '100%' : 'auto', minWidth: 0 }}>
+            <div style={{ flex: (campusSubTab === 'onboarding' || campusSubTab === 'students' || campusSubTab === 'cooperations') ? '1' : '1.6', display: 'flex', flexDirection: 'column', gap: '24px', width: (campusSubTab === 'onboarding' || campusSubTab === 'students' || campusSubTab === 'cooperations') ? '100%' : 'auto', minWidth: 0 }}>
               
               {/* Subtab: Startseite (Briefing) */}
               {campusSubTab === 'briefing' && (
@@ -6285,7 +6936,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <Users size={22} style={{ color: '#0f172a' }} />
                         <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                          Lehrerverwaltung
+                          Lehrerverwaltung ({allUniqueTeachers.length})
                         </h3>
                       </div>
                       
@@ -6606,14 +7257,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 <span style={{
                                   padding: '5px 12px',
                                   borderRadius: '10px',
-                                  background: isGroove ? '#fce8e6' : '#f5f5f7',
-                                  color: isGroove ? '#c5221f' : '#86868b',
+                                  background: isGroove ? '#fef3c7' : '#f5f5f7',
+                                  color: isGroove ? '#b45309' : '#86868b',
                                   fontSize: '0.74rem',
                                   fontWeight: 700,
                                   minWidth: '55px',
                                   textAlign: 'center'
                                 }}>
-                                  Groove
+                                  Groovelab
                                 </span>
                               </div>
 
@@ -6730,19 +7381,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               </div>
 
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Hauptinstrument / Fach *</label>
-                                <select
-                                  value={newTeacherInstrument || (activeSubjectsList[0] || '')}
-                                  onChange={(e) => setNewTeacherInstrument(e.target.value)}
-                                  style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white', color: '#1e293b' }}
-                                >
-                                  {activeSubjectsList.map((subName) => (
-                                    <option key={subName} value={subName}>
-                                      {subName}
-                                    </option>
-                                  ))}
-                                </select>
+                                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Instrumente/Fächer *</label>
+                                <AppleStyleTokenField
+                                  label=""
+                                  selectedString={newTeacherInstrument}
+                                  onChange={setNewTeacherInstrument}
+                                  suggestions={activeSubjectsList}
+                                  placeholder="Unterrichtsfächer auswählen..."
+                                />
                               </div>
+
 
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                 <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Endzeit / Vertragsende (Zugriff erlischt automatisch)</label>
@@ -7875,6 +8523,93 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         );
                       })()}
 
+                      {/* Fixed "Allgemein" entry for students without a teacher */}
+                      {(() => {
+                        const unassignedCount = students.filter(s => !s.teacher_id && s.is_campus_active).length;
+                        const isSelected = studentFilterTeacher === 'none';
+                        const isHovered = dragHoveredTeacher === 'none';
+                        return (
+                          <div
+                            key="allgemein"
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              setDragHoveredTeacher('none');
+                            }}
+                            onDragLeave={() => setDragHoveredTeacher(null)}
+                            onDrop={(e) => {
+                              const studentId = e.dataTransfer.getData("studentId");
+                              if (studentId) {
+                                handleUpdateStudentTeacher(studentId, null);
+                              }
+                              setDragHoveredTeacher(null);
+                            }}
+                            onClick={() => {
+                              setStudentFilterTeacher('none');
+                              setStudentCurrentPage(1);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '12px 16px',
+                              borderRadius: '16px',
+                              border: isHovered
+                                ? '2px dashed #94a3b8'
+                                : isSelected
+                                  ? '1.5px solid #cbd5e1'
+                                  : '1.5px solid #f1f5f9',
+                              background: isHovered
+                                ? '#f8fafc'
+                                : isSelected
+                                  ? '#f1f5f9'
+                                  : '#ffffff',
+                              cursor: 'pointer',
+                              transform: isHovered ? 'scale(1.02)' : 'scale(1)',
+                              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+                              <div style={{
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '50%',
+                                background: '#f1f5f9',
+                                color: '#64748b',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.85rem',
+                                fontWeight: 900,
+                                fontFamily: 'Urbanist',
+                                flexShrink: 0
+                              }}>
+                                AL
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                                  Allgemein
+                                </span>
+                                <span style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'Inter' }}>
+                                  Ohne Lehrerzuweisung
+                                </span>
+                              </div>
+                            </div>
+                            <span style={{
+                              padding: '4px 10px',
+                              borderRadius: '10px',
+                              background: isSelected ? '#e2e8f0' : '#f1f5f9',
+                              color: isSelected ? '#334155' : '#64748b',
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              fontFamily: 'Urbanist',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {unassignedCount} Schüler
+                            </span>
+                          </div>
+                        );
+                      })()}
+
                       {allUniqueTeachers.map((t: any) => {
                         const teacherName = `${t.firstName || t.first_name || ''} ${t.lastName || t.last_name || ''}`.trim();
                         const assignedCount = students.filter(s => s.teacher_id === t.id && s.is_campus_active).length;
@@ -7952,59 +8687,285 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               </div>
                             </div>
 
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
-                              <span style={{
-                                padding: '4px 10px',
-                                borderRadius: '10px',
-                                background: isSelected ? '#d1fae5' : '#f1f5f9',
-                                color: isSelected ? '#065f46' : '#64748b',
-                                fontSize: '0.68rem',
-                                fontWeight: 800,
-                                fontFamily: 'Urbanist',
-                                whiteSpace: 'nowrap'
+                            <span style={{
+                              padding: '4px 10px',
+                              borderRadius: '10px',
+                              background: isSelected ? '#d1fae5' : '#f1f5f9',
+                              color: isSelected ? '#065f46' : '#64748b',
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              fontFamily: 'Urbanist',
+                              whiteSpace: 'nowrap',
+                              flexShrink: 0
+                            }}>
+                              {assignedCount} Schüler
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Cooperations Sidebar */}
+              {campusSubTab === 'cooperations' && (() => {
+                const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
+                  if (!acc.some(existing => existing.id === t.id)) {
+                    acc.push(t);
+                  }
+                  return acc;
+                }, []);
+
+                // Filter teachers to only show those who have "kooperation" in their instrument/subjects
+                const coopTeachersList = allUniqueTeachers.filter(t => 
+                  (t.instrument || '').toLowerCase().includes('kooperation')
+                );
+
+                const getAvatarGradient = (name: string) => getAlphabeticalColor(name).avatarBg;
+                const getAvatarTextColor = (name: string) => getAlphabeticalColor(name).avatarColor;
+
+                return (
+                  <div className="google-card" style={{
+                    width: '340px',
+                    flexShrink: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '20px',
+                    padding: '24px',
+                    borderRadius: '24px',
+                    border: '1.5px solid #cbd5e1',
+                    background: '#ffffff',
+                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Users size={20} style={{ color: '#0f172a' }} />
+                      <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                        Kooperationslehrer
+                      </h3>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', fontWeight: 550, lineHeight: 1.45, fontFamily: 'Inter' }}>
+                      Klicke auf eine Lehrkraft, um das Kooperationen-Board nach ihr zu filtern.
+                    </p>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '500px', overflowY: 'auto', paddingRight: '4px' }}>
+                      
+                      {/* Option: Alle Lehrer anzeigen */}
+                      {(() => {
+                        const isActive = cooperationFilterTeacher === 'All';
+                        return (
+                          <div
+                            onClick={() => {
+                              setCooperationFilterTeacher('All');
+                              setCooperationCurrentPage(1);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '12px 16px',
+                              borderRadius: '16px',
+                              border: isActive 
+                                ? '1.5px solid #22c55e' 
+                                : '1.5px solid #f1f5f9',
+                              background: isActive 
+                                ? '#f0fdf4' 
+                                : '#ffffff',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                              boxShadow: isActive ? '0 4px 12px rgba(34,197,150,0.06)' : 'none'
+                            }}
+                            className="hover-scale-mini"
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '50%',
+                                background: '#f1f5f9',
+                                color: '#475569',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.8rem',
+                                fontWeight: 800
                               }}>
-                                {assignedCount} Schüler
-                              </span>
-                              
-                              <button
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  if (confirm(`Möchtest du alle nicht zugeordneten Schüler dem Lehrer ${teacherName} zuweisen?`)) {
-                                    const campusStudents = students.filter(s => s.is_campus_active);
-                                    const unassignedIds = campusStudents.filter(s => !s.teacher_id).map(s => s.id);
-                                    if (unassignedIds.length === 0) {
-                                      alert('Es gibt keine nicht-zugeordneten Schüler.');
-                                      return;
-                                    }
-                                    
-                                    const { error } = await supabase
-                                      .from('users')
-                                      .update({ teacher_id: t.id })
-                                      .in('id', unassignedIds);
-                                    
-                                    if (error) {
-                                      alert(error.message);
-                                    } else {
-                                      alert(`${unassignedIds.length} Schüler wurden ${teacherName} erfolgreich zugewiesen.`);
-                                      fetchDashboardData();
-                                    }
-                                  }
-                                }}
-                                style={{
-                                  background: 'none',
-                                  color: '#1a73e8',
-                                  border: 'none',
-                                  padding: 0,
-                                  fontSize: '0.65rem',
-                                  fontWeight: 700,
-                                  cursor: 'pointer',
-                                  fontFamily: 'Urbanist',
-                                  transition: 'color 0.15s'
-                                }}
-                              >
-                                Alle zuweisen
-                              </button>
+                                👥
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b', fontFamily: 'Urbanist' }}>
+                                  Alle Lehrer anzeigen
+                                </span>
+                                <span style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'Inter' }}>
+                                  Gesamtübersicht
+                                </span>
+                              </div>
                             </div>
+
+                            <span style={{
+                              padding: '4px 10px',
+                              borderRadius: '10px',
+                              background: isActive ? '#d1fae5' : '#f1f5f9',
+                              color: isActive ? '#065f46' : '#64748b',
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              fontFamily: 'Urbanist'
+                            }}>
+                              {cooperations.length} Koop.
+                            </span>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Option: Allgemein (Kein Lehrer zugewiesen) */}
+                      {(() => {
+                        const isActive = cooperationFilterTeacher === 'none';
+                        const unassignedCount = cooperations.filter(c => !c.teacher_id).length;
+                        return (
+                          <div
+                            onClick={() => {
+                              setCooperationFilterTeacher('none');
+                              setCooperationCurrentPage(1);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '12px 16px',
+                              borderRadius: '16px',
+                              border: isActive 
+                                ? '1.5px solid #22c55e' 
+                                : '1.5px solid #f1f5f9',
+                              background: isActive 
+                                ? '#f0fdf4' 
+                                : '#ffffff',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                              boxShadow: isActive ? '0 4px 12px rgba(34,197,150,0.06)' : 'none'
+                            }}
+                            className="hover-scale-mini"
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '50%',
+                                background: '#f5f5f7',
+                                color: '#86868b',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.8rem',
+                                fontWeight: 800
+                              }}>
+                                ⬜
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b', fontFamily: 'Urbanist' }}>
+                                  Allgemein
+                                </span>
+                                <span style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'Inter' }}>
+                                  Ohne Lehrerzuweisung
+                                </span>
+                              </div>
+                            </div>
+
+                            <span style={{
+                              padding: '4px 10px',
+                              borderRadius: '10px',
+                              background: isActive ? '#d1fae5' : '#f1f5f9',
+                              color: isActive ? '#065f46' : '#64748b',
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              fontFamily: 'Urbanist'
+                            }}>
+                              {unassignedCount} Koop.
+                            </span>
+                          </div>
+                        );
+                      })()}
+
+                      {/* List each teacher who has Kooperationen as subject */}
+                      {coopTeachersList.map((t: any) => {
+                        const isSelected = cooperationFilterTeacher === t.id;
+                        const teacherName = `${t.firstName || t.first_name || ''} ${t.lastName || t.last_name || ''}`.trim();
+                        const tInitials = `${t.firstName?.[0] || t.first_name?.[0] || ''}${t.lastName?.[0] || t.last_name?.[0] || ''}`.toUpperCase() || 'D';
+                        const tAvatarBg = getAvatarGradient(teacherName);
+                        const tAvatarColor = getAvatarTextColor(teacherName);
+                        const assignedCount = cooperations.filter(c => c.teacher_id === t.id).length;
+
+                        return (
+                          <div
+                            key={t.id}
+                            onClick={() => {
+                              setCooperationFilterTeacher(isSelected ? 'All' : t.id);
+                              setCooperationCurrentPage(1);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '12px 16px',
+                              borderRadius: '16px',
+                              border: isSelected 
+                                ? '1.5px solid #22c55e' 
+                                : '1.5px solid #f1f5f9',
+                              background: isSelected 
+                                ? '#f0fdf4' 
+                                : '#ffffff',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                              boxShadow: isSelected ? '0 4px 12px rgba(34,197,150,0.06)' : 'none'
+                            }}
+                            className="hover-scale-mini"
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                              <div style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '50%',
+                                background: tAvatarBg,
+                                color: tAvatarColor,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.78rem',
+                                fontWeight: 900,
+                                flexShrink: 0
+                              }}>
+                                {tInitials}
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                <span style={{ 
+                                  fontSize: '0.82rem', 
+                                  fontWeight: 800, 
+                                  color: '#1e293b', 
+                                  fontFamily: 'Urbanist',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
+                                }}>
+                                  {teacherName}
+                                </span>
+                                <span style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'Inter', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {t.instrument || 'Lehrer'}
+                                </span>
+                              </div>
+                            </div>
+
+                            <span style={{
+                              padding: '4px 10px',
+                              borderRadius: '10px',
+                              background: isSelected ? '#d1fae5' : '#f1f5f9',
+                              color: isSelected ? '#065f46' : '#64748b',
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              fontFamily: 'Urbanist',
+                              whiteSpace: 'nowrap',
+                              flexShrink: 0
+                            }}>
+                              {assignedCount} Koop.
+                            </span>
                           </div>
                         );
                       })}
@@ -8267,9 +9228,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             >
                               {(() => {
                                 const cleanName = cleanRoomName(room.name);
-                                return idx === 0
-                                  ? (cleanName.toLowerCase() === 'hauptraum' ? '👑 Hauptraum' : `👑 Hauptraum - ${cleanName}`)
-                                  : cleanName;
+                                return `${idx + 1} - ${cleanName}`;
                               })()}
                             </button>
                           );
@@ -9037,249 +9996,865 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           // Compute per-room utilization from approved/pending allocations
           const getOccupiedDays = (roomId: string) =>
             [1,2,3,4,5].filter(d => matrixAllocations.some(p => p.roomId === roomId && p.dayOfWeek === d));
+          
           const INSTRUMENT_COLOR: Record<string, string> = {
             Schlagzeug: '#ef4444', Piano: '#3b82f6', Gitarre: '#10b981',
             Gesang: '#8b5cf6', Geige: '#f59e0b', Querflöte: '#06b6d4',
             Saxophon: '#f97316', Bass: '#64748b', Keyboard: '#ec4899', Trompete: '#eab308',
           };
-          return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', fontFamily: 'Inter, sans-serif' }}>
 
-              {/* Header + Sub-nav */}
-              <div style={{ background: 'white', borderRadius: '24px', padding: '20px 24px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <DoorOpen size={20} color="#0b57d0" /> Raumverwaltung
-                  </h3>
-                  <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 550 }}>{rooms.length} Räume · Ausstattung & Belegung im Blick</p>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  {/* Segmented Control */}
-                  <div style={{ background: '#f1f5f9', borderRadius: '12px', padding: '3px', display: 'flex', gap: '2px', border: '1px solid rgba(0,0,0,0.02)' }}>
-                    {(['overview', 'plan'] as const).map(v => {
-                      const isActive = roomsSubView === v || (v === 'overview' && roomsSubView === 'settings');
-                      return (
-                        <button
-                          key={v}
-                          type="button"
-                          onClick={() => { setRoomsSubView(v); setEditingRoom(null); }}
-                          style={{
-                            padding: '7px 16px',
-                            borderRadius: '9px',
-                            border: 'none',
-                            background: isActive ? '#ffffff' : 'transparent',
-                            color: isActive ? '#0f172a' : '#64748b',
-                            fontWeight: isActive ? 800 : 600,
-                            fontSize: '0.75rem',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                            boxShadow: isActive ? '0 1px 3px rgba(15,23,42,0.08), 0 1px 1px rgba(15,23,42,0.04)' : 'none',
+          // Local floor mappings fallback if schema cache is missing the floor column
+          const localFloorMappings = (() => {
+            try {
+              return JSON.parse(localStorage.getItem(`groovelab_room_floor_mappings_${schoolId}`) || '{}');
+            } catch {
+              return {};
+            }
+          })();
+
+          // Unique rooms by Name to guarantee absolutely zero duplicate room names are rendered
+          const uniqueRooms = rooms.reduce((acc: any[], current: any) => {
+            if (current && current.name) {
+              const nameKey = (current.name || '').toLowerCase().trim();
+              if (!acc.some(item => (item.name || '').toLowerCase().trim() === nameKey)) {
+                acc.push(current);
+              }
+            }
+            return acc;
+          }, []);
+
+          // Filter logic for rooms matching search and selected floor & status
+          const filteredRooms = uniqueRooms.filter((r: any) => {
+            const name = (r.name || '').toLowerCase();
+            const query = roomSearchQuery.toLowerCase().trim();
+            const matchesSearch = !query || name.includes(query);
+            
+            const floorName = r.floor || localFloorMappings[r.id] || 'Allgemein';
+            const matchesFloor = roomFilterFloor === 'All' || floorName === roomFilterFloor;
+            
+            let matchesStatus = true;
+            if (roomFilterStatus === 'campus') matchesStatus = r.is_campus_active !== false;
+            else if (roomFilterStatus === 'groovelab') matchesStatus = r.is_groovelab_active;
+            else if (roomFilterStatus === 'inactive') matchesStatus = (r.is_campus_active === false) && !r.is_groovelab_active;
+            
+            return matchesSearch && matchesFloor && matchesStatus;
+          }).sort((a, b) => {
+            const nameA = (a.name || '').toLowerCase().trim();
+            const nameB = (b.name || '').toLowerCase().trim();
+            return nameA.localeCompare(nameB, 'de');
+          });
+
+          // Sort helper for floors: Allgemein is top (9999), EG is 0, OGs are positive, UGs are negative
+          const getFloorWeight = (f: string) => {
+            if (f === 'Allgemein') return 9999;
+            if (f === 'EG') return 0;
+            const ogMatch = f.match(/^(\d+)\.\s*OG$/i);
+            if (ogMatch) return parseInt(ogMatch[1]);
+            const ugMatch = f.match(/^(\d+)\.\s*UG$/i);
+            if (ugMatch) return -parseInt(ugMatch[1]);
+            return -9999;
+          };
+
+          // Unique floors computed from all unique rooms plus addedFloors, always including 'Allgemein' and 'EG'
+          const allFloorsList = Array.from(new Set([
+            'Allgemein', 
+            'EG',
+            ...uniqueRooms.map(r => r.floor || localFloorMappings[r.id] || 'Allgemein'), 
+            ...addedFloors
+          ])).sort((a, b) => getFloorWeight(b) - getFloorWeight(a));
+
+          return (
+            <>
+              <div className="campus-grid">
+              
+              {/* LEFT CONTENT PANE: ROOMS LIST BOARD (mirrors Schülerboard) */}
+              <div style={{ flex: '1', display: 'flex', flexDirection: 'column', gap: '24px', width: '100%', minWidth: 0 }}>
+                {/* 1. ROOM BOARD HEADER CARD */}
+                <div className="google-card" style={{
+                  width: '100%',
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '24px', 
+                  padding: '24px',
+                  borderRadius: '24px',
+                  border: '1.5px solid #cbd5e1',
+                  background: '#ffffff',
+                  boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)',
+                  minWidth: 0
+                }}>
+                  {/* TITLE BLOCK */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <DoorOpen size={22} style={{ color: '#0f172a' }} />
+                      <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                        Raumboard ({uniqueRooms.length})
+                      </h3>
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      {/* Segmented Control for Views */}
+                      <div style={{ background: '#f1f5f9', borderRadius: '12px', padding: '3px', display: 'flex', gap: '2px', border: '1px solid rgba(0,0,0,0.02)' }}>
+                        {(['overview', 'plan'] as const).map(v => {
+                          const isActive = roomsSubView === v || (v === 'overview' && roomsSubView === 'settings');
+                          return (
+                            <button
+                              key={v}
+                              type="button"
+                              onClick={() => { setRoomsSubView(v); setEditingRoom(null); }}
+                              style={{
+                                padding: '6px 14px',
+                                borderRadius: '9px',
+                                border: 'none',
+                                background: isActive ? '#ffffff' : 'transparent',
+                                color: isActive ? '#0f172a' : '#64748b',
+                                fontWeight: isActive ? 800 : 600,
+                                fontSize: '0.75rem',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                boxShadow: isActive ? '0 1px 3px rgba(15,23,42,0.08)' : 'none',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}
+                            >
+                              {v === 'overview' ? <Sliders size={13} /> : <Calendar size={13} />}
+                              {v === 'overview' ? 'Übersicht' : 'Belegungsplan'}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <button
+                        onClick={() => setIsRoomCsvExpanded(!isRoomCsvExpanded)}
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '6px', 
+                          borderRadius: '12px', 
+                          padding: '8px 16px', 
+                          fontSize: '0.8rem', 
+                          fontWeight: 800,
+                          background: isRoomCsvExpanded ? '#f1f5f9' : '#ffffff',
+                          border: '1px solid #cbd5e1',
+                          cursor: 'pointer',
+                          fontFamily: 'Urbanist',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        📄 Sammel-Onboarding (CSV) {isRoomCsvExpanded ? '▲' : '▼'}
+                      </button>
+
+                      <button
+                        onClick={() => openRoomEditor()}
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '6px', 
+                          borderRadius: '12px', 
+                          padding: '8px 16px', 
+                          fontSize: '0.8rem', 
+                          fontWeight: 800,
+                          background: '#34a853',
+                          color: '#ffffff',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontFamily: 'Urbanist',
+                          boxShadow: '0 4px 10px rgba(52,168,83,0.15)',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        ➕ Raum anlegen
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* CSV BOX FOR ROOMS */}
+                  {isRoomCsvExpanded && (
+                    <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px dashed #cbd5e1', display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px', marginBottom: '4px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                        <strong style={{ fontSize: '0.88rem', color: '#0f172a', fontWeight: 900, fontFamily: 'Urbanist' }}>
+                          Sammel-Onboarding (Räume)
+                        </strong>
+                        <span style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'Inter' }}>
+                          Format pro Zeile: <code>Raumname; Max Schüler (optional); Größe in m² (optional)</code>
+                        </span>
+                      </div>
+
+                      {/* smarte-auto-zuweisung indicator */}
+                      {roomFilterFloor && roomFilterFloor !== 'All' && (
+                        <div style={{
+                          background: 'rgba(34, 197, 94, 0.03)',
+                          border: '1.5px solid rgba(34, 197, 94, 0.12)',
+                          borderRadius: '16px',
+                          padding: '12px 16px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '16px',
+                          marginTop: '2px',
+                          marginBottom: '2px',
+                          flexWrap: 'wrap'
+                        }}>
+                          <span style={{ fontSize: '0.68rem', color: '#166534', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>
+                            ⚡ smarte-auto-zuweisung:
+                          </span>
+                          
+                          <div style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '6px'
-                          }}
-                        >
-                          {v === 'overview' ? <Sliders size={13} /> : <Calendar size={13} />}
-                          {v === 'overview' ? 'Übersicht' : 'Belegungsplan'}
-                        </button>
-                      );
-                    })}
+                            gap: '8px',
+                            background: '#ffffff',
+                            border: '1.5px solid #cbd5e1',
+                            padding: '4px 12px',
+                            borderRadius: '100px',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                          }}>
+                            <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                              🏢 {roomFilterFloor}
+                            </span>
+                            <span style={{ fontSize: '0.6rem', fontWeight: 900, background: '#f1f5f9', color: '#64748b', padding: '1px 6px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                              Stockwerk
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      <form onSubmit={handleBulkRoomImport} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <textarea
+                          value={roomCsvText}
+                          onChange={e => setRoomCsvText(e.target.value)}
+                          placeholder="z.B.&#10;Klavierzimmer;2;12&#10;Schlagzeugstudio;1;18&#10;Theorieraum;15;30"
+                          rows={5}
+                          style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', fontFamily: 'monospace', outline: 'none', background: '#ffffff', resize: 'vertical' }}
+                        />
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          <button
+                            type="button"
+                            onClick={() => setIsRoomCsvExpanded(false)}
+                            style={{ padding: '8px 16px', borderRadius: '10px', border: '1.5px solid #cbd5e1', background: '#ffffff', color: '#64748b', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer' }}
+                          >
+                            Abbrechen
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={roomCsvSaving || !roomCsvText.trim()}
+                            style={{ padding: '8px 20px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg, #0b57d0 0%, #1a73e8 100%)', color: '#ffffff', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', opacity: roomCsvSaving || !roomCsvText.trim() ? 0.6 : 1 }}
+                          >
+                            {roomCsvSaving ? 'Wird importiert...' : 'Importieren'}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  )}
+
+                  {/* KPI ROW */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
+                    <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: '10px 14px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span style={{ fontSize: '0.62rem', color: '#1e40af', fontWeight: 800, textTransform: 'uppercase', fontFamily: 'Urbanist' }}>Räume Gesamt</span>
+                      <strong style={{ fontSize: '1.4rem', color: '#1e3a8a', fontWeight: 900, fontFamily: 'Urbanist' }}>{rooms.length}</strong>
+                    </div>
+                    <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px 14px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span style={{ fontSize: '0.62rem', color: '#166534', fontWeight: 800, textTransform: 'uppercase', fontFamily: 'Urbanist' }}>Campus Aktiv</span>
+                      <strong style={{ fontSize: '1.4rem', color: '#14532d', fontWeight: 900, fontFamily: 'Urbanist' }}>{rooms.filter(r => r.is_campus_active !== false).length}</strong>
+                    </div>
+                    <div style={{ background: '#feefe3', border: '1px solid #fed7aa', padding: '10px 14px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span style={{ fontSize: '0.62rem', color: '#854d0e', fontWeight: 800, textTransform: 'uppercase', fontFamily: 'Urbanist' }}>GrooveLab Aktiv</span>
+                      <strong style={{ fontSize: '1.4rem', color: '#713f12', fontWeight: 900, fontFamily: 'Urbanist' }}>{rooms.filter(r => r.is_groovelab_active).length}</strong>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => openRoomEditor()}
-                    style={{
-                      background: 'linear-gradient(135deg, #0b57d0 0%, #1a73e8 100%)',
-                      color: 'white',
-                      border: 'none',
-                      padding: '9px 16px',
-                      borderRadius: '12px',
-                      fontWeight: 800,
-                      fontSize: '0.75rem',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      boxShadow: '0 2px 8px rgba(11,87,208,0.2)',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <Plus size={14} strokeWidth={2.5} />
-                    Raum anlegen
-                  </button>
+
+                  {/* FILTER & SEARCH */}
+                  <div style={{ 
+                    display: 'flex', 
+                    gap: '12px', 
+                    background: '#f8fafc', 
+                    padding: '12px', 
+                    borderRadius: '16px',
+                    border: '1px solid #cbd5e1',
+                    flexWrap: 'wrap',
+                    alignItems: 'center'
+                  }}>
+                    <div style={{ flex: 1.5, minWidth: '200px', position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', fontSize: '0.8rem' }}>🔍</span>
+                      <input 
+                        type="text" 
+                        placeholder="Raum suchen..." 
+                        value={roomSearchQuery}
+                        onChange={(e) => setRoomSearchQuery(e.target.value)}
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '8px 12px 8px 34px',
+                          borderRadius: '8px',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '0.78rem',
+                          outline: 'none',
+                          background: 'white',
+                          fontWeight: 700
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ flex: 1, minWidth: '130px' }}>
+                      <select 
+                        value={roomFilterFloor}
+                        onChange={(e) => setRoomFilterFloor(e.target.value)}
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: 'white', fontWeight: 700 }}
+                      >
+                        <option value="All">🏢 Alle Stockwerke</option>
+                        {allFloorsList.map(fl => (
+                          <option key={fl} value={fl}>{fl}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div style={{ flex: 1, minWidth: '130px' }}>
+                      <select
+                        value={roomFilterStatus}
+                        onChange={(e) => setRoomFilterStatus(e.target.value as any)}
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: 'white', fontWeight: 700 }}
+                      >
+                        <option value="all">⚡ Alle Tarife</option>
+                        <option value="campus">🎓 Campus Aktiv</option>
+                        <option value="groovelab">🎸 GrooveLab Aktiv</option>
+                        <option value="inactive">⚪ Inaktiv</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* ROOM LIST CONTAINER */}
+                  {roomsSubView === 'overview' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowX: 'auto', overflowY: 'scroll', maxHeight: '550px', paddingRight: '6px', width: '100%' }}>
+                      {filteredRooms.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b', fontSize: '0.88rem', fontWeight: 700 }}>
+                          Keine Räume mit diesen Filtereinstellungen gefunden.
+                        </div>
+                      ) : (
+                        filteredRooms.map((room: any) => {
+                          const initials = (room.name || 'RM').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+                          const rColor = getAlphabeticalColor(room.name || 'R');
+                          const equipment: string[] = Array.isArray(room.equipment) ? room.equipment : [];
+
+                          return (
+                            <div 
+                              key={room.id} 
+                              draggable={true}
+                              onDragStart={(e) => {
+                                e.dataTransfer.setData("roomId", room.id);
+                                e.dataTransfer.effectAllowed = "move";
+                              }}
+                              style={{ 
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '16px',
+                                padding: '10px 16px',
+                                borderRadius: '16px',
+                                background: '#ffffff',
+                                border: '1px solid #f1f5f9',
+                                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.01)',
+                                minWidth: '850px',
+                                transition: 'all 0.25s ease',
+                                cursor: 'grab'
+                              }}
+                              className="hover-scale"
+                            >
+                              {/* Circular initials avatar */}
+                              <div 
+                                onClick={() => openRoomEditor(room)}
+                                style={{ 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  gap: '16px', 
+                                  minWidth: '220px',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                <div style={{
+                                  width: '42px',
+                                  height: '42px',
+                                  borderRadius: '50%',
+                                  background: rColor.avatarBg,
+                                  color: rColor.avatarColor,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '0.95rem',
+                                  fontWeight: 900,
+                                  flexShrink: 0,
+                                  fontFamily: 'Urbanist'
+                                }}>
+                                  {initials}
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                  <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                                    {room.name}
+                                  </span>
+                                  
+                                  {/* Stats row: 2 columns (Max. Students, qm size) matching mockup */}
+                                  <div style={{ display: 'flex', gap: '14px', marginTop: '6px' }}>
+                                    {/* Column 1: Max. Schüler */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', minWidth: '32px' }}>
+                                      <span style={{ fontSize: '0.95rem', lineHeight: '1.1' }}>👥</span>
+                                      <span style={{ fontSize: '0.62rem', color: '#86868b', marginTop: '2px', fontWeight: 550, fontFamily: 'Inter' }}>Max.</span>
+                                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#1d1d1f', fontFamily: 'Inter' }}>{room.max_students || 1}</span>
+                                    </div>
+                                    {/* Column 2: QM Größe */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', minWidth: '32px' }}>
+                                      <span style={{ fontSize: '0.95rem', lineHeight: '1.1' }}>📐</span>
+                                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#1d1d1f', marginTop: '2px', fontFamily: 'Inter' }}>{room.qm || 0}</span>
+                                      <span style={{ fontSize: '0.62rem', color: '#86868b', fontWeight: 550, fontFamily: 'Inter' }}>qm</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Floor Badge pill */}
+                              <div style={{ display: 'flex', alignItems: 'center', minWidth: '130px' }}>
+                                <span style={{ 
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  padding: '6px 12px', 
+                                  borderRadius: '10px', 
+                                  background: '#f1f5f9', 
+                                  color: '#334155', 
+                                  fontSize: '0.78rem', 
+                                  fontWeight: 800,
+                                  fontFamily: 'Urbanist'
+                                }}>
+                                  🏢 {room.floor || localFloorMappings[room.id] || 'Allgemein'}
+                                </span>
+                              </div>
+
+                              {/* Micro Status Toggles */}
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <button
+                                  onClick={async () => {
+                                    const newVal = room.is_campus_active === false ? true : false;
+                                    const { error } = await supabase.from('rooms').update({ is_campus_active: newVal }).eq('id', room.id);
+                                    if (error) alert(error.message);
+                                    else {
+                                      setRooms(prev => prev.map(r => r.id === room.id ? { ...r, is_campus_active: newVal } : r));
+                                    }
+                                  }}
+                                  style={{
+                                    padding: '6px 14px',
+                                    borderRadius: '10px',
+                                    border: 'none',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    background: room.is_campus_active !== false ? '#e2f6ea' : '#f1f5f9',
+                                    color: room.is_campus_active !== false ? '#137333' : '#86868b',
+                                    transition: 'all 0.15s ease',
+                                    fontFamily: 'Urbanist'
+                                  }}
+                                  className="hover-scale-mini"
+                                >
+                                  Campus
+                                </button>
+
+                                <button
+                                  onClick={async () => {
+                                    const newVal = !room.is_groovelab_active;
+                                    const { error } = await supabase.from('rooms').update({ is_groovelab_active: newVal }).eq('id', room.id);
+                                    if (error) alert(error.message);
+                                    else {
+                                      setRooms(prev => prev.map(r => r.id === room.id ? { ...r, is_groovelab_active: newVal } : r));
+                                    }
+                                  }}
+                                  style={{
+                                    padding: '6px 14px',
+                                    borderRadius: '10px',
+                                    border: 'none',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    background: room.is_groovelab_active ? '#fff3e0' : '#f1f5f9',
+                                    color: room.is_groovelab_active ? '#e65100' : '#64748b',
+                                    transition: 'all 0.15s ease',
+                                    fontFamily: 'Urbanist'
+                                  }}
+                                  className="hover-scale-mini"
+                                >
+                                  Groovelab
+                                </button>
+                              </div>
+
+                              {/* Actions: Only red X to delete */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: 'auto', flexShrink: 0 }}>
+                                <button
+                                  onClick={() => handleDeleteRoom(room.id)}
+                                  style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '1.2rem', fontWeight: 900, cursor: 'pointer', padding: '0 4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                  className="hover-scale-mini"
+                                  title="Löschen"
+                                >
+                                  ❌
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+
+                  {/* ── VIEW 2: Belegungsplan (read-only matrix grid inside left panel) ── */}
+                  {roomsSubView === 'plan' && (
+                    <div style={{ background: '#f8fafc', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '20px', overflowX: 'auto' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                        <div>
+                          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: '#0f172a' }}>📅 Wöchentlicher Belegungsplan</h4>
+                          <p style={{ margin: '3px 0 0 0', fontSize: '0.72rem', color: '#64748b' }}>Lese-Ansicht · Zum Bearbeiten → Campus › Stundenpläne</p>
+                        </div>
+                      </div>
+                      {filteredRooms.length === 0 ? (
+                        <p style={{ textAlign: 'center', color: '#94a3b8', padding: '32px', fontWeight: 700 }}>Keine Räume gefunden.</p>
+                      ) : (
+                        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: '600px' }}>
+                          <colgroup>
+                            <col style={{ width: '130px' }} />
+                            {[1,2,3,4,5].map(d => <col key={d} />)}
+                          </colgroup>
+                          <thead>
+                            <tr style={{ borderBottom: '2px solid #cbd5e1' }}>
+                              <th style={{ padding: '8px 10px', fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', textAlign: 'left' }}>Raum</th>
+                              {[1,2,3,4,5].map(d => (
+                                <th key={d} style={{ padding: '8px 10px', fontSize: '0.73rem', fontWeight: 900, color: '#334155', textTransform: 'uppercase', textAlign: 'left' }}>
+                                  {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag'][d]}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredRooms.map((room, rIdx) => {
+                              const equipment: string[] = Array.isArray(room.equipment) ? room.equipment : [];
+                              return (
+                                <tr key={room.id} style={{ borderBottom: rIdx < filteredRooms.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                                  <td style={{ padding: '10px 8px', verticalAlign: 'top' }}>
+                                    <strong style={{ fontSize: '0.78rem', color: '#0f172a', fontWeight: 800, display: 'block' }}>{room.name}</strong>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '4px' }}>
+                                      {equipment.map(tag => (
+                                        <span key={tag} style={{ fontSize: '0.55rem', fontWeight: 800, padding: '1px 5px', borderRadius: '5px', background: `${INSTRUMENT_COLOR[tag] || '#94a3b8'}18`, color: INSTRUMENT_COLOR[tag] || '#64748b' }}>{tag}</span>
+                                      ))}
+                                    </div>
+                                  </td>
+                                  {[1,2,3,4,5].map(dayNum => {
+                                    const cellPlans = matrixAllocations.filter(p => p.roomId === room.id && p.dayOfWeek === dayNum);
+                                    return (
+                                      <td key={dayNum} style={{ padding: '6px', verticalAlign: 'top' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minHeight: '50px' }}>
+                                          {cellPlans.map(plan => {
+                                            const color = INSTRUMENT_COLOR[plan.instrument] || '#64748b';
+                                            return (
+                                              <div
+                                                key={plan.id}
+                                                onClick={() => setSelectedDayPlan(plan)}
+                                                style={{ background: `${color}10`, border: `1px solid ${color}30`, borderLeft: `4px solid ${color}`, borderRadius: '9px', padding: '6px 8px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' }}
+                                              >
+                                                <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#0f172a' }}>{plan.teacherName}</span>
+                                                <span style={{ fontSize: '0.58rem', fontWeight: 700, color }}>{plan.instrument}</span>
+                                                <span style={{ fontSize: '0.6rem', fontFamily: 'monospace', fontWeight: 900, color: '#475569' }}>⏱ {plan.startTime}–{plan.endTime}</span>
+                                              </div>
+                                            );
+                                          })}
+                                          {cellPlans.length === 0 && (
+                                            <div style={{ height: '40px', borderRadius: '8px', background: '#ffffff', border: '1px dashed #e2e8f0' }} />
+                                          )}
+                                        </div>
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  )}
+
                 </div>
               </div>
 
-              {/* ── VIEW 1: Übersicht ── */}
-              {(roomsSubView === 'overview' || roomsSubView === 'settings') && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {rooms.length === 0 ? (
-                    <div style={{ background: 'white', borderRadius: '20px', padding: '48px 24px', textAlign: 'center', color: '#94a3b8', border: '2px dashed #e2e8f0' }}>
-                      <DoorOpen size={36} style={{ marginBottom: '12px', opacity: 0.4 }} />
-                      <p style={{ margin: 0, fontWeight: 700, fontSize: '0.9rem' }}>Noch keine Räume angelegt.</p>
-                      <button onClick={() => openRoomEditor()} style={{ marginTop: '16px', background: '#0b57d0', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '10px', fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer' }}>
-                        + Ersten Raum anlegen
-                      </button>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
-                      {rooms.map(room => {
-                        const occupied = getOccupiedDays(room.id);
-                        const pct = Math.round((occupied.length / 5) * 100);
-                        const status = pct === 0 ? { label: 'Frei', color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' }
-                          : pct < 80 ? { label: 'Teilbelegt', color: '#d97706', bg: '#fffbeb', border: '#fde68a' }
-                          : { label: 'Voll', color: '#ef4444', bg: '#fef2f2', border: '#fecaca' };
-                        const equipment: string[] = Array.isArray(room.equipment) ? room.equipment : [];
-                        return (
-                          <div key={room.id} style={{ background: 'white', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '20px', padding: '20px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                            {/* Room header */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                              <div>
-                                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>{room.name}</h4>
-                                <div style={{ display: 'flex', gap: '8px', marginTop: '4px', fontSize: '0.65rem', color: '#94a3b8', fontWeight: 700, alignItems: 'center' }}>
-                                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <User size={12} color="#94a3b8" /> Max. {room.max_teachers || 1}
-                                  </span>
-                                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <Users size={12} color="#94a3b8" /> Max. {room.max_students || 1}
-                                  </span>
-                                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <Sliders size={12} color="#94a3b8" /> {room.qm || 0} qm
-                                  </span>
-                                </div>
-                              </div>
-                              <span style={{ fontSize: '0.65rem', fontWeight: 900, padding: '3px 9px', borderRadius: '8px', background: status.bg, color: status.color, border: `1px solid ${status.border}` }}>
-                                {status.label}
-                              </span>
-                            </div>
-                            {/* Equipment tags */}
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                              {equipment.length > 0 ? equipment.map(tag => (
-                                <span key={tag} style={{ fontSize: '0.62rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', background: `${INSTRUMENT_COLOR[tag] || '#94a3b8'}15`, color: INSTRUMENT_COLOR[tag] || '#64748b', border: `1px solid ${INSTRUMENT_COLOR[tag] || '#94a3b8'}30` }}>
-                                  {tag}
-                                </span>
-                              )) : (
-                                <span style={{ fontSize: '0.62rem', color: '#cbd5e1', fontWeight: 600 }}>Keine Ausstattung hinterlegt</span>
-                              )}
-                            </div>
-                            {/* Weekly utilization bar */}
-                            <div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.63rem', fontWeight: 800, color: '#94a3b8', marginBottom: '5px' }}>
-                                <span>Wochenauslastung</span>
-                                <span style={{ color: status.color }}>{occupied.length}/5 Tage</span>
-                              </div>
-                              <div style={{ display: 'flex', gap: '3px' }}>
-                                {[1,2,3,4,5].map(d => (
-                                  <div key={d} style={{ flex: 1, height: '6px', borderRadius: '3px', background: occupied.includes(d) ? status.color : '#e2e8f0', transition: 'background 0.2s' }} title={['','Mo','Di','Mi','Do','Fr'][d]} />
-                                ))}
-                              </div>
-                            </div>
-                            {/* Actions */}
-                            <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
-                              <button onClick={() => { setRoomsSubView('plan'); }} style={{ flex: 1, padding: '7px', borderRadius: '9px', border: '1px solid #e2e8f0', background: 'white', color: '#475569', fontWeight: 700, fontSize: '0.7rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                                <Calendar size={12} /> Belegung
-                              </button>
-                              <button onClick={() => openRoomEditor(room)} style={{ flex: 1, padding: '7px', borderRadius: '9px', border: '1px solid #e2e8f0', background: 'white', color: '#0b57d0', fontWeight: 700, fontSize: '0.7rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                                <Edit3 size={12} /> Bearbeiten
-                              </button>
-                              <button onClick={() => handleDeleteRoom(room.id)} style={{ padding: '7px 10px', borderRadius: '9px', border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.04)', color: '#ef4444', fontWeight: 700, fontSize: '0.7rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <Trash2 size={12} />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                      {/* Add room card */}
-                      <button onClick={() => openRoomEditor()} style={{ background: 'white', border: '2px dashed #e2e8f0', borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px', cursor: 'pointer', color: '#94a3b8', minHeight: '180px', transition: 'all 0.2s' }}>
-                        <Plus size={24} />
-                        <span style={{ fontSize: '0.78rem', fontWeight: 800 }}>Raum hinzufügen</span>
-                      </button>
-                    </div>
-                  )}
+              {/* RIGHT SIDEBAR PANEL: STOCKWERKE (mirrors Lehrer-Sidebar) */}
+              <div className="google-card" style={{
+                width: '340px',
+                flexShrink: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '20px',
+                padding: '24px',
+                borderRadius: '24px',
+                border: '1.5px solid #cbd5e1',
+                background: '#ffffff',
+                boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <School size={20} style={{ color: '#0f172a' }} />
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                    Stockwerke
+                  </h3>
                 </div>
-              )}
+                <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.45, fontFamily: 'Inter' }}>
+                  Klicke auf ein Stockwerk, um die Ansicht zu filtern, oder ziehe einen Raum per Drag & Drop hierhin.
+                </p>
 
-              {/* ── VIEW 2: Belegungsplan (read-only matrix) ── */}
-              {roomsSubView === 'plan' && (
-                <div style={{ background: 'white', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', padding: '24px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', overflowX: 'auto' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                    <div>
-                      <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>📅 Wöchentlicher Belegungsplan</h4>
-                      <p style={{ margin: '3px 0 0 0', fontSize: '0.75rem', color: '#64748b' }}>Lese-Ansicht · Zum Bearbeiten → Campus › Stundenpläne</p>
-                    </div>
-                    <button
-                      onClick={() => { /* switch to campus schedules */ }}
-                      style={{ background: '#eff6ff', color: '#0b57d0', border: '1px solid #bfdbfe', padding: '8px 14px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}
-                    >
-                      🗓️ Im Stundenplan bearbeiten
-                    </button>
-                  </div>
-                  {rooms.length === 0 ? (
-                    <p style={{ textAlign: 'center', color: '#94a3b8', padding: '32px', fontWeight: 700 }}>Noch keine Räume vorhanden.</p>
-                  ) : (
-                    <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: '600px' }}>
-                      <colgroup>
-                        <col style={{ width: '130px' }} />
-                        {[1,2,3,4,5].map(d => <col key={d} />)}
-                      </colgroup>
-                      <thead>
-                        <tr style={{ borderBottom: '2px solid #f1f5f9' }}>
-                          <th style={{ padding: '10px 12px', fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'left' }}>Raum</th>
-                          {[1,2,3,4,5].map(d => (
-                            <th key={d} style={{ padding: '10px 10px', fontSize: '0.73rem', fontWeight: 900, color: '#334155', textTransform: 'uppercase', textAlign: 'left' }}>
-                              {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag'][d]}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {rooms.map((room, rIdx) => {
-                          const equipment: string[] = Array.isArray(room.equipment) ? room.equipment : [];
-                          return (
-                            <tr key={room.id} style={{ borderBottom: rIdx < rooms.length - 1 ? '1px solid #f8fafc' : 'none' }}>
-                              <td style={{ padding: '12px', verticalAlign: 'top' }}>
-                                <strong style={{ fontSize: '0.78rem', color: '#0f172a', fontWeight: 800, display: 'block' }}>{room.name}</strong>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '4px' }}>
-                                  {equipment.map(tag => (
-                                    <span key={tag} style={{ fontSize: '0.55rem', fontWeight: 800, padding: '1px 5px', borderRadius: '5px', background: `${INSTRUMENT_COLOR[tag] || '#94a3b8'}18`, color: INSTRUMENT_COLOR[tag] || '#64748b' }}>{tag}</span>
-                                  ))}
-                                </div>
-                              </td>
-                              {[1,2,3,4,5].map(dayNum => {
-                                const cellPlans = matrixAllocations.filter(p => p.roomId === room.id && p.dayOfWeek === dayNum);
-                                return (
-                                  <td key={dayNum} style={{ padding: '8px', verticalAlign: 'top' }}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minHeight: '56px' }}>
-                                      {cellPlans.map(plan => {
-                                        const color = INSTRUMENT_COLOR[plan.instrument] || '#64748b';
-                                        return (
-                                          <div
-                                            key={plan.id}
-                                            onClick={() => setSelectedDayPlan(plan)}
-                                            style={{ background: `${color}10`, border: `1px solid ${color}30`, borderLeft: `4px solid ${color}`, borderRadius: '9px', padding: '7px 9px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px', transition: 'all 0.15s' }}
-                                          >
-                                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>{plan.teacherName}</span>
-                                            <span style={{ fontSize: '0.6rem', fontWeight: 700, color }}>{plan.instrument}</span>
-                                            <span style={{ fontSize: '0.62rem', fontFamily: 'monospace', fontWeight: 900, color: '#475569' }}>⏱ {plan.startTime}–{plan.endTime}</span>
-                                          </div>
-                                        );
-                                      })}
-                                      {cellPlans.length === 0 && (
-                                        <div style={{ height: '44px', borderRadius: '8px', background: '#f8fafc', border: '1px dashed #e2e8f0' }} />
-                                      )}
-                                    </div>
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  )}
-                  {/* Drawer for clicked plan details — reuse same selectedDayPlan drawer rendered below */}
+                <button
+                  onClick={() => {
+                    // Calculate next OG and next UG numbers based on current list
+                    let maxOG = 0;
+                    let maxUG = 0;
+                    allFloorsList.forEach(f => {
+                      const ogMatch = f.match(/^(\d+)\.\s*OG$/i);
+                      if (ogMatch) {
+                        const num = parseInt(ogMatch[1]);
+                        if (num > maxOG) maxOG = num;
+                      }
+                      const ugMatch = f.match(/^(\d+)\.\s*UG$/i);
+                      if (ugMatch) {
+                        const num = parseInt(ugMatch[1]);
+                        if (num > maxUG) maxUG = num;
+                      }
+                    });
+                    const nextOG = maxOG + 1;
+                    const nextUG = maxUG + 1;
+
+                    const input = prompt(
+                      `Neues Stockwerk anlegen:\n\n` +
+                      `• Schreibe „OG“ für das nächste Obergeschoss: ${nextOG}. OG (+${nextOG})\n` +
+                      `• Schreibe „UG“ für das nächste Untergeschoss: ${nextUG}. UG (-${nextUG})\n` +
+                      `• Oder gib einen individuellen Namen ein:`
+                    );
+
+                    if (input && input.trim()) {
+                      const val = input.trim().toLowerCase();
+                      let finalName = input.trim();
+                      if (val === 'og' || val === 'o') {
+                        finalName = `${nextOG}. OG`;
+                      } else if (val === 'ug' || val === 'u') {
+                        finalName = `${nextUG}. UG`;
+                      }
+
+                      if (allFloorsList.includes(finalName)) {
+                        alert(`Das Stockwerk „${finalName}“ existiert bereits.`);
+                        return;
+                      }
+
+                      const updated = [...addedFloors, finalName];
+                      setAddedFloors(updated);
+                      localStorage.setItem(`groovelab_added_floors_${schoolId}`, JSON.stringify(updated));
+                    }
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    borderRadius: '12px',
+                    padding: '8px 16px',
+                    fontSize: '0.78rem',
+                    fontWeight: 800,
+                    background: '#eff6ff',
+                    color: '#0b57d0',
+                    border: '1px solid #bfdbfe',
+                    cursor: 'pointer',
+                    fontFamily: 'Urbanist',
+                    transition: 'all 0.2s'
+                  }}
+                  className="hover-scale"
+                >
+                  ➕ Stockwerk anlegen
+                </button>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '500px', overflowY: 'auto', paddingRight: '4px' }}>
+                  {/* "Alle Stockwerke anzeigen" */}
+                  {(() => {
+                    const isActive = roomFilterFloor === 'All';
+                    return (
+                      <div
+                        onClick={() => setRoomFilterFloor('All')}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '12px 16px',
+                          borderRadius: '16px',
+                          border: isActive ? '1.5px solid #22c55e' : '1.5px solid #f1f5f9',
+                          background: isActive ? '#f0fdf4' : '#ffffff',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          boxShadow: isActive ? '0 4px 12px rgba(34,197,150,0.06)' : 'none'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                          <div style={{
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '50%',
+                            background: '#e2f6ea',
+                            color: '#137333',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '1rem',
+                            flexShrink: 0
+                          }}>
+                            🏢
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                            <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                              Alle Stockwerke
+                            </span>
+                            <span style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'Inter' }}>
+                              Gesamtübersicht
+                            </span>
+                          </div>
+                        </div>
+                        <span style={{
+                          padding: '4px 10px',
+                          borderRadius: '10px',
+                          background: isActive ? '#d1fae5' : '#f1f5f9',
+                          color: isActive ? '#065f46' : '#64748b',
+                          fontSize: '0.68rem',
+                          fontWeight: 800,
+                          fontFamily: 'Urbanist',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {uniqueRooms.length} Räume
+                        </span>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Floor Cards list */}
+                  {allFloorsList.map((flName: string) => {
+                    const isActive = roomFilterFloor === flName;
+                    const isHovered = dragHoveredFloor === flName;
+                    const floorRoomCount = uniqueRooms.filter(r => (r.floor || localFloorMappings[r.id] || 'Allgemein') === flName).length;
+                    const avatarInitials = flName.substring(0, 2).toUpperCase();
+                    const colorSet = getAlphabeticalColor(flName);
+
+                    return (
+                      <div
+                        key={flName}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                          setDragHoveredFloor(flName);
+                        }}
+                        onDragLeave={() => setDragHoveredFloor(null)}
+                        onDrop={async (e) => {
+                          const roomId = e.dataTransfer.getData("roomId");
+                          if (roomId) {
+                            // Update local floor mapping immediately as robust fallback
+                            try {
+                              const mappings = JSON.parse(localStorage.getItem(`groovelab_room_floor_mappings_${schoolId}`) || '{}');
+                              mappings[roomId] = flName;
+                              localStorage.setItem(`groovelab_room_floor_mappings_${schoolId}`, JSON.stringify(mappings));
+                            } catch (err) {
+                              console.error(err);
+                            }
+
+                            // Update local state instantly so UI responds immediately
+                            setRooms(prev => prev.map(r => r.id === roomId ? { ...r, floor: flName } : r));
+
+                            // Update in database as primary storage
+                            const { error } = await supabase.from('rooms').update({ floor: flName }).eq('id', roomId);
+                            if (error) {
+                              console.warn("Supabase floor save failed, fell back to local storage cache:", error.message);
+                            }
+                          }
+                          setDragHoveredFloor(null);
+                        }}
+                        onClick={() => setRoomFilterFloor(flName)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '12px 16px',
+                          borderRadius: '16px',
+                          border: isHovered
+                            ? '2px dashed #3b82f6'
+                            : isActive
+                              ? '1.5px solid #3b82f6'
+                              : '1.5px solid #f1f5f9',
+                          background: isHovered
+                            ? '#eff6ff'
+                            : isActive
+                              ? '#f0f9ff'
+                              : '#ffffff',
+                          cursor: 'pointer',
+                          transform: isHovered ? 'scale(1.02)' : 'scale(1)',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                          boxShadow: isActive ? '0 4px 12px rgba(59,130,246,0.06)' : 'none'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+                          <div style={{
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '50%',
+                            background: colorSet.avatarBg,
+                            color: colorSet.avatarColor,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.85rem',
+                            fontWeight: 900,
+                            fontFamily: 'Urbanist',
+                            flexShrink: 0
+                          }}>
+                            {avatarInitials}
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                            <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              {flName}
+                              {flName !== 'Allgemein' && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirm(`Stockwerk „${flName}“ löschen? Zugeordnete Räume werden zurück auf „Allgemein“ gesetzt.`)) {
+                                      // Reset rooms on this floor to Allgemein
+                                      supabase.from('rooms').update({ floor: 'Allgemein' }).eq('floor', flName).then(() => {
+                                        setRooms(prev => prev.map(r => (r.floor || 'Allgemein') === flName ? { ...r, floor: 'Allgemein' } : r));
+                                        const updated = addedFloors.filter(f => f !== flName);
+                                        setAddedFloors(updated);
+                                        localStorage.setItem(`groovelab_added_floors_${schoolId}`, JSON.stringify(updated));
+                                        if (roomFilterFloor === flName) setRoomFilterFloor('All');
+                                      });
+                                    }
+                                  }}
+                                  style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0, fontSize: '0.75rem' }}
+                                  title="Stockwerk löschen"
+                                >
+                                  🗑️
+                                </button>
+                              )}
+                            </span>
+                            <span style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'Inter' }}>
+                              {flName === 'Allgemein' ? 'Standard-Zuweisung' : 'Stockwerk'}
+                            </span>
+                          </div>
+                        </div>
+                        <span style={{
+                          padding: '4px 10px',
+                          borderRadius: '10px',
+                          background: isActive ? '#bae6fd' : '#f1f5f9',
+                          color: isActive ? '#0369a1' : '#64748b',
+                          fontSize: '0.68rem',
+                          fontWeight: 800,
+                          fontFamily: 'Urbanist',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {floorRoomCount} {floorRoomCount === 1 ? 'Raum' : 'Räume'}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
-              )}
+              </div>
+
+            </div>
 
               {/* ── VIEW 3: Einstellungen / Editor ── */}
               {roomsSubView === 'settings' && (
@@ -9349,7 +10924,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           />
                         </div>
                         <div>
-                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Größe in qm</label>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Größe in m²</label>
                           <input
                             type="number"
                             value={roomFormQm}
@@ -9360,66 +10935,28 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         </div>
                       </div>
 
-                      {/* Max teachers */}
+                      {/* Modul-Aktivierung */}
                       <div>
-                        <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Max. Lehrkräfte gleichzeitig</label>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          {[1, 2, 3].map(n => (
-                            <button
-                              key={n}
-                              type="button"
-                              onClick={() => setRoomFormMaxTeachers(n)}
-                              style={{
-                                flex: 1,
-                                padding: '10px',
-                                borderRadius: '10px',
-                                border: '1.5px solid',
-                                borderColor: roomFormMaxTeachers === n ? '#0b57d0' : '#cbd5e1',
-                                background: roomFormMaxTeachers === n ? '#eff6ff' : 'white',
-                                color: roomFormMaxTeachers === n ? '#0b57d0' : '#475569',
-                                fontWeight: 800,
-                                fontSize: '0.82rem',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
-                              }}
-                            >
-                              {n}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Instrument tags */}
-                      <div>
-                        <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>Ausstattung / Instrumente</label>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                          {(() => {
-                            const availableEquipment = schoolEquipment.length > 0 ? schoolEquipment.map(e => e.name) : INSTRUMENT_TAGS;
-                            return availableEquipment.map(tag => {
-                              const active = roomFormEquipment.includes(tag);
-                              const color = INSTRUMENT_COLOR[tag] || '#64748b';
-                              return (
-                                <button
-                                  key={tag}
-                                  type="button"
-                                  onClick={() => setRoomFormEquipment(prev => active ? prev.filter(t => t !== tag) : [...prev, tag])}
-                                  style={{
-                                    padding: '6px 12px',
-                                    borderRadius: '20px',
-                                    border: `1.5px solid ${active ? color : '#cbd5e1'}`,
-                                    background: active ? `${color}10` : 'white',
-                                    color: active ? color : '#64748b',
-                                    fontWeight: 800,
-                                    fontSize: '0.72rem',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.15s'
-                                  }}
-                                >
-                                  {tag}
-                                </button>
-                              );
-                            });
-                          })()}
+                        <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>Modul-Aktivierung</label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={roomFormIsCampusActive}
+                              onChange={e => setRoomFormIsCampusActive(e.target.checked)}
+                              style={{ width: '16px', height: '16px', accentColor: '#0b57d0' }}
+                            />
+                            Im Campus-Modul aktiv (Wochenpläne & Belegungen)
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={roomFormIsGroovelabActive}
+                              onChange={e => setRoomFormIsGroovelabActive(e.target.checked)}
+                              style={{ width: '16px', height: '16px', accentColor: '#0b57d0' }}
+                            />
+                            Im GrooveLab-Modul aktiv (iPads / Live-Lab)
+                          </label>
                         </div>
                       </div>
                     </div>
@@ -9502,7 +11039,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 </div>
               )}
 
-            </div>
+            </>
           );
         })()}
 
@@ -9852,8 +11389,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             {/* Form Content */}
             <div style={{ padding: '24px', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
               
-              {/* TWO COLUMN GENERAL INFO CARDS */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              {/* GENERAL INFO CARD */}
+              <div>
                 {/* Students KPI Card */}
                 <div style={{
                   background: 'linear-gradient(135deg, #f0fdf4 0%, #e6f4ea 100%)',
@@ -9864,18 +11401,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 }}>
                   <span style={{ fontSize: '0.68rem', color: '#166534', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schüleranzahl</span>
                   <strong style={{ display: 'block', fontSize: '1.45rem', color: '#14532d', marginTop: '4px', fontWeight: 900 }}>{manageTeacher.studentCount || 0}</strong>
-                </div>
-
-                {/* Limit KPI Card */}
-                <div style={{
-                  background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                  border: '1px solid #cbd5e1',
-                  padding: '16px',
-                  borderRadius: '16px',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.01)'
-                }}>
-                  <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schülerlimit</span>
-                  <strong style={{ display: 'block', fontSize: '1.45rem', color: '#334155', marginTop: '4px', fontWeight: 900 }}>{manageTeacher.maxStudents || 10}</strong>
                 </div>
               </div>
 
@@ -9933,19 +11458,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Hauptinstrument / Fach</label>
-                <input 
-                  type="text" 
-                  value={manageTeacher.instrument} 
-                  onChange={(e) => setManageTeacher({ ...manageTeacher, instrument: e.target.value })}
-                  style={{
-                    padding: '10px 14px',
-                    borderRadius: '12px',
-                    border: '1px solid #cbd5e1',
-                    background: '#ffffff',
-                    fontSize: '0.85rem',
-                    outline: 'none'
-                  }}
+                <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Instrumente/Fächer</label>
+                <AppleStyleTokenField
+                  label=""
+                  selectedString={manageTeacher.instrument}
+                  onChange={(val) => setManageTeacher({ ...manageTeacher, instrument: val })}
+                  suggestions={activeSubjectsList}
+                  placeholder="Unterrichtsfächer auswählen..."
                 />
               </div>
 

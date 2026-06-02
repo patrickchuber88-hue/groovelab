@@ -142,6 +142,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         .from('rooms')
         .select('id, name')
         .eq('school_id', schoolId)
+        .eq('is_campus_active', true)
         .order('name');
       const loadedRooms = rData || [];
       setRooms(loadedRooms);

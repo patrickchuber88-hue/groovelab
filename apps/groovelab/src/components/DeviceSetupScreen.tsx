@@ -153,7 +153,7 @@ export function DeviceSetupScreen() {
       // Persist the resolved school ID to localStorage for stability
       localStorage.setItem('groovelab_school_id', targetSchoolId);
 
-      let roomsQuery = supabase.from('rooms').select('*').order('sort_order', { ascending: true });
+      let roomsQuery = supabase.from('rooms').select('*').eq('is_groovelab_active', true).order('sort_order', { ascending: true });
       if (targetSchoolId) {
         roomsQuery = roomsQuery.eq('school_id', targetSchoolId);
       }
@@ -313,9 +313,7 @@ export function DeviceSetupScreen() {
                 >
                   {(() => {
                     const cleanName = cleanRoomName(room.name);
-                    return idx === 0
-                      ? (cleanName.toLowerCase() === 'hauptraum' ? '👑 Hauptraum' : `👑 Hauptraum - ${cleanName}`)
-                      : cleanName;
+                    return `${idx + 1} - ${cleanName}`;
                   })()}
                 </button>
               );

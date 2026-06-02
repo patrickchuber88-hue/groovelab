@@ -10,7 +10,7 @@ const supabase = createClient(
 import fs from 'fs';
 
 async function run() {
-  const sql = fs.readFileSync('supabase/migrations/100_schedule_occurrences.sql', 'utf-8');
+  const sql = fs.readFileSync('supabase/migrations/109_add_song_is_groovelab_active.sql', 'utf-8');
   console.log("Trying exec_sql...");
   const { data, error } = await supabase.rpc('exec_sql', { query: sql });
   if (error) {

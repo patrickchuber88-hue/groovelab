@@ -236,11 +236,10 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
       .from('rooms')
       .select('*')
       .eq('school_id', schoolId)
+      .eq('is_campus_active', true)
       .order('sort_order', { ascending: true });
     setRooms(rData || []);
-    if (rData && rData.length > 0) {
-      setSelectedRoom((prev: any) => prev || rData[0]);
-    }
+    // By default, no room should be visible (selectedRoom starts as null)
 
     // 3. Fetch Availabilities
     const { data: aData } = await supabase
