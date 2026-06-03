@@ -183,6 +183,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   // Active Songs
   const [activeSongSkills, setActiveSongSkills] = useState<any[]>([]);
   const [selectedActiveSongId, setSelectedActiveSongId] = useState<string>('');
+  const [rhythmVal, setRhythmVal] = useState<number>(25);
+  const [fingerVal, setFingerVal] = useState<number>(25);
+  const [expressionVal, setExpressionVal] = useState<number>(25);
+  const [isSubSlidersExpanded, setIsSubSlidersExpanded] = useState<boolean>(false);
 
   // Active paintbrush mode
   const [activeBrush, setActiveBrush] = useState<'NONE' | 'LOCKED' | 'HOMEWORK' | 'MASTERED' | 'THEORY'>('NONE');
@@ -813,6 +817,25 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     setActiveInputTab('active_song');
     setActiveSubView('song');
     setSongProgressPercent(skill.progress_percent || 0);
+    
+    // Load sub-sliders
+    const savedValsStr = localStorage.getItem(`song_skills_detail_${student.id}_${skill.id}`);
+    let r = skill.progress_percent || 0;
+    let f = skill.progress_percent || 0;
+    let e = skill.progress_percent || 0;
+    if (savedValsStr) {
+      try {
+        const parsed = JSON.parse(savedValsStr);
+        if (typeof parsed.rhythm === 'number') r = parsed.rhythm;
+        if (typeof parsed.finger === 'number') f = parsed.finger;
+        if (typeof parsed.expression === 'number') e = parsed.expression;
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    setRhythmVal(r);
+    setFingerVal(f);
+    setExpressionVal(e);
     
     const fullTitle = `${skill.songs?.artist} - ${skill.songs?.title} (${skill.instrument})`;
     setTopicName(fullTitle);
@@ -2111,6 +2134,134 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: 'hsl(130, 65%, 82%)' }}>●</span> Grün (gemeistert - 100%)</span>
                       </div>
                     </div>
+
+                    {/* Collapsible Progress Sliders Widget */}
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px',
+                      background: 'white',
+                      borderRadius: '18px',
+                      padding: '16px',
+                      border: '1px solid rgba(0, 0, 0, 0.08)',
+                      boxShadow: '0 4px 15px rgba(0,0,0,0.02)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#0f172a' }}>
+                          Fortschritt: {songProgressPercent}%
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsSubSlidersExpanded(!isSubSlidersExpanded)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#4b5563',
+                            fontSize: '0.74rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            padding: '4px 8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          {isSubSlidersExpanded ? 'Details ausblenden ▲' : 'Details einblenden ▼'}
+                        </button>
+                      </div>
+
+                      {/* Main Average Slider */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={songProgressPercent}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10);
+                            setSongProgressPercent(val);
+                            setRhythmVal(val);
+                            setFingerVal(val);
+                            setExpressionVal(val);
+                            setHasChanges(true);
+                            localStorage.setItem(`song_skills_detail_${student.id}_${selectedActiveSongId}`, JSON.stringify({
+                              rhythm: val,
+                              finger: val,
+                              expression: val
+                            }));
+                          }}
+                          style={{
+                            flex: 1,
+                            accentColor: '#456355',
+                            height: '6px',
+                            borderRadius: '3px',
+                            cursor: 'pointer'
+                          }}
+                        />
+                      </div>
+
+                      {/* Sub sliders (Rhythm, Finger, Expression) */}
+                      {isSubSlidersExpanded && (
+                        <div style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '12px',
+                          borderTop: '1px solid rgba(0, 0, 0, 0.06)',
+                          paddingTop: '12px',
+                          animation: 'fadeIn 0.2s ease'
+                        }}>
+                          {[
+                            { label: 'Rhythmus', value: rhythmVal, type: 'rhythm' },
+                            { label: 'Finger', value: fingerVal, type: 'finger' },
+                            { label: 'Ausdruck', value: expressionVal, type: 'expression' }
+                          ].map(sub => (
+                            <div key={sub.type} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', fontWeight: 800, color: '#4b5563' }}>
+                                <span>{sub.label}</span>
+                                <span>{sub.value}%</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={sub.value}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value, 10);
+                                  let r = rhythmVal;
+                                  let f = fingerVal;
+                                  let eVal = expressionVal;
+                                  if (sub.type === 'rhythm') {
+                                    r = val;
+                                    setRhythmVal(val);
+                                  } else if (sub.type === 'finger') {
+                                    f = val;
+                                    setFingerVal(val);
+                                  } else if (sub.type === 'expression') {
+                                    eVal = val;
+                                    setExpressionVal(val);
+                                  }
+                                  setHasChanges(true);
+                                  const avg = Math.round((r + f + eVal) / 3);
+                                  setSongProgressPercent(avg);
+                                  localStorage.setItem(`song_skills_detail_${student.id}_${selectedActiveSongId}`, JSON.stringify({
+                                    rhythm: r,
+                                    finger: f,
+                                    expression: eVal
+                                  }));
+                                }}
+                                style={{
+                                  width: '100%',
+                                  accentColor: '#456355',
+                                  height: '4px',
+                                  borderRadius: '2px',
+                                  cursor: 'pointer'
+                                }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })()
@@ -2975,10 +3126,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
                           {[
-                            { mode: 'LOCKED', color: 'hsl(355, 75%, 84%)', label: 'Rot (unbearbeitet)', getActive: () => status === 'IN_PROGRESS' && !isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(false); setSongProgressPercent(25); setHasChanges(true); } },
-                            { mode: 'HOMEWORK', color: 'hsl(47, 85%, 84%)', label: 'Gelb (Hausaufgabe)', getActive: () => status === 'IN_PROGRESS' && isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(true); setSongProgressPercent(25); setHasChanges(true); } },
-                            { mode: 'MASTERED', color: 'hsl(130, 65%, 82%)', label: 'Grün (erledigt)', getActive: () => status === 'MASTERED', action: () => { setStatus('MASTERED'); setIsCurrentHomework(false); setSongProgressPercent(100); setHasChanges(true); } }
-                          ].map(b => {
+                             { mode: 'LOCKED', color: 'hsl(355, 75%, 84%)', label: 'Rot (unbearbeitet)', getActive: () => status === 'IN_PROGRESS' && !isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(false); setSongProgressPercent(25); setRhythmVal(25); setFingerVal(25); setExpressionVal(25); setHasChanges(true); } },
+                             { mode: 'HOMEWORK', color: 'hsl(47, 85%, 84%)', label: 'Gelb (Hausaufgabe)', getActive: () => status === 'IN_PROGRESS' && isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(true); setSongProgressPercent(25); setRhythmVal(25); setFingerVal(25); setExpressionVal(25); setHasChanges(true); } },
+                             { mode: 'MASTERED', color: 'hsl(130, 65%, 82%)', label: 'Grün (erledigt)', getActive: () => status === 'MASTERED', action: () => { setStatus('MASTERED'); setIsCurrentHomework(false); setSongProgressPercent(100); setRhythmVal(100); setFingerVal(100); setExpressionVal(100); setHasChanges(true); } }
+                           ].map(b => {
                             const isActive = b.getActive();
                             return (
                               <button
