@@ -3755,30 +3755,80 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       }
                     }}
                     style={{
-                      background: '#fef08a',
-                      border: '1px solid #fde047',
-                      borderRadius: '4px',
-                      padding: '6px 12px',
-                      boxShadow: '2px 3px 6px rgba(0,0,0,0.08)',
-                      transform: 'rotate(3deg)',
+                      background: 'linear-gradient(135deg, #fffbeb 0%, #fef9c3 60%, #fef08a 100%)',
+                      border: 'none',
+                      borderRadius: '2px 4px 12px 2px / 4px 12px 2px 16px',
+                      padding: '16px 14px 10px 14px',
+                      boxShadow: '0 8px 20px rgba(0,0,0,0.06), 0 3px 6px rgba(0,0,0,0.04), inset 0 -3px 8px rgba(254, 240, 138, 0.4)',
+                      transform: 'rotate(2.5deg)',
                       cursor: 'pointer',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '2px',
-                      fontSize: '0.72rem',
-                      fontWeight: 900,
+                      gap: '3px',
+                      fontSize: '0.74rem',
+                      fontWeight: 800,
                       color: '#854d0e',
-                      fontFamily: '"Comic Sans MS", "Marker Felt", sans-serif',
-                      transition: 'all 0.15s ease',
-                      flexShrink: 0
+                      fontFamily: '"Caveat", "Kalam", "Patrick Hand", "Gochi Hand", "Comic Sans MS", cursive',
+                      transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                      flexShrink: 0,
+                      position: 'relative',
+                      minWidth: '102px'
                     }}
-                    className="hover-scale"
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-3px) rotate(4deg) scale(1.05)';
+                      e.currentTarget.style.boxShadow = '0 14px 28px rgba(0,0,0,0.09), 0 6px 12px rgba(0,0,0,0.07), inset 0 -3px 8px rgba(254, 240, 138, 0.4)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'rotate(2.5deg)';
+                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.06), 0 3px 6px rgba(0,0,0,0.04), inset 0 -3px 8px rgba(254, 240, 138, 0.4)';
+                    }}
                   >
-                    <span style={{ fontSize: '0.9rem', lineHeight: '1' }}>📌</span>
-                    <span style={{ textDecoration: 'underline' }}>Hausaufgaben</span>
-                    <span>Archiv</span>
+                    {/* Realistic CSS pushpin */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '-12px',
+                      left: '50%',
+                      transform: 'translateX(-50%) rotate(-10deg)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      zIndex: 10,
+                      pointerEvents: 'none'
+                    }}>
+                      {/* Red Pin Head */}
+                      <div style={{
+                        width: '12px',
+                        height: '12px',
+                        borderRadius: '50%',
+                        background: 'radial-gradient(circle at 4px 4px, #f87171 0%, #dc2626 60%, #991b1b 100%)',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.3), inset 0 -1px 3px rgba(0,0,0,0.4)',
+                        position: 'relative'
+                      }}>
+                        {/* Metallic reflection highlight */}
+                        <div style={{
+                          position: 'absolute',
+                          top: '2px',
+                          left: '2px',
+                          width: '4px',
+                          height: '4px',
+                          borderRadius: '50%',
+                          background: 'rgba(255,255,255,0.7)'
+                        }} />
+                      </div>
+                      {/* Pin Shaft (metal) */}
+                      <div style={{
+                        width: '2px',
+                        height: '10px',
+                        background: 'linear-gradient(90deg, #cbd5e1 0%, #64748b 100%)',
+                        boxShadow: '1px 1px 2px rgba(0,0,0,0.2)',
+                        marginTop: '-1px'
+                      }} />
+                    </div>
+
+                    <span style={{ fontSize: '0.82rem', fontWeight: 900, textTransform: 'lowercase', letterSpacing: '-0.01em', opacity: 0.9 }}>hausaufgaben</span>
+                    <span style={{ fontSize: '0.92rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px dashed rgba(133, 77, 14, 0.25)', paddingBottom: '2px', width: '100%', textAlign: 'center' }}>archiv</span>
                   </button>
                 </div>
 
