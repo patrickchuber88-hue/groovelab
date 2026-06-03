@@ -119,7 +119,7 @@ const getInstrumentTypeKey = (instrument: string | null | undefined): string => 
   if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return 'saxophonist';
   return 'guitarist';
 };
-const brandColor = "#eab308";
+const brandColor = "#16a34a";
 import { TeacherDashboard } from './TeacherDashboard';
 import { ElegantBirthdayPicker } from './ElegantBirthdayPicker';
 import QRCode from 'react-qr-code';
@@ -393,6 +393,12 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     }
   });
   const [studentDetailSearch, setStudentDetailSearch] = useState('');
+  const [assignStudentSearch, setAssignStudentSearch] = useState('');
+  const [isAssignSearchFocused, setIsAssignSearchFocused] = useState(false);
+  const [isEditingBookHeader, setIsEditingBookHeader] = useState(false);
+  const [editBookTitle, setEditBookTitle] = useState('');
+  const [editBookAuthor, setEditBookAuthor] = useState('');
+  const [editBookTotalPages, setEditBookTotalPages] = useState(50);
   const [showTageskompassModal, setShowTageskompassModal] = useState(false);
   const [selectedStudentForTageskompass, setSelectedStudentForTageskompass] = useState<any>(null);
   const [initialLehrwerkIdForTageskompass, setInitialLehrwerkIdForTageskompass] = useState<string | null>(null);
@@ -406,6 +412,22 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [quickInstrument, setQuickInstrument] = useState('Gitarre');
 
   const getLehrwerkColor = (title: string) => {
+    const trimmed = (title || '').trim();
+    let hash = 0;
+    for (let i = 0; i < trimmed.length; i++) {
+      hash = trimmed.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = Math.abs(hash) % 360;
+    return {
+      from: `hsl(${hue}, 85%, 94%)`,
+      to: `hsl(${hue}, 80%, 84%)`,
+      text: `hsl(${hue}, 90%, 25%)`,
+      shadowFrom: `hsla(${hue}, 85%, 50%, 0.2)`,
+      shadowTo: `hsla(${hue}, 80%, 40%, 0.15)`
+    };
+  };
+
+  const getSongColor = (title: string) => {
     const trimmed = (title || '').trim();
     const firstChar = trimmed.charAt(0).toUpperCase();
     const charCode = firstChar.charCodeAt(0) || 65;
@@ -779,7 +801,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
   const [editingRoomName, setEditingRoomName] = useState('');
 
-  const brandColor = admin?.schools?.brand_color || '#eab308';
+  const brandColor = admin?.schools?.brand_color || '#16a34a';
 
   const getStatusColor = (studentId: string, lastSeen: string | null, createdAt?: string | null) => {
     const hasLiveSession = activeSessions.some(se => se.user_id === studentId);
@@ -2376,7 +2398,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       is_campus_active: activePlatform === 'campus',
       is_groovelab_active: activePlatform !== 'campus',
       // REGEL: Lehrer-Songs werden explizit mit dem Lehrer verknüpft
-      teacher_id: admin.role === 'teacher' ? admin.id : null
+      teacher_id: userId
     };
 
     let { data, error } = await supabase.from('songs').insert(insertPayload).select().single();
@@ -4338,722 +4360,295 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   );
 
   const renderSongsTab = () => {
-    const renderLehrwerkeSection = () => {
-      const filteredLehrwerke = lehrwerke.filter(item => 
-        item.title.toLowerCase().includes(songSearch.toLowerCase()) || 
-        (item.author || '').toLowerCase().includes(songSearch.toLowerCase())
-      );
+    const filteredLehrwerke = lehrwerke.filter(item => 
+      item.title.toLowerCase().includes(songSearch.toLowerCase()) || 
+      (item.author || '').toLowerCase().includes(songSearch.toLowerCase())
+    );
 
-      const handleAddLehrwerkSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!newLehrwerk.title) return;
-        
-        const insertPayload = {
-          title: newLehrwerk.title,
-          author: newLehrwerk.author || null,
-          total_pages: Number(newLehrwerk.totalPages) || 50,
-          school_id: admin?.school_id,
-          teacher_id: admin?.role === 'teacher' ? admin.id : null
+    const handleAddLehrwerkSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!newLehrwerk.title) return;
+      
+      const insertPayload = {
+        title: newLehrwerk.title,
+        author: newLehrwerk.author || null,
+        total_pages: Number(newLehrwerk.totalPages) || 50,
+        school_id: admin?.school_id,
+        teacher_id: userId
+      };
+
+      const { data, error } = await supabase
+        .from('lehrwerke')
+        .insert(insertPayload)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error creating Lehrwerk:", error);
+        return;
+      }
+
+      if (data) {
+        const created = {
+          ...data,
+          totalPages: data.total_pages || 50
         };
+        setLehrwerke(prev => [...prev, created]);
+        setShowAddLehrwerk(false);
+        setNewLehrwerk({ title: '', author: '', totalPages: 50 });
+      }
+    };
 
-        const { data, error } = await supabase
-          .from('lehrwerke')
-          .insert(insertPayload)
-          .select()
-          .single();
+    const handleEditLehrwerkSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!editingLehrwerk || !editingLehrwerk.title) return;
 
-        if (error) {
-          console.error("Error creating Lehrwerk:", error);
-          return;
-        }
-
-        if (data) {
-          const created = {
-            ...data,
-            totalPages: data.total_pages || 50
-          };
-          setLehrwerke(prev => [...prev, created]);
-          setShowAddLehrwerk(false);
-          setNewLehrwerk({ title: '', author: '', totalPages: 50 });
-        }
+      const updatePayload = {
+        title: editingLehrwerk.title,
+        author: editingLehrwerk.author || null,
+        total_pages: Number(editingLehrwerk.totalPages) || 50
       };
 
-      const handleEditLehrwerkSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!editingLehrwerk || !editingLehrwerk.title) return;
+      const { error } = await supabase
+        .from('lehrwerke')
+        .update(updatePayload)
+        .eq('id', editingLehrwerk.id);
 
-        const updatePayload = {
-          title: editingLehrwerk.title,
-          author: editingLehrwerk.author || null,
-          total_pages: Number(editingLehrwerk.totalPages) || 50
-        };
+      if (error) {
+        console.error("Error updating Lehrwerk:", error);
+        return;
+      }
 
-        const { error } = await supabase
-          .from('lehrwerke')
-          .update(updatePayload)
-          .eq('id', editingLehrwerk.id);
+      setLehrwerke(prev => prev.map(item => item.id === editingLehrwerk.id ? { ...item, ...updatePayload, totalPages: updatePayload.total_pages } : item));
+      setEditingLehrwerk(null);
+    };
 
-        if (error) {
-          console.error("Error updating Lehrwerk:", error);
-          return;
-        }
+    const handleDeleteLehrwerk = async (id: string) => {
+      const { error } = await supabase
+        .from('lehrwerke')
+        .delete()
+        .eq('id', id);
 
-        setLehrwerke(prev => prev.map(item => item.id === editingLehrwerk.id ? { ...item, ...updatePayload, totalPages: updatePayload.total_pages } : item));
-        setEditingLehrwerk(null);
-      };
+      if (error) {
+        console.error("Error deleting Lehrwerk:", error);
+        return;
+      }
 
-      const handleDeleteLehrwerk = async (id: string) => {
-        const { error } = await supabase
-          .from('lehrwerke')
-          .delete()
-          .eq('id', id);
-
-        if (error) {
-          console.error("Error deleting Lehrwerk:", error);
-          return;
-        }
-
-        setLehrwerke(prev => prev.filter(item => item.id !== id));
-        if (editingLehrwerk?.id === id) setEditingLehrwerk(null);
-      };
-
-      return (
-        <div 
-          className="glass-panel" 
-          style={{ 
-            background: 'white', 
-            borderRadius: '20px', 
-            border: '1px solid rgba(0, 0, 0, 0.05)', 
-            padding: '16px 20px', 
-            boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: '16px' 
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
-            <div>
-              <h2 style={{ fontSize: '1.75rem', color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                <div style={{ background: `${brandColor}15`, color: brandColor, padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
-                  <Library size={16} />
-                </div>
-                {admin?.role === 'teacher' ? (
-                  <span style={{ fontWeight: 400 }}>
-                    <strong style={{ fontWeight: 900 }}>Meine Mediathek:</strong> Lehrwerke verwalten
-                  </span>
-                ) : (
-                  <span style={{ fontWeight: 900 }}>Lehrwerke</span>
-                )}
-              </h2>
-              <p style={{ color: '#64748b', fontSize: '0.8rem', margin: '6px 0 0 0', fontWeight: 600 }}>
-                {admin?.role === 'teacher' 
-                  ? 'Hier siehst du nur Lehrwerke, die du persönlich angelegt hast.' 
-                  : 'Erstelle und pflege Schulbücher für den Campus.'}
-              </p>
-            </div>
-            <button 
-              type="button"
-              onClick={() => {
-                setShowAddLehrwerk(!showAddLehrwerk);
-                setEditingLehrwerk(null);
-              }} 
-              style={{ 
-                background: `linear-gradient(135deg, ${brandColor}, ${brandColor}ee)`, 
-                color: 'white', 
-                border: 'none', 
-                padding: '8px 16px', 
-                borderRadius: '12px', 
-                cursor: 'pointer', 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '6px', 
-                fontSize: '0.8rem', 
-                fontWeight: 900,
-                boxShadow: `0 4px 12px -3px ${brandColor}50`,
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <Plus size={16} strokeWidth={3} /> Lehrwerk hinzufügen
-            </button>
-          </div>
-
-          {showAddLehrwerk && (
-            <form onSubmit={handleAddLehrwerkSubmit} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: 'white', borderRadius: '24px', border: `1px solid ${brandColor}20` }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Neues Lehrwerk anlegen</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Titel des Buchs</label>
-                  <input required placeholder="z.B. GrooveLab Drums Vol. 2" value={newLehrwerk.title} onChange={e => setNewLehrwerk({...newLehrwerk, title: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Autor (optional)</label>
-                  <input placeholder="z.B. Max Mustermann" value={newLehrwerk.author || ''} onChange={e => setNewLehrwerk({...newLehrwerk, author: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Seitenzahl des Buchs</label>
-                  <input type="number" min="1" max="1000" placeholder="50" value={newLehrwerk.totalPages} onChange={e => setNewLehrwerk({...newLehrwerk, totalPages: Number(e.target.value) || 50})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button type="submit" style={{ flex: 1, background: brandColor, color: 'white', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 800, cursor: 'pointer' }}>Speichern</button>
-                <button type="button" onClick={() => setShowAddLehrwerk(false)} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 700, cursor: 'pointer' }}>Abbrechen</button>
-              </div>
-            </form>
-          )}
-
-          {editingLehrwerk && (
-            <form onSubmit={handleEditLehrwerkSubmit} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: 'white', borderRadius: '24px', border: `1px solid ${brandColor}20`, animation: 'fadeIn 0.2s' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>📚 Lehrwerk bearbeiten: {editingLehrwerk.title}</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Titel des Buchs</label>
-                  <input required placeholder="z.B. GrooveLab Drums Vol. 2" value={editingLehrwerk.title} onChange={e => setEditingLehrwerk({...editingLehrwerk, title: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Autor (optional)</label>
-                  <input placeholder="z.B. Max Mustermann" value={editingLehrwerk.author || ''} onChange={e => setEditingLehrwerk({...editingLehrwerk, author: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Seitenzahl des Buchs</label>
-                  <input type="number" min="1" max="1000" placeholder="50" value={editingLehrwerk.totalPages || 50} onChange={e => setEditingLehrwerk({...editingLehrwerk, totalPages: Number(e.target.value) || 50})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button type="submit" style={{ flex: 1, background: brandColor, color: 'white', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 800, cursor: 'pointer' }}>Änderungen speichern</button>
-                <button type="button" onClick={() => setEditingLehrwerk(null)} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 700, cursor: 'pointer' }}>Abbrechen</button>
-              </div>
-            </form>
-          )}
-
-          {/* Lehrwerk Search & Filters */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: '#f8fafc', padding: '16px 20px', borderRadius: '16px', border: '1px solid #e2e8f0', marginBottom: '4px' }}>
-            <div style={{ position: 'relative', flex: 1 }}>
-              <Search size={18} color="#94a3b8" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
-              <input 
-                placeholder="Lehrwerke suchen..." 
-                value={songSearch}
-                onChange={e => setSongSearch(e.target.value)}
-                style={{ width: '100%', padding: '10px 14px 10px 42px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600, outline: 'none' }}
-              />
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
-            {filteredLehrwerke.map(item => (
-              <div 
-                key={item.id} 
-                className="glass-panel hover-scale" 
-                onClick={() => {
-                  setSelectedLehrwerkForDetail(item);
-                  setStudentDetailSearch('');
-                }}
-                style={{ 
-                  padding: '20px', 
-                  background: 'white', 
-                  display: 'flex', 
-                  gap: '16px', 
-                  alignItems: 'center', 
-                  borderRadius: '24px', 
-                  border: editingLehrwerk?.id === item.id ? `2px solid ${brandColor}` : '1px solid #e2e8f0', 
-                  boxShadow: '0 10px 25px -5px rgba(0,0,0,0.02)',
-                  position: 'relative',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                {(() => {
-                  const gradient = getLehrwerkColor(item.title);
-                  return (
-                    <div style={{ 
-                      width: '64px', 
-                      height: '84px', 
-                      background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`, 
-                      borderRadius: '8px', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center', 
-                      color: gradient.text, 
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.06)' 
-                    }}>
-                      <BookOpen size={24} color={gradient.text} />
-                    </div>
-                  );
-                })()}
-                <div style={{ flex: 1 }}>
-                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>{item.title}</h4>
-                  {item.author && <p style={{ margin: '0 0 4px 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>von {item.author}</p>}
-                  <p style={{ margin: '0 0 4px 0', fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>📖 {item.totalPages || 50} Seiten</p>
-                </div>
-                <button 
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteLehrwerk(item.id);
-                  }} 
-                  style={{ 
-                    position: 'absolute', 
-                    right: '16px', 
-                    top: '16px', 
-                    background: '#fff1f2', 
-                    border: 'none', 
-                    width: '32px', 
-                    height: '32px', 
-                    borderRadius: '10px', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center', 
-                    cursor: 'pointer', 
-                    color: '#ef4444', 
-                    transition: 'all 0.2s' 
-                  }}
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            ))}
-          </div>
-
-        </div>
-      );
+      setLehrwerke(prev => prev.filter(item => item.id !== id));
+      if (editingLehrwerk?.id === id) setEditingLehrwerk(null);
     };
 
     return (
-      <div style={{ marginTop: '0px' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {activePlatform === 'campus' && (
-            <div style={{ display: 'flex', background: '#f1f5f9', padding: '6px', borderRadius: '18px', width: 'fit-content', gap: '8px', marginBottom: '8px' }}>
+      <div 
+        className="glass-panel" 
+        style={{ 
+          background: 'white', 
+          borderRadius: '20px', 
+          border: '1px solid rgba(0, 0, 0, 0.05)', 
+          padding: '24px 30px', 
+          boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '24px' 
+        }}
+      >
+        {/* Header Area */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h2 style={{ fontSize: '1.85rem', color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontWeight: 900 }}>
+              <div style={{ background: `${brandColor}15`, color: brandColor, padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
+                <Library size={20} />
+              </div>
+              <span>Meine Mediathek</span>
+            </h2>
+            <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '4px 0 0 0', fontWeight: 600 }}>
+              {admin?.role === 'teacher' 
+                ? 'Verwalte deine Songs und Lehrwerke für den Unterricht.' 
+                : 'Verwalte alle Songs und Lehrwerke deiner Musikschule.'}
+            </p>
+          </div>
+        </div>
+
+        {/* Unified Smart Search Field */}
+        <div style={{ position: 'relative', width: '100%' }}>
+          <Search size={18} color="#94a3b8" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
+          <input 
+            placeholder="Songs nach Titel/Interpret oder Lehrwerke nach Titel/Autor durchsuchen..." 
+            value={songSearch}
+            onChange={e => setSongSearch(e.target.value)}
+            style={{ 
+              width: '100%', 
+              padding: '12px 14px 12px 48px', 
+              borderRadius: '14px', 
+              border: '1px solid #e2e8f0', 
+              background: '#f8fafc', 
+              fontWeight: 600, 
+              fontSize: '0.92rem', 
+              outline: 'none', 
+              transition: 'all 0.2s',
+              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.01)'
+            }}
+          />
+        </div>
+
+        {/* Two Columns Layout */}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', 
+          gap: '30px', 
+          alignItems: 'flex-start' 
+        }}>
+          {/* Left Column: Songs */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Music size={16} color={brandColor} /> Songs ({songs.length})
+              </h3>
               <button 
                 type="button"
-                onClick={() => setMediathekTab('songs')}
-                style={{
-                  padding: '10px 24px',
-                  borderRadius: '14px',
-                  border: 'none',
-                  background: mediathekTab === 'songs' ? 'white' : 'transparent',
-                  color: mediathekTab === 'songs' ? '#1e293b' : '#64748b',
-                  fontWeight: 950,
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  boxShadow: mediathekTab === 'songs' ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
-                  transition: 'all 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
+                onClick={() => setShowAddSong(!showAddSong)} 
+                style={{ 
+                  background: `linear-gradient(135deg, ${brandColor}, ${brandColor}ee)`, 
+                  color: 'white', 
+                  border: 'none', 
+                  padding: '6px 12px', 
+                  borderRadius: '10px', 
+                  cursor: 'pointer', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  fontSize: '0.75rem', 
+                  fontWeight: 900,
+                  boxShadow: `0 4px 10px -3px ${brandColor}40`,
+                  transition: 'all 0.2s ease'
                 }}
               >
-                <Music size={15} color={mediathekTab === 'songs' ? '#1e293b' : '#64748b'} />
-                Songs
-              </button>
-              <button 
-                type="button"
-                onClick={() => setMediathekTab('lehrwerke')}
-                style={{
-                  padding: '10px 24px',
-                  borderRadius: '14px',
-                  border: 'none',
-                  background: mediathekTab === 'lehrwerke' ? 'white' : 'transparent',
-                  color: mediathekTab === 'lehrwerke' ? '#1e293b' : '#64748b',
-                  fontWeight: 950,
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  boxShadow: mediathekTab === 'lehrwerke' ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
-                  transition: 'all 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <Library size={15} color={mediathekTab === 'lehrwerke' ? '#1e293b' : '#64748b'} />
-                Lehrwerke
+                <Plus size={14} strokeWidth={3} /> Song hinzufügen
               </button>
             </div>
-          )}
 
-          {activePlatform === 'campus' && mediathekTab === 'lehrwerke' ? (
-            renderLehrwerkeSection()
-          ) : (
-            <div 
-              className="glass-panel" 
-              style={{ 
-                background: 'white', 
-                borderRadius: '20px', 
-                border: '1px solid rgba(0, 0, 0, 0.05)', 
-                padding: '16px 20px', 
-                boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
-                display: 'flex', 
-                flexDirection: 'column', 
-                gap: '16px' 
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
-                <div>
-                  <h2 style={{ fontSize: '1.75rem', color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                    <div style={{ background: `${brandColor}15`, color: brandColor, padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
-                      <Library size={16} />
-                    </div>
-                    {admin?.role === 'teacher' ? (
-                      <span style={{ fontWeight: 400 }}>
-                        <strong style={{ fontWeight: 900 }}>Meine Mediathek:</strong> Songs verwalten
-                      </span>
-                    ) : (
-                      <span style={{ fontWeight: 900 }}>Songs</span>
-                    )}
-                  </h2>
-                  <p style={{ color: '#64748b', fontSize: '0.8rem', margin: '6px 0 0 0', fontWeight: 600 }}>
-                    {admin?.role === 'teacher' 
-                      ? 'Hier siehst du nur Songs, die du persönlich für deine Schüler angelegt hast.' 
-                      : 'Verwalte alle Songs deiner Musikschule.'}
-                  </p>
+            {showAddSong && (
+              <form onSubmit={handleAddSong} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'white', borderRadius: '16px', border: `1px solid ${brandColor}20`, boxShadow: '0 8px 24px rgba(0,0,0,0.02)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Interpret / Band</label>
+                    <input required placeholder="z.B. Nirvana" value={newSong.artist} onChange={e => setNewSong({...newSong, artist: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Songtitel</label>
+                    <input required placeholder="z.B. Smells Like Teenspirit" value={newSong.title} onChange={e => setNewSong({...newSong, title: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                  </div>
                 </div>
-                <button 
-                  onClick={() => setShowAddSong(!showAddSong)} 
-                  style={{ 
-                    background: `linear-gradient(135deg, ${brandColor}, ${brandColor}ee)`, 
-                    color: 'white', 
-                    border: 'none', 
-                    padding: '8px 16px', 
-                    borderRadius: '12px', 
-                    cursor: 'pointer', 
+
+                {activePlatform !== 'campus' && (
+                  <>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Cloud Link</label>
+                      <input placeholder="https://cloud.folder.link..." value={newSong.media_link} onChange={e => setNewSong({...newSong, media_link: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                    </div>
+                  </>
+                )}
+
+                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                  <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer' }}>Speichern</button>
+                  <button type="button" onClick={() => setShowAddSong(false)} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem' }}>Abbrechen</button>
+                </div>
+              </form>
+            )}
+
+            {editingSong && (
+              <form onSubmit={handleUpdateSong} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '16px', boxShadow: '0 8px 24px rgba(0,0,0,0.02)' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0369a1', margin: 0 }}>Song bearbeiten</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Interpret</label>
+                    <input required placeholder="Interpret" value={editingSong.artist} onChange={e => setEditingSong({...editingSong, artist: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Titel</label>
+                    <input required placeholder="Titel" value={editingSong.title} onChange={e => setEditingSong({...editingSong, title: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer' }}>Speichern</button>
+                  <button type="button" onClick={() => setEditingSong(null)} style={{ flex: 1, background: 'white', color: '#64748b', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem' }}>Abbrechen</button>
+                </div>
+              </form>
+            )}
+
+            {/* Songs List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {songs.filter(song => {
+                const matchesSearch = songSearch === '' || 
+                  song.title?.toLowerCase().includes(songSearch.toLowerCase()) || 
+                  song.artist?.toLowerCase().includes(songSearch.toLowerCase());
+                return matchesSearch;
+              }).map(song => {
+                const lwColor = getSongColor(song.title || '');
+                const coverBg = `linear-gradient(135deg, ${lwColor.from} 0%, ${lwColor.to} 100%)`;
+                return (
+                  <div key={song.id} className="glass-panel" style={{ 
+                    padding: '14px 18px', 
                     display: 'flex', 
+                    gap: '12px',
                     alignItems: 'center', 
-                    gap: '6px', 
-                    fontSize: '0.8rem', 
-                    fontWeight: 900,
-                    boxShadow: `0 4px 12px -3px ${brandColor}50`,
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <Plus size={16} strokeWidth={3} /> Song hinzufügen
-                </button>
-              </div>
-
-              {/* Song Search & Filters */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: '#f8fafc', padding: '16px 20px', borderRadius: '16px', border: '1px solid #e2e8f0', marginBottom: '4px' }}>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <div style={{ flex: 1, minWidth: '240px', position: 'relative' }}>
-                    <Search size={18} color="#94a3b8" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
-                    <input 
-                      placeholder={`Suche nach ${songSearchType === 'title' ? 'Songtitel' : 'Interpret'}...`}
-                      value={songSearch}
-                      onChange={e => setSongSearch(e.target.value)}
-                      style={{ width: '100%', padding: '10px 14px 10px 42px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600, outline: 'none' }}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', background: '#e2e8f0', padding: '3px', borderRadius: '10px' }}>
-                    <button 
-                      onClick={() => setSongSearchType('title')}
-                      style={{ padding: '6px 14px', borderRadius: '8px', border: 'none', background: songSearchType === 'title' ? 'white' : 'transparent', color: songSearchType === 'title' ? brandColor : '#64748b', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s' }}
-                    >
-                      Song
-                    </button>
-                    <button 
-                      onClick={() => setSongSearchType('artist')}
-                      style={{ padding: '6px 14px', borderRadius: '8px', border: 'none', background: songSearchType === 'artist' ? 'white' : 'transparent', color: songSearchType === 'artist' ? brandColor : '#64748b', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s' }}
-                    >
-                      Interpret
-                    </button>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', paddingTop: '8px', borderTop: '1px solid #e2e8f0' }}>
-                  <button 
-                    onClick={() => setSongAlphaFilter(null)}
-                    style={{ 
-                      padding: '4px 10px', minWidth: '40px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 900,
-                      background: songAlphaFilter === null ? brandColor : 'white',
-                      color: songAlphaFilter === null ? 'white' : '#64748b',
-                      border: '1px solid #cbd5e1',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    ALLE
-                  </button>
-                  {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(char => (
-                    <button 
-                      key={char}
-                      onClick={() => setSongAlphaFilter(char)}
-                      style={{ 
-                        width: '26px', height: '26px', borderRadius: '6px', border: 'none', fontSize: '0.7rem', fontWeight: 800,
-                        background: songAlphaFilter === char ? brandColor : 'transparent',
-                        color: songAlphaFilter === char ? 'white' : '#94a3b8',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      {char}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {showAddSong && (
-                <form onSubmit={handleAddSong} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: 'white', borderRadius: '20px', border: `1px solid ${brandColor}20`, boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Interpret / Band</label>
-                      <input required placeholder="z.B. Nirvana" value={newSong.artist} onChange={e => setNewSong({...newSong, artist: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                    background: 'white', 
+                    borderRadius: '24px', 
+                    border: editingSong?.id === song.id ? `2px solid ${brandColor}` : '1px solid #cbd5e1', 
+                    borderLeft: `5px solid ${lwColor.from}`,
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)', 
+                    transition: 'all 0.2s ease',
+                    minHeight: '92px',
+                    boxSizing: 'border-box'
+                  }}>
+                    {/* Pink/Peach Sleeve + Vinyl peeking out Cover Icon */}
+                    <div style={{ position: 'relative', width: '68px', height: '56px', flexShrink: 0 }}>
+                      {/* Vinyl record peeking out from the right */}
+                      <div style={{
+                        position: 'absolute',
+                        right: '4px',
+                        top: '5px',
+                        width: '46px',
+                        height: '46px',
+                        borderRadius: '50%',
+                        background: '#090a0f',
+                        boxShadow: '0 4px 10px rgba(0,0,0,0.25)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1
+                      }}>
+                        {/* Center hole/label */}
+                        <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: lwColor.to, opacity: 0.45 }} />
+                      </div>
+                      {/* Cover Sleeve */}
+                      <div style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        width: '56px',
+                        height: '56px',
+                        background: coverBg,
+                        borderRadius: '16px',
+                        boxShadow: '0 8px 20px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 2,
+                        border: `1px solid ${lwColor.text}18`
+                      }}>
+                        <span style={{ fontSize: '28px', lineHeight: 1, filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.1))' }}>🎵</span>
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Songtitel</label>
-                      <input required placeholder="z.B. Smells Like Teenspirit" value={newSong.title} onChange={e => setNewSong({...newSong, title: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+
+                    {/* Title and Artist */}
+                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                      <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '1.15rem', letterSpacing: '-0.02em', lineHeight: '1.2' }}>{song.title}</div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>von {song.artist}</div>
                     </div>
-                  </div>
 
-                  {activePlatform !== 'campus' && (
-                    <>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Cloud Link (Noten / Material)</label>
-                        <div style={{ position: 'relative' }}>
-                          <Box size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                          <input placeholder="https://cloud.folder.link..." value={newSong.media_link} onChange={e => setNewSong({...newSong, media_link: e.target.value})} style={{ width: '100%', padding: '10px 12px 10px 38px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>OneDrive/Dropbox PDF-Ordner</label>
-                          <input placeholder="Ordner-Link..." value={newSong.pdf_folder_url || ''} onChange={e => setNewSong({...newSong, pdf_folder_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>OneDrive Guitar Pro Link (.gp)</label>
-                          <input placeholder="ms-onedrive://..." value={newSong.guitar_pro_url || ''} onChange={e => setNewSong({...newSong, guitar_pro_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
-                        </div>
-                      </div>
-
-                      <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span>📄</span> Instrumenten-spezifische PDF-Dateien
-                        </div>
-                        
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎸 E-Gitarre PDF Link</label>
-                            <input placeholder="Link..." value={newSong.pdf_guitar_url || ''} onChange={e => setNewSong({...newSong, pdf_guitar_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎸 E-Bass PDF Link</label>
-                            <input placeholder="Link..." value={newSong.pdf_bass_url || ''} onChange={e => setNewSong({...newSong, pdf_bass_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🥁 E-Drums PDF Link</label>
-                            <input placeholder="Link..." value={newSong.pdf_drums_url || ''} onChange={e => setNewSong({...newSong, pdf_drums_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎹 E-Piano PDF Link</label>
-                            <input placeholder="Link..." value={newSong.pdf_keys_url || ''} onChange={e => setNewSong({...newSong, pdf_keys_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎤 Gesang / Lyrics PDF Link</label>
-                            <input placeholder="Link..." value={newSong.pdf_vocals_url || ''} onChange={e => setNewSong({...newSong, pdf_vocals_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎵 Playback Audio-Track Link</label>
-                            <input placeholder="Link..." value={newSong.playalong_url || ''} onChange={e => setNewSong({...newSong, playalong_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: '#fffbeb', borderRadius: '12px', border: '1px solid #fef3c7' }}>
-                        <input type="checkbox" id="add-bypass-wlan" checked={!!newSong.bypass_wlan_check} onChange={e => setNewSong({...newSong, bypass_wlan_check: e.target.checked})} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: brandColor }} />
-                        <label htmlFor="add-bypass-wlan" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#b45309', cursor: 'pointer' }}>
-                          WLAN-Sperre ignorieren (Home-Testing Bypass)
-                        </label>
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Arrangement / Instrumente</label>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px' }}>
-                          {['E-Gitarre', 'E-Drums', 'E-Piano', 'E-Bass'].map(inst => (
-                            <div key={inst} style={{ padding: '10px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                              <div style={{ fontSize: '1.2rem' }}>{ADMIN_INSTRUMENT_ICONS[inst] || '🎵'}</div>
-                              <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>{inst}</div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <button type="button" onClick={() => setNewSong({...newSong, instrumentation: {...newSong.instrumentation, [inst]: Math.max(0, (newSong.instrumentation[inst] || 0) - 1)}})} style={{ width: '22px', height: '22px', borderRadius: '6px', border: 'none', background: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', cursor: 'pointer', fontWeight: 900 }}>-</button>
-                                <span style={{ fontWeight: 900, fontSize: '0.9rem', minWidth: '14px', textAlign: 'center' }}>{newSong.instrumentation[inst] || 0}</span>
-                                <button type="button" onClick={() => setNewSong({...newSong, instrumentation: {...newSong.instrumentation, [inst]: (newSong.instrumentation[inst] || 0) + 1}})} style={{ width: '22px', height: '22px', borderRadius: '6px', border: 'none', background: brandColor, color: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', cursor: 'pointer', fontWeight: 900 }}>+</button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
-                    <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer', boxShadow: `0 4px 12px ${brandColor}20` }}>In Bibliothek speichern</button>
-                    <button type="button" onClick={() => setShowAddSong(false)} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 800, cursor: 'pointer' }}>Abbrechen</button>
-                  </div>
-                </form>
-              )}
-
-              {editingSong && (
-                <form onSubmit={handleUpdateSong} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '20px', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0369a1', margin: 0 }}>Song bearbeiten</h3>
-                  
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Interpret</label>
-                      <input required placeholder="Interpret" value={editingSong.artist} onChange={e => setEditingSong({...editingSong, artist: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Titel</label>
-                      <input required placeholder="Titel" value={editingSong.title} onChange={e => setEditingSong({...editingSong, title: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
-                    </div>
-                  </div>
-
-                  {activePlatform !== 'campus' && (
-                    <>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Cloud Link (Noten / Material)</label>
-                        <div style={{ position: 'relative' }}>
-                          <Box size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                          <input placeholder="https://cloud.folder.link..." value={editingSong.media_link} onChange={e => setEditingSong({...editingSong, media_link: e.target.value})} style={{ width: '100%', padding: '10px 12px 10px 38px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>OneDrive/Dropbox PDF-Ordner</label>
-                          <input placeholder="Ordner-Link..." value={editingSong.pdf_folder_url || ''} onChange={e => setEditingSong({...editingSong, pdf_folder_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>OneDrive Guitar Pro Link (.gp)</label>
-                          <input placeholder="ms-onedrive://..." value={editingSong.guitar_pro_url || ''} onChange={e => setEditingSong({...editingSong, guitar_pro_url: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
-                        </div>
-                      </div>
-
-                      <div style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #bae6fd', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 900, color: '#0369a1', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span>📄</span> Instrumenten-spezifische PDF-Dateien
-                        </div>
-                        
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎸 E-Gitarre PDF Link</label>
-                            <input placeholder="Link..." value={editingSong.pdf_guitar_url || ''} onChange={e => setEditingSong({...editingSong, pdf_guitar_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎸 E-Bass PDF Link</label>
-                            <input placeholder="Link..." value={editingSong.pdf_bass_url || ''} onChange={e => setEditingSong({...editingSong, pdf_bass_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🥁 E-Drums PDF Link</label>
-                            <input placeholder="Link..." value={editingSong.pdf_drums_url || ''} onChange={e => setEditingSong({...editingSong, pdf_drums_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎹 E-Piano PDF Link</label>
-                            <input placeholder="Link..." value={editingSong.pdf_keys_url || ''} onChange={e => setEditingSong({...editingSong, pdf_keys_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎤 Gesang / Lyrics PDF Link</label>
-                            <input placeholder="Link..." value={editingSong.pdf_vocals_url || ''} onChange={e => setEditingSong({...editingSong, pdf_vocals_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>🎵 Playback Audio Link</label>
-                            <input placeholder="Link..." value={editingSong.playalong_url || ''} onChange={e => setEditingSong({...editingSong, playalong_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: '#fffbeb', borderRadius: '12px', border: '1px solid #fef3c7' }}>
-                        <input type="checkbox" id="edit-bypass-wlan" checked={!!editingSong.bypass_wlan_check} onChange={e => setEditingSong({...editingSong, bypass_wlan_check: e.target.checked})} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: brandColor }} />
-                        <label htmlFor="edit-bypass-wlan" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#b45309', cursor: 'pointer' }}>
-                          WLAN-Sperre ignorieren (Home-Testing Bypass)
-                        </label>
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Arrangement / Instrumente</label>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px' }}>
-                          {['E-Gitarre', 'E-Drums', 'E-Piano', 'E-Bass'].map(inst => (
-                            <div key={inst} style={{ padding: '10px', borderRadius: '12px', background: 'white', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                              <div style={{ fontSize: '1.2rem' }}>{ADMIN_INSTRUMENT_ICONS[inst] || '🎵'}</div>
-                              <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>{inst}</div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <button type="button" onClick={() => setEditingSong({...editingSong, instrumentation: {...(editingSong.instrumentation || {}), [inst]: Math.max(0, ((editingSong.instrumentation || {})[inst] || 0) - 1)}})} style={{ width: '22px', height: '22px', borderRadius: '6px', border: 'none', background: '#f1f5f9', cursor: 'pointer', fontWeight: 900 }}>-</button>
-                                <span style={{ fontWeight: 900, fontSize: '0.9rem', minWidth: '14px', textAlign: 'center' }}>{(editingSong.instrumentation || {})[inst] || 0}</span>
-                                <button type="button" onClick={() => setEditingSong({...editingSong, instrumentation: {...(editingSong.instrumentation || {}), [inst]: ((editingSong.instrumentation || {})[inst] || 0) + 1}})} style={{ width: '22px', height: '22px', borderRadius: '6px', border: 'none', background: brandColor, color: 'white', cursor: 'pointer', fontWeight: 900 }}>+</button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer' }}>Aktualisieren</button>
-                    <button type="button" onClick={() => setEditingSong(null)} style={{ flex: 1, background: 'white', color: '#64748b', border: '1px solid #e2e8f0', padding: '12px', borderRadius: '12px', fontWeight: 800, cursor: 'pointer' }}>Abbrechen</button>
-                  </div>
-                </form>
-              )}
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
-                {songs.filter(song => {
-                  const matchesSearch = songSearch === '' || 
-                    (songSearchType === 'title' ? song.title : song.artist)?.toLowerCase().includes(songSearch.toLowerCase());
-                  
-                  const matchesAlpha = !songAlphaFilter || 
-                    (songSearchType === 'title' ? song.title : song.artist)?.toUpperCase().startsWith(songAlphaFilter);
-                  
-                  return matchesSearch && matchesAlpha;
-                }).map(song => (
-
-                  <div key={song.id} className="glass-panel" style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', borderRadius: '20px', border: '1px solid #f1f5f9', borderLeft: `6px solid ${brandColor}`, boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0, flex: 1, marginRight: '12px' }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.artist}</div>
-                        <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '1.1rem', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.title}</div>
-                      </div>
-                      
-                      {activePlatform !== 'campus' && (
-                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                          {(() => {
-                            const inst = song.instrumentation || {};
-                            const norm: Record<string, number> = {};
-                            Object.entries(inst).forEach(([k, v]) => {
-                              const lower = k.toLowerCase();
-                              let key = k;
-                              if (lower === 'guitar' || lower === 'e-gitarre') key = 'E-Gitarre';
-                              else if (lower === 'bass' || lower === 'e-bass') key = 'E-Bass';
-                              else if (lower === 'drums' || lower === 'e-drums') key = 'E-Drums';
-                              else if (lower === 'piano' || lower === 'keys' || lower === 'e-piano') key = 'E-Piano';
-                              else if (lower === 'vocals' || lower === 'gesang') key = 'Vocals';
-                              norm[key] = Math.max(norm[key] || 0, v as number);
-                            });
-                            
-                            return Object.entries(norm).map(([inst, count]) => (
-                              count > 0 && (
-                                <div key={inst} style={{ padding: '3px 8px', borderRadius: '6px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  <span style={{ fontSize: '0.8rem' }}>{ADMIN_INSTRUMENT_ICONS[inst]}</span>
-                                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b' }}>{count}</span>
-                                </div>
-                              )
-                            ));
-                          })()}
-                          {song.media_link && (
-                            <div style={{ padding: '3px 8px', borderRadius: '6px', background: `${brandColor}10`, border: `1px solid ${brandColor}20`, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <Box size={10} color={brandColor} />
-                              <span style={{ fontSize: '0.7rem', fontWeight: 800, color: brandColor }}>Cloud</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', gap: '8px', flexShrink: 0, marginLeft: '16px' }}>
                       <button onClick={() => {
                         const inst = song.instrumentation || {};
                         const norm: any = { 'E-Gitarre': 0, 'E-Bass': 0, 'E-Drums': 0, 'E-Piano': 0 };
@@ -5067,14 +4662,195 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                           else norm[k] = v;
                         });
                         setEditingSong({...song, instrumentation: norm});
-                      }} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '10px', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Pencil size={18} /></button>
-                      <button onClick={() => handleDeleteSong(song.id)} style={{ background: '#fff1f2', border: '1px solid #fecaca', padding: '10px', borderRadius: '10px', cursor: 'pointer', color: '#ef4444', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={18} /></button>
+                      }} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', width: '44px', height: '44px', borderRadius: '12px', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Pencil size={18} /></button>
+                      <button onClick={() => handleDeleteSong(song.id)} style={{ background: '#fff1f2', border: '1px solid #fecaca', width: '44px', height: '44px', borderRadius: '12px', cursor: 'pointer', color: '#ef4444', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={18} /></button>
                     </div>
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
-          )}
+          </div>
+
+          {/* Right Column: Lehrwerke */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Library size={16} color={brandColor} /> Lehrwerke ({lehrwerke.length})
+              </h3>
+              <button 
+                type="button"
+                onClick={() => {
+                  setShowAddLehrwerk(!showAddLehrwerk);
+                  setEditingLehrwerk(null);
+                }} 
+                style={{ 
+                  background: `linear-gradient(135deg, ${brandColor}, ${brandColor}ee)`, 
+                  color: 'white', 
+                  border: 'none', 
+                  padding: '6px 12px', 
+                  borderRadius: '10px', 
+                  cursor: 'pointer', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  fontSize: '0.75rem', 
+                  fontWeight: 900,
+                  boxShadow: `0 4px 10px -3px ${brandColor}40`,
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <Plus size={14} strokeWidth={3} /> Lehrwerk hinzufügen
+              </button>
+            </div>
+
+            {showAddLehrwerk && (
+              <form onSubmit={handleAddLehrwerkSubmit} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'white', borderRadius: '16px', border: `1px solid ${brandColor}20`, boxShadow: '0 8px 24px rgba(0,0,0,0.02)' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Neues Lehrwerk</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>Titel</label>
+                    <input required placeholder="z.B. GrooveLab Drums Vol. 2" value={newLehrwerk.title} onChange={e => setNewLehrwerk({...newLehrwerk, title: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>Autor</label>
+                    <input placeholder="z.B. Max Mustermann" value={newLehrwerk.author || ''} onChange={e => setNewLehrwerk({...newLehrwerk, author: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>Seiten</label>
+                    <input type="number" min="1" max="1000" placeholder="50" value={newLehrwerk.totalPages} onChange={e => setNewLehrwerk({...newLehrwerk, totalPages: Number(e.target.value) || 50})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer' }}>Speichern</button>
+                  <button type="button" onClick={() => setShowAddLehrwerk(false)} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem' }}>Abbrechen</button>
+                </div>
+              </form>
+            )}
+
+            {editingLehrwerk && (
+              <form onSubmit={handleEditLehrwerkSubmit} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'white', borderRadius: '16px', border: `1px solid ${brandColor}20`, boxShadow: '0 8px 24px rgba(0,0,0,0.02)' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Lehrwerk bearbeiten</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>Titel</label>
+                    <input required placeholder="z.B. GrooveLab Drums Vol. 2" value={editingLehrwerk.title} onChange={e => setEditingLehrwerk({...editingLehrwerk, title: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>Autor</label>
+                    <input placeholder="z.B. Max Mustermann" value={editingLehrwerk.author || ''} onChange={e => setEditingLehrwerk({...editingLehrwerk, author: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>Seiten</label>
+                    <input type="number" min="1" max="1000" placeholder="50" value={editingLehrwerk.totalPages || 50} onChange={e => setEditingLehrwerk({...editingLehrwerk, totalPages: Number(e.target.value) || 50})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer' }}>Speichern</button>
+                  <button type="button" onClick={() => setEditingLehrwerk(null)} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem' }}>Abbrechen</button>
+                </div>
+              </form>
+            )}
+
+            {/* Lehrwerke List (1 element per line) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
+              {filteredLehrwerke.map(item => {
+                const gradient = getLehrwerkColor(item.title);
+                return (
+                  <div 
+                    key={item.id} 
+                    className="glass-panel hover-scale" 
+                    onClick={() => {
+                      setSelectedLehrwerkForDetail(item);
+                      setStudentDetailSearch('');
+                    }}
+                    style={{ 
+                      padding: '14px 18px', 
+                      background: 'white', 
+                      display: 'flex', 
+                      gap: '12px', 
+                      alignItems: 'center', 
+                      borderRadius: '24px', 
+                      border: editingLehrwerk?.id === item.id ? `2px solid ${brandColor}` : '1px solid #e2e8f0', 
+                      borderLeft: `5px solid ${gradient.from}`,
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
+                      position: 'relative',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      minHeight: '92px',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <div style={{ 
+                      width: '44px', 
+                      height: '58px', 
+                      background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`, 
+                      borderRadius: '6px', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      color: gradient.text, 
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                      flexShrink: 0
+                    }}>
+                      <BookOpen size={18} color={gradient.text} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <h4 style={{ margin: '0 0 2px 0', fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h4>
+                      {item.author && <p style={{ margin: '0 0 2px 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>von {item.author}</p>}
+                      <p style={{ margin: 0, fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700 }}>📖 {item.totalPages || 50} Seiten</p>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                      <button 
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingLehrwerk(item);
+                          setShowAddLehrwerk(false);
+                        }}
+                        style={{ 
+                          background: '#f8fafc', 
+                          border: '1px solid #e2e8f0', 
+                          width: '44px', 
+                          height: '44px', 
+                          borderRadius: '12px', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          cursor: 'pointer', 
+                          color: '#64748b', 
+                          transition: 'all 0.2s' 
+                        }}
+                      >
+                        <Pencil size={18} />
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteLehrwerk(item.id);
+                        }} 
+                        style={{ 
+                          background: '#fff1f2', 
+                          border: 'none', 
+                          width: '44px', 
+                          height: '44px', 
+                          borderRadius: '12px', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          cursor: 'pointer', 
+                          color: '#ef4444', 
+                          transition: 'all 0.2s' 
+                        }}
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -6293,24 +6069,6 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       {renderBatchiPadModal()}
       {renderLogoutDialog()}
 
-      {showTageskompassModal && selectedStudentForTageskompass && (
-        <MeisterwerkDocumentationModal
-          student={{
-            id: selectedStudentForTageskompass.id,
-            first_name: selectedStudentForTageskompass.first_name,
-            last_name: selectedStudentForTageskompass.last_name,
-            photo_url: selectedStudentForTageskompass.photo_url || '/avatar_ghost.jpg'
-          }}
-          onClose={() => {
-            setShowTageskompassModal(false);
-            setSelectedStudentForTageskompass(null);
-            setInitialLehrwerkIdForTageskompass(null);
-          }}
-          teacherId={userId}
-          initialLehrwerkId={initialLehrwerkIdForTageskompass || undefined}
-        />
-      )}
-
       {/* Notebook Lehrwerk Detail Modal */}
       {selectedLehrwerkForDetail && (() => {
         const book = selectedLehrwerkForDetail;
@@ -6526,8 +6284,18 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
                   {/* Content Container (shifted to not overlap binder holes) */}
                   <div style={{ paddingRight: '12px' }}>
-                    {/* Book Cover / Header info */}
-                    <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '24px' }}>
+                    {/* Book Cover / Header info Widget */}
+                    <div style={{
+                      background: 'white',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '20px',
+                      padding: '20px',
+                      boxShadow: '0 10px 25px -5px rgba(0,0,0,0.03), 0 8px 10px -6px rgba(0,0,0,0.03)',
+                      marginBottom: '24px',
+                      display: 'flex',
+                      gap: '20px',
+                      alignItems: 'center'
+                    }}>
                       <div style={{ 
                         width: '80px', 
                         height: '105px', 
@@ -6536,30 +6304,183 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                         display: 'flex', 
                         alignItems: 'center', 
                         justifyContent: 'center', 
-                        boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
+                        boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+                        flexShrink: 0
                       }}>
                         <BookOpen size={36} color={gradient.text} />
                       </div>
-                      <div>
-                        <h2 style={{ margin: '0 0 6px 0', fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                          {book.title}
-                        </h2>
-                        {book.author && (
-                          <p style={{ margin: '0 0 4px 0', fontSize: '0.9rem', color: '#475569', fontWeight: 600 }}>
-                            von {book.author}
-                          </p>
-                        )}
-                        <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700 }}>
-                          📖 {book.totalPages || 50} Seiten
-                        </span>
-                      </div>
+                      {isEditingBookHeader ? (
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <input
+                            type="text"
+                            value={editBookTitle}
+                            onChange={e => setEditBookTitle(e.target.value)}
+                            placeholder="Titel"
+                            style={{
+                              padding: '8px 12px',
+                              borderRadius: '8px',
+                              border: '1px solid #cbd5e1',
+                              fontSize: '0.95rem',
+                              fontWeight: 800,
+                              outline: 'none',
+                              width: '100%',
+                              background: '#f8fafc'
+                            }}
+                          />
+                          <input
+                            type="text"
+                            value={editBookAuthor}
+                            onChange={e => setEditBookAuthor(e.target.value)}
+                            placeholder="Autor"
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: '8px',
+                              border: '1px solid #cbd5e1',
+                              fontSize: '0.8rem',
+                              fontWeight: 600,
+                              outline: 'none',
+                              width: '100%',
+                              background: '#f8fafc'
+                            }}
+                          />
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <input
+                              type="number"
+                              value={editBookTotalPages}
+                              onChange={e => setEditBookTotalPages(parseInt(e.target.value) || 0)}
+                              placeholder="Seiten"
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                border: '1px solid #cbd5e1',
+                                fontSize: '0.8rem',
+                                fontWeight: 700,
+                                outline: 'none',
+                                width: '80px',
+                                background: '#f8fafc'
+                              }}
+                            />
+                            <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 650 }}>Seiten</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!editBookTitle.trim()) return;
+                                const updatePayload = {
+                                  title: editBookTitle,
+                                  author: editBookAuthor || null,
+                                  total_pages: Number(editBookTotalPages) || 50
+                                };
+                                const { error } = await supabase
+                                  .from('lehrwerke')
+                                  .update(updatePayload)
+                                  .eq('id', book.id);
+
+                                if (error) {
+                                  console.error("Error updating Lehrwerk:", error);
+                                  return;
+                                }
+
+                                setLehrwerke(prev => prev.map(item => item.id === book.id ? { ...item, ...updatePayload, totalPages: updatePayload.total_pages } : item));
+                                setSelectedLehrwerkForDetail({ ...book, ...updatePayload, totalPages: updatePayload.total_pages });
+                                setIsEditingBookHeader(false);
+                              }}
+                              style={{
+                                background: '#16a34a',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                padding: '6px 12px',
+                                fontSize: '0.78rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <Check size={12} /> Speichern
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setIsEditingBookHeader(false)}
+                              style={{
+                                background: '#f1f5f9',
+                                color: '#475569',
+                                border: 'none',
+                                borderRadius: '8px',
+                                padding: '6px 12px',
+                                fontSize: '0.78rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <X size={12} /> Abbrechen
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <h2 style={{ margin: '0 0 6px 0', fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                              {book.title}
+                            </h2>
+                            {book.author && (
+                              <p style={{ margin: '0 0 4px 0', fontSize: '0.9rem', color: '#475569', fontWeight: 600 }}>
+                                von {book.author}
+                              </p>
+                            )}
+                            <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700 }}>
+                              📖 {book.totalPages || 50} Seiten
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditBookTitle(book.title);
+                              setEditBookAuthor(book.author || '');
+                              setEditBookTotalPages(book.totalPages || 50);
+                              setIsEditingBookHeader(true);
+                            }}
+                            style={{
+                              background: '#f8fafc',
+                              border: '1px solid #e2e8f0',
+                              width: '44px',
+                              height: '44px',
+                              borderRadius: '12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              color: '#64748b',
+                              transition: 'all 0.2s',
+                              flexShrink: 0
+                            }}
+                          >
+                            <Pencil size={18} />
+                          </button>
+                        </div>
+                      )}
                     </div>
 
-                    {/* List of working students */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #cbd5e1', paddingBottom: '6px', margin: '20px 0 12px 0' }}>
-                      <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Users size={18} color="#0f172a" /> {selectedStudentForProgress ? 'Ausgewählter Schüler' : `Zugewiesene Schüler (${assignedStudents.length})`}
-                      </h3>
+                    {/* Assigned Students Widget */}
+                    <div style={{
+                      background: 'white',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '24px',
+                      padding: '24px',
+                      boxShadow: '0 10px 25px -5px rgba(0,0,0,0.03), 0 8px 10px -6px rgba(0,0,0,0.03)',
+                      marginTop: '20px'
+                    }}>
+                      {/* List of working students */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #cbd5e1', paddingBottom: '6px', margin: '0 0 12px 0' }}>
+                        <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Users size={18} color="#0f172a" /> {selectedStudentForProgress ? 'Ausgewählter Schüler' : `Zugewiesene Schüler (${assignedStudents.length})`}
+                        </h3>
                       {!selectedStudentForProgress && (
                         <div style={{ position: 'relative', width: '226px' }}>
                           <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
@@ -6976,6 +6897,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                         </>
                       );
                     })()}
+                    </div> {/* Close Assigned Students Widget */}
                   </div>
                 </div>
 
@@ -7153,46 +7075,87 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                           ➕ Schüler hinzufügen
                         </h3>
 
-                        {/* Unassigned Students List */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          {unassignedStudents.map((s: any) => (
-                            <div key={s.id} style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              background: 'rgba(255, 255, 255, 0.5)',
-                              border: '1px dashed #cbd5e1',
-                              padding: '8px 12px',
-                              borderRadius: '12px'
-                            }}>
-                              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>
-                                {s.first_name} {s.last_name}
-                              </span>
-                              <button
-                                onClick={() => handleAssign(s.id)}
-                                style={{
-                                  background: gradient.from,
-                                  color: gradient.text,
-                                  border: `1px solid ${gradient.text}`,
-                                  borderRadius: '8px',
-                                  padding: '5px 12px',
-                                  fontSize: '0.75rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer',
-                                  transition: 'transform 0.1s'
-                                }}
-                                className="hover-scale-mini"
-                              >
-                                Hinzufügen
-                              </button>
-                            </div>
-                          ))}
-                          {unassignedStudents.length === 0 && (
-                            <p style={{ fontStyle: 'italic', color: '#94a3b8', fontSize: '0.8rem', textAlign: 'center', marginTop: '12px' }}>
-                              Keine weiteren Schüler gefunden.
-                            </p>
-                          )}
+                        <div style={{ position: 'relative', marginBottom: '16px' }}>
+                          <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+                          <input
+                            type="text"
+                            placeholder="Schüler suchen..."
+                            value={assignStudentSearch}
+                            onChange={e => setAssignStudentSearch(e.target.value)}
+                            onFocus={() => setIsAssignSearchFocused(true)}
+                            onBlur={() => setTimeout(() => setIsAssignSearchFocused(false), 200)}
+                            style={{
+                              width: '100%',
+                              padding: '8px 10px 8px 30px',
+                              borderRadius: '10px',
+                              border: '1px solid #cbd5e1',
+                              fontSize: '0.85rem',
+                              fontWeight: 650,
+                              outline: 'none',
+                              background: 'white'
+                            }}
+                          />
                         </div>
+
+                        {/* Unassigned Students List */}
+                        {!isAssignSearchFocused && assignStudentSearch.trim() === '' ? (
+                          <p style={{ fontStyle: 'italic', color: '#94a3b8', fontSize: '0.8rem', textAlign: 'center', marginTop: '16px' }}>
+                            Tippe einen Namen ein, um Schüler zu suchen...
+                          </p>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '350px', overflowY: 'auto' }}>
+                            {students
+                              .filter((s: any) => !assignedList.some((a: any) => a.studentId === s.id))
+                              .filter((s: any) => {
+                                if (assignStudentSearch.trim() === '') return true;
+                                return `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase().includes(assignStudentSearch.toLowerCase());
+                              })
+                              .map((s: any) => (
+                                <div key={s.id} style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  background: 'white',
+                                  border: '1px solid #cbd5e1',
+                                  padding: '8px 12px',
+                                  borderRadius: '12px',
+                                  boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+                                }}>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>
+                                    {s.first_name} {s.last_name}
+                                  </span>
+                                  <button
+                                    onClick={() => {
+                                      handleAssign(s.id);
+                                      setAssignStudentSearch('');
+                                    }}
+                                    style={{
+                                      background: '#16a34a',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '8px',
+                                      padding: '5px 12px',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 800,
+                                      cursor: 'pointer',
+                                      transition: 'transform 0.1s'
+                                    }}
+                                    className="hover-scale-mini"
+                                  >
+                                    Hinzufügen
+                                  </button>
+                                </div>
+                              ))}
+                            {students
+                              .filter((s: any) => !assignedList.some((a: any) => a.studentId === s.id))
+                              .filter((s: any) => `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase().includes(assignStudentSearch.toLowerCase()))
+                              .length === 0 && (
+                                <p style={{ fontStyle: 'italic', color: '#94a3b8', fontSize: '0.8rem', textAlign: 'center', marginTop: '12px' }}>
+                                  Keine Schüler gefunden.
+                                </p>
+                              )}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -7242,6 +7205,24 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             </div>
           </div>
         )})()}
+
+      {showTageskompassModal && selectedStudentForTageskompass && (
+        <MeisterwerkDocumentationModal
+          student={{
+            id: selectedStudentForTageskompass.id,
+            first_name: selectedStudentForTageskompass.first_name,
+            last_name: selectedStudentForTageskompass.last_name,
+            photo_url: selectedStudentForTageskompass.photo_url || '/avatar_ghost.jpg'
+          }}
+          onClose={() => {
+            setShowTageskompassModal(false);
+            setSelectedStudentForTageskompass(null);
+            setInitialLehrwerkIdForTageskompass(null);
+          }}
+          teacherId={userId}
+          initialLehrwerkId={initialLehrwerkIdForTageskompass || undefined}
+        />
+      )}
 
       {/* Modals for Band Editing (Teacher Sonderrecht) */}
       {editingBand && (

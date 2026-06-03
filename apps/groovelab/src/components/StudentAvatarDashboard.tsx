@@ -132,10 +132,11 @@ const getISOWeek = (dateInput?: string | Date): string => {
 
 const getLehrwerkColor = (title: string) => {
   const trimmed = (title || '').trim();
-  const firstChar = trimmed.charAt(0).toUpperCase();
-  const charCode = firstChar.charCodeAt(0) || 65;
-  const clampedCode = Math.max(65, Math.min(90, charCode));
-  const hue = Math.round(((clampedCode - 65) / 25) * 360);
+  let hash = 0;
+  for (let i = 0; i < trimmed.length; i++) {
+    hash = trimmed.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash) % 360;
   return {
     from: `hsl(${hue}, 85%, 94%)`,
     to: `hsl(${hue}, 80%, 84%)`,

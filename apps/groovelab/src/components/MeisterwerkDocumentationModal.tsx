@@ -165,6 +165,22 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   const getLehrwerkColor = (title: string) => {
     const trimmed = (title || '').trim();
+    let hash = 0;
+    for (let i = 0; i < trimmed.length; i++) {
+      hash = trimmed.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = Math.abs(hash) % 360;
+    return {
+      from: `hsl(${hue}, 85%, 94%)`,
+      to: `hsl(${hue}, 80%, 84%)`,
+      text: `hsl(${hue}, 90%, 25%)`,
+      shadowFrom: `hsla(${hue}, 85%, 50%, 0.2)`,
+      shadowTo: `hsla(${hue}, 80%, 40%, 0.15)`
+    };
+  };
+
+  const getSongColor = (title: string) => {
+    const trimmed = (title || '').trim();
     const firstChar = trimmed.charAt(0).toUpperCase();
     const charCode = firstChar.charCodeAt(0) || 65;
     const clampedCode = Math.max(65, Math.min(90, charCode));
@@ -192,6 +208,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   // Active paintbrush mode
   const [activeBrush, setActiveBrush] = useState<'NONE' | 'LOCKED' | 'HOMEWORK' | 'MASTERED' | 'THEORY'>('NONE');
   const [showAllPagesGrid, setShowAllPagesGrid] = useState(false);
+  const [isSongSearchFocused, setIsSongSearchFocused] = useState(false);
 
   // Session log to capture all modifications made in current modal open state
   const [sessionLogs, setSessionLogs] = useState<string[]>([]);
@@ -264,11 +281,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         if (studentError) throw studentError;
 
         if (studentUser?.school_id) {
-          const { data: songsData, error: songsError } = await supabase
+          let sq = supabase
             .from('songs')
             .select('*')
-            .eq('school_id', studentUser.school_id)
-            .order('title', { ascending: true });
+            .eq('school_id', studentUser.school_id);
+          
+          if (teacherId) {
+            sq = sq.eq('teacher_id', teacherId);
+          }
+          
+          const { data: songsData, error: songsError } = await sq.order('title', { ascending: true });
 
           if (songsError) throw songsError;
           setSongs(songsData || []);
@@ -1413,7 +1435,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           title: newSongTitle.trim(),
           artist: newSongArtist.trim(),
           school_id: schoolId,
-          is_campus_active: true
+          is_campus_active: true,
+          teacher_id: teacherId || null
         })
         .select()
         .maybeSingle();
@@ -1446,11 +1469,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   const assignSongToStudent = async (song: any, schoolId: string) => {
     // Refresh catalog local list
-    const { data: refreshedSongs } = await supabase
+    let sq = supabase
       .from('songs')
       .select('*')
-      .eq('school_id', schoolId)
-      .order('title', { ascending: true });
+      .eq('school_id', schoolId);
+    if (teacherId) {
+      sq = sq.eq('teacher_id', teacherId);
+    }
+    const { data: refreshedSongs } = await sq.order('title', { ascending: true });
     if (refreshedSongs) {
       setSongs(refreshedSongs);
     }
@@ -1512,14 +1538,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const bookColor = (activeBook && activeSubView === 'lehrwerk') 
     ? getLehrwerkColor(activeBook.title) 
     : (activeSong && activeSubView === 'song') 
-      ? getLehrwerkColor(activeSong.songs?.title || 'Song') 
+      ? getSongColor(activeSong.songs?.title || 'Song') 
       : null;
 
   return (
     <div style={{
       position: 'fixed',
       inset: 0,
-      zIndex: 4000,
+      zIndex: 9999,
       background: 'rgba(9, 9, 11, 0.65)',
       backdropFilter: 'blur(20px)',
       display: 'flex',
@@ -2135,7 +2161,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               (() => {
                 const skill = activeSongSkills.find(s => s.id === selectedActiveSongId);
                 if (!skill) return null;
-                const songColor = getLehrwerkColor(skill.songs?.title || 'Song');
+                const songColor = getSongColor(skill.songs?.title || 'Song');
                 const progress = songProgressPercent;
 
                 return (
@@ -2744,7 +2770,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {activeSongSkills.map(skill => {
                       const progress = skill.is_stage_ready ? 100 : (skill.progress_percent || 0);
-                      const songColor = getLehrwerkColor(skill.songs?.title || 'Song');
+                      const songColor = getSongColor(skill.songs?.title || 'Song');
 
                       return (
                         <div
@@ -2989,11 +3015,17 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       background: '#f8f8fa',
                       transition: 'border-color 0.2s'
                     }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = '#000'}
-                    onBlur={(e) => e.currentTarget.style.borderColor = '#e8e8ed'}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#000';
+                      setIsSongSearchFocused(true);
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#e8e8ed';
+                      setTimeout(() => setIsSongSearchFocused(false), 200);
+                    }}
                   />
 
-                  {songSearch.trim().length > 0 && (
+                  {(songSearch.trim().length > 0 || isSongSearchFocused) && (
                     <div style={{
                       maxHeight: '180px',
                       overflowY: 'auto',
@@ -3322,9 +3354,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   {/* 7. Color buttons inline, right aligned */}
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
                     {[
-                      { mode: 'LOCKED', color: 'hsl(355, 75%, 84%)', label: 'Rot (unbearbeitet)', getActive: () => status === 'IN_PROGRESS' && !isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(false); setHasChanges(true); } },
-                      { mode: 'HOMEWORK', color: 'hsl(47, 85%, 84%)', label: 'Gelb (Hausaufgabe)', getActive: () => status === 'IN_PROGRESS' && isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(true); setHasChanges(true); } },
-                      { mode: 'MASTERED', color: 'hsl(130, 65%, 82%)', label: 'Grün (erledigt)', getActive: () => status === 'MASTERED', action: () => { setStatus('MASTERED'); setIsCurrentHomework(false); setHasChanges(true); } }
+                      { mode: 'LOCKED', color: 'hsl(355, 75%, 84%)', label: 'Rot (unbearbeitet)', getActive: () => status === 'IN_PROGRESS' && !isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(false); setHasChanges(true); if (activeLehrwerkId && activePageNumber) triggerDirectSave(activeLehrwerkId, activePageNumber, 'IN_PROGRESS', false); } },
+                      { mode: 'HOMEWORK', color: 'hsl(47, 85%, 84%)', label: 'Gelb (Hausaufgabe)', getActive: () => status === 'IN_PROGRESS' && isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(true); setHasChanges(true); if (activeLehrwerkId && activePageNumber) triggerDirectSave(activeLehrwerkId, activePageNumber, 'IN_PROGRESS', true); } },
+                      { mode: 'MASTERED', color: 'hsl(130, 65%, 82%)', label: 'Grün (erledigt)', getActive: () => status === 'MASTERED', action: () => { setStatus('MASTERED'); setIsCurrentHomework(false); setHasChanges(true); if (activeLehrwerkId && activePageNumber) triggerDirectSave(activeLehrwerkId, activePageNumber, 'MASTERED', false); } }
                     ].map(b => {
                       const isActive = b.getActive();
                       return (
