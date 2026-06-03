@@ -3741,109 +3741,113 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   </div>
                   
                   {/* Sticky Note Button for History */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveSubView('history');
-                      // Pre-select the most recent week if available
-                      const weeks = Array.from(new Set(progressItems
-                        .filter(item => item.updated_at)
-                        .map(item => getISOWeek(item.updated_at))
-                      )).sort().reverse();
-                      if (weeks.length > 0) {
-                        setSelectedHistoryWeek(weeks[0]);
-                      }
-                    }}
+                  <div 
                     style={{
-                      background: '#fef9c3', // Warm soft yellow post-it color
-                      border: '1px solid #fef08a',
-                      borderRadius: '2px 4px 16px 2px / 4px 16px 2px 20px', // Organic paper look
-                      padding: '16px 14px 10px 14px',
-                      boxShadow: '0 6px 15px rgba(0,0,0,0.05), inset 0 -2px 5px rgba(254, 240, 138, 0.4)',
+                      filter: 'drop-shadow(0 6px 12px rgba(0,0,0,0.08)) drop-shadow(0 2px 4px rgba(0,0,0,0.06))',
+                      transition: 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                       transform: 'rotate(3deg)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '2px',
-                      fontFamily: '"Helvetica Neue", Helvetica, Inter, Arial, sans-serif',
-                      transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                       flexShrink: 0,
-                      position: 'relative',
-                      minWidth: '96px',
-                      minHeight: '76px'
+                      cursor: 'pointer'
                     }}
-                    className="hover-scale"
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-3px) rotate(4deg) scale(1.05)';
-                      e.currentTarget.style.boxShadow = '0 10px 20px rgba(0,0,0,0.08), inset 0 -2px 5px rgba(254, 240, 138, 0.4)';
+                      e.currentTarget.style.transform = 'translateY(-4px) rotate(4.5deg) scale(1.06)';
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.transform = 'rotate(3deg)';
-                      e.currentTarget.style.boxShadow = '0 6px 15px rgba(0,0,0,0.05), inset 0 -2px 5px rgba(254, 240, 138, 0.4)';
                     }}
                   >
-                    {/* 3D Pushpin on top */}
-                    <div style={{
-                      position: 'absolute',
-                      top: '-10px',
-                      left: '50%',
-                      transform: 'translateX(-50%) rotate(-8deg)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      zIndex: 10,
-                      pointerEvents: 'none'
-                    }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveSubView('history');
+                        // Pre-select the most recent week if available
+                        const weeks = Array.from(new Set(progressItems
+                          .filter(item => item.updated_at)
+                          .map(item => getISOWeek(item.updated_at))
+                        )).sort().reverse();
+                        if (weeks.length > 0) {
+                          setSelectedHistoryWeek(weeks[0]);
+                        }
+                      }}
+                      style={{
+                        background: 'repeating-linear-gradient(45deg, rgba(0,0,0,0.005) 0px, rgba(0,0,0,0.005) 1px, transparent 1px, transparent 4px), linear-gradient(135deg, #fffdf2 0%, #fefcbf 70%, #fef08a 100%)',
+                        border: 'none',
+                        clipPath: 'polygon(2% 2%, 23% 1%, 43% 3%, 63% 1%, 83% 2%, 98% 1%, 99% 19%, 97% 38%, 99% 58%, 98% 78%, 99% 98%, 79% 97%, 59% 99%, 39% 97%, 19% 98%, 2% 99%, 1% 79%, 3% 59%, 1% 39%, 2% 19%)',
+                        padding: '18px 14px 12px 14px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '2px',
+                        fontFamily: '"Helvetica Neue", Helvetica, Inter, Arial, sans-serif',
+                        flexShrink: 0,
+                        position: 'relative',
+                        minWidth: '98px',
+                        minHeight: '78px'
+                      }}
+                    >
+                      {/* 3D Pushpin on top */}
                       <div style={{
-                        width: '12px',
-                        height: '12px',
-                        borderRadius: '50%',
-                        background: 'radial-gradient(circle at 4px 4px, #f87171 0%, #dc2626 60%, #991b1b 100%)',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.25), inset 0 -1px 3px rgba(0,0,0,0.4)',
-                        position: 'relative'
+                        position: 'absolute',
+                        top: '-10px',
+                        left: '50%',
+                        transform: 'translateX(-50%) rotate(-8deg)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        zIndex: 10,
+                        pointerEvents: 'none'
                       }}>
                         <div style={{
-                          position: 'absolute',
-                          top: '2px',
-                          left: '2px',
-                          width: '4px',
-                          height: '4px',
+                          width: '12px',
+                          height: '12px',
                           borderRadius: '50%',
-                          background: 'rgba(255,255,255,0.7)'
+                          background: 'radial-gradient(circle at 4px 4px, #f87171 0%, #dc2626 60%, #991b1b 100%)',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.25), inset 0 -1px 3px rgba(0,0,0,0.4)',
+                          position: 'relative'
+                        }}>
+                          <div style={{
+                            position: 'absolute',
+                            top: '2px',
+                            left: '2px',
+                            width: '4px',
+                            height: '4px',
+                            borderRadius: '50%',
+                            background: 'rgba(255,255,255,0.7)'
+                          }} />
+                        </div>
+                        <div style={{
+                          width: '2px',
+                          height: '8px',
+                          background: 'linear-gradient(90deg, #cbd5e1 0%, #64748b 100%)',
+                          marginTop: '-1px'
                         }} />
                       </div>
-                      <div style={{
-                        width: '2px',
-                        height: '8px',
-                        background: 'linear-gradient(90deg, #cbd5e1 0%, #64748b 100%)',
-                        marginTop: '-1px'
-                      }} />
-                    </div>
 
-                    <span style={{ 
-                      fontSize: '0.66rem', 
-                      fontWeight: 700, 
-                      color: '#a16207', 
-                      textTransform: 'uppercase', 
-                      letterSpacing: '0.04em', 
-                      lineHeight: 1 
-                    }}>
-                      Hausaufgaben
-                    </span>
-                    <span style={{ 
-                      fontSize: '0.86rem', 
-                      fontWeight: 900, 
-                      color: '#854d0e', 
-                      textTransform: 'uppercase', 
-                      letterSpacing: '0.06em', 
-                      lineHeight: 1.1,
-                      marginTop: '1px'
-                    }}>
-                      Archiv
-                    </span>
-                  </button>
+                      <span style={{ 
+                        fontSize: '0.66rem', 
+                        fontWeight: 800, 
+                        color: '#a16207', 
+                        textTransform: 'uppercase', 
+                        letterSpacing: '0.04em', 
+                        lineHeight: 1 
+                      }}>
+                        Hausaufgaben
+                      </span>
+                      <span style={{ 
+                        fontSize: '0.86rem', 
+                        fontWeight: 900, 
+                        color: '#854d0e', 
+                        textTransform: 'uppercase', 
+                        letterSpacing: '0.06em', 
+                        lineHeight: 1.1,
+                        marginTop: '1px'
+                      }}>
+                        Archiv
+                      </span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* The Main Input Form Card */}
