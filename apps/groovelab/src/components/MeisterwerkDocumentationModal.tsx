@@ -163,6 +163,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [selectedHistoryWeek, setSelectedHistoryWeek] = useState<string | null>(null);
   const [songProgressPercent, setSongProgressPercent] = useState<number>(25);
 
+  // Always start at hub view when modal opens
+  useEffect(() => {
+    setActiveSubView('hub');
+    setActiveModalTab('document');
+    setActiveLehrwerkId(null);
+    setActivePageNumber(null);
+    setSelectedActiveSongId('');
+  }, [student.id]);
+
   const getLehrwerkColor = (title: string) => {
     const trimmed = (title || '').trim();
     let hash = 0;
@@ -1779,6 +1788,29 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
             {activeSubView === 'history' ? (
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease', overflowY: 'auto', padding: '24px' }}>
+                <button
+                  type="button"
+                  onClick={() => setActiveSubView('hub')}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: '#f1f5f9',
+                    border: 'none',
+                    color: '#475569',
+                    padding: '8px 14px',
+                    borderRadius: '20px',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    width: 'fit-content',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover-scale"
+                >
+                  <span>← Zurück zum Hub</span>
+                </button>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
                     📚 Hausaufgaben-Archiv
@@ -2724,13 +2756,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   </span>
                 </div>
 
-                {activeSongSkills.length === 0 ? (
-                  <div style={{ padding: '40px 16px', textAlign: 'center', border: '2px dashed #e8e8ed', borderRadius: '24px', color: '#7d7d82', fontSize: '0.82rem', fontWeight: 600 }}>
-                    Keine aktiven Songs eingetragen.
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {activeSongSkills.map(skill => {
+                {(() => {
+                    const activeSongs = activeSongSkills.filter(skill =>
+                      !skill.is_stage_ready && (skill.progress_percent || 0) < 100
+                    );
+                    if (activeSongs.length === 0) return (
+                      <div style={{ padding: '40px 16px', textAlign: 'center', border: '2px dashed #e8e8ed', borderRadius: '24px', color: '#7d7d82', fontSize: '0.82rem', fontWeight: 600 }}>
+                        Keine aktiven Songs eingetragen.
+                      </div>
+                    );
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {activeSongs.map(skill => {
                       const progress = skill.is_stage_ready ? 100 : (skill.progress_percent || 0);
                       const songColor = getSongColor(skill.songs?.title || 'Song');
 
@@ -2842,8 +2879,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         </div>
                       );
                     })}
-                  </div>
-                )}
+                    </div>
+                  );
+                })()}
 
                 <div style={{ borderTop: '1px solid #e8e8ed', paddingTop: '20px', marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
