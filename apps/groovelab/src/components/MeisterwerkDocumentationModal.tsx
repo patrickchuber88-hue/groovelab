@@ -2129,7 +2129,30 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               <button
                                 key={num}
                                 type="button"
-                                onClick={() => selectTextbookPage(activeLehrwerkId, num)}
+                                onClick={() => {
+                                  if (activeBrush === 'NONE') {
+                                    selectTextbookPage(activeLehrwerkId!, num);
+                                  } else {
+                                    let targetStatus: 'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED' = 'IN_PROGRESS';
+                                    let targetHomework = false;
+
+                                    if (activeBrush === 'LOCKED') {
+                                      targetStatus = 'IN_PROGRESS';
+                                      targetHomework = false;
+                                    } else if (activeBrush === 'HOMEWORK') {
+                                      targetStatus = 'IN_PROGRESS';
+                                      targetHomework = true;
+                                    } else if (activeBrush === 'MASTERED') {
+                                      targetStatus = 'MASTERED';
+                                      targetHomework = false;
+                                    } else if (activeBrush === 'THEORY') {
+                                      targetStatus = 'THEORY_DONE';
+                                      targetHomework = false;
+                                    }
+
+                                    triggerDirectSave(activeLehrwerkId!, num, targetStatus, targetHomework);
+                                  }
+                                }}
                                 style={{
                                   height: '44px',
                                   borderRadius: '50%',
