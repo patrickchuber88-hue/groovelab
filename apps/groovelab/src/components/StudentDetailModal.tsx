@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap } from 'lucide-react';
+import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap, BookOpen } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import QRCode from 'react-qr-code';
 import { 
@@ -208,6 +208,21 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     });
   }, []);
 
+  const getLehrwerkColor = (title: string) => {
+    const trimmed = (title || '').trim();
+    const firstChar = trimmed.charAt(0).toUpperCase();
+    const charCode = firstChar.charCodeAt(0) || 65;
+    const clampedCode = Math.max(65, Math.min(90, charCode));
+    const hue = Math.round(((clampedCode - 65) / 25) * 360);
+    return {
+      from: `hsl(${hue}, 85%, 94%)`,
+      to: `hsl(${hue}, 80%, 84%)`,
+      text: `hsl(${hue}, 90%, 25%)`,
+      shadowFrom: `hsla(${hue}, 85%, 50%, 0.2)`,
+      shadowTo: `hsla(${hue}, 80%, 40%, 0.15)`
+    };
+  };
+
   useEffect(() => {
     setIsCampusActive(student.is_campus_active ?? student.isCampusActive ?? false);
     setIsGroovelabActive(student.is_groovelab_active ?? student.isGroovelabActive ?? false);
@@ -220,23 +235,33 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   }, [student]);
 
   useEffect(() => {
-    // Load global Lehrwerke
-    try {
-      const stored = localStorage.getItem('campus_lehrwerke');
-      if (stored) {
-        setGlobalLehrwerke(JSON.parse(stored));
-      } else {
-        // Default library
-        const defaults = [
-          { id: '1', title: 'GrooveLab Guitar Vol. 1', instrument: 'Guitar', type: 'Standardwerk für E-Gitarre', progress: 60, emoji: '🎸', color: '#34a853', totalPages: 50 },
-          { id: '2', title: 'GrooveLab Drums Vol. 1', instrument: 'Drums', type: 'Standardwerk für Schlagzeug', progress: 45, emoji: '🥁', color: '#4f46e5', totalPages: 50 },
-          { id: '3', title: 'GrooveLab Bass Vol. 1', instrument: 'Bass', type: 'Standardwerk für E-Bass', progress: 30, emoji: '🎸', color: '#f59e0b', totalPages: 50 },
-          { id: '4', title: 'GrooveLab Keys Vol. 1', instrument: 'Keys', type: 'Standardwerk für Keyboard', progress: 80, emoji: '🎹', color: '#ec4899', totalPages: 50 },
-          { id: '5', title: 'GrooveLab Vocals Vol. 1', instrument: 'Vocals', type: 'Standardwerk für Gesang', progress: 50, emoji: '🎤', color: '#3b82f6', totalPages: 50 }
-        ];
-        setGlobalLehrwerke(defaults);
+    // Load global Lehrwerke from Supabase
+    const fetchLehrwerke = async () => {
+      try {
+        let query = supabase.from('lehrwerke').select('*');
+        if (currentTeacherId) {
+          query = query.eq('teacher_id', currentTeacherId);
+        }
+        const { data: lehrwerkeData, error } = await query.order('title');
+        if (error) throw error;
+
+        if (lehrwerkeData && lehrwerkeData.length > 0) {
+          const mapped = lehrwerkeData.map((item: any) => ({
+            ...item,
+            totalPages: item.total_pages || 50,
+            emoji: item.emoji || '📖',
+            color: item.color || '#456355'
+          }));
+          setGlobalLehrwerke(mapped);
+        } else {
+          setGlobalLehrwerke([]);
+        }
+      } catch (err) {
+        console.error('Error fetching lehrwerke in StudentDetailModal:', err);
       }
-    } catch (e) {}
+    };
+
+    fetchLehrwerke();
 
     // Load student assigned progress
     try {
@@ -248,7 +273,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         setAssignedLehrwerke(filtered);
       }
     } catch (e) {}
-  }, [student.id]);
+  }, [student.id, currentTeacherId]);
 
   const handleAssignLehrwerk = (lehrwerkId: string) => {
     if (!lehrwerkId) return;
@@ -696,98 +721,61 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           <X size={20} />
         </button>
 
-        {/* iOS-style Segmented Control Switch + Schüler-Notizbuch Button */}
+        {/* iOS-style Segmented Control Switch */}
         <div style={{ 
           marginBottom: '24px', 
-          display: 'grid', 
-          gridTemplateColumns: '1.25fr 360px', 
-          gap: '40px', 
+          display: 'flex', 
+          justifyContent: 'flex-start',
           alignItems: 'center' 
         }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-            <div style={{ 
-              background: 'rgba(120, 120, 128, 0.12)', 
-              borderRadius: '99px', 
-              padding: '2px', 
-              display: 'inline-flex', 
-              gap: '2px' 
-            }}>
-              <button
-                onClick={() => handleTabChange('campus')}
-                style={{
-                  border: 'none',
-                  borderRadius: '99px',
-                  padding: '8px 20px',
-                  fontSize: '0.85rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  background: localTab === 'campus' ? '#ffffff' : 'transparent',
-                  color: localTab === 'campus' ? '#000000' : '#636366',
-                  boxShadow: localTab === 'campus' ? '0 1px 3px rgba(0,0,0,0.12), 0 1px 1px rgba(0,0,0,0.08)' : 'none'
-                }}
-              >
-                <GraduationCap size={16} />
-                <span>Campus</span>
-              </button>
-              <button
-                onClick={() => handleTabChange('groovelab')}
-                style={{
-                  border: 'none',
-                  borderRadius: '99px',
-                  padding: '8px 20px',
-                  fontSize: '0.85rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  background: localTab === 'groovelab' ? '#ffffff' : 'transparent',
-                  color: localTab === 'groovelab' ? '#000000' : '#636366',
-                  boxShadow: localTab === 'groovelab' ? '0 1px 3px rgba(0,0,0,0.12), 0 1px 1px rgba(0,0,0,0.08)' : 'none'
-                }}
-              >
-                <Music size={16} />
-                <span>GrooveLab</span>
-              </button>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+          <div style={{ 
+            background: 'rgba(120, 120, 128, 0.12)', 
+            borderRadius: '99px', 
+            padding: '2px', 
+            display: 'inline-flex', 
+            gap: '2px' 
+          }}>
             <button
-              onClick={() => {
-                if (onOpenTageskompass) {
-                  onOpenTageskompass(student);
-                } else {
-                  setShowTageskompassModal(true);
-                }
-              }}
+              onClick={() => handleTabChange('campus')}
               style={{
                 border: 'none',
                 borderRadius: '99px',
                 padding: '8px 20px',
                 fontSize: '0.85rem',
-                fontWeight: 800,
+                fontWeight: 700,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
                 transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                background: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
-                color: '#064e3b',
-                boxShadow: '0 2px 8px rgba(245, 158, 11, 0.2)',
-                fontFamily: 'inherit',
-                height: '38px',
-                boxSizing: 'border-box'
+                background: localTab === 'campus' ? '#ffffff' : 'transparent',
+                color: localTab === 'campus' ? '#000000' : '#636366',
+                boxShadow: localTab === 'campus' ? '0 1px 3px rgba(0,0,0,0.12), 0 1px 1px rgba(0,0,0,0.08)' : 'none'
               }}
-              className="hover-scale"
             >
-              <span>📓</span>
-              <span>Schüler-Notizbuch</span>
+              <GraduationCap size={16} />
+              <span>Campus</span>
+            </button>
+            <button
+              onClick={() => handleTabChange('groovelab')}
+              style={{
+                border: 'none',
+                borderRadius: '99px',
+                padding: '8px 20px',
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                background: localTab === 'groovelab' ? '#ffffff' : 'transparent',
+                color: localTab === 'groovelab' ? '#000000' : '#636366',
+                boxShadow: localTab === 'groovelab' ? '0 1px 3px rgba(0,0,0,0.12), 0 1px 1px rgba(0,0,0,0.08)' : 'none'
+              }}
+            >
+              <Music size={16} />
+              <span>GrooveLab</span>
             </button>
           </div>
         </div>
@@ -1124,9 +1112,44 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                   flexDirection: 'column',
                   gap: '16px'
                 }}>
-                  <h3 style={{ fontSize: '0.9rem', fontWeight: 900, textTransform: 'uppercase', color: '#10b981', letterSpacing: '0.08em', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Music size={16} /> Songs & Lehrwerke
-                  </h3>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', width: '100%' }}>
+                    <h3 style={{ fontSize: '0.9rem', fontWeight: 900, textTransform: 'uppercase', color: '#10b981', letterSpacing: '0.08em', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Music size={16} /> Songs & Lehrwerke
+                    </h3>
+
+                    {/* Schüler-Notizbuch Button */}
+                    <button
+                      onClick={() => {
+                        if (onOpenTageskompass) {
+                          onOpenTageskompass(student);
+                        } else {
+                          setShowTageskompassModal(true);
+                        }
+                      }}
+                      style={{
+                        border: '1.5px solid #dfd3be',
+                        borderRadius: '99px',
+                        padding: '6px 14px',
+                        fontSize: '0.74rem',
+                        fontWeight: 850,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                        background: 'linear-gradient(135deg, #fdfaf2 0%, #f4e8d1 100%)',
+                        color: '#5c4033',
+                        boxShadow: '0 4px 12px rgba(139, 90, 43, 0.06)',
+                        fontFamily: 'inherit',
+                        height: '30px',
+                        boxSizing: 'border-box'
+                      }}
+                      className="hover-scale"
+                    >
+                      <span style={{ fontSize: '0.85rem', lineHeight: '1' }}>📓</span>
+                      <span style={{ fontFamily: 'Urbanist, sans-serif', letterSpacing: '0.01em' }}>Schüler-Notizbuch</span>
+                    </button>
+                  </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {/* Lehrwerke Row */}
@@ -1143,6 +1166,8 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                           const masteredCount = Object.values(pageStates).filter((p: any) => p.status === 'mastered').length;
                           const percent = Math.round((masteredCount / totalPages) * 100);
 
+                          const bookColor = getLehrwerkColor(book.title);
+
                           return (
                             <div key={assigned.lehrwerkId} style={{ 
                               background: '#ffffff', 
@@ -1154,8 +1179,31 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                               justifyContent: 'space-between',
                               fontSize: '0.82rem'
                             }}>
-                              <span style={{ fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span>{book.emoji || '📖'}</span>
+                              <span style={{ fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div style={{
+                                  width: '24px',
+                                  height: '32px',
+                                  background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
+                                  borderRadius: '4px',
+                                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                  border: 'none',
+                                  position: 'relative',
+                                  flexShrink: 0,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}>
+                                  <BookOpen size={11} color={bookColor.text} />
+                                  <div style={{
+                                    position: 'absolute',
+                                    left: 0,
+                                    top: 0,
+                                    bottom: 0,
+                                    width: '3px',
+                                    background: 'rgba(0,0,0,0.08)',
+                                    borderRight: '1px solid rgba(255,255,255,0.1)'
+                                  }} />
+                                </div>
                                 <span>{book.title}</span>
                               </span>
                               <span style={{ 

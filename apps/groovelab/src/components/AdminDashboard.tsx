@@ -10,6 +10,7 @@ import {
 import { renderInstrumentIcon } from '../utils/instruments';
 import { StudentDetailModal } from './StudentDetailModal';
 import { ScheduleBoard } from './ScheduleBoard';
+import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
 
 const cleanRoomName = (name: string | null | undefined): string => {
   if (!name) return 'Unbenannter Raum';
@@ -392,6 +393,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     }
   });
   const [studentDetailSearch, setStudentDetailSearch] = useState('');
+  const [showTageskompassModal, setShowTageskompassModal] = useState(false);
+  const [selectedStudentForTageskompass, setSelectedStudentForTageskompass] = useState<any>(null);
+  const [initialLehrwerkIdForTageskompass, setInitialLehrwerkIdForTageskompass] = useState<string | null>(null);
   const [assignedStudentsSearchQuery, setAssignedStudentsSearchQuery] = useState('');
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
   const [draggedStationId, setDraggedStationId] = useState<string | null>(null);
@@ -6289,6 +6293,24 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       {renderBatchiPadModal()}
       {renderLogoutDialog()}
 
+      {showTageskompassModal && selectedStudentForTageskompass && (
+        <MeisterwerkDocumentationModal
+          student={{
+            id: selectedStudentForTageskompass.id,
+            first_name: selectedStudentForTageskompass.first_name,
+            last_name: selectedStudentForTageskompass.last_name,
+            photo_url: selectedStudentForTageskompass.photo_url || '/avatar_ghost.jpg'
+          }}
+          onClose={() => {
+            setShowTageskompassModal(false);
+            setSelectedStudentForTageskompass(null);
+            setInitialLehrwerkIdForTageskompass(null);
+          }}
+          teacherId={userId}
+          initialLehrwerkId={initialLehrwerkIdForTageskompass || undefined}
+        />
+      )}
+
       {/* Notebook Lehrwerk Detail Modal */}
       {selectedLehrwerkForDetail && (() => {
         const book = selectedLehrwerkForDetail;
@@ -6619,49 +6641,103 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                 </div>
                               </div>
                               {selectedStudentForProgress ? (
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); setSelectedStudentForProgress(null); }}
-                                  style={{
-                                    background: '#f1f5f9',
-                                    border: 'none',
-                                    borderRadius: '8px',
-                                    padding: '6px 12px',
-                                    fontSize: '0.78rem',
-                                    fontWeight: 700,
-                                    color: '#475569',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px',
-                                    transition: 'all 0.2s'
-                                  }}
-                                  onMouseEnter={(e) => e.currentTarget.style.background = '#e2e8f0'}
-                                  onMouseLeave={(e) => e.currentTarget.style.background = '#f1f5f9'}
-                                >
-                                  <ChevronLeft size={12} /> Zurück
-                                </button>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedStudentForTageskompass(selectedStudentForProgress);
+                                      setInitialLehrwerkIdForTageskompass(book.id);
+                                      setShowTageskompassModal(true);
+                                    }}
+                                    style={{
+                                      background: '#456355',
+                                      border: 'none',
+                                      borderRadius: '8px',
+                                      padding: '6px 12px',
+                                      fontSize: '0.78rem',
+                                      fontWeight: 800,
+                                      color: 'white',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      transition: 'all 0.2s'
+                                    }}
+                                    className="hover-scale"
+                                  >
+                                    <BookOpen size={12} /> Protokoll
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setSelectedStudentForProgress(null); }}
+                                    style={{
+                                      background: '#f1f5f9',
+                                      border: 'none',
+                                      borderRadius: '8px',
+                                      padding: '6px 12px',
+                                      fontSize: '0.78rem',
+                                      fontWeight: 700,
+                                      color: '#475569',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      transition: 'all 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.background = '#e2e8f0'}
+                                    onMouseLeave={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                                  >
+                                    <ChevronLeft size={12} /> Zurück
+                                  </button>
+                                </div>
                               ) : (
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleUnassign(s.id); }}
-                                  style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    color: '#ef4444',
-                                    cursor: 'pointer',
-                                    width: '28px',
-                                    height: '28px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    borderRadius: '50%',
-                                    transition: 'all 0.2s'
-                                  }}
-                                  onMouseEnter={(e) => e.currentTarget.style.background = '#fee2e2'}
-                                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                                  title="Verbindung trennen"
-                                >
-                                  <X size={16} strokeWidth={2.5} />
-                                </button>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedStudentForTageskompass(s);
+                                      setInitialLehrwerkIdForTageskompass(book.id);
+                                      setShowTageskompassModal(true);
+                                    }}
+                                    style={{
+                                      background: '#456355',
+                                      border: 'none',
+                                      borderRadius: '8px',
+                                      padding: '6px 12px',
+                                      fontSize: '0.74rem',
+                                      fontWeight: 800,
+                                      color: 'white',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      transition: 'all 0.2s'
+                                    }}
+                                    className="hover-scale"
+                                  >
+                                    <BookOpen size={12} /> Protokoll
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleUnassign(s.id); }}
+                                    style={{
+                                      background: 'transparent',
+                                      border: 'none',
+                                      color: '#ef4444',
+                                      cursor: 'pointer',
+                                      width: '28px',
+                                      height: '28px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      borderRadius: '50%',
+                                      transition: 'all 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.background = '#fee2e2'}
+                                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                    title="Verbindung trennen"
+                                  >
+                                    <X size={16} strokeWidth={2.5} />
+                                  </button>
+                                </div>
                               )}
                             </div>
                           );
