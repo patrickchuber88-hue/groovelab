@@ -1988,7 +1988,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 const skill = activeSongSkills.find(s => s.id === selectedActiveSongId);
                 if (!skill) return null;
                 const songColor = getLehrwerkColor(skill.songs?.title || 'Song');
-                const progress = skill.is_stage_ready ? 100 : (skill.progress_percent || 0);
+                const progress = status === 'MASTERED' ? 100 : (skill.is_stage_ready ? 100 : (skill.progress_percent || 0));
 
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease' }}>
@@ -2053,7 +2053,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           🎸 {skill.instrument} • {progress}%
                         </span>
                         <div style={{ width: '100%', height: '6px', background: '#e8e8ed', borderRadius: '3px', marginTop: '6px', overflow: 'hidden' }}>
-                          <div style={{ width: `${progress}%`, height: '100%', background: skill.is_stage_ready ? '#10b981' : '#000', transition: 'width 0.4s ease' }} />
+                          <div style={{ width: `${progress}%`, height: '100%', background: (status === 'MASTERED' || skill.is_stage_ready) ? '#10b981' : '#000', transition: 'width 0.4s ease' }} />
                         </div>
                       </div>
                     </div>
@@ -2077,7 +2077,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           {[
                             { mode: 'LOCKED', color: 'hsl(355, 75%, 84%)', label: 'Rot (unbearbeitet)', getActive: () => status === 'IN_PROGRESS' && !isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(false); setSongProgressPercent(25); setHasChanges(true); } },
                             { mode: 'HOMEWORK', color: 'hsl(47, 85%, 84%)', label: 'Gelb (Hausaufgabe)', getActive: () => status === 'IN_PROGRESS' && isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(true); setSongProgressPercent(25); setHasChanges(true); } },
-                            { mode: 'MASTERED', color: 'hsl(130, 65%, 82%)', label: 'Grün (gemeistert)', getActive: () => status === 'MASTERED', action: () => { setStatus('MASTERED'); setIsCurrentHomework(false); setSongProgressPercent(100); setHasChanges(true); } }
+                            { mode: 'MASTERED', color: 'hsl(130, 65%, 82%)', label: 'Grün (gemeistert - 100%)', getActive: () => status === 'MASTERED', action: () => { setStatus('MASTERED'); setIsCurrentHomework(false); setSongProgressPercent(100); setHasChanges(true); } }
                           ].map(b => {
                             const isActive = b.getActive();
                             return (
@@ -2108,7 +2108,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       <div style={{ borderTop: '1px solid rgba(0, 0, 0, 0.05)', paddingTop: '8px', display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: 'hsl(355, 75%, 84%)' }}>●</span> Rot (unbearbeitet)</span>
                         <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: 'hsl(47, 85%, 84%)' }}>●</span> Gelb (Hausaufgabe)</span>
-                        <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: 'hsl(130, 65%, 82%)' }}>●</span> Grün (gemeistert)</span>
+                        <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: 'hsl(130, 65%, 82%)' }}>●</span> Grün (gemeistert - 100%)</span>
                       </div>
                     </div>
                   </div>
