@@ -293,7 +293,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           user_id: studentId,
           song_id: selectedSongForDetail.id,
           instrument: instrument,
-          progress_percent: 25,
+          progress_percent: 0,
           is_stage_ready: false
         })
         .select('*, student:users!user_song_skills_user_id_fkey(*)')
@@ -8079,7 +8079,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                       </span>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
                                         <div style={{ flex: 1, height: '4px', background: '#f1f5f9', borderRadius: '2px', overflow: 'hidden' }}>
-                                          <div style={{ width: `${s.progress_percent || 0}%`, height: '100%', background: s.is_stage_ready ? 'hsl(130, 60%, 52%)' : 'hsl(47, 85%, 52%)', borderRadius: '2px' }} />
+                                          <div style={{ width: `${s.progress_percent || 0}%`, height: '100%', background: (s.is_stage_ready || s.progress_percent === 100) ? 'hsl(130, 65%, 82%)' : 'hsl(47, 85%, 84%)', borderRadius: '2px' }} />
                                         </div>
                                         <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 700, flexShrink: 0 }}>
                                           {s.progress_percent || 0}% Fortschritt
@@ -8536,7 +8536,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                   WebkitAppearance: 'none',
                                   height: '8px',
                                   borderRadius: '4px',
-                                  background: `linear-gradient(to right, #000 0%, #000 ${songTotalProgressVal}%, #e2e8f0 ${songTotalProgressVal}%, #e2e8f0 100%)`,
+                                  background: `linear-gradient(to right, ${songTotalProgressVal === 100 ? 'hsl(130, 65%, 82%)' : 'hsl(47, 85%, 84%)'} 0%, ${songTotalProgressVal === 100 ? 'hsl(130, 65%, 82%)' : 'hsl(47, 85%, 84%)'} ${songTotalProgressVal}%, #e2e8f0 ${songTotalProgressVal}%, #e2e8f0 100%)`,
                                   outline: 'none',
                                   cursor: 'pointer'
                                 }}
@@ -8565,9 +8565,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                             {showSongProgressDetails && (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
                                 {[
-                                  { label: 'Rhythmus & Timing', value: songRhythmVal, color: '#ef4444', type: 'rhythm' },
-                                  { label: 'Finger & Technik', value: songFingerVal, color: '#eab308', type: 'finger' },
-                                  { label: 'Ausdruck & Performance', value: songDynamicsVal, color: '#10b981', type: 'dynamics' }
+                                  { label: 'Rhythmus & Timing', value: songRhythmVal, color: '#000000', type: 'rhythm' },
+                                  { label: 'Finger & Technik', value: songFingerVal, color: '#000000', type: 'finger' },
+                                  { label: 'Ausdruck & Performance', value: songDynamicsVal, color: '#000000', type: 'dynamics' }
                                 ].map(slider => (
                                   <div key={slider.type} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', fontWeight: 800 }}>

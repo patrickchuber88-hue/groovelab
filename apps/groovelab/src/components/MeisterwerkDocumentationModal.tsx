@@ -217,6 +217,20 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   // Active paintbrush mode
   const [activeBrush, setActiveBrush] = useState<'NONE' | 'LOCKED' | 'HOMEWORK' | 'MASTERED' | 'THEORY'>('NONE');
   const [showAllPagesGrid, setShowAllPagesGrid] = useState(false);
+  const [textbookPageChunkIndex, setTextbookPageChunkIndex] = useState<number>(() => {
+    try {
+      const val = localStorage.getItem('groovelab_textbook_page_chunk_index');
+      return val ? parseInt(val, 10) : 0;
+    } catch {
+      return 0;
+    }
+  });
+
+  const setPageChunk = (idx: number) => {
+    setTextbookPageChunkIndex(idx);
+    localStorage.setItem('groovelab_textbook_page_chunk_index', String(idx));
+  };
+
   const [isSongSearchFocused, setIsSongSearchFocused] = useState(false);
 
   // Session log to capture all modifications made in current modal open state
@@ -594,6 +608,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           });
           
           localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
+          setAssignedLehrwerke(updated.filter((item: any) => item.studentId === student.id));
           
           const globalStored = localStorage.getItem('campus_lehrwerke');
           if (globalStored) {
@@ -646,6 +661,54 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       notifyHomeworkChange();
     } catch (e) {
       console.error('Error deleting note:', e);
+    }
+  };
+
+  const handleDeletePageNote = async (bookTitle: string, pageNum: number) => {
+    try {
+      const book = globalLehrwerke.find(b => b.title === bookTitle);
+      if (!book) return;
+
+      const stored = localStorage.getItem('student_lehrwerke_progress');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const updated = parsed.map((item: any) => {
+          if (item.studentId === student.id && item.lehrwerkId === book.id) {
+            const pageStates = { ...item.pageStates };
+            if (pageStates[pageNum]) {
+              pageStates[pageNum] = {
+                ...pageStates[pageNum],
+                homeworkNotes: '',
+                homework_notes: ''
+              };
+            }
+            return { ...item, pageStates };
+          }
+          return item;
+        });
+        localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
+      }
+
+      const currentWeek = getISOWeek();
+      const existing = progressItems.find(item => 
+        item.topic_name === `${bookTitle} - Seite ${pageNum}` && 
+        item.updated_at && 
+        getISOWeek(item.updated_at) === currentWeek
+      );
+
+      if (existing?.id) {
+        const { error } = await supabase
+          .from('progress_matrix')
+          .update({ homework_notes: '' })
+          .eq('id', existing.id);
+        if (error) throw error;
+      }
+
+      await fetchProgress();
+      loadLehrwerke();
+      notifyHomeworkChange();
+    } catch (err) {
+      console.error('Error deleting page note:', err);
     }
   };
 
@@ -825,7 +888,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     // Auto-populate form
     setTopicName(topicNameStr);
     setTeacherNotes(dbItem ? (dbItem.teacher_notes || '') : (pageState.notes || ''));
-    setHomeworkNotes(pageState.homeworkNotes || pageState.homework_notes || '');
+    let loadedNote = '';
+    if (dbItem?.homework_notes) {
+      try {
+        const parsed = JSON.parse(dbItem.homework_notes);
+        loadedNote = Array.isArray(parsed) ? parsed.join('\n') : String(parsed);
+      } catch {
+        loadedNote = dbItem.homework_notes;
+      }
+    } else {
+      loadedNote = pageState.homeworkNotes || pageState.homework_notes || '';
+    }
+    setHomeworkNotes(loadedNote);
 
     // Map textbook page statuses to Supabase/form states
     const bookPageStatus = pageState.status || 'locked';
@@ -983,6 +1057,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       });
 
       localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
+      setAssignedLehrwerke(updated.filter((item: any) => item.studentId === student.id));
       loadLehrwerke();
 
       setTopicName(`${book.title} - Seite ${pageNum}`);
@@ -1138,6 +1213,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     setSaving(true);
     setError(null);
 
+    let targetHomework = isCurrentHomework;
     // Save page status to local textbooks structure if page active
     if (activeInputTab === 'lehrwerk_page' && activeLehrwerkId && activePageNumber !== null) {
       try {
@@ -1150,8 +1226,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           pageStatus = 'mastered';
         } else if (status === 'THEORY_DONE') {
           pageStatus = 'purple';
-        } else if (isCurrentHomework) {
+        } else if (isCurrentHomework || (status === 'IN_PROGRESS' && homeworkNotes.trim().length > 0)) {
           pageStatus = 'homework';
+          targetHomework = true;
         }
 
         // Manage global page status (purple / info)
@@ -1192,6 +1269,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         });
 
         localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
+        setAssignedLehrwerke(updated.filter((item: any) => item.studentId === student.id));
         loadLehrwerke();
       } catch (err) {
         console.error('Error saving textbook local progress:', err);
@@ -1227,7 +1305,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     const combinedHomeworkNotes = JSON.stringify(finalNotesList);
 
     const hasHomeworkText = finalNotesList.length > 0;
-    const finalIsCurrentHomework = isCurrentHomework || (isLehrwerkPage || isSong ? homeworkNotes.trim().length > 0 : hasHomeworkText);
+    const finalIsCurrentHomework = targetHomework || (isLehrwerkPage || isSong ? homeworkNotes.trim().length > 0 : hasHomeworkText);
 
     const payload = {
       id: activeItem?.id,
@@ -1268,8 +1346,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           }
         }
 
+        if (targetHomework && !isCurrentHomework) {
+          setIsCurrentHomework(true);
+        }
+
         await fetchProgress();
         notifyHomeworkChange();
+        setHomeworkNotes('');
         if (!keepOpen) {
           if (activeSubView === 'hub') {
             onClose();
@@ -1389,7 +1472,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           user_id: student.id,
           song_id: songId,
           instrument: defaultInstrument,
-          progress_percent: 25,
+          progress_percent: 0,
           is_stage_ready: false
         })
         .select('*, songs(*)')
@@ -1530,7 +1613,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         user_id: student.id,
         song_id: song.id,
         instrument: defaultInstrument,
-        progress_percent: 25,
+        progress_percent: 0,
         is_stage_ready: false
       })
       .select('*, songs(*)')
@@ -2075,6 +2158,39 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             Ganzes Lehrwerk anzeigen
                           </button>
                         </div>
+                        {pages.length > 60 && (
+                          <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                            {Array.from({ length: Math.ceil(pages.length / 60) }).map((_, idx) => {
+                              const startPage = idx * 60 + 1;
+                              const endPage = Math.min((idx + 1) * 60, pages.length);
+                              const totalChunks = Math.ceil(pages.length / 60);
+                              const activeChunkIndex = Math.min(textbookPageChunkIndex, Math.max(0, totalChunks - 1));
+                              const isSelected = activeChunkIndex === idx;
+                              return (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  onClick={() => setPageChunk(idx)}
+                                  style={{
+                                    background: isSelected ? '#456355' : '#f1f5f9',
+                                    color: isSelected ? 'white' : '#475569',
+                                    border: 'none',
+                                    padding: '6px 12px',
+                                    borderRadius: '12px',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease',
+                                    boxShadow: isSelected ? '0 2px 6px rgba(69, 99, 85, 0.2)' : 'none'
+                                  }}
+                                  className="hover-scale"
+                                >
+                                  {startPage}-{endPage}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                         <div style={{
                           display: 'grid',
                           gridTemplateColumns: 'repeat(auto-fill, minmax(44px, 1fr))',
@@ -2083,85 +2199,90 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           overflowY: 'auto',
                           padding: '4px'
                         }}>
-                          {pages.map(num => {
-                            const pageState = assignedBook.pageStates[num] || { status: 'locked' };
-                            const globalPage = book.globalPageStates?.[num] === 'purple';
-                            const status = globalPage ? 'purple' : (pageState.status || 'locked');
+                          {(() => {
+                            const totalChunks = Math.ceil(pages.length / 60);
+                            const activeChunkIndex = Math.min(textbookPageChunkIndex, Math.max(0, totalChunks - 1));
+                            const displayedPages = pages.length > 60 ? pages.slice(activeChunkIndex * 60, (activeChunkIndex + 1) * 60) : pages;
+                            return displayedPages.map(num => {
+                              const pageState = assignedBook.pageStates[num] || { status: 'locked' };
+                              const globalPage = book.globalPageStates?.[num] === 'purple';
+                              const status = globalPage ? 'purple' : (pageState.status || 'locked');
 
-                            let borderColor = 'hsl(355, 70%, 73%)';
-                            let bg = 'hsl(355, 80%, 94%)';
-                            let textColor = 'hsl(355, 80%, 30%)';
+                              let borderColor = 'hsl(355, 70%, 73%)';
+                              let bg = 'hsl(355, 80%, 94%)';
+                              let textColor = 'hsl(355, 80%, 30%)';
 
-                            if (status === 'homework') {
-                              borderColor = 'hsl(47, 80%, 68%)';
-                              bg = 'hsl(47, 90%, 93%)';
-                              textColor = 'hsl(47, 85%, 28%)';
-                            } else if (status === 'mastered') {
-                              borderColor = 'hsl(130, 60%, 70%)';
-                              bg = 'hsl(130, 70%, 93%)';
-                              textColor = 'hsl(130, 70%, 25%)';
-                            } else if (status === 'purple') {
-                              borderColor = 'hsl(255, 65%, 73%)';
-                              bg = 'hsl(255, 80%, 94%)';
-                              textColor = 'hsl(255, 75%, 32%)';
-                            }
+                              if (status === 'homework') {
+                                borderColor = 'hsl(47, 80%, 68%)';
+                                bg = 'hsl(47, 90%, 93%)';
+                                textColor = 'hsl(47, 85%, 28%)';
+                              } else if (status === 'mastered') {
+                                borderColor = 'hsl(130, 60%, 70%)';
+                                bg = 'hsl(130, 70%, 93%)';
+                                textColor = 'hsl(130, 70%, 25%)';
+                              } else if (status === 'purple') {
+                                borderColor = 'hsl(255, 65%, 73%)';
+                                bg = 'hsl(255, 80%, 94%)';
+                                textColor = 'hsl(255, 75%, 32%)';
+                              }
 
-                            let solidActiveBg = 'hsl(355, 75%, 84%)';
-                            if (status === 'homework') solidActiveBg = 'hsl(47, 85%, 84%)';
-                            else if (status === 'mastered') solidActiveBg = 'hsl(130, 65%, 82%)';
-                            else if (status === 'purple') solidActiveBg = 'hsl(255, 75%, 84%)';
+                              let solidActiveBg = 'hsl(355, 75%, 84%)';
+                              if (status === 'homework') solidActiveBg = 'hsl(47, 85%, 84%)';
+                              else if (status === 'mastered') solidActiveBg = 'hsl(130, 65%, 82%)';
+                              else if (status === 'purple') solidActiveBg = 'hsl(255, 75%, 84%)';
 
-                            const isPageActive = activePageNumber === num;
+                              const isPageActive = activePageNumber === num;
 
-                            return (
-                              <button
-                                key={num}
-                                type="button"
-                                onClick={() => {
-                                  if (activeBrush === 'NONE') {
-                                    selectTextbookPage(activeLehrwerkId!, num);
-                                  } else {
-                                    let targetStatus: 'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED' = 'IN_PROGRESS';
-                                    let targetHomework = false;
+                              return (
+                                <button
+                                  key={num}
+                                  type="button"
+                                  onClick={() => {
+                                    if (activeBrush === 'NONE') {
+                                      selectTextbookPage(activeLehrwerkId!, num);
+                                    } else {
+                                      let targetStatus: 'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED' = 'IN_PROGRESS';
+                                      let targetHomework = false;
 
-                                    if (activeBrush === 'LOCKED') {
-                                      targetStatus = 'IN_PROGRESS';
-                                      targetHomework = false;
-                                    } else if (activeBrush === 'HOMEWORK') {
-                                      targetStatus = 'IN_PROGRESS';
-                                      targetHomework = true;
-                                    } else if (activeBrush === 'MASTERED') {
-                                      targetStatus = 'MASTERED';
-                                      targetHomework = false;
-                                    } else if (activeBrush === 'THEORY') {
-                                      targetStatus = 'THEORY_DONE';
-                                      targetHomework = false;
+                                      if (activeBrush === 'LOCKED') {
+                                        targetStatus = 'IN_PROGRESS';
+                                        targetHomework = false;
+                                      } else if (activeBrush === 'HOMEWORK') {
+                                        targetStatus = 'IN_PROGRESS';
+                                        targetHomework = true;
+                                      } else if (activeBrush === 'MASTERED') {
+                                        targetStatus = 'MASTERED';
+                                        targetHomework = false;
+                                      } else if (activeBrush === 'THEORY') {
+                                        targetStatus = 'THEORY_DONE';
+                                        targetHomework = false;
+                                      }
+
+                                      triggerDirectSave(activeLehrwerkId!, num, targetStatus, targetHomework);
                                     }
-
-                                    triggerDirectSave(activeLehrwerkId!, num, targetStatus, targetHomework);
-                                  }
-                                }}
-                                style={{
-                                  height: '44px',
-                                  borderRadius: '50%',
-                                  border: `2px solid ${isPageActive ? solidActiveBg : borderColor}`,
-                                  background: isPageActive ? solidActiveBg : bg,
-                                  color: isPageActive ? 'white' : textColor,
-                                  fontWeight: 900,
-                                  fontSize: '0.88rem',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  boxShadow: isPageActive ? '0 4px 8px rgba(0,0,0,0.1)' : 'none',
-                                  transform: isPageActive ? 'scale(1.08)' : 'none',
-                                  transition: 'all 0.15s ease'
-                                }}
-                              >
-                                {num}
-                              </button>
-                            );
-                          })}
+                                  }}
+                                  style={{
+                                    height: '44px',
+                                    borderRadius: '50%',
+                                    border: `2px solid ${isPageActive ? solidActiveBg : borderColor}`,
+                                    background: isPageActive ? solidActiveBg : bg,
+                                    color: isPageActive ? 'white' : textColor,
+                                    fontWeight: 900,
+                                    fontSize: '0.88rem',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: isPageActive ? '0 4px 8px rgba(0,0,0,0.1)' : 'none',
+                                    transform: isPageActive ? 'scale(1.08)' : 'none',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                >
+                                  {num}
+                                </button>
+                              );
+                            });
+                          })()}
                         </div>
                       </div>
                     )}
@@ -2262,7 +2383,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           {progress}%
                         </span>
                         <div style={{ width: '100%', height: '7px', background: '#e8e8ed', borderRadius: '3.5px', marginTop: '6px', overflow: 'hidden' }}>
-                          <div style={{ width: `${progress}%`, height: '100%', background: (status === 'MASTERED' || skill.is_stage_ready) ? '#10b981' : '#000', transition: 'width 0.4s ease' }} />
+                          <div style={{ width: `${progress}%`, height: '100%', background: (status === 'MASTERED' || skill.is_stage_ready || progress === 100) ? 'hsl(130, 65%, 82%)' : 'hsl(47, 85%, 84%)', transition: 'width 0.4s ease' }} />
                         </div>
                       </div>
                     </div>
@@ -2444,11 +2565,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           }}
                           style={{
                             flex: 1,
-                            accentColor: songProgressPercent === 100 ? '#10b981' : '#000000',
+                            accentColor: songProgressPercent === 100 ? 'hsl(130, 65%, 82%)' : 'hsl(47, 85%, 84%)',
                             height: '9px',
                             borderRadius: '4.5px',
                             cursor: 'pointer',
-                            background: `linear-gradient(to right, ${songProgressPercent === 100 ? '#10b981' : '#000000'} 0%, ${songProgressPercent === 100 ? '#10b981' : '#000000'} ${songProgressPercent}%, #e8e8ed ${songProgressPercent}%, #e8e8ed 100%)`,
+                            background: `linear-gradient(to right, ${songProgressPercent === 100 ? 'hsl(130, 65%, 82%)' : 'hsl(47, 85%, 84%)'} 0%, ${songProgressPercent === 100 ? 'hsl(130, 65%, 82%)' : 'hsl(47, 85%, 84%)'} ${songProgressPercent}%, #e8e8ed ${songProgressPercent}%, #e8e8ed 100%)`,
                             WebkitAppearance: 'none',
                             outline: 'none',
                             transition: 'all 0.3s ease'
@@ -2469,9 +2590,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           animation: 'fadeIn 0.2s ease'
                         }}>
                           {songProgressPercent < 100 && [
-                            { label: 'Rhythmus & Timing', value: rhythmVal, type: 'rhythm', color: '#ef4444' },
-                            { label: 'Finger & Technik', value: fingerVal, type: 'finger', color: '#eab308' },
-                            { label: 'Ausdruck & Performance', value: expressionVal, type: 'expression', color: '#10b981' }
+                            { label: 'Rhythmus & Timing', value: rhythmVal, type: 'rhythm', color: '#000000' },
+                            { label: 'Finger & Technik', value: fingerVal, type: 'finger', color: '#000000' },
+                            { label: 'Ausdruck & Performance', value: expressionVal, type: 'expression', color: '#000000' }
                           ].map(sub => (
                             <div key={sub.type} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', fontWeight: 800, color: '#4b5563' }}>
@@ -2920,7 +3041,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 <div style={{
                                   width: `${progress}%`,
                                   height: '100%',
-                                  background: skill.is_stage_ready ? '#10b981' : '#000',
+                                  background: (skill.is_stage_ready || progress === 100) ? 'hsl(130, 65%, 82%)' : 'hsl(47, 85%, 84%)',
                                   transition: 'width 0.3s ease'
                                 }} />
                               </div>
@@ -4205,7 +4326,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   groupedLehrwerke[bookTitle].pages.push(pageNum);
                                 }
                               } else {
-                                otherHWs.push(item);
+                                const cleanTopic = item.topic_name.replace(/\s*\([^)]*\)\s*$/, '');
+                                if (!otherHWs.some(existing => existing.topic_name.replace(/\s*\([^)]*\)\s*$/, '') === cleanTopic)) {
+                                  otherHWs.push(item);
+                                }
                               }
                             });
                             
@@ -4360,9 +4484,31 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                             }
                                             
                                             return (
-                                              <div key={`p-note-${p}`} style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', fontSize: '0.74rem', color: '#475569', lineHeight: '1.4' }}>
-                                                <span style={{ fontWeight: 800, color: '#b45309', flexShrink: 0 }}>S. {p}:</span>
-                                                <span style={{ fontWeight: 650, color: '#1e293b' }}>{noteText}</span>
+                                              <div key={`p-note-${p}`} style={{ display: 'flex', gap: '6px', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem', color: '#475569', lineHeight: '1.4' }}>
+                                                <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', flex: 1 }}>
+                                                  <span style={{ fontWeight: 800, color: '#b45309', flexShrink: 0 }}>S. {p}:</span>
+                                                  <span style={{ fontWeight: 650, color: '#1e293b' }}>{noteText}</span>
+                                                </div>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleDeletePageNote(item.title, p)}
+                                                  style={{
+                                                    border: 'none',
+                                                    background: 'none',
+                                                    color: '#ef4444',
+                                                    cursor: 'pointer',
+                                                    fontSize: '0.7rem',
+                                                    fontWeight: 800,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    padding: '2px',
+                                                    marginLeft: '6px',
+                                                    flexShrink: 0
+                                                  }}
+                                                >
+                                                  ✕
+                                                </button>
                                               </div>
                                             );
                                           })}
@@ -4392,7 +4538,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                           border: '1px solid rgba(251, 191, 36, 0.3)',
                                           boxShadow: '0 3px 8px rgba(0,0,0,0.03), 0 0 12px rgba(251, 191, 36, 0.32)'
                                         }}>
-                                          <span>🎵 {item.topic_name}</span>
+                                          <span>🎵 {item.topic_name.replace(/\s*\([^)]*\)\s*$/, '')}</span>
                                           {!(item.updated_at && getISOWeek(item.updated_at) !== getISOWeek()) && (
                                             <button
                                               type="button"
@@ -4414,6 +4560,55 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                               ✕
                                             </button>
                                           )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {homeworkNotesList.length > 0 && (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid rgba(251, 191, 36, 0.2)', paddingTop: '8px', marginTop: '4px' }}>
+                                    <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                      Bemerkungen & Hinweise
+                                    </span>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                      {homeworkNotesList.map((note, idx) => (
+                                        <div key={idx} style={{
+                                          display: 'flex',
+                                          alignItems: 'flex-start',
+                                          justifyContent: 'space-between',
+                                          background: '#ffffff',
+                                          border: '1px solid rgba(251, 191, 36, 0.15)',
+                                          padding: '8px 12px',
+                                          borderRadius: '12px',
+                                          fontSize: '0.76rem',
+                                          fontWeight: 650,
+                                          color: '#1e293b',
+                                          lineHeight: '1.4',
+                                          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
+                                        }}>
+                                          <div style={{ flex: 1, paddingRight: '8px' }}>
+                                            {note}
+                                          </div>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDeleteNote(idx)}
+                                            style={{
+                                              border: 'none',
+                                              background: 'none',
+                                              color: '#ef4444',
+                                              cursor: 'pointer',
+                                              fontSize: '0.74rem',
+                                              fontWeight: 800,
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              padding: '2px',
+                                              alignSelf: 'flex-start'
+                                            }}
+                                          >
+                                            ✕
+                                          </button>
                                         </div>
                                       ))}
                                     </div>
@@ -4470,7 +4665,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           </div>
 
                           <button
-                            type="submit"
+                            type="button"
+                            onClick={handleAddNote}
                             disabled={saving}
                             style={{
                               background: '#456355',
