@@ -3747,7 +3747,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       transition: 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                       transform: 'rotate(3deg)',
                       flexShrink: 0,
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      position: 'relative'
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.transform = 'translateY(-4px) rotate(4.5deg) scale(1.06)';
@@ -3756,6 +3757,45 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       e.currentTarget.style.transform = 'rotate(3deg)';
                     }}
                   >
+                    {/* 3D Pushpin positioned on top of the paper */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '-10px',
+                      left: '50%',
+                      transform: 'translateX(-50%) rotate(-8deg)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      zIndex: 10,
+                      pointerEvents: 'none'
+                    }}>
+                      <div style={{
+                        width: '14px',
+                        height: '14px',
+                        borderRadius: '50%',
+                        background: 'radial-gradient(circle at 4px 4px, #f87171 0%, #dc2626 60%, #991b1b 100%)',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.25), inset 0 -1px 3px rgba(0,0,0,0.4)',
+                        position: 'relative'
+                      }}>
+                        <div style={{
+                          position: 'absolute',
+                          top: '2.5px',
+                          left: '2.5px',
+                          width: '4.5px',
+                          height: '4.5px',
+                          borderRadius: '50%',
+                          background: 'rgba(255,255,255,0.75)'
+                        }} />
+                      </div>
+                      <div style={{
+                        width: '2px',
+                        height: '10px',
+                        background: 'linear-gradient(90deg, #cbd5e1 0%, #64748b 100%)',
+                        marginTop: '-1px',
+                        boxShadow: '1px 1px 2px rgba(0,0,0,0.15)'
+                      }} />
+                    </div>
+
                     <button
                       type="button"
                       onClick={() => {
@@ -3773,7 +3813,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         background: 'repeating-linear-gradient(45deg, rgba(0,0,0,0.005) 0px, rgba(0,0,0,0.005) 1px, transparent 1px, transparent 4px), linear-gradient(135deg, #fffdf2 0%, #fefcbf 70%, #fef08a 100%)',
                         border: 'none',
                         clipPath: 'polygon(2% 2%, 23% 1%, 43% 3%, 63% 1%, 83% 2%, 98% 1%, 99% 19%, 97% 38%, 99% 58%, 98% 78%, 99% 98%, 79% 97%, 59% 99%, 39% 97%, 19% 98%, 2% 99%, 1% 79%, 3% 59%, 1% 39%, 2% 19%)',
-                        padding: '18px 14px 12px 14px',
+                        padding: '22px 14px 12px 14px', // Increased top padding to clear the pin base
                         cursor: 'pointer',
                         display: 'flex',
                         flexDirection: 'column',
@@ -3782,49 +3822,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         gap: '2px',
                         fontFamily: '"Helvetica Neue", Helvetica, Inter, Arial, sans-serif',
                         flexShrink: 0,
-                        position: 'relative',
                         minWidth: '98px',
                         minHeight: '78px'
                       }}
                     >
-                      {/* 3D Pushpin on top */}
-                      <div style={{
-                        position: 'absolute',
-                        top: '-10px',
-                        left: '50%',
-                        transform: 'translateX(-50%) rotate(-8deg)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        zIndex: 10,
-                        pointerEvents: 'none'
-                      }}>
-                        <div style={{
-                          width: '12px',
-                          height: '12px',
-                          borderRadius: '50%',
-                          background: 'radial-gradient(circle at 4px 4px, #f87171 0%, #dc2626 60%, #991b1b 100%)',
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.25), inset 0 -1px 3px rgba(0,0,0,0.4)',
-                          position: 'relative'
-                        }}>
-                          <div style={{
-                            position: 'absolute',
-                            top: '2px',
-                            left: '2px',
-                            width: '4px',
-                            height: '4px',
-                            borderRadius: '50%',
-                            background: 'rgba(255,255,255,0.7)'
-                          }} />
-                        </div>
-                        <div style={{
-                          width: '2px',
-                          height: '8px',
-                          background: 'linear-gradient(90deg, #cbd5e1 0%, #64748b 100%)',
-                          marginTop: '-1px'
-                        }} />
-                      </div>
-
                       <span style={{ 
                         fontSize: '0.66rem', 
                         fontWeight: 800, 
