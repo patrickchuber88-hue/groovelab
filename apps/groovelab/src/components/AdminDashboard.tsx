@@ -223,6 +223,64 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [songLessonNotesList, setSongLessonNotesList] = useState<string[]>([]);
   const [songStatus, setSongStatus] = useState<'unbearbeitet' | 'in_progress' | 'mastered'>('unbearbeitet');
   const [showSongProgressDetails, setShowSongProgressDetails] = useState<boolean>(true);
+
+  // Textbausteine states
+  const [textbausteine, setTextbausteine] = useState<any[]>(() => {
+    const stored = localStorage.getItem('groovelab_textbausteine');
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch (e) {
+        console.error("Error parsing textbausteine:", e);
+      }
+    }
+    return [
+      { id: '1', label: '🐌 Schnecken-Tempo', text: 'Spiele die schwierige Passage ganz langsam wie eine Schnecke. Erst wenn deine Finger den Weg im Schlaf kennen, schalten wir den Turbo an!', type: 'both', active: true },
+      { id: '2', label: '🔂 Ritter-Dreierspiel', text: 'Wiederhole den kniffligen Übergang dreimal hintereinander fehlerfrei. Schaffst du das, hast du die Stelle gemeistert!', type: 'both', active: true },
+      { id: '3', label: '🎵 Laut-Leise Zauber', text: 'Lass das Stück lebendig klingen! Mache deutliche Unterschiede zwischen Flüsterlautstärke (piano) und Löwenbrüllen (forte).', type: 'both', active: true },
+      { id: '4', label: '⏱️ 10-Min.-Champion', text: 'Stelle dir einen Timer auf 10 Minuten. Übe diese Woche jeden Tag kurz und fokussiert, anstatt einmal ganz lang am Wochenende.', type: 'both', active: true },
+      { id: '5', label: '🌟 Eigener Remix', text: 'Du beherrschst die Noten super! Überlege dir bis zum nächsten Mal eine eigene coole Rhythmus-Variante für diesen Teil.', type: 'songs', active: true },
+      { id: '6', label: '🕵️‍♂️ Noten-Detektiv', text: 'Lies die Noten laut mit und achte genau auf die Tonlängen. Sei wie ein Detektiv, dem keine Note entwischt!', type: 'lehrwerke', active: true },
+      { id: '7', label: '👁️ Blind-Flug', text: 'Schließe beim Spielen mal die Augen. Fühle die Tasten/Saiten und spiele die Stelle ganz blind auswendig!', type: 'both', active: true },
+      { id: '8', label: '🥁 Puls-Master', text: 'Klatsche zuerst den Rhythmus und zähle laut mit, bevor du dein Instrument spielst. Der Rhythmus ist das Herz der Musik!', type: 'both', active: true },
+      { id: '9', label: '🧩 Puzzle-Taktik', text: 'Übe nicht das ganze Stück auf einmal. Nimm dir einen einzelnen Takt vor und setze ihn als perfektes Puzzleteil zusammen!', type: 'both', active: true }
+    ];
+  });
+
+  const [editingTextbaustein, setEditingTextbaustein] = useState<any | null>(null);
+  const [tbLabel, setTbLabel] = useState('');
+  const [tbText, setTbText] = useState('');
+  const [tbType, setTbType] = useState<'songs' | 'lehrwerke' | 'both'>('both');
+
+  useEffect(() => {
+    localStorage.setItem('groovelab_textbausteine', JSON.stringify(textbausteine));
+  }, [textbausteine]);
+
+  const handleSaveTextbaustein = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tbLabel.trim() || !tbText.trim()) return;
+
+    if (editingTextbaustein) {
+      setTextbausteine(prev => prev.map(tb => tb.id === editingTextbaustein.id ? { ...tb, label: tbLabel.trim(), text: tbText.trim(), type: tbType } : tb));
+      setEditingTextbaustein(null);
+    } else {
+      const newTb = {
+        id: String(Date.now()),
+        label: tbLabel.trim(),
+        text: tbText.trim(),
+        type: tbType,
+        active: true
+      };
+      setTextbausteine(prev => [...prev, newTb]);
+    }
+    setTbLabel('');
+    setTbText('');
+    setTbType('both');
+  };
+
+  const handleToggleTextbausteinActive = (id: string) => {
+    setTextbausteine(prev => prev.map(tb => tb.id === id ? { ...tb, active: !tb.active } : tb));
+  };
   
   const getISOWeekNum = (dateInput?: string | Date, lessonDay: number = 1): string => {
     let date: Date;
@@ -673,11 +731,25 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
   const getLehrwerkColor = (title: string) => {
     const trimmed = (title || '').trim();
-    let hash = 0;
-    for (let i = 0; i < trimmed.length; i++) {
-      hash = trimmed.charCodeAt(i) + ((hash << 5) - hash);
+    const sorted = [...lehrwerke].sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+    const index = sorted.findIndex(b => (b.title || '').trim() === trimmed);
+    
+    if (index !== -1 && sorted.length > 0) {
+      const position = index % 26;
+      const hue = Math.round((position / 25) * 360);
+      return {
+        from: `hsl(${hue}, 85%, 94%)`,
+        to: `hsl(${hue}, 80%, 84%)`,
+        text: `hsl(${hue}, 90%, 25%)`,
+        shadowFrom: `hsla(${hue}, 85%, 50%, 0.2)`,
+        shadowTo: `hsla(${hue}, 80%, 40%, 0.15)`
+      };
     }
-    const hue = Math.abs(hash) % 360;
+
+    const firstChar = trimmed.charAt(0).toUpperCase();
+    const charCode = firstChar.charCodeAt(0) || 65;
+    const clampedCode = Math.max(65, Math.min(90, charCode));
+    const hue = Math.round(((clampedCode - 65) / 25) * 360);
     return {
       from: `hsl(${hue}, 85%, 94%)`,
       to: `hsl(${hue}, 80%, 84%)`,
@@ -4816,19 +4888,23 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     };
 
     return (
-      <div 
-        className="glass-panel" 
-        style={{ 
-          background: 'white', 
-          borderRadius: '20px', 
-          border: '1px solid rgba(0, 0, 0, 0.05)', 
-          padding: '24px 30px', 
-          boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: '24px' 
-        }}
-      >
+      <div style={{ display: 'flex', gap: '24px', alignItems: 'stretch', width: '100%', flexWrap: 'wrap' }}>
+        {/* Left Side: Main Mediathek Area */}
+        <div 
+          className="glass-panel" 
+          style={{ 
+            flex: '1 1 65%',
+            minWidth: '480px',
+            background: 'white', 
+            borderRadius: '20px', 
+            border: '1px solid rgba(0, 0, 0, 0.05)', 
+            padding: '24px 30px', 
+            boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '24px' 
+          }}
+        >
         {/* Header Area */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
@@ -5325,8 +5401,222 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           </div>
         </div>
       </div>
-    );
-  };
+
+      {/* Right Side: Textbausteine Sidebar */}
+      <div 
+        className="glass-panel" 
+        style={{ 
+          flex: '1 1 30%',
+          minWidth: '320px',
+          background: 'white', 
+          borderRadius: '20px', 
+          border: '1px solid rgba(0, 0, 0, 0.05)', 
+          padding: '24px 20px', 
+          boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '20px',
+          alignSelf: 'stretch'
+        }}
+      >
+        {/* Title */}
+        <div>
+          <h2 style={{ fontSize: '1.4rem', color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontWeight: 900 }}>
+            <span style={{ background: `${brandColor}15`, color: brandColor, padding: '5px 8px', borderRadius: '8px', display: 'flex', alignItems: 'center', fontSize: '1.1rem' }}>⚡</span>
+            <span>Textbausteine</span>
+          </h2>
+          <p style={{ color: '#64748b', fontSize: '0.78rem', margin: '4px 0 0 0', fontWeight: 600 }}>
+            Verwalte deine Unterrichts-Notizen.
+          </p>
+        </div>
+
+        {/* Add / Edit Form */}
+        <form onSubmit={handleSaveTextbaustein} style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: '#f8fafc', padding: '16px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
+          <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
+            {editingTextbaustein ? '✏️ Textbaustein bearbeiten' : '➕ Neuer Textbaustein'}
+          </h4>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b' }}>Label / Emoji</label>
+            <input 
+              required 
+              placeholder="z.B. 🐌 Schnecken-Tempo" 
+              value={tbLabel} 
+              onChange={e => setTbLabel(e.target.value)} 
+              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, outline: 'none' }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b' }}>Inhalt des Textbausteins</label>
+            <textarea 
+              required 
+              placeholder="Text der eingefügt wird..." 
+              value={tbText} 
+              onChange={e => setTbText(e.target.value)} 
+              rows={3} 
+              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 650, outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b' }}>Bereich zuordnen</label>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              {(['both', 'songs', 'lehrwerke'] as const).map(type => {
+                const labelMap = { both: 'Beide', songs: 'Songs', lehrwerke: 'Lehrwerke' };
+                const isSelected = tbType === type;
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setTbType(type)}
+                    style={{
+                      flex: 1,
+                      padding: '6px 4px',
+                      borderRadius: '8px',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      border: isSelected ? `1.5px solid ${brandColor}` : '1.5px solid #e2e8f0',
+                      background: isSelected ? `${brandColor}10` : 'white',
+                      color: isSelected ? brandColor : '#475569',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    {labelMap[type]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+            <button 
+              type="submit" 
+              style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer' }}
+            >
+              Speichern
+            </button>
+            {editingTextbaustein && (
+              <button 
+                type="button" 
+                onClick={() => {
+                  setEditingTextbaustein(null);
+                  setTbLabel('');
+                  setTbText('');
+                  setTbType('both');
+                }} 
+                style={{ flex: 1, background: '#e2e8f0', color: '#475569', border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer' }}
+              >
+                Abbrechen
+              </button>
+            )}
+          </div>
+        </form>
+
+        {/* Existing templates header & list */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, minHeight: 0 }}>
+          <h4 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 800, color: '#475569', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>Bestehende Bausteine</span>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', background: '#f1f5f9', padding: '2px 6px', borderRadius: '9999px' }}>
+              {textbausteine.length}
+            </span>
+          </h4>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', flex: 1, paddingRight: '4px', maxHeight: '420px' }}>
+            {textbausteine.map((tb: any) => {
+              const badgeStyle = 
+                tb.type === 'songs' 
+                  ? { bg: '#fff7ed', text: '#c2410c', border: '#ffedd5', label: 'Songs' }
+                  : tb.type === 'lehrwerke'
+                    ? { bg: '#f5f3ff', text: '#6d28d9', border: '#ede9fe', label: 'Lehrwerke' }
+                    : { bg: '#eff6ff', text: '#1d4ed8', border: '#dbeafe', label: 'Beide' };
+
+              return (
+                <div 
+                  key={tb.id} 
+                  style={{ 
+                    border: '1px solid #e2e8f0', 
+                    borderRadius: '12px', 
+                    padding: '12px', 
+                    background: 'white',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    opacity: tb.active ? 1 : 0.65,
+                    transition: 'opacity 0.2s',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
+                      {tb.label}
+                    </span>
+                    <span style={{ fontSize: '0.62rem', fontWeight: 800, background: badgeStyle.bg, color: badgeStyle.text, border: `1px solid ${badgeStyle.border}`, padding: '2px 6px', borderRadius: '6px', whiteSpace: 'nowrap' }}>
+                      {badgeStyle.label}
+                    </span>
+                  </div>
+
+                  <p style={{ margin: 0, fontSize: '0.78rem', color: '#4b5563', lineHeight: '1.35', fontWeight: 650, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'break-word' }}>
+                    {tb.text}
+                  </p>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', borderTop: '1px dashed #f1f5f9', paddingTop: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleTextbausteinActive(tb.id)}
+                      style={{
+                        background: tb.active ? '#f0fdf4' : '#f1f5f9',
+                        color: tb.active ? '#16a34a' : '#64748b',
+                        border: tb.active ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                        padding: '4px 8px',
+                        borderRadius: '9999px',
+                        fontSize: '0.68rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      {tb.active ? '🟢 Aktiv' : '⚪ Inaktiv'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingTextbaustein(tb);
+                        setTbLabel(tb.label);
+                        setTbText(tb.text);
+                        setTbType(tb.type);
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#64748b',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '6px',
+                        transition: 'background 0.15s'
+                      }}
+                      className="hover-bg"
+                    >
+                      <Pencil size={13} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
   const renderStatsTab = () => {
     if (!stats) return (
@@ -7347,17 +7637,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                 ⚡ Schnell-Textbausteine
                               </span>
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                {[
-                                  { label: '🐌 Schnecken-Tempo', text: 'Spiele die schwierige Passage ganz langsam wie eine Schnecke. Erst wenn deine Finger den Weg im Schlaf kennen, schalten wir den Turbo an!' },
-                                  { label: '🔂 Ritter-Dreierspiel', text: 'Wiederhole den kniffligen Übergang dreimal hintereinander fehlerfrei. Schaffst du das, hast du die Stelle gemeistert!' },
-                                  { label: '🎵 Laut-Leise Zauber', text: 'Lass das Stück lebendig klingen! Mache deutliche Unterschiede zwischen Flüsterlautstärke (piano) und Löwenbrüllen (forte).' },
-                                  { label: '⏱️ 10-Min.-Champion', text: 'Stelle dir einen Timer auf 10 Minuten. Übe diese Woche jeden Tag kurz und fokussiert, anstatt einmal ganz lang am Wochenende.' },
-                                  { label: '🌟 Eigener Remix', text: 'Du beherrschst die Noten super! Überlege dir bis zum nächsten Mal eine eigene coole Rhythmus-Variante für diesen Teil.' },
-                                  { label: '🕵️‍♂️ Noten-Detektiv', text: 'Lies die Noten laut mit und achte genau auf die Tonlängen. Sei wie ein Detektiv, dem keine Note entwischt!' },
-                                  { label: '👁️ Blind-Flug', text: 'Schließe beim Spielen mal die Augen. Fühle die Tasten/Saiten und spiele die Stelle ganz blind auswendig!' },
-                                  { label: '🥁 Puls-Master', text: 'Klatsche zuerst den Rhythmus und zähle laut mit, bevor du dein Instrument spielst. Der Rhythmus ist das Herz der Musik!' },
-                                  { label: '🧩 Puzzle-Taktik', text: 'Übe nicht das ganze Stück auf einmal. Nimm dir einen einzelnen Takt vor und setze ihn als perfektes Puzzleteil zusammen!' }
-                                ].map((tpl, i) => (
+                                {textbausteine
+                                  .filter((tb: any) => tb.active && (tb.type === 'both' || tb.type === 'lehrwerke'))
+                                  .map((tpl, i) => (
                                   <button
                                     key={i}
                                     type="button"
@@ -8313,12 +8595,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                           <div style={{ marginTop: '4px' }}>
                             <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '6px', textTransform: 'uppercase' }}>⚡ Schnell-Textbausteine</span>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                              {[
-                                { label: '🐌 Schnecken-Tempo', text: 'Spiele die schwierige Passage ganz langsam wie eine Schnecke. Erst wenn deine Finger den Weg im Schlaf kennen, schalten wir den Turbo an!' },
-                                { label: '🔂 Ritter-Dreierspiel', text: 'Wiederhole den kniffligen Übergang dreimal hintereinander fehlerfrei. Schaffst du das, hast du die Stelle gemeistert!' },
-                                { label: '🥁 Puls-Master', text: 'Klatsche zuerst den Rhythmus und zähle laut mit, bevor du dein Instrument spielst. Der Rhythmus ist das Herz der Musik!' },
-                                { label: '🧩 Puzzle-Taktik', text: 'Übe nicht den ganzen Song auf einmal. Nimm dir einen einzelnen Takt vor und setze ihn als perfektes Puzzleteil zusammen!' }
-                              ].map((tpl, i) => (
+                                {textbausteine
+                                  .filter((tb: any) => tb.active && (tb.type === 'both' || tb.type === 'songs'))
+                                  .map((tpl, i) => (
                                 <button
                                   key={i}
                                   type="button"

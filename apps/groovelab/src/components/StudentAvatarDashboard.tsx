@@ -130,13 +130,28 @@ const getISOWeek = (dateInput?: string | Date): string => {
   return getISOWeekRaw(dateInput, 1);
 };
 
-const getLehrwerkColor = (title: string) => {
+const getLehrwerkColor = (title: string, customLehrwerkeList?: any[]) => {
   const trimmed = (title || '').trim();
-  let hash = 0;
-  for (let i = 0; i < trimmed.length; i++) {
-    hash = trimmed.charCodeAt(i) + ((hash << 5) - hash);
+  const list = customLehrwerkeList || [];
+  const sorted = [...list].sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+  const index = sorted.findIndex(b => (b.title || '').trim() === trimmed);
+  
+  if (index !== -1 && sorted.length > 0) {
+    const position = index % 26;
+    const hue = Math.round((position / 25) * 360);
+    return {
+      from: `hsl(${hue}, 85%, 94%)`,
+      to: `hsl(${hue}, 80%, 84%)`,
+      text: `hsl(${hue}, 90%, 25%)`,
+      shadowFrom: `hsla(${hue}, 85%, 50%, 0.2)`,
+      shadowTo: `hsla(${hue}, 80%, 40%, 0.15)`
+    };
   }
-  const hue = Math.abs(hash) % 360;
+
+  const firstChar = trimmed.charAt(0).toUpperCase();
+  const charCode = firstChar.charCodeAt(0) || 65;
+  const clampedCode = Math.max(65, Math.min(90, charCode));
+  const hue = Math.round(((clampedCode - 65) / 25) * 360);
   return {
     from: `hsl(${hue}, 85%, 94%)`,
     to: `hsl(${hue}, 80%, 84%)`,
@@ -2781,7 +2796,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       return (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
                           {allStudentBooks.map(book => {
-                            const gradient = getLehrwerkColor(book.title);
+                            const gradient = getLehrwerkColor(book.title, lehrwerke);
                             const assignment = localProgress.find((p: any) => p.studentId === studentId && p.lehrwerkId === book.id);
                             
                             let masteredCount = 0;
@@ -4806,7 +4821,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       {/* Notebook Lehrwerk Detail Modal */}
       {selectedLehrwerkForDetail && (() => {
         const book = selectedLehrwerkForDetail;
-        const gradient = getLehrwerkColor(book.title);
+        const gradient = getLehrwerkColor(book.title, lehrwerke);
         
         // Find pages/chapters of this book and their status from localProgress and progressItems
         const pagesMap: Record<number, { status: string, notes: string, id?: string }> = {};

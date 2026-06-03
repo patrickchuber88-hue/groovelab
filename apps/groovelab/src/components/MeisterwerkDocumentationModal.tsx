@@ -174,11 +174,25 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   const getLehrwerkColor = (title: string) => {
     const trimmed = (title || '').trim();
-    let hash = 0;
-    for (let i = 0; i < trimmed.length; i++) {
-      hash = trimmed.charCodeAt(i) + ((hash << 5) - hash);
+    const sorted = [...globalLehrwerke].sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+    const index = sorted.findIndex(b => (b.title || '').trim() === trimmed);
+    
+    if (index !== -1 && sorted.length > 0) {
+      const position = index % 26;
+      const hue = Math.round((position / 25) * 360);
+      return {
+        from: `hsl(${hue}, 85%, 94%)`,
+        to: `hsl(${hue}, 80%, 84%)`,
+        text: `hsl(${hue}, 90%, 25%)`,
+        shadowFrom: `hsla(${hue}, 85%, 50%, 0.2)`,
+        shadowTo: `hsla(${hue}, 80%, 40%, 0.15)`
+      };
     }
-    const hue = Math.abs(hash) % 360;
+
+    const firstChar = trimmed.charAt(0).toUpperCase();
+    const charCode = firstChar.charCodeAt(0) || 65;
+    const clampedCode = Math.max(65, Math.min(90, charCode));
+    const hue = Math.round(((clampedCode - 65) / 25) * 360);
     return {
       from: `hsl(${hue}, 85%, 94%)`,
       to: `hsl(${hue}, 80%, 84%)`,
