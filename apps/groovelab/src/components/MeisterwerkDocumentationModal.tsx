@@ -2208,9 +2208,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         <div style={{
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '12px',
+                          gap: '26px',
                           borderTop: '1px solid rgba(0, 0, 0, 0.06)',
-                          paddingTop: '12px',
+                          paddingTop: '20px',
+                          marginTop: '8px',
                           animation: 'fadeIn 0.2s ease'
                         }}>
                           {[
@@ -2218,7 +2219,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             { label: 'Finger', value: fingerVal, type: 'finger', color: '#eab308' },
                             { label: 'Ausdruck', value: expressionVal, type: 'expression', color: '#10b981' }
                           ].map(sub => (
-                            <div key={sub.type} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <div key={sub.type} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', fontWeight: 800, color: '#4b5563' }}>
                                 <span>{sub.label}</span>
                                 <span>{sub.value}%</span>
@@ -2260,7 +2261,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   cursor: 'pointer',
                                   background: `linear-gradient(to right, ${sub.color} 0%, ${sub.color} ${sub.value}%, #e8e8ed ${sub.value}%, #e8e8ed 100%)`,
                                   WebkitAppearance: 'none',
-                                  outline: 'none'
+                                  outline: 'none',
+                                  padding: '8px 0' // increases the tap/touch target area size vertical padding
                                 }}
                               />
                             </div>
