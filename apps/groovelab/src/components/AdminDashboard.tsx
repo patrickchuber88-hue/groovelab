@@ -5417,9 +5417,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       <div 
         className="glass-panel" 
         style={{ 
-          flex: '0 0 240px',
-          width: '240px',
-          minWidth: '220px',
+          flex: '0 0 260px',
+          width: '260px',
+          minWidth: '240px',
           background: 'white', 
           borderRadius: '20px', 
           border: '1px solid rgba(0, 0, 0, 0.05)', 
@@ -5477,41 +5477,62 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             </span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', flex: 1, maxHeight: '580px', paddingRight: '2px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '8px', overflowY: 'auto', flex: 1, maxHeight: '580px', paddingRight: '2px' }}>
             {textbausteine.map((tb: any) => {
-              const badgeStyle = 
-                tb.type === 'songs' 
-                  ? { bg: '#fff7ed', text: '#c2410c', label: 'S' }
-                  : tb.type === 'lehrwerke'
-                    ? { bg: '#f5f3ff', text: '#6d28d9', label: 'L' }
-                    : { bg: '#eff6ff', text: '#1d4ed8', label: 'B' };
+              const parts = tb.label.split(' ');
+              const hasEmoji = parts[0] && /\p{Emoji}/u.test(parts[0]);
+              const emoji = hasEmoji ? parts[0] : '🎵';
+              const name = hasEmoji ? parts.slice(1).join(' ') : tb.label;
 
               return (
                 <div 
                   key={tb.id} 
                   style={{ 
                     border: '1px solid #e2e8f0', 
-                    borderRadius: '10px', 
-                    padding: '10px', 
+                    borderRadius: '12px', 
+                    padding: '10px 8px', 
                     background: 'white',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '4px',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    textAlign: 'center',
+                    gap: '6px',
                     opacity: tb.active ? 1 : 0.55,
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.01)'
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.01)',
+                    minHeight: '110px'
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
-                      {tb.active ? '🟢 ' : '⚪ '}{tb.label}
-                    </span>
-                    <span style={{ fontSize: '0.6rem', fontWeight: 900, background: badgeStyle.bg, color: badgeStyle.text, padding: '1px 4px', borderRadius: '4px', transform: 'scale(0.95)' }} title={tb.type === 'both' ? 'Beide' : tb.type === 'songs' ? 'Songs' : 'Lehrwerke'}>
-                      {badgeStyle.label}
-                    </span>
-                  </div>
-                  <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', lineHeight: '1.3', fontWeight: 600, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                    {tb.text}
-                  </p>
+                  <span style={{ fontSize: '1.4rem', marginTop: '2px' }}>
+                    {emoji}
+                  </span>
+                  
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e293b', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.2', height: '2.4em', wordBreak: 'break-word' }}>
+                    {name}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => handleToggleTextbausteinActive(tb.id)}
+                    style={{
+                      background: tb.active ? '#f0fdf4' : '#f1f5f9',
+                      color: tb.active ? '#16a34a' : '#64748b',
+                      border: tb.active ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                      padding: '3px 8px',
+                      borderRadius: '9999px',
+                      fontSize: '0.62rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '3px',
+                      width: '100%',
+                      justifyContent: 'center',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    <span>{tb.active ? '🟢 Aktiv' : '⚪ Inakt.'}</span>
+                  </button>
                 </div>
               );
             })}
