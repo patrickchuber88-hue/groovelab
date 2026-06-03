@@ -163,6 +163,34 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [selectedHistoryWeek, setSelectedHistoryWeek] = useState<string | null>(null);
   const [songProgressPercent, setSongProgressPercent] = useState<number>(25);
 
+  const [textbausteine] = useState<any[]>(() => {
+    const stored = localStorage.getItem('groovelab_textbausteine');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed.length > 0 && parsed.some((x: any) => x.category)) {
+          return parsed;
+        }
+      } catch (e) {
+        console.error("Error parsing textbausteine:", e);
+      }
+    }
+    return [
+      { id: 'r1', label: '🥁 Puls-Master', text: 'Klatsche zuerst den Rhythmus und zähle laut mit, bevor du auf dem Instrument startest. Der Rhythmus ist das Herz der Musik!', type: 'both', category: 'rhythm', active: true },
+      { id: 'r2', label: '⏱️ Metronom-Buddy', text: 'Übe diese Passage mit dem Metronom bei langsamem Tempo. Steigere die Geschwindigkeit erst, wenn es 3-mal perfekt im Takt war.', type: 'both', category: 'rhythm', active: true },
+      { id: 'r3', label: '🐌 Schnecken-Tempo', text: 'Übe die schwierige Passage ganz langsam wie eine Schnecke. Erst wenn du den Ablauf im Schlaf beherrschst, schalten wir den Turbo an!', type: 'both', category: 'rhythm', active: true },
+      { id: 'r4', label: '🧩 Puzzle-Taktik', text: 'Teile das Stück in kleine Häppchen auf. Nimm dir einen einzelnen Takt vor und setze ihn als perfektes Puzzleteil zusammen!', type: 'both', category: 'rhythm', active: true },
+      { id: 't1', label: '🔂 Ritter-Dreierspiel', text: 'Wiederhole den kniffligen Übergang dreimal hintereinander fehlerfrei. Schaffst du das, hast du die Stelle gemeistert!', type: 'both', category: 'technique', active: true },
+      { id: 't2', label: '👁️ Blind-Flug', text: 'Schließe beim Üben mal die Augen. Vertraue auf dein Gefühl und meistere die Stelle ganz blind auswendig!', type: 'both', category: 'technique', active: true },
+      { id: 't3', label: '🏋️‍♂️ Fokus-Gym', text: 'Trainiere die schwierige Stelle ganz fokussiert in Zeitlupe, um maximale Kontrolle und Präzision aufzubauen.', type: 'both', category: 'technique', active: true },
+      { id: 't4', label: '🕵️‍♂️ Detail-Detektiv', text: 'Lies den Text oder die Noten laut mit und achte genau auf jedes Detail. Sei wie ein Detektiv, dem kein Fehler entgeht!', type: 'lehrwerke', category: 'technique', active: true },
+      { id: 'p1', label: '🎵 Laut-Leise Zauber', text: 'Lass das Stück lebendig klingen! Mache deutliche Unterschiede zwischen Flüsterlautstärke (piano) und Löwenbrüllen (forte).', type: 'both', category: 'performance', active: true },
+      { id: 'p2', label: '🌟 Eigener Remix', text: 'Du beherrschst das Stück super! Überlege dir bis zum nächsten Mal eine eigene coole Rhythmus-Variante oder Verzierung für diesen Teil.', type: 'songs', category: 'performance', active: true },
+      { id: 'p3', label: '🎭 Storyteller', text: 'Welche Geschichte erzählt dieses Stück? Gestalte den Klang so, als würdest du ein trauriges, spannendes oder fröhliches Abenteuer vertonen.', type: 'both', category: 'performance', active: true },
+      { id: 'p4', label: '🌊 Atem-Fluss', text: 'Gestalte die Phrasen wie einen langen Atemzug. Verbinde die Töne weich und lasse die Musik atmen.', type: 'both', category: 'performance', active: true }
+    ];
+  });
+
   // Always start at hub view when modal opens
   useEffect(() => {
     setActiveSubView('hub');
@@ -4655,14 +4683,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         {/* Schnell-Textbausteine & Submit button side-by-side */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                            {[
-                              { label: '🐌 Schnecke', text: 'Spiele die schwierige Passage ganz langsam wie eine Schnecke.' },
-                              { label: '🔂 Ritter-Drei', text: 'Wiederhole den kniffligen Übergang dreimal hintereinander fehlerfrei.' },
-                              { label: '🎵 Laut-Leise', text: 'Lass das Stück lebendig klingen! Mache deutliche Unterschiede.' },
-                              { label: '⏱️ 10-Min.', text: 'Stelle dir einen Timer auf 10 Minuten. Übe jeden Tag.' }
-                            ].map((tpl, i) => (
+                            {textbausteine
+                              .filter((tb: any) => tb.active)
+                              .map((tpl, i) => (
                               <button
-                                key={i}
+                                key={tpl.id || i}
                                 type="button"
                                 onClick={() => {
                                   setHomeworkNotes(prev => prev ? `${prev}\n\n${tpl.text}` : tpl.text);

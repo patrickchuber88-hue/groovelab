@@ -229,21 +229,44 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     const stored = localStorage.getItem('groovelab_textbausteine');
     if (stored) {
       try {
-        return JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        const containsOldWording = parsed.some((x: any) => 
+          x.text.includes('Fingersätze') || 
+          x.text.includes('Tasten/Saiten') || 
+          x.text.includes('Fingern') || 
+          x.text.includes('Griffwechsel')
+        );
+        if (parsed.length > 0 && parsed.some((x: any) => x.category) && !containsOldWording) {
+          return parsed;
+        }
       } catch (e) {
         console.error("Error parsing textbausteine:", e);
       }
     }
     return [
-      { id: '1', label: '🐌 Schnecken-Tempo', text: 'Spiele die schwierige Passage ganz langsam wie eine Schnecke. Erst wenn deine Finger den Weg im Schlaf kennen, schalten wir den Turbo an!', type: 'both', active: true },
-      { id: '2', label: '🔂 Ritter-Dreierspiel', text: 'Wiederhole den kniffligen Übergang dreimal hintereinander fehlerfrei. Schaffst du das, hast du die Stelle gemeistert!', type: 'both', active: true },
-      { id: '3', label: '🎵 Laut-Leise Zauber', text: 'Lass das Stück lebendig klingen! Mache deutliche Unterschiede zwischen Flüsterlautstärke (piano) und Löwenbrüllen (forte).', type: 'both', active: true },
-      { id: '4', label: '⏱️ 10-Min.-Champion', text: 'Stelle dir einen Timer auf 10 Minuten. Übe diese Woche jeden Tag kurz und fokussiert, anstatt einmal ganz lang am Wochenende.', type: 'both', active: true },
-      { id: '5', label: '🌟 Eigener Remix', text: 'Du beherrschst die Noten super! Überlege dir bis zum nächsten Mal eine eigene coole Rhythmus-Variante für diesen Teil.', type: 'songs', active: true },
-      { id: '6', label: '🕵️‍♂️ Noten-Detektiv', text: 'Lies die Noten laut mit und achte genau auf die Tonlängen. Sei wie ein Detektiv, dem keine Note entwischt!', type: 'lehrwerke', active: true },
-      { id: '7', label: '👁️ Blind-Flug', text: 'Schließe beim Spielen mal die Augen. Fühle die Tasten/Saiten und spiele die Stelle ganz blind auswendig!', type: 'both', active: true },
-      { id: '8', label: '🥁 Puls-Master', text: 'Klatsche zuerst den Rhythmus und zähle laut mit, bevor du dein Instrument spielst. Der Rhythmus ist das Herz der Musik!', type: 'both', active: true },
-      { id: '9', label: '🧩 Puzzle-Taktik', text: 'Übe nicht das ganze Stück auf einmal. Nimm dir einen einzelnen Takt vor und setze ihn als perfektes Puzzleteil zusammen!', type: 'both', active: true }
+      // Rhythmus & Timing
+      { id: 'r1', label: '🥁 Puls-Master', text: 'Klatsche zuerst den Rhythmus und zähle laut mit, bevor du auf dem Instrument startest. Der Rhythmus ist das Herz der Musik!', type: 'both', category: 'rhythm', active: true },
+      { id: 'r2', label: '⏱️ Metronom-Buddy', text: 'Übe diese Passage mit dem Metronom bei langsamem Tempo. Steigere die Geschwindigkeit erst, wenn es 3-mal perfekt im Takt war.', type: 'both', category: 'rhythm', active: true },
+      { id: 'r3', label: '🐌 Schnecken-Tempo', text: 'Übe die schwierige Passage ganz langsam wie eine Schnecke. Erst wenn du den Ablauf im Schlaf beherrschst, schalten wir den Turbo an!', type: 'both', category: 'rhythm', active: true },
+      { id: 'r4', label: '🧩 Puzzle-Taktik', text: 'Teile das Stück in kleine Häppchen auf. Nimm dir einen einzelnen Takt vor und setze ihn als perfektes Puzzleteil zusammen!', type: 'both', category: 'rhythm', active: true },
+      { id: 'r5', label: '🚶‍♂️ Klatsch-Gehen', text: 'Gehe gleichmäßig im Puls des Stücks durch den Raum und klatsche den Rhythmus der Melodie dazu.', type: 'both', category: 'rhythm', active: false },
+      { id: 'r6', label: '⏳ Dehnungs-Übung', text: 'Wiederhole den Ablauf extrem gedehnt und langsam, um die genauen Abstände und Übergänge bewusst zu spüren.', type: 'both', category: 'rhythm', active: false },
+
+      // Finger & Technik
+      { id: 't1', label: '🔂 Ritter-Dreierspiel', text: 'Wiederhole den kniffligen Übergang dreimal hintereinander fehlerfrei. Schaffst du das, hast du die Stelle gemeistert!', type: 'both', category: 'technique', active: true },
+      { id: 't2', label: '👁️ Blind-Flug', text: 'Schließe beim Üben mal die Augen. Vertraue auf dein Gefühl und meistere die Stelle ganz blind auswendig!', type: 'both', category: 'technique', active: true },
+      { id: 't3', label: '🏋️‍♂️ Fokus-Gym', text: 'Trainiere die schwierige Stelle ganz fokussiert in Zeitlupe, um maximale Kontrolle und Präzision aufzubauen.', type: 'both', category: 'technique', active: true },
+      { id: 't4', label: '🕵️‍♂️ Detail-Detektiv', text: 'Lies den Text oder die Noten laut mit und achte genau auf jedes Detail. Sei wie ein Detektiv, dem kein Fehler entgeht!', type: 'lehrwerke', category: 'technique', active: true },
+      { id: 't5', label: '🚀 Hürden-Sprung', text: 'Konzentriere dich auf die Bewegung direkt vor und nach dem schwierigen Wechsel. Wiederhole diesen Sprung gezielt mehrmals.', type: 'both', category: 'technique', active: false },
+      { id: 't6', label: '🕸️ Relax-Übung', text: 'Achte darauf, dass alle Muskeln entspannt bleiben, die gerade Pause haben – so sparst du Energie und spielst flüssiger.', type: 'both', category: 'technique', active: false },
+
+      // Ausdruck & Performance
+      { id: 'p1', label: '🎵 Laut-Leise Zauber', text: 'Lass das Stück lebendig klingen! Mache deutliche Unterschiede zwischen Flüsterlautstärke (piano) und Löwenbrüllen (forte).', type: 'both', category: 'performance', active: true },
+      { id: 'p2', label: '🌟 Eigener Remix', text: 'Du beherrschst das Stück super! Überlege dir bis zum nächsten Mal eine eigene coole Rhythmus-Variante oder Verzierung für diesen Teil.', type: 'songs', category: 'performance', active: true },
+      { id: 'p3', label: '🎭 Storyteller', text: 'Welche Geschichte erzählt dieses Stück? Gestalte den Klang so, als würdest du ein trauriges, spannendes oder fröhliches Abenteuer vertonen.', type: 'both', category: 'performance', active: true },
+      { id: 'p4', label: '🌊 Atem-Fluss', text: 'Gestalte die Phrasen wie einen langen Atemzug. Verbinde die Töne weich und lasse die Musik atmen.', type: 'both', category: 'performance', active: true },
+      { id: 'p5', label: '🎤 Echo-Spiel', text: 'Stelle dir vor, die zweite Hälfte der Phrase ist das leise Echo aus den Bergen. Gestalte sie deutlich leiser.', type: 'both', category: 'performance', active: false },
+      { id: 'p6', label: '🎬 Scheinwerfer-An', text: 'Spiele das Stück einmal komplett durch, ohne bei Fehlern anzuhalten - genau so, als stündest du live auf einer großen Bühne!', type: 'both', category: 'performance', active: false }
     ];
   });
 
@@ -251,7 +274,45 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [tbLabel, setTbLabel] = useState('');
   const [tbText, setTbText] = useState('');
   const [tbType, setTbType] = useState<'songs' | 'lehrwerke' | 'both'>('both');
+  const [tbCategory, setTbCategory] = useState<'rhythm' | 'technique' | 'performance'>('rhythm');
+  const [tbSearch, setTbSearch] = useState('');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<'all' | 'rhythm' | 'technique' | 'performance'>('all');
   const [showTextbausteinModal, setShowTextbausteinModal] = useState<boolean>(false);
+  const [selectedIcon, setSelectedIcon] = useState('🎵');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [copiedTbId, setCopiedTbId] = useState<string | null>(null);
+
+  const AVAILABLE_ICONS = [
+    '🐌', '🚀', '🕵️‍♂️', '🧩', '🥁', '🎹', '🎸', '🎷', '🎧', '🎤', '🎼', '🏆', 
+    '🎖️', '🌟', '🎯', '⚡', '💡', '🔍', '🦖', '🦁', '🦊', '🦉', '🦄', '🔥', 
+    '👑', '🌈', '🎨', '🎬', '⏱️', '🎵', '🎺', '🎻', '🔔', '📢', '🏰', '🎈', 
+    '👽', '🍿', '🧊', '🦾', '🧠', '✨', '🍀', '🍕', '🐱', '🐶', '🧁', '💿', 
+    '📻', '🎙️', '🎛️', '🎚️', '🎶', '🦾', '🦸‍♂️', '🧙‍♂️', '🏃‍♂️', '🧗‍♂️', '🏄‍♂️', '🧘‍♂️', 
+    '👾', '🛸', '💎', '🔑', '🧭', '🗺️', '🎪', '🎢', '🎳', '🎮', '🧪', '🧬', 
+    '⚙️', '🛠️', '🧱', '🎉', '🎊', '🔇', '🔈', '🗯️', '💭', '✏️', '📝', '📂', 
+    '📈', '📬', '🏷️', '❤️', '🍀', '🌈'
+  ];
+
+  useEffect(() => {
+    if (editingTextbaustein) {
+      const parts = editingTextbaustein.label.split(' ');
+      const hasEmoji = parts[0] && /\p{Emoji}/u.test(parts[0]);
+      if (hasEmoji) {
+        setSelectedIcon(parts[0]);
+        setTbLabel(parts.slice(1).join(' '));
+      } else {
+        setSelectedIcon('🎵');
+        setTbLabel(editingTextbaustein.label);
+      }
+      setTbCategory(editingTextbaustein.category || 'rhythm');
+    } else {
+      const used = textbausteine.map(tb => tb.label.split(' ')[0]);
+      const firstAvail = AVAILABLE_ICONS.find(icon => !used.includes(icon)) || '🎵';
+      setSelectedIcon(firstAvail);
+      setTbLabel('');
+      setTbCategory('rhythm');
+    }
+  }, [editingTextbaustein, textbausteine]);
 
   const handleDeleteTextbaustein = (id: string) => {
     setTextbausteine(prev => prev.filter(tb => tb.id !== id));
@@ -260,6 +321,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       setTbLabel('');
       setTbText('');
       setTbType('both');
+      setTbCategory('rhythm');
     }
   };
 
@@ -271,15 +333,18 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     e.preventDefault();
     if (!tbLabel.trim() || !tbText.trim()) return;
 
+    const fullLabel = `${selectedIcon} ${tbLabel.trim()}`;
+
     if (editingTextbaustein) {
-      setTextbausteine(prev => prev.map(tb => tb.id === editingTextbaustein.id ? { ...tb, label: tbLabel.trim(), text: tbText.trim(), type: tbType } : tb));
+      setTextbausteine(prev => prev.map(tb => tb.id === editingTextbaustein.id ? { ...tb, label: fullLabel, text: tbText.trim(), type: tbType, category: tbCategory } : tb));
       setEditingTextbaustein(null);
     } else {
       const newTb = {
         id: String(Date.now()),
-        label: tbLabel.trim(),
+        label: fullLabel,
         text: tbText.trim(),
         type: tbType,
+        category: tbCategory,
         active: true
       };
       setTextbausteine(prev => [...prev, newTb]);
@@ -287,6 +352,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     setTbLabel('');
     setTbText('');
     setTbType('both');
+    setTbCategory('rhythm');
   };
 
   const handleToggleTextbausteinActive = (id: string) => {
@@ -5483,15 +5549,33 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               const hasEmoji = parts[0] && /\p{Emoji}/u.test(parts[0]);
               const emoji = hasEmoji ? parts[0] : '🎵';
               const name = hasEmoji ? parts.slice(1).join(' ') : tb.label;
+              const isCopied = copiedTbId === tb.id;
+
+              const handleCardClick = () => {
+                if (selectedLehrwerkForDetail && selectedStudentForProgress) {
+                  setNewHomeworkNoteText(prev => prev ? `${prev}\n\n${tb.text}` : tb.text);
+                  setCopiedTbId(tb.id);
+                  setTimeout(() => setCopiedTbId(null), 850);
+                } else if (selectedSongForDetail && selectedStudentForProgress) {
+                  setSongLessonNotes(prev => prev ? `${prev}\n\n${tb.text}` : tb.text);
+                  setCopiedTbId(tb.id);
+                  setTimeout(() => setCopiedTbId(null), 850);
+                } else {
+                  navigator.clipboard.writeText(tb.text);
+                  setCopiedTbId(tb.id);
+                  setTimeout(() => setCopiedTbId(null), 1000);
+                }
+              };
 
               return (
                 <div 
                   key={tb.id} 
+                  onClick={handleCardClick}
                   style={{ 
-                    border: '1px solid #e2e8f0', 
+                    border: isCopied ? '1.5px solid #22c55e' : '1px solid #e2e8f0', 
                     borderRadius: '12px', 
                     padding: '10px 8px', 
-                    background: 'white',
+                    background: isCopied ? '#f0fdf4' : 'white',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
@@ -5499,21 +5583,40 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     textAlign: 'center',
                     gap: '6px',
                     opacity: tb.active ? 1 : 0.55,
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.01)',
-                    minHeight: '110px'
+                    boxShadow: isCopied ? '0 4px 10px rgba(34, 197, 94, 0.15)' : '0 1px 2px rgba(0,0,0,0.01)',
+                    minHeight: '110px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    transform: isCopied ? 'scale(0.96)' : 'none'
                   }}
+                  className="hover-scale-mini"
                 >
-                  <span style={{ fontSize: '1.4rem', marginTop: '2px' }}>
-                    {emoji}
+                  <span style={{ fontSize: '1.4rem', marginTop: '2px', transform: isCopied ? 'scale(1.15)' : 'none', transition: 'all 0.2s' }}>
+                    {isCopied ? '✅' : emoji}
                   </span>
                   
-                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e293b', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.2', height: '2.4em', wordBreak: 'break-word' }}>
-                    {name}
+                  <span style={{ 
+                    fontSize: '0.72rem', 
+                    fontWeight: 800, 
+                    color: isCopied ? '#15803d' : '#1e293b', 
+                    display: '-webkit-box', 
+                    WebkitLineClamp: 2, 
+                    WebkitBoxOrient: 'vertical', 
+                    overflow: 'hidden', 
+                    lineHeight: '1.2', 
+                    height: '2.4em', 
+                    wordBreak: 'break-word',
+                    transition: 'color 0.2s'
+                  }}>
+                    {isCopied ? (selectedLehrwerkForDetail || selectedSongForDetail ? 'Eingefügt! ✓' : 'Kopiert! ✓') : name}
                   </span>
 
                   <button
                     type="button"
-                    onClick={() => handleToggleTextbausteinActive(tb.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleTextbausteinActive(tb.id);
+                    }}
                     style={{
                       background: tb.active ? '#f0fdf4' : '#f1f5f9',
                       color: tb.active ? '#16a34a' : '#64748b',
@@ -7510,11 +7613,11 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                               <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>
                                 Hausaufgaben-Notizen
                               </label>
-                              <textarea
+                               <textarea
                                 placeholder="Hausaufgaben, Übetipps oder Notizen für diese Woche..."
                                 value={newHomeworkNoteText}
                                 onChange={(e) => setNewHomeworkNoteText(e.target.value)}
-                                rows={3}
+                                rows={5}
                                 style={{
                                   width: '100%',
                                   padding: '12px',
@@ -8462,7 +8565,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                               placeholder="Übetipps für diese Woche hinzufügen..."
                               value={songLessonNotes}
                               onChange={e => setSongLessonNotes(e.target.value)}
-                              rows={4}
+                              rows={6}
                               style={{
                                 width: '100%',
                                 padding: '10px 14px',
@@ -8473,7 +8576,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                 background: 'white',
                                 outline: 'none',
                                 fontStyle: 'italic',
-                                minHeight: '115px',
+                                minHeight: '145px',
                                 fontFamily: 'inherit',
                                 resize: 'vertical'
                               }}
@@ -8906,7 +9009,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                               placeholder="Notizen zum Schüler, Stärken oder Schwächen..."
                               value={songInternalNotes}
                               onChange={e => setSongInternalNotes(e.target.value)}
-                              rows={3}
+                              rows={5}
                               style={{
                                 width: '100%',
                                 padding: '12px',
@@ -9122,6 +9225,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   setTbLabel('');
                   setTbText('');
                   setTbType('both');
+                  setTbCategory('rhythm');
+                  setTbSearch('');
+                  setSelectedCategoryFilter('all');
                 }} 
                 style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}
               >
@@ -9130,65 +9236,138 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             </div>
 
             {/* Content: Form and List in Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '24px', minHeight: 0, flex: 1 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', minHeight: 0, flex: 1 }}>
               
               {/* Form Column */}
-              <form onSubmit={handleSaveTextbaustein} style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: '#f8fafc', padding: '20px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
-                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#1e293b' }}>
-                  {editingTextbaustein ? '✏️ Baustein bearbeiten' : '➕ Neuer Baustein'}
-                </h3>
+              <form onSubmit={handleSaveTextbaustein} style={{ display: 'flex', flexDirection: 'column', gap: '14px', background: '#f8fafc', padding: '20px', borderRadius: '20px', border: '1px solid #e2e8f0', justifyContent: 'space-between', height: '100%' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#1e293b' }}>
+                    {editingTextbaustein ? '✏️ Baustein bearbeiten' : '➕ Neuer Baustein'}
+                  </h3>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>Label / Emoji</label>
-                  <input 
-                    required 
-                    placeholder="z.B. 🐌 Schnecken-Tempo" 
-                    value={tbLabel} 
-                    onChange={e => setTbLabel(e.target.value)} 
-                    style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 600, outline: 'none' }}
-                  />
-                </div>
+                  {/* Icon selector button trigger */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>Wähle ein Icon</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowEmojiPicker(true)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '10px 14px',
+                        borderRadius: '10px',
+                        border: '1px solid #cbd5e1',
+                        background: 'white',
+                        cursor: 'pointer',
+                        width: '100%',
+                        textAlign: 'left',
+                        transition: 'all 0.15s',
+                        outline: 'none'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = brandColor}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = '#cbd5e1'}
+                    >
+                      <span style={{ fontSize: '1.8rem', background: '#f1f5f9', width: '48px', height: '48px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {selectedIcon}
+                      </span>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b' }}>Emoji auswählen</span>
+                        <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>Klicken, um die Emoji-Liste anzuzeigen</span>
+                      </div>
+                    </button>
+                  </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>Inhalt des Textbausteins</label>
-                  <textarea 
-                    required 
-                    placeholder="Dieser Text wird beim Klicken eingefügt..." 
-                    value={tbText} 
-                    onChange={e => setTbText(e.target.value)} 
-                    rows={4} 
-                    style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 650, outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
-                  />
-                </div>
+                  {/* Label (Name) */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>Schnell-Textname (ohne Icon)</label>
+                    <input 
+                      required 
+                      placeholder="z.B. Schnecken-Tempo" 
+                      value={tbLabel} 
+                      onChange={e => setTbLabel(e.target.value)} 
+                      style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 600, outline: 'none' }}
+                    />
+                  </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>Bereich zuordnen</label>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    {(['both', 'songs', 'lehrwerke'] as const).map(type => {
-                      const labelMap = { both: 'Beide', songs: 'Songs', lehrwerke: 'Lehrwerke' };
-                      const isSelected = tbType === type;
-                      return (
-                        <button
-                          key={type}
-                          type="button"
-                          onClick={() => setTbType(type)}
-                          style={{
-                            flex: 1,
-                            padding: '8px 6px',
-                            borderRadius: '10px',
-                            fontSize: '0.75rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            border: isSelected ? `1.5px solid ${brandColor}` : '1.5px solid #e2e8f0',
-                            background: isSelected ? `${brandColor}10` : 'white',
-                            color: isSelected ? brandColor : '#475569',
-                            transition: 'all 0.15s'
-                          }}
-                        >
-                          {labelMap[type]}
-                        </button>
-                      );
-                    })}
+                  {/* Inhalt des Textbausteins */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>Inhalt des Textbausteins</label>
+                    <textarea 
+                      required 
+                      placeholder="Dieser Text wird beim Klicken eingefügt..." 
+                      value={tbText} 
+                      onChange={e => setTbText(e.target.value)} 
+                      rows={8} 
+                      style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 650, outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
+                    />
+                  </div>
+
+                  {/* Kategorie */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>Kategorie</label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      {[
+                        { id: 'rhythm', label: '🥁 Rhythmus' },
+                        { id: 'technique', label: '🎹 Technik' },
+                        { id: 'performance', label: '🎭 Ausdruck' }
+                      ].map(cat => {
+                        const isSelected = tbCategory === cat.id;
+                        return (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => setTbCategory(cat.id as any)}
+                            style={{
+                              flex: 1,
+                              padding: '8px 4px',
+                              borderRadius: '10px',
+                              fontSize: '0.72rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              border: isSelected ? `1.5px solid ${brandColor}` : '1.5px solid #cbd5e1',
+                              background: isSelected ? `${brandColor}10` : 'white',
+                              color: isSelected ? brandColor : '#475569',
+                              transition: 'all 0.15s'
+                            }}
+                          >
+                            {cat.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Scope */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>Bereich zuordnen</label>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      {(['both', 'songs', 'lehrwerke'] as const).map(type => {
+                        const labelMap = { both: 'Beide', songs: 'Songs', lehrwerke: 'Lehrwerke' };
+                        const isSelected = tbType === type;
+                        return (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => setTbType(type)}
+                            style={{
+                              flex: 1,
+                              padding: '8px 6px',
+                              borderRadius: '10px',
+                              fontSize: '0.75rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              border: isSelected ? `1.5px solid ${brandColor}` : '1.5px solid #e2e8f0',
+                              background: isSelected ? `${brandColor}10` : 'white',
+                              color: isSelected ? brandColor : '#475569',
+                              transition: 'all 0.15s'
+                            }}
+                          >
+                            {labelMap[type]}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
@@ -9207,6 +9386,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                         setTbLabel('');
                         setTbText('');
                         setTbType('both');
+                        setTbCategory('rhythm');
                       }} 
                       style={{ flex: 1, background: '#e2e8f0', color: '#475569', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer' }}
                     >
@@ -9218,126 +9398,279 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
               {/* List Column */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', minHeight: 0 }}>
-                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#475569', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>Bestehende Bausteine</span>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', background: '#f1f5f9', padding: '4px 10px', borderRadius: '9999px' }}>
-                    {textbausteine.length}
-                  </span>
-                </h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>Bestehende Bausteine</span>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', background: '#f1f5f9', padding: '4px 10px', borderRadius: '9999px' }}>
+                      {textbausteine.length}
+                    </span>
+                  </h3>
+                </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', flex: 1, paddingRight: '6px' }}>
-                  {textbausteine.map((tb: any) => {
-                    const badgeStyle = 
-                      tb.type === 'songs' 
-                        ? { bg: '#fff7ed', text: '#c2410c', border: '#ffedd5', label: 'Songs' }
-                        : tb.type === 'lehrwerke'
-                          ? { bg: '#f5f3ff', text: '#6d28d9', border: '#ede9fe', label: 'Lehrwerke' }
-                          : { bg: '#eff6ff', text: '#1d4ed8', border: '#dbeafe', label: 'Beide' };
+                {/* Search Field */}
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.9rem', pointerEvents: 'none' }}>🔍</span>
+                  <input
+                    type="text"
+                    placeholder="Bausteine durchsuchen..."
+                    value={tbSearch}
+                    onChange={e => setTbSearch(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px 10px 38px',
+                      borderRadius: '12px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.82rem',
+                      fontWeight: 650,
+                      outline: 'none',
+                      background: 'white'
+                    }}
+                  />
+                </div>
 
+                {/* Category tabs */}
+                <div style={{ display: 'flex', gap: '4px', padding: '2px', background: '#f1f5f9', borderRadius: '12px' }}>
+                  {[
+                    { id: 'all', label: 'Alle' },
+                    { id: 'rhythm', label: '🥁 Rhythmus' },
+                    { id: 'technique', label: '🎹 Technik' },
+                    { id: 'performance', label: '🎭 Ausdruck' }
+                  ].map(cat => {
+                    const isSelected = selectedCategoryFilter === cat.id;
                     return (
-                      <div 
-                        key={tb.id} 
-                        style={{ 
-                          border: '1px solid #e2e8f0', 
-                          borderRadius: '16px', 
-                          padding: '14px', 
-                          background: 'white',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '10px',
-                          opacity: tb.active ? 1 : 0.6,
-                          transition: 'opacity 0.2s',
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setSelectedCategoryFilter(cat.id as any)}
+                        style={{
+                          flex: 1,
+                          padding: '6px 4px',
+                          borderRadius: '10px',
+                          fontSize: '0.72rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          border: 'none',
+                          background: isSelected ? 'white' : 'transparent',
+                          color: isSelected ? '#1f2937' : '#64748b',
+                          boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                          transition: 'all 0.15s'
                         }}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                          <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>
-                            {tb.label}
-                          </span>
-                          <span style={{ fontSize: '0.65rem', fontWeight: 800, background: badgeStyle.bg, color: badgeStyle.text, border: `1px solid ${badgeStyle.border}`, padding: '3px 8px', borderRadius: '8px' }}>
-                            {badgeStyle.label}
-                          </span>
-                        </div>
-
-                        <p style={{ margin: 0, fontSize: '0.8rem', color: '#4b5563', lineHeight: '1.4', fontWeight: 650 }}>
-                          {tb.text}
-                        </p>
-
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', borderTop: '1px dashed #f1f5f9', paddingTop: '10px' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleTextbausteinActive(tb.id)}
-                            style={{
-                              background: tb.active ? '#f0fdf4' : '#f1f5f9',
-                              color: tb.active ? '#16a34a' : '#64748b',
-                              border: tb.active ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                              padding: '6px 12px',
-                              borderRadius: '9999px',
-                              fontSize: '0.72rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              transition: 'all 0.15s'
-                            }}
-                          >
-                            {tb.active ? '🟢 Aktiv' : '⚪ Inaktiv'}
-                          </button>
-
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingTextbaustein(tb);
-                                setTbLabel(tb.label);
-                                setTbText(tb.text);
-                                setTbType(tb.type);
-                              }}
-                              style={{
-                                background: '#f8fafc',
-                                border: '1px solid #e2e8f0',
-                                color: '#64748b',
-                                cursor: 'pointer',
-                                padding: '6px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                borderRadius: '8px',
-                                transition: 'all 0.15s'
-                              }}
-                              className="hover-bg"
-                            >
-                              <Pencil size={14} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteTextbaustein(tb.id)}
-                              style={{
-                                background: '#fff1f2',
-                                border: 'none',
-                                color: '#ef4444',
-                                cursor: 'pointer',
-                                padding: '6px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                borderRadius: '8px',
-                                transition: 'all 0.15s'
-                              }}
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
+                        {cat.label}
+                      </button>
                     );
                   })}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', flex: 1, paddingRight: '6px' }}>
+                  {textbausteine
+                    .filter((tb: any) => {
+                      if (selectedCategoryFilter !== 'all' && tb.category !== selectedCategoryFilter) return false;
+                      if (tbSearch.trim() !== '') {
+                        const query = tbSearch.toLowerCase();
+                        return tb.label.toLowerCase().includes(query) || tb.text.toLowerCase().includes(query);
+                      }
+                      return true;
+                    })
+                    .map((tb: any) => {
+                      const badgeStyle = 
+                        tb.type === 'songs' 
+                          ? { bg: '#fff7ed', text: '#c2410c', border: '#ffedd5', label: 'Songs' }
+                          : tb.type === 'lehrwerke'
+                            ? { bg: '#f5f3ff', text: '#6d28d9', border: '#ede9fe', label: 'Lehrwerke' }
+                            : { bg: '#eff6ff', text: '#1d4ed8', border: '#dbeafe', label: 'Beide' };
+
+                      const isCurrentEditing = editingTextbaustein?.id === tb.id;
+
+                      return (
+                        <div 
+                          key={tb.id} 
+                          onClick={() => {
+                            setEditingTextbaustein(tb);
+                            setTbLabel(tb.label); // Note: useEffect will cleanly split label and selectedIcon!
+                            setTbText(tb.text);
+                            setTbType(tb.type);
+                            setTbCategory(tb.category || 'rhythm');
+                          }}
+                          style={{ 
+                            border: isCurrentEditing ? `2px solid ${brandColor}` : '1px solid #e2e8f0', 
+                            borderRadius: '16px', 
+                            padding: '14px', 
+                            background: isCurrentEditing ? `${brandColor}05` : 'white',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '10px',
+                            opacity: tb.active ? 1 : 0.6,
+                            transition: 'all 0.2s',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                            cursor: 'pointer'
+                          }}
+                          className="hover-scale-mini"
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                            <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>
+                              {tb.label}
+                            </span>
+                            <span style={{ fontSize: '0.65rem', fontWeight: 800, background: badgeStyle.bg, color: badgeStyle.text, border: `1px solid ${badgeStyle.border}`, padding: '3px 8px', borderRadius: '8px' }}>
+                              {badgeStyle.label}
+                            </span>
+                          </div>
+
+                          <p style={{ margin: 0, fontSize: '0.8rem', color: '#4b5563', lineHeight: '1.4', fontWeight: 650 }}>
+                            {tb.text}
+                          </p>
+
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', borderTop: '1px dashed #f1f5f9', paddingTop: '10px' }}>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleTextbausteinActive(tb.id);
+                              }}
+                              style={{
+                                background: tb.active ? '#f0fdf4' : '#f1f5f9',
+                                color: tb.active ? '#16a34a' : '#64748b',
+                                border: tb.active ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                                padding: '6px 12px',
+                                borderRadius: '9999px',
+                                fontSize: '0.72rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                transition: 'all 0.15s'
+                              }}
+                            >
+                              {tb.active ? '🟢 Aktiv' : '⚪ Inaktiv'}
+                            </button>
+
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingTextbaustein(tb);
+                                  setTbLabel(tb.label);
+                                  setTbText(tb.text);
+                                  setTbType(tb.type);
+                                  setTbCategory(tb.category || 'rhythm');
+                                }}
+                                style={{
+                                  background: '#f8fafc',
+                                  border: '1px solid #e2e8f0',
+                                  color: '#64748b',
+                                  cursor: 'pointer',
+                                  padding: '6px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  borderRadius: '8px',
+                                  transition: 'all 0.15s'
+                                }}
+                                className="hover-bg"
+                              >
+                                <Pencil size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteTextbaustein(tb.id);
+                                }}
+                                style={{
+                                  background: '#fff1f2',
+                                  border: 'none',
+                                  color: '#ef4444',
+                                  cursor: 'pointer',
+                                  padding: '6px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  borderRadius: '8px',
+                                  transition: 'all 0.15s'
+                                }}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
 
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {showEmojiPicker && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 7000, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div className="glass-panel animation-scale-up" style={{ background: 'white', padding: '32px', borderRadius: '28px', maxWidth: '640px', width: '90vw', maxHeight: '80vh', display: 'flex', flexDirection: 'column', gap: '20px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#1e293b' }}>Icon auswählen</h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Wähle ein passendes Icon für diesen Textbaustein</p>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setShowEmojiPicker(false)}
+                style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(8, 1fr)', 
+              gap: '10px', 
+              background: '#f8fafc', 
+              padding: '16px', 
+              borderRadius: '16px', 
+              border: '1px solid #e2e8f0', 
+              overflowY: 'auto', 
+              flex: 1 
+            }}>
+              {AVAILABLE_ICONS.filter(icon => {
+                const usedIcons = textbausteine
+                   .filter(tb => !editingTextbaustein || tb.id !== editingTextbaustein.id)
+                   .map(tb => tb.label.split(' ')[0]);
+                return !usedIcons.includes(icon);
+              }).map(icon => {
+                const isSelected = selectedIcon === icon;
+                return (
+                  <button
+                    key={icon}
+                    type="button"
+                    onClick={() => {
+                      setSelectedIcon(icon);
+                      setShowEmojiPicker(false);
+                    }}
+                    style={{
+                      fontSize: '1.8rem',
+                      padding: '10px',
+                      borderRadius: '12px',
+                      border: isSelected ? `2.5px solid ${brandColor}` : '2px solid transparent',
+                      background: isSelected ? `${brandColor}15` : 'white',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                      transition: 'all 0.15s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+                    onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                  >
+                    {icon}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
