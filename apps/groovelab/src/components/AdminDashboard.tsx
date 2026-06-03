@@ -198,6 +198,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [showAddLehrwerk, setShowAddLehrwerk] = useState(false);
   const [newLehrwerk, setNewLehrwerk] = useState({ title: '', author: '', totalPages: 50 });
   const [editingLehrwerk, setEditingLehrwerk] = useState<any | null>(null);
+  const [bulkModeLehrwerke, setBulkModeLehrwerke] = useState(false);
+  const [bulkTextLehrwerke, setBulkTextLehrwerke] = useState('');
   const [selectedLehrwerkForDetail, setSelectedLehrwerkForDetail] = useState<any | null>(null);
   const [selectedStudentForProgress, setSelectedStudentForProgress] = useState<any | null>(null);
   const [selectedBrush, setSelectedBrush] = useState<'unbearbeitet' | 'in_progress' | 'mastered' | 'theory_done'>('in_progress');
@@ -650,6 +652,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   }, [activeEditStationId, stations]);
   
   const [showAddSong, setShowAddSong] = useState(false);
+  const [bulkModeSongs, setBulkModeSongs] = useState(false);
+  const [bulkTextSongs, setBulkTextSongs] = useState('');
   const [newSong, setNewSong] = useState({ artist: '', title: '', level: 1, media_link: '', tomplay_url: '', pdf_folder_url: '', guitar_pro_url: '', pdf_drums_url: '', pdf_guitar_url: '', pdf_bass_url: '', pdf_vocals_url: '', pdf_keys_url: '', playalong_url: '', bypass_wlan_check: false, instrumentation: { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 } as Record<string, number> });
   
   const [songSearch, setSongSearch] = useState('');
@@ -2369,7 +2373,69 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     e.preventDefault();
     if (!admin?.school_id) return;
 
-    // Check limits if enabled
+    if (bulkModeSongs) {
+      const lines = bulkTextSongs.split('\n').map(l => l.trim()).filter(Boolean);
+      if (lines.length === 0) return;
+
+      if (admin?.schools?.limits_enabled) {
+        const maxSongs = admin.schools.max_songs ?? 5;
+        if (songs.length + lines.length > maxSongs) {
+          alert(`Limit überschritten! Du kannst nicht ${lines.length} Songs hinzufügen, da das Maximum bei ${maxSongs} liegt (Aktuell: ${songs.length}).`);
+          return;
+        }
+      }
+
+      const insertPayloads = lines.map(line => {
+        let artist = 'Unbekannt';
+        let title = line;
+        if (line.includes(' - ')) {
+          const parts = line.split(' - ');
+          artist = parts[0].trim();
+          title = parts.slice(1).join(' - ').trim();
+        }
+        return {
+          school_id: admin.school_id, 
+          artist, 
+          title, 
+          level: 1, 
+          media_link: '',
+          tomplay_url: '',
+          pdf_folder_url: '',
+          guitar_pro_url: '',
+          pdf_drums_url: '',
+          pdf_guitar_url: '',
+          pdf_bass_url: '',
+          pdf_vocals_url: '',
+          pdf_keys_url: '',
+          playalong_url: '',
+          bypass_wlan_check: false,
+          instrumentation: { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 },
+          is_campus_active: activePlatform === 'campus',
+          is_groovelab_active: activePlatform !== 'campus',
+          teacher_id: userId
+        };
+      });
+
+      let { data, error } = await supabase.from('songs').insert(insertPayloads).select();
+
+      if (error && (error.message.includes('playalong_url') || error.code === 'PGRST204' || error.message.includes('column') || error.message.includes('cache'))) {
+        console.warn('[AdminDashboard] playalong_url column missing, retrying bulk insert without it');
+        const strippedPayloads = insertPayloads.map(({ playalong_url, ...stripped }) => stripped);
+        const retryResult = await supabase.from('songs').insert(strippedPayloads).select();
+        data = retryResult.data;
+        error = retryResult.error;
+      }
+
+      if (error) alert('Fehler: ' + error.message);
+      else if (data) {
+        setSongs([...songs, ...data]);
+        setShowAddSong(false);
+        setBulkModeSongs(false);
+        setBulkTextSongs('');
+      }
+      return;
+    }
+
     if (admin?.schools?.limits_enabled) {
       const maxSongs = admin.schools.max_songs ?? 5;
       if (songs.length >= maxSongs) {
@@ -2397,13 +2463,11 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       instrumentation: newSong.instrumentation,
       is_campus_active: activePlatform === 'campus',
       is_groovelab_active: activePlatform !== 'campus',
-      // REGEL: Lehrer-Songs werden explizit mit dem Lehrer verknüpft
       teacher_id: userId
     };
 
     let { data, error } = await supabase.from('songs').insert(insertPayload).select().single();
     
-    // Fallback: If playalong_url column doesn't exist, retry without it
     if (error && (error.message.includes('playalong_url') || error.code === 'PGRST204' || error.message.includes('column') || error.message.includes('cache'))) {
       console.warn('[AdminDashboard] playalong_url column missing, retrying insert without it');
       const { playalong_url, ...strippedPayload } = insertPayload;
@@ -4367,6 +4431,61 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
     const handleAddLehrwerkSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
+      
+      if (bulkModeLehrwerke) {
+        const lines = bulkTextLehrwerke.split('\n').map(l => l.trim()).filter(Boolean);
+        if (lines.length === 0) return;
+
+        const insertPayloads = lines.map(line => {
+          let title = line;
+          let author = null;
+          let totalPages = 50;
+
+          if (line.includes(' - ')) {
+            const parts = line.split(' - ');
+            title = parts[0].trim();
+            if (parts.length === 2) {
+              const second = parts[1].trim();
+              if (/^\d+$/.test(second)) {
+                totalPages = parseInt(second, 10);
+              } else {
+                author = second;
+              }
+            } else if (parts.length >= 3) {
+              author = parts[1].trim();
+              totalPages = parseInt(parts[2].trim(), 10) || 50;
+            }
+          }
+
+          return {
+            title,
+            author,
+            total_pages: totalPages,
+            school_id: admin?.school_id,
+            teacher_id: userId
+          };
+        });
+
+        const { data, error } = await supabase
+          .from('lehrwerke')
+          .insert(insertPayloads)
+          .select();
+
+        if (error) {
+          alert('Fehler beim Sammel-Import: ' + error.message);
+        } else if (data) {
+          const mapped = data.map((d: any) => ({
+            ...d,
+            totalPages: d.total_pages || 50
+          }));
+          setLehrwerke(prev => [...prev, ...mapped]);
+          setShowAddLehrwerk(false);
+          setBulkModeLehrwerke(false);
+          setBulkTextLehrwerke('');
+        }
+        return;
+      }
+
       if (!newLehrwerk.title) return;
       
       const insertPayload = {
@@ -4529,29 +4648,71 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
             {showAddSong && (
               <form onSubmit={handleAddSong} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'white', borderRadius: '16px', border: `1px solid ${brandColor}20`, boxShadow: '0 8px 24px rgba(0,0,0,0.02)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Interpret / Band</label>
-                    <input required placeholder="z.B. Nirvana" value={newSong.artist} onChange={e => setNewSong({...newSong, artist: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Songtitel</label>
-                    <input required placeholder="z.B. Smells Like Teenspirit" value={newSong.title} onChange={e => setNewSong({...newSong, title: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                  </div>
+                {/* Mode Toggles */}
+                <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px', gap: '12px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setBulkModeSongs(false)}
+                    style={{
+                      background: 'none', border: 'none', padding: '4px 8px', fontSize: '0.78rem', fontWeight: !bulkModeSongs ? 800 : 600,
+                      color: !bulkModeSongs ? brandColor : '#64748b', borderBottom: !bulkModeSongs ? `2px solid ${brandColor}` : 'none', cursor: 'pointer', outline: 'none'
+                    }}
+                  >
+                    Einzeln hinzufügen
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBulkModeSongs(true)}
+                    style={{
+                      background: 'none', border: 'none', padding: '4px 8px', fontSize: '0.78rem', fontWeight: bulkModeSongs ? 800 : 600,
+                      color: bulkModeSongs ? brandColor : '#64748b', borderBottom: bulkModeSongs ? `2px solid ${brandColor}` : 'none', cursor: 'pointer', outline: 'none'
+                    }}
+                  >
+                    Sammel-Onboarding
+                  </button>
                 </div>
 
-                {activePlatform !== 'campus' && (
+                {!bulkModeSongs ? (
                   <>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Cloud Link</label>
-                      <input placeholder="https://cloud.folder.link..." value={newSong.media_link} onChange={e => setNewSong({...newSong, media_link: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Interpret / Band</label>
+                        <input required placeholder="z.B. Nirvana" value={newSong.artist} onChange={e => setNewSong({...newSong, artist: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Songtitel</label>
+                        <input required placeholder="z.B. Smells Like Teenspirit" value={newSong.title} onChange={e => setNewSong({...newSong, title: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                      </div>
                     </div>
+
+                    {activePlatform !== 'campus' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Cloud Link</label>
+                        <input placeholder="https://cloud.folder.link..." value={newSong.media_link} onChange={e => setNewSong({...newSong, media_link: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                      </div>
+                    )}
                   </>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Mehrere Songs eintragen</label>
+                    <p style={{ margin: 0, fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>Format: Interpret - Songtitel (eine Zeile pro Song)</p>
+                    <textarea
+                      required
+                      placeholder={`Nirvana - Smells Like Teen Spirit\nMichael Jackson - Billie Jean\nColdplay - Yellow`}
+                      value={bulkTextSongs}
+                      onChange={e => setBulkTextSongs(e.target.value)}
+                      style={{
+                        width: '100%', height: '140px', padding: '12px', borderRadius: '10px',
+                        border: '1px solid #e2e8f0', fontSize: '0.85rem', fontWeight: 600, fontFamily: 'monospace',
+                        outline: 'none', resize: 'none'
+                      }}
+                    />
+                  </div>
                 )}
 
                 <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                  <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer' }}>Speichern</button>
-                  <button type="button" onClick={() => setShowAddSong(false)} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem' }}>Abbrechen</button>
+                  <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer' }}>Importieren / Speichern</button>
+                  <button type="button" onClick={() => { setShowAddSong(false); setBulkModeSongs(false); setBulkTextSongs(''); }} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem' }}>Abbrechen</button>
                 </div>
               </form>
             )}
@@ -4705,24 +4866,68 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
             {showAddLehrwerk && (
               <form onSubmit={handleAddLehrwerkSubmit} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'white', borderRadius: '16px', border: `1px solid ${brandColor}20`, boxShadow: '0 8px 24px rgba(0,0,0,0.02)' }}>
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Neues Lehrwerk</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>Titel</label>
-                    <input required placeholder="z.B. GrooveLab Drums Vol. 2" value={newLehrwerk.title} onChange={e => setNewLehrwerk({...newLehrwerk, title: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>Autor</label>
-                    <input placeholder="z.B. Max Mustermann" value={newLehrwerk.author || ''} onChange={e => setNewLehrwerk({...newLehrwerk, author: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>Seiten</label>
-                    <input type="number" min="1" max="1000" placeholder="50" value={newLehrwerk.totalPages} onChange={e => setNewLehrwerk({...newLehrwerk, totalPages: Number(e.target.value) || 50})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Neues Lehrwerk</h4>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setBulkModeLehrwerke(false)}
+                      style={{
+                        background: 'none', border: 'none', padding: '4px 8px', fontSize: '0.78rem', fontWeight: !bulkModeLehrwerke ? 800 : 600,
+                        color: !bulkModeLehrwerke ? brandColor : '#64748b', borderBottom: !bulkModeLehrwerke ? `2px solid ${brandColor}` : 'none', cursor: 'pointer', outline: 'none'
+                      }}
+                    >
+                      Einzeln
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBulkModeLehrwerke(true)}
+                      style={{
+                        background: 'none', border: 'none', padding: '4px 8px', fontSize: '0.78rem', fontWeight: bulkModeLehrwerke ? 800 : 600,
+                        color: bulkModeLehrwerke ? brandColor : '#64748b', borderBottom: bulkModeLehrwerke ? `2px solid ${brandColor}` : 'none', cursor: 'pointer', outline: 'none'
+                      }}
+                    >
+                      Sammel-Onboarding
+                    </button>
                   </div>
                 </div>
+
+                {!bulkModeLehrwerke ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>Titel</label>
+                      <input required placeholder="z.B. GrooveLab Drums Vol. 2" value={newLehrwerk.title} onChange={e => setNewLehrwerk({...newLehrwerk, title: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>Autor</label>
+                      <input placeholder="z.B. Max Mustermann" value={newLehrwerk.author || ''} onChange={e => setNewLehrwerk({...newLehrwerk, author: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>Seiten</label>
+                      <input type="number" min="1" max="1000" placeholder="50" value={newLehrwerk.totalPages} onChange={e => setNewLehrwerk({...newLehrwerk, totalPages: Number(e.target.value) || 50})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Mehrere Lehrwerke eintragen</label>
+                    <p style={{ margin: 0, fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>Format: Titel - Autor - Seitenzahl (eine Zeile pro Lehrwerk)</p>
+                    <textarea
+                      required
+                      placeholder={`GrooveLab Drums Vol. 2 - Max Mustermann - 50\nGitarrenschule 1 - Hans Müller - 64\nKlavierfibel - Unbekannt - 40`}
+                      value={bulkTextLehrwerke}
+                      onChange={e => setBulkTextLehrwerke(e.target.value)}
+                      style={{
+                        width: '100%', height: '140px', padding: '12px', borderRadius: '10px',
+                        border: '1px solid #e2e8f0', fontSize: '0.85rem', fontWeight: 600, fontFamily: 'monospace',
+                        outline: 'none', resize: 'none'
+                      }}
+                    />
+                  </div>
+                )}
+
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer' }}>Speichern</button>
-                  <button type="button" onClick={() => setShowAddLehrwerk(false)} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem' }}>Abbrechen</button>
+                  <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer' }}>Importieren / Speichern</button>
+                  <button type="button" onClick={() => { setShowAddLehrwerk(false); setBulkModeLehrwerke(false); setBulkTextLehrwerke(''); }} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem' }}>Abbrechen</button>
                 </div>
               </form>
             )}
