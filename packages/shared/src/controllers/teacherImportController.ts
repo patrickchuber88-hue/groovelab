@@ -138,10 +138,8 @@ export async function importTeachersHandler(req: Request, res: Response): Promis
       // Generates a 6-digit random numeric string
       const ausweisNummer = Math.floor(100000 + Math.random() * 900000).toString();
 
-      // Generate an encrypted 'teacher_qr_token' using HMAC
-      const hmac = createHmac('sha256', TOKEN_SECRET);
-      hmac.update(`${email}:${ausweisNummer}:${Date.now()}`);
-      const teacherQrToken = hmac.digest('hex');
+      // Generate a coupled 'teacher_qr_token'
+      const teacherQrToken = 't_' + ausweisNummer;
 
       importedTeachers.push({
         school_id: schoolId,

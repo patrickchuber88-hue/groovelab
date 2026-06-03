@@ -1777,7 +1777,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       
       try {
         const pin = 'GL-' + Math.floor(1000 + Math.random() * 9000);
-        const qrToken = 't_' + Math.random().toString(36).substring(2, 12);
+        const qrToken = 't_' + pin;
         const { error } = await supabase
           .from('users')
           .insert({
@@ -2028,7 +2028,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         const instrument = parts[3]?.trim() || (teacherFilterInstrument !== 'All' ? teacherFilterInstrument : 'Allgemein');
         const maxStudents = parseInt(parts[4]?.trim()) || 10;
         const pin = 'GL-' + Math.floor(1000 + Math.random() * 9000);
-        const qrToken = 't_' + Math.random().toString(36).substring(2, 12);
+        const qrToken = 't_' + pin;
 
         const { error } = await supabase
           .from('users')
@@ -2073,7 +2073,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
     try {
       const pin = 'GL-' + Math.floor(1000 + Math.random() * 9000);
-      const qrToken = 't_' + Math.random().toString(36).substring(2, 12);
+      const qrToken = 't_' + pin;
 
       const { error } = await supabase
         .from('users')
@@ -2115,7 +2115,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
     try {
       const pin = 'GL-' + Math.floor(1000 + Math.random() * 9000);
-      const qrToken = 't_' + Math.random().toString(36).substring(2, 12);
+      const qrToken = 't_' + pin;
 
       const { error } = await supabase
         .from('users')
@@ -2153,7 +2153,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
     try {
       const pin = 'GL-' + Math.floor(1000 + Math.random() * 9000);
-      const qrToken = 't_' + Math.random().toString(36).substring(2, 12);
+      const qrToken = 't_' + pin;
 
       const { error } = await supabase
         .from('users')
@@ -11558,13 +11558,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 <button 
                   onClick={async () => {
                     const newPin = 'GL-' + Math.floor(1000 + Math.random() * 9000);
+                    const newQrToken = 't_' + newPin;
                     try {
                       const { error } = await supabase
                         .from('users')
-                        .update({ ausweis_nummer: newPin })
+                        .update({ ausweis_nummer: newPin, teacher_qr_token: newQrToken })
                         .eq('id', manageTeacher.id);
                       if (error) throw error;
-                      setManageTeacher({ ...manageTeacher, ausweisNummer: newPin });
+                      setManageTeacher({ ...manageTeacher, ausweisNummer: newPin, teacherQrToken: newQrToken });
                       fetchDashboardData();
                     } catch (err: any) {
                       alert('Fehler beim Zurücksetzen: ' + err.message);
