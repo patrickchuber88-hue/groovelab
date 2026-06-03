@@ -2071,7 +2071,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#4b5563', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span>🖌️</span> Pinsel zum Einfärben:
+                          <span>🎵</span> Songstatus:
                         </span>
                         <div style={{ display: 'flex', gap: '8px' }}>
                           {[
