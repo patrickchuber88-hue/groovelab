@@ -3286,10 +3286,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                     background: '#ffffff',
                                     color: '#475569',
                                     padding: '4px 10px',
-                                    borderRadius: '20px',
+                                    borderRadius: '999px',
                                     fontSize: '0.76rem',
                                     fontWeight: 900,
-                                    boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
+                                    border: '1px solid rgba(251, 191, 36, 0.3)',
+                                    boxShadow: '0 3px 8px rgba(0,0,0,0.03), 0 0 12px rgba(251, 191, 36, 0.32)'
                                   }}>
                                     <span>🎵 {item.topic_name}</span>
                                   </div>
@@ -4028,13 +4029,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                             background: '#ffffff',
                                             color: '#475569',
                                             padding: '4px 10px 4px 12px',
-                                            borderRadius: '20px',
+                                            borderRadius: '999px',
                                             fontSize: '0.76rem',
                                             fontWeight: 900,
-                                            border: 'none',
+                                            border: '1px solid rgba(251, 191, 36, 0.3)',
                                             fontFamily: '"Helvetica Neue", Helvetica, Inter, Arial, sans-serif',
                                             letterSpacing: '-0.02em',
-                                            boxShadow: '0 2px 6px rgba(0,0,0,0.03), 0 0 8px rgba(251, 191, 36, 0.18)'
+                                            boxShadow: '0 3px 8px rgba(0,0,0,0.03), 0 0 12px rgba(251, 191, 36, 0.32)'
                                           }}>
                                             <span>📄 S. {p}</span>
                                             {original?.id && !(original?.updated_at && getISOWeek(original.updated_at) !== getISOWeek()) && (
@@ -4079,11 +4080,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                           background: '#ffffff',
                                           color: '#475569',
                                           padding: '4px 10px 4px 12px',
-                                          borderRadius: '20px',
+                                          borderRadius: '999px',
                                           fontSize: '0.76rem',
                                           fontWeight: 900,
-                                          border: 'none',
-                                          boxShadow: '0 2px 6px rgba(0,0,0,0.03), 0 0 8px rgba(251, 191, 36, 0.18)'
+                                          border: '1px solid rgba(251, 191, 36, 0.3)',
+                                          boxShadow: '0 3px 8px rgba(0,0,0,0.03), 0 0 12px rgba(251, 191, 36, 0.32)'
                                         }}>
                                           <span>🎵 {item.topic_name}</span>
                                           {!(item.updated_at && getISOWeek(item.updated_at) !== getISOWeek()) && (

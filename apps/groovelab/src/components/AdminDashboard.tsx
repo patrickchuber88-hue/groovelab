@@ -6729,12 +6729,12 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                           gap: '5px',
                                           background: '#ffffff',
                                           color: '#475569',
-                                          padding: '4px 8px 4px 10px',
-                                          borderRadius: '6px',
+                                          padding: '4px 10px 4px 12px',
+                                          borderRadius: '999px',
                                           fontSize: '0.76rem',
                                           fontWeight: 900,
-                                          border: '1px solid #e2e8f0',
-                                          boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                                          border: '1px solid rgba(251, 191, 36, 0.3)',
+                                          boxShadow: '0 3px 8px rgba(0,0,0,0.03), 0 0 12px rgba(251, 191, 36, 0.32)'
                                         }}>
                                           <span>{p.status === 'theory_done' ? '🧠' : '📄'} S. {p.num}</span>
                                         </div>
