@@ -4461,6 +4461,29 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               ))}
             </div>
           )}
+          <button
+            type="button"
+            onClick={() => setActiveSubView('hub')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: '#f1f5f9',
+              border: 'none',
+              color: '#475569',
+              padding: '8px 14px',
+              borderRadius: '20px',
+              fontSize: '0.74rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              width: 'fit-content',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+              transition: 'all 0.15s ease'
+            }}
+            className="hover-scale"
+          >
+            <span>← Zurück zum Hub</span>
+          </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
             <span style={{ fontSize: '1.25rem' }}>🏆</span>
             <span style={{
@@ -4471,7 +4494,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               letterSpacing: '0.05em',
               fontFamily: '"Helvetica Neue", Helvetica, Inter, Arial, sans-serif'
             }}>
-              Meisterwerke
+              Deine Meisterwerke
             </span>
           </div>
 
@@ -4561,36 +4584,79 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       Noch keine Meisterwerk-Songs vorhanden.
                     </div>
                   ) : (
-                    masteredSongs.map((skill, idx) => (
-                      <div key={`m-song-${idx}`} style={{
-                        background: 'white',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '20px',
-                        padding: '16px 20px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '6px',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{
-                            fontSize: '0.86rem',
-                            color: '#0f172a',
-                            fontWeight: 900,
-                            letterSpacing: '-0.03em',
-                            fontFamily: '"Helvetica Neue", Helvetica, Inter, Arial, sans-serif'
-                          }}>
-                            🎤 {skill.songs?.title}
+                    masteredSongs.map((skill, idx) => {
+                      const songColor = getSongColor(skill.songs?.title || 'Song');
+                      return (
+                        <div key={`m-song-${idx}`} style={{
+                          background: 'white',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '20px',
+                          padding: '12px 18px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '14px',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                        }}>
+                          {/* Cover + Vinyl */}
+                          <div style={{ position: 'relative', width: '52px', height: '44px', flexShrink: 0 }}>
+                            <div style={{
+                              position: 'absolute',
+                              right: '1px',
+                              top: '3px',
+                              width: '38px',
+                              height: '38px',
+                              borderRadius: '50%',
+                              background: 'radial-gradient(circle, #27272a 35%, #09090b 36%, #18181b 45%, #09090b 60%)',
+                              border: '1px solid #000',
+                              boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              zIndex: 1
+                            }}>
+                              <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: songColor.to, border: '1px solid rgba(0,0,0,0.2)' }} />
+                            </div>
+                            <div style={{
+                              position: 'absolute',
+                              left: 0,
+                              top: 0,
+                              width: '44px',
+                              height: '44px',
+                              background: `linear-gradient(135deg, ${songColor.from} 0%, ${songColor.to} 100%)`,
+                              borderRadius: '5px',
+                              border: '1px solid rgba(0,0,0,0.1)',
+                              boxShadow: '0 3px 6px rgba(0,0,0,0.15)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '1.2rem',
+                              zIndex: 2
+                            }}>
+                              🎵
+                            </div>
                           </div>
-                          <span style={{ fontSize: '0.72rem', background: '#f1f5f9', color: '#334155', padding: '3px 8px', borderRadius: '8px', fontWeight: 800, border: '1px solid #e2e8f0' }}>
-                            {skill.instrument}
-                          </span>
+
+                          {/* Content in a single line */}
+                          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                            <div style={{
+                              fontSize: '0.86rem',
+                              color: '#0f172a',
+                              fontWeight: 900,
+                              letterSpacing: '-0.02em',
+                              fontFamily: '"Helvetica Neue", Helvetica, Inter, Arial, sans-serif',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
+                            }}>
+                              {skill.songs?.artist} - {skill.songs?.title}
+                            </div>
+                            <span style={{ fontSize: '0.72rem', background: '#f1f5f9', color: '#334155', padding: '3px 8px', borderRadius: '8px', fontWeight: 800, border: '1px solid #e2e8f0', flexShrink: 0 }}>
+                              {skill.instrument}
+                            </span>
+                          </div>
                         </div>
-                        <div style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 700 }}>
-                          {skill.songs?.artist}
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
 
@@ -4627,52 +4693,60 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       Noch keine Meisterwerk-Lehrwerke vorhanden.
                     </div>
                   ) : (
-                    masteredBooksList.map((item, idx) => (
-                      <div key={`m-lw-${idx}`} style={{
-                        background: 'white',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '20px',
-                        padding: '16px 20px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '12px',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-                      }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {(() => {
-                              const bookColor = getLehrwerkColor(item.title);
-                              return (
-                                <div style={{
-                                  width: '14px',
-                                  height: '18px',
-                                  background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
-                                  borderRadius: '3px',
-                                  border: `1px solid ${bookColor.text}`,
-                                  flexShrink: 0
-                                }} />
-                              );
-                            })()}
-                            <span>{item.title}</span>
+                    masteredBooksList.map((item, idx) => {
+                      const bookColor = getLehrwerkColor(item.title);
+                      return (
+                        <div key={`m-lw-${idx}`} style={{
+                          background: 'white',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '20px',
+                          padding: '12px 18px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '14px',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                        }}>
+                          {/* Gradient cover book */}
+                          <div style={{
+                            width: '34px',
+                            height: '44px',
+                            background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
+                            borderRadius: '4px',
+                            position: 'relative',
+                            boxShadow: '0 3px 6px rgba(0,0,0,0.15)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}>
+                            <BookOpen size={16} color={bookColor.text} />
+                            <div style={{
+                              position: 'absolute',
+                              left: 0,
+                              top: 0,
+                              bottom: 0,
+                              width: '3px',
+                              background: 'rgba(0,0,0,0.12)',
+                              borderRight: '1px solid rgba(255,255,255,0.08)'
+                            }} />
                           </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                          {item.pages.map((p: number) => (
-                            <div key={p} style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              background: '#f1f5f9',
-                              color: '#334155',
-                              padding: '4px 10px',
-                              borderRadius: '8px',
-                              fontSize: '0.74rem',
-                              fontWeight: 800,
-                              border: '1px solid #e2e8f0'
-                            }}>
-                              S. {p}
-                            </div>
-                          ))}
+
+                          {/* Content in a single line */}
+                          <div style={{
+                            fontSize: '0.86rem',
+                            color: '#0f172a',
+                            fontWeight: 900,
+                            letterSpacing: '-0.02em',
+                            fontFamily: '"Helvetica Neue", Helvetica, Inter, Arial, sans-serif',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}>
+                            {item.title} - <span style={{ color: '#475569', fontWeight: 700 }}>S. {item.pages.join(', ')}</span>
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
