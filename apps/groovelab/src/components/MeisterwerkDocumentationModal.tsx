@@ -4463,7 +4463,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           )}
           <button
             type="button"
-            onClick={() => setActiveSubView('hub')}
+            onClick={() => { setActiveModalTab('document'); setActiveSubView('hub'); }}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
