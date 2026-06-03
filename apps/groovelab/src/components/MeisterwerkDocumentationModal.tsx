@@ -875,17 +875,30 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     // Look up existing database notes in progressItems
     const dbItem = progressItems.find(item => item.topic_name === fullTitle);
     setTeacherNotes(dbItem ? (dbItem.teacher_notes || '') : '');
+    // Load homework notes list
+    if (dbItem && dbItem.homework_notes) {
+      const rawNotes = dbItem.homework_notes;
+      try {
+        if (rawNotes.startsWith('[') && rawNotes.endsWith(']')) {
+          setHomeworkNotesList(JSON.parse(rawNotes));
+        } else {
+          setHomeworkNotesList([rawNotes]);
+        }
+      } catch {
+        setHomeworkNotesList([rawNotes]);
+      }
+    } else {
+      setHomeworkNotesList([]);
+    }
     setHomeworkNotes('');
     
-    if (skill.is_stage_ready) {
+    if (skill.is_stage_ready || skill.progress_percent === 100 || (dbItem && dbItem.status === 'MASTERED')) {
       setStatus('MASTERED');
-      setIsCurrentHomework(false);
-    } else if (skill.progress_percent >= 50) {
-      setStatus('THEORY_DONE');
       setIsCurrentHomework(false);
     } else {
       setStatus('IN_PROGRESS');
-      setIsCurrentHomework(skill.is_current_homework || false);
+      const isHw = dbItem ? dbItem.is_current_homework : (skill.is_current_homework || false);
+      setIsCurrentHomework(isHw);
     }
   };
 
@@ -1204,14 +1217,17 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       }
     }
 
+    const isLehrwerkPage = (activeInputTab === 'lehrwerk_page');
+    const isSong = (activeInputTab === 'active_song');
+
     let finalNotesList = [...homeworkNotesList];
-    if (homeworkNotes.trim().length > 0) {
+    if (!isLehrwerkPage && !isSong && homeworkNotes.trim().length > 0) {
       finalNotesList.push(homeworkNotes.trim());
     }
     const combinedHomeworkNotes = JSON.stringify(finalNotesList);
 
     const hasHomeworkText = finalNotesList.length > 0;
-    const finalIsCurrentHomework = isCurrentHomework || hasHomeworkText;
+    const finalIsCurrentHomework = isCurrentHomework || (isLehrwerkPage || isSong ? homeworkNotes.trim().length > 0 : hasHomeworkText);
 
     const payload = {
       id: activeItem?.id,
@@ -1220,7 +1236,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       status,
       isCurrentHomework: finalIsCurrentHomework,
       teacherNotes: teacherNotes.trim(),
-      homeworkNotes: combinedHomeworkNotes
+      homeworkNotes: (isLehrwerkPage || isSong) ? homeworkNotes.trim() : combinedHomeworkNotes
     };
 
     try {
@@ -1235,18 +1251,20 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       });
 
       if (response.ok) {
-        // Sync homework notes to all other progress items of the current week for this student
-        const currentWeek = getISOWeek();
-        const currentWeekItems = progressItems.filter(item => 
-          item.updated_at && getISOWeek(item.updated_at) === currentWeek
-        );
-        if (currentWeekItems.length > 0) {
-          const itemIds = currentWeekItems.map(item => item.id).filter(Boolean);
-          if (itemIds.length > 0) {
-            await supabase
-              .from('progress_matrix')
-              .update({ homework_notes: combinedHomeworkNotes })
-              .in('id', itemIds);
+        if (!isLehrwerkPage && !isSong) {
+          // Sync homework notes to all other progress items of the current week for this student
+          const currentWeek = getISOWeek();
+          const currentWeekItems = progressItems.filter(item => 
+            item.updated_at && getISOWeek(item.updated_at) === currentWeek
+          );
+          if (currentWeekItems.length > 0) {
+            const itemIds = currentWeekItems.map(item => item.id).filter(Boolean);
+            if (itemIds.length > 0) {
+              await supabase
+                .from('progress_matrix')
+                .update({ homework_notes: combinedHomeworkNotes })
+                .in('id', itemIds);
+            }
           }
         }
 
@@ -2266,8 +2284,34 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         </span>
                         <div style={{ display: 'flex', gap: '8px' }}>
                           {[
-                            { mode: 'LOCKED', color: 'hsl(355, 75%, 84%)', label: 'Rot (unbearbeitet)', getActive: () => status === 'IN_PROGRESS' && !isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(false); setSongProgressPercent(25); setHasChanges(true); } },
-                            { mode: 'HOMEWORK', color: 'hsl(47, 85%, 84%)', label: 'Gelb (Hausaufgabe)', getActive: () => status === 'IN_PROGRESS' && isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(true); setSongProgressPercent(25); setHasChanges(true); } },
+                            { mode: 'LOCKED', color: 'hsl(355, 75%, 84%)', label: 'Rot (unbearbeitet)', getActive: () => status === 'IN_PROGRESS' && !isCurrentHomework, action: () => {
+                               setStatus('IN_PROGRESS');
+                               setIsCurrentHomework(false);
+                               setSongProgressPercent(25);
+                               setRhythmVal(25);
+                               setFingerVal(25);
+                               setExpressionVal(25);
+                               setHasChanges(true);
+                               localStorage.setItem(`song_skills_detail_${student.id}_${selectedActiveSongId}`, JSON.stringify({
+                                 rhythm: 25,
+                                 finger: 25,
+                                 expression: 25
+                               }));
+                             } },
+                            { mode: 'HOMEWORK', color: 'hsl(47, 85%, 84%)', label: 'Gelb (Hausaufgabe)', getActive: () => status === 'IN_PROGRESS' && isCurrentHomework, action: () => {
+                               setStatus('IN_PROGRESS');
+                               setIsCurrentHomework(true);
+                               setSongProgressPercent(25);
+                               setRhythmVal(25);
+                               setFingerVal(25);
+                               setExpressionVal(25);
+                               setHasChanges(true);
+                               localStorage.setItem(`song_skills_detail_${student.id}_${selectedActiveSongId}`, JSON.stringify({
+                                 rhythm: 25,
+                                 finger: 25,
+                                 expression: 25
+                               }));
+                             } },
                             { mode: 'MASTERED', color: 'hsl(130, 65%, 82%)', label: 'Grün (gemeistert - 100%)', getActive: () => status === 'MASTERED', action: () => {
                                setStatus('MASTERED');
                                setIsCurrentHomework(false);
@@ -2384,6 +2428,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             setFingerVal(val);
                             setExpressionVal(val);
                             if (val === 100) {
+                              setStatus('MASTERED');
+                              setIsCurrentHomework(false);
                               setIsSubSlidersExpanded(false);
                             } else {
                               setStatus('IN_PROGRESS');
@@ -2458,6 +2504,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   if (avg < 100) {
                                     setStatus('IN_PROGRESS');
                                     setIsCurrentHomework(true);
+                                  } else {
+                                    setStatus('MASTERED');
+                                    setIsCurrentHomework(false);
                                   }
                                   localStorage.setItem(`song_skills_detail_${student.id}_${selectedActiveSongId}`, JSON.stringify({
                                     rhythm: r,
@@ -3594,6 +3643,80 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       >
                         Notizen speichern
                       </button>
+                    </div>
+
+                    {/* Live Preview Box */}
+                    <div style={{
+                      marginTop: '12px',
+                      background: 'rgba(251, 191, 36, 0.05)',
+                      border: '1.5px dashed rgba(251, 191, 36, 0.3)',
+                      borderRadius: '16px',
+                      padding: '12px 16px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px'
+                    }}>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span>👁️ Live-Vorschau (im Hausaufgaben-Widget):</span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ fontSize: '0.86rem', color: '#09090b', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {(() => {
+                            const book = globalLehrwerke.find(b => b.id === activeLehrwerkId);
+                            const bookColor = getLehrwerkColor(book?.title || '');
+                            return (
+                              <div style={{
+                                width: '14px',
+                                height: '18px',
+                                background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
+                                borderRadius: '3px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0
+                              }}>
+                                <BookOpen size={8} color={bookColor.text} />
+                              </div>
+                            );
+                          })()}
+                          <span>{globalLehrwerke.find(b => b.id === activeLehrwerkId)?.title}</span> · <span style={{ color: '#4b5563', fontWeight: 700 }}>S. {activePageNumber}</span>
+                        </div>
+                        <div style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          background: '#ffffff',
+                          color: '#475569',
+                          padding: '4px 10px 4px 12px',
+                          borderRadius: '999px',
+                          fontSize: '0.74rem',
+                          fontWeight: 900,
+                          border: '1px solid rgba(251, 191, 36, 0.3)',
+                          boxShadow: '0 3px 8px rgba(0,0,0,0.03), 0 0 12px rgba(251, 191, 36, 0.2)',
+                          alignSelf: 'flex-start'
+                        }}>
+                          <span>📄 S. {activePageNumber}</span>
+                        </div>
+                        <div style={{ 
+                          display: 'flex', 
+                          gap: '6px', 
+                          alignItems: 'flex-start', 
+                          fontSize: '0.74rem', 
+                          color: '#475569', 
+                          lineHeight: '1.4',
+                          background: '#ffffff',
+                          border: '1px solid rgba(251, 191, 36, 0.15)',
+                          borderRadius: '12px',
+                          padding: '8px 12px',
+                          marginTop: '2px',
+                          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
+                        }}>
+                          <span style={{ fontWeight: 800, color: '#b45309', flexShrink: 0 }}>S. {activePageNumber}:</span>
+                          <span style={{ fontWeight: 650, color: homeworkNotes.trim() ? '#1e293b' : '#94a3b8', fontStyle: homeworkNotes.trim() ? 'normal' : 'italic', whiteSpace: 'pre-wrap' }}>
+                            {homeworkNotes.trim() || 'Keine Hausaufgabe eingetragen'}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
