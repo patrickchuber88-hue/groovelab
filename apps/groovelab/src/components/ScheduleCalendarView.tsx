@@ -951,17 +951,17 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
         alignItems: 'center',
         gap: '16px'
       }}>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0, width: '264px' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
           <div style={{ height: '40px', width: '40px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.15)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <CalendarIcon size={20} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
-              KW {weekNumber}
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em', whiteSpace: 'nowrap', display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+              <span>KW {weekNumber}</span>
+              <span style={{ color: '#86868b', fontSize: '0.78rem', fontWeight: 500 }}>
+                ({weekStart.toLocaleDateString('de-DE')} - {new Date(weekStart.getTime() + 6 * 86400000).toLocaleDateString('de-DE')})
+              </span>
             </h2>
-            <p style={{ color: '#86868b', fontSize: '0.78rem', fontWeight: 500, marginTop: '1px', whiteSpace: 'nowrap', margin: '1px 0 0 0' }}>
-              {weekStart.toLocaleDateString('de-DE')} - {new Date(weekStart.getTime() + 6 * 86400000).toLocaleDateString('de-DE')}
-            </p>
           </div>
         </div>
 
