@@ -6388,148 +6388,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
                   {/* Content Container */}
                   <div style={{ paddingLeft: '12px' }}>
-                    <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: '0 0 12px 0', borderBottom: '2px solid #cbd5e1', paddingBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>➕ Schüler zuweisen</span>
-                      <button
-                        onClick={() => setShowQuickAddStudent(!showQuickAddStudent)}
-                        style={{
-                          background: showQuickAddStudent ? '#f1f5f9' : gradient.from,
-                          color: showQuickAddStudent ? '#475569' : gradient.text,
-                          border: showQuickAddStudent ? '1px solid #cbd5e1' : `1px solid ${gradient.text}`,
-                          borderRadius: '8px',
-                          padding: '4px 10px',
-                          fontSize: '0.75rem',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}
-                      >
-                        {showQuickAddStudent ? 'Abbrechen' : '+ Neuen Schüler anlegen'}
-                      </button>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: '0 0 12px 0', borderBottom: '2px solid #cbd5e1', paddingBottom: '6px' }}>
+                      ➕ Schüler hinzufügen
                     </h3>
-
-                    {showQuickAddStudent && (
-                      <form 
-                        onSubmit={async (e) => {
-                          e.preventDefault();
-                          if (!quickFirstName.trim()) return;
-                          try {
-                            const qrToken = crypto.randomUUID();
-                            const studentInstrument = quickInstrument;
-                            const studentAvatarUrl = getInstrumentAvatarUrl(studentInstrument);
-
-                            const { data: newStudentData, error: insertErr } = await supabase.from('users').insert({
-                              school_id: admin.school_id, 
-                              role: 'student', 
-                              first_name: quickFirstName, 
-                              last_name: quickLastName.length > 1 ? quickLastName.charAt(0) + '.' : quickLastName, 
-                              birth_date: null,
-                              photo_url: '/avatar_ghost.jpg',
-                              avatar_url: studentAvatarUrl,
-                              qr_token: qrToken,
-                              is_external_vocalist: false,
-                              instrument: studentInstrument,
-                              is_campus_active: activePlatform === 'campus',
-                              is_groovelab_active: activePlatform === 'groovelab'
-                            }).select().single();
-
-                            if (insertErr) {
-                              alert('Fehler: ' + insertErr.message);
-                              return;
-                            }
-
-                            if (newStudentData) {
-                              await supabase.from('avatars').upsert({
-                                user_id: newStudentData.id,
-                                avatar_style: 'Premium_Hero',
-                                instrument_type: getInstrumentTypeKey(studentInstrument),
-                                evolution_level: 1,
-                                xp: 0,
-                                asset_path: studentAvatarUrl,
-                                streak_flame: 0
-                              });
-
-                              // Assign
-                              const stored = localStorage.getItem('student_lehrwerke_progress');
-                              const parsed = stored ? JSON.parse(stored) : [];
-                              const newAssignment = {
-                                studentId: newStudentData.id,
-                                lehrwerkId: book.id,
-                                assignedAt: new Date().toISOString(),
-                                pageStates: {}
-                              };
-                              const updated = [...parsed, newAssignment];
-                              localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
-                              setLocalProgress(updated);
-                              setStudents([...students, newStudentData]);
-
-                              setQuickFirstName('');
-                              setQuickLastName('');
-                              setShowQuickAddStudent(false);
-                            }
-                          } catch (err: any) {
-                            console.error(err);
-                            alert('Fehler beim Anlegen des Schülers.');
-                          }
-                        }}
-                        style={{
-                          background: 'white',
-                          border: '1px solid #cbd5e1',
-                          borderRadius: '14px',
-                          padding: '16px',
-                          marginBottom: '16px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '10px',
-                          boxShadow: '0 4px 10px rgba(0,0,0,0.02)'
-                        }}
-                      >
-                        <div style={{ fontWeight: 800, fontSize: '0.8rem', color: '#0f172a' }}>Neuen Schüler anlegen</div>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <input 
-                            required
-                            placeholder="Vorname *" 
-                            value={quickFirstName}
-                            onChange={e => setQuickFirstName(e.target.value)}
-                            style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.8rem', fontWeight: 600 }}
-                          />
-                          <input 
-                            placeholder="Nachname" 
-                            value={quickLastName}
-                            onChange={e => setQuickLastName(e.target.value)}
-                            style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.8rem', fontWeight: 600 }}
-                          />
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                          <select
-                            value={quickInstrument}
-                            onChange={e => setQuickInstrument(e.target.value)}
-                            style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.8rem', fontWeight: 600, background: 'white' }}
-                          >
-                            {Object.keys(ADMIN_INSTRUMENT_ICONS).map(inst => (
-                              <option key={inst} value={inst}>{inst}</option>
-                            ))}
-                          </select>
-                          <button
-                            type="submit"
-                            style={{
-                              background: gradient.from,
-                              color: gradient.text,
-                              border: `1px solid ${gradient.text}`,
-                              borderRadius: '8px',
-                              padding: '8px 16px',
-                              fontSize: '0.8rem',
-                              fontWeight: 800,
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Anlegen & Zuweisen
-                          </button>
-                        </div>
-                      </form>
-                    )}
                     
                     {/* Search field */}
                     <div style={{ position: 'relative', marginBottom: '16px' }}>
@@ -6582,7 +6443,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                             }}
                             className="hover-scale-mini"
                           >
-                            Zuweisen
+                            Hinzufügen
                           </button>
                         </div>
                       ))}
