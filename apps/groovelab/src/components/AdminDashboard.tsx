@@ -1564,12 +1564,32 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           .order('sort_order', { ascending: true });
         if (roomsData) setRooms(roomsData);
 
-        const { data: stationsData } = await supabase
+        let { data: stationsData } = await supabase
           .from('stations')
           .select('*, rooms!inner(school_id)')
           .eq('rooms.school_id', adminData.school_id)
           .order('sort_order', { ascending: true })
           .order('name');
+
+        if (roomsData && stationsData) {
+          const missingLehrerInserts = [];
+          for (const room of roomsData) {
+            const hasLehrer = stationsData.some(s => s.room_id === room.id && s.name.toLowerCase() === 'lehrer ipad');
+            if (!hasLehrer) {
+              missingLehrerInserts.push({
+                room_id: room.id,
+                name: 'Lehrer iPad',
+                color: '#eab308'
+              });
+            }
+          }
+          if (missingLehrerInserts.length > 0) {
+            const { data: newStations } = await supabase.from('stations').insert(missingLehrerInserts).select();
+            if (newStations) {
+              stationsData = [...stationsData, ...newStations];
+            }
+          }
+        }
         if (stationsData) setStations(stationsData);
       } else if (activeTab === 'songs') {
         let sq = supabase
@@ -4437,7 +4457,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     </div>
   );
 
-  const renderRoomsTab = () => {
+  const renderCampusRoomsTab = () => {
     const selectedRoom = rooms.find(r => r.id === selectedCampusRoomId) || rooms[0];
     
     // Calculate available rooms for selected booking search criteria
@@ -4900,7 +4920,241 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         </div>
       </div>
     );
-  }
+  };
+
+  const renderGroovelabRoomsTab = () => {
+    const groovelabBrandColor = '#eab308';
+    
+    return (
+      <div style={{ marginTop: '24px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="glass-panel" style={{ 
+            background: 'linear-gradient(135deg, #ffffff, #f8fafc)', 
+            border: '1px solid #e2e8f0', 
+            borderRadius: '24px', 
+            padding: '24px', 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            marginBottom: '8px',
+            boxShadow: '0 4px 20px -2px rgba(0,0,0,0.02)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ background: `${groovelabBrandColor}15`, color: groovelabBrandColor, padding: '14px', borderRadius: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 8px 20px -6px ${groovelabBrandColor}30` }}>
+                <Box size={28} />
+              </div>
+              <div>
+                <h2 style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>
+                  Räume & Übeplätze
+                </h2>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
+                  Verwalte deine Räume und ordne Kiosk-Stationen zu
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a' }}>{rooms.length}</div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Räume</div>
+              </div>
+              <div style={{ width: '1px', height: '32px', background: '#cbd5e1' }} />
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a' }}>{stations.length}</div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>iPads Gesamt</div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '24px' }}>
+            {rooms.map((room, index) => (
+              <div 
+                key={room.id} 
+                className="glass-panel" 
+                draggable
+                onDragStart={e => handleRoomDragStart(e, room.id)}
+                onDragOver={handleRoomDragOver}
+                onDragEnter={e => handleRoomDragEnter(e, room.id)}
+                onDragLeave={handleRoomDragLeave}
+                onDrop={e => handleRoomDrop(e, room.id)}
+                onDragEnd={handleRoomDragEnd}
+                style={{ 
+                  padding: '24px', 
+                  background: 'white', 
+                  borderRadius: '24px', 
+                  border: dragOverRoomId === room.id ? `2px dashed ${groovelabBrandColor}` : '1px solid #f1f5f9',
+                  opacity: draggedRoomId === room.id ? 0.4 : 1,
+                  cursor: 'grab',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {/* Kopfzeile: Hauptinformationen & Aktionen */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <GripVertical size={18} color="#cbd5e1" style={{ cursor: 'grab' }} />
+                      <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: `${groovelabBrandColor}10`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Box size={20} color={groovelabBrandColor} />
+                      </div>
+                    </div>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>
+                      {index + 1}. {room.name}
+                    </h3>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={() => setCustomizingRoom(room)} style={{ padding: '8px 12px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569', cursor: 'pointer', fontWeight: 700, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <MapPin size={14} color={groovelabBrandColor} /> Layout
+                    </button>
+                    <button onClick={() => triggerBatchAddStations(room.id)} style={{ padding: '8px 12px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', color: groovelabBrandColor, cursor: 'pointer', fontWeight: 700, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Plus size={14} /> iPad
+                    </button>
+                  </div>
+                </div>
+
+                {/* Fußzeile: Sekundäre Einstellungen (Geofence) */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderTop: '1px solid #f8fafc', paddingTop: '16px' }}>
+                  {/* Linke Seite: Geofence Tags & Löschen-Link */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                    {(room.geofence_points || []).map((pt: any, idx: number) => (
+                      <div key={idx} style={{ 
+                        background: '#fef9c3', 
+                        border: '1px solid #fef08a', 
+                        borderRadius: '8px', 
+                        padding: '6px 10px', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '8px',
+                        fontSize: '0.7rem',
+                        color: '#854d0e',
+                        fontWeight: 700
+                      }}>
+                        <MapPin size={10} /> Punkt {idx + 1}
+                        <button 
+                          onClick={() => handleDeleteGeofencePoint(room.id, idx)}
+                          style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
+                          title="Punkt löschen"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
+                    
+                    {(room.geofence_points?.length > 0 || room.latitude) && (
+                      <button 
+                        onClick={() => handleClearGeofencePoints(room.id)}
+                        style={{ background: 'transparent', border: 'none', color: '#cbd5e1', fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer', padding: '6px' }}
+                      >
+                        Alle löschen
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Rechte Seite: Geofence Kontrollen (Scan / Manuell) */}
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button 
+                      onClick={() => handleAddGeofencePoint(room.id)}
+                      style={{ 
+                        background: '#fffbeb', 
+                        border: '1px dashed #fcd34d', 
+                        borderRadius: '8px', 
+                        padding: '6px 10px', 
+                        color: '#92400e', 
+                        fontSize: '0.7rem', 
+                        fontWeight: 800, 
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                      title="Aktuellen Standort scannen"
+                    >
+                      <MapPin size={12} /> Scan
+                    </button>
+
+                    <button 
+                      onClick={() => setShowManualInput(showManualInput === room.id ? null : room.id)}
+                      style={{ 
+                        background: '#f8fafc', 
+                        border: '1px dashed #cbd5e1', 
+                        borderRadius: '8px', 
+                        padding: '6px 10px', 
+                        color: '#64748b', 
+                        fontSize: '0.7rem', 
+                        fontWeight: 800, 
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <Plus size={12} /> Manuell
+                    </button>
+
+                    {showManualInput === room.id && (
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', animation: 'fadeIn 0.2s' }}>
+                        <input 
+                          placeholder="Lat, Lng" 
+                          value={manualCoords[room.id] || ''} 
+                          onChange={e => setManualCoords({...manualCoords, [room.id]: e.target.value})}
+                          style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.7rem', width: '140px' }} 
+                        />
+                        <button 
+                          onClick={() => {
+                            const parts = manualCoords[room.id]?.split(',').map(s => s.trim());
+                            if (parts?.length === 2 && !isNaN(Number(parts[0])) && !isNaN(Number(parts[1]))) {
+                              handleAddGeofencePoint(room.id, Number(parts[0]), Number(parts[1]));
+                              setManualCoords({...manualCoords, [room.id]: ''});
+                              setShowManualInput(null);
+                            } else {
+                              alert('Format: 47.123, 7.456');
+                            }
+                          }}
+                          style={{ background: groovelabBrandColor, color: 'white', border: 'none', borderRadius: '8px', padding: '6px 10px', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer' }}
+                        >
+                          Set
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {stations
+                    .filter(s => s.room_id === room.id)
+                    .sort((a, b) => {
+                      const aIsLehrer = a.name.toLowerCase() === 'lehrer ipad';
+                      const bIsLehrer = b.name.toLowerCase() === 'lehrer ipad';
+                      if (aIsLehrer && !bIsLehrer) return -1;
+                      if (!aIsLehrer && bIsLehrer) return 1;
+                      return 0;
+                    })
+                    .map(station => (
+                      <div key={station.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #f1f5f9', transition: 'all 0.2s' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 700, color: '#475569' }}>
+                          <Tablet size={16} color={getStationColor(station.name)} /> {station.name}
+                        </div>
+                        {station.name.toLowerCase() !== 'lehrer ipad' && (
+                          <button onClick={() => handleDeleteStation(station.id)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }} onMouseEnter={e => e.currentTarget.style.color = '#ef4444'} onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}>
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  {stations.filter(s => s.room_id === room.id).length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8', fontSize: '0.8125rem', border: '1px dashed #e2e8f0', borderRadius: '14px' }}>Keine Übeplätze definiert.</div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderRoomsTab = () => {
+    return activePlatform === 'groovelab' ? renderGroovelabRoomsTab() : renderCampusRoomsTab();
+  };
 
   const renderSongsTab = () => {
     const brandColor = '#fbbc05';
