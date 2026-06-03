@@ -956,6 +956,14 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           }));
           setLehrwerke(mappedLw);
         }
+
+        // Fetch students for assignments in songs/lehrwerke detail modal
+        let studSq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
+        if (activePlatform === 'campus') studSq = studSq.eq('is_campus_active', true);
+        else studSq = studSq.eq('is_groovelab_active', true);
+        if (adminData.role === 'teacher') studSq = studSq.eq('teacher_id', adminData.id);
+        const { data: studentsData } = await studSq.order('first_name');
+        if (studentsData) setStudents(studentsData);
       } else if (activeTab === 'bands') {
         const { data: bandsData } = await supabase
           .from('bands')
