@@ -198,6 +198,191 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [newLehrwerk, setNewLehrwerk] = useState({ title: '', author: '', totalPages: 50 });
   const [editingLehrwerk, setEditingLehrwerk] = useState<any | null>(null);
   const [selectedLehrwerkForDetail, setSelectedLehrwerkForDetail] = useState<any | null>(null);
+  const [selectedStudentForProgress, setSelectedStudentForProgress] = useState<any | null>(null);
+  const [selectedBrush, setSelectedBrush] = useState<'unbearbeitet' | 'in_progress' | 'mastered' | 'theory_done'>('in_progress');
+  const [weeklyHomeworkNotesList, setWeeklyHomeworkNotesList] = useState<string[]>([]);
+  const [newHomeworkNoteText, setNewHomeworkNoteText] = useState('');
+  const [lessonDayForProgress, setLessonDayForProgress] = useState<number>(1);
+  
+  const getISOWeekNum = (dateInput?: string | Date, lessonDay: number = 1): string => {
+    let date: Date;
+    if (!dateInput) {
+      date = new Date();
+    } else if (dateInput instanceof Date) {
+      date = dateInput;
+    } else {
+      const match = String(dateInput).match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (match) {
+        const year = parseInt(match[1], 10);
+        const month = parseInt(match[2], 10) - 1; // 0-indexed
+        const day = parseInt(match[3], 10);
+        date = new Date(year, month, day);
+      } else {
+        date = new Date(dateInput);
+      }
+    }
+    
+    if (isNaN(date.getTime())) {
+      date = new Date();
+    }
+
+    // Adjust the date back to the most recent lesson day
+    const currentDay = date.getDay(); // 0 (Sun) to 6 (Sat)
+    let diff = currentDay - lessonDay;
+    if (diff < 0) {
+      diff += 7;
+    }
+    
+    const lessonStart = new Date(date);
+    lessonStart.setDate(date.getDate() - diff);
+
+    const d = new Date(Date.UTC(lessonStart.getFullYear(), lessonStart.getMonth(), lessonStart.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+    return String(weekNo).padStart(2, '0');
+  };
+
+  const fetchWeeklyHomeworkNotes = async (studentId: string, currentLessonDay: number) => {
+    try {
+      const currentWeekNum = getISOWeekNum(undefined, currentLessonDay);
+      const topicName = `Hausaufgabe KW ${currentWeekNum}`;
+      
+      const { data, error } = await supabase
+        .from('progress_matrix')
+        .select('*')
+        .eq('student_id', studentId)
+        .eq('topic_name', topicName)
+        .maybeSingle();
+        
+      if (data && data.homework_notes) {
+        try {
+          const raw = data.homework_notes;
+          if (raw.startsWith('[') && raw.endsWith(']')) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              setWeeklyHomeworkNotesList(parsed);
+              return;
+            }
+          }
+          const lines = raw.split('\n').map((l: string) => l.trim()).filter(Boolean);
+          setWeeklyHomeworkNotesList(lines);
+        } catch (e) {
+          setWeeklyHomeworkNotesList([data.homework_notes]);
+        }
+      } else {
+        setWeeklyHomeworkNotesList([]);
+      }
+    } catch (err) {
+      console.error('Error fetching weekly homework notes:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedStudentForProgress) {
+      const loadLessonDayAndFetch = async () => {
+        let activeLessonDay = 1;
+        try {
+          const { data } = await supabase
+            .from('schedules')
+            .select('day_of_week')
+            .eq('student_id', selectedStudentForProgress.id)
+            .limit(1);
+          if (data && data.length > 0 && data[0].day_of_week !== undefined) {
+            activeLessonDay = data[0].day_of_week;
+          }
+        } catch (e) {
+          console.error('Error loading lesson day:', e);
+        }
+        setLessonDayForProgress(activeLessonDay);
+        fetchWeeklyHomeworkNotes(selectedStudentForProgress.id, activeLessonDay);
+      };
+      loadLessonDayAndFetch();
+    } else {
+      setWeeklyHomeworkNotesList([]);
+      setLessonDayForProgress(1);
+    }
+  }, [selectedStudentForProgress]);
+
+  const handleAddWeeklyHomeworkNote = async () => {
+    if (!newHomeworkNoteText.trim() || !selectedStudentForProgress) return;
+    
+    const updatedNotes = [...weeklyHomeworkNotesList, newHomeworkNoteText.trim()];
+    setWeeklyHomeworkNotesList(updatedNotes);
+    setNewHomeworkNoteText('');
+    
+    try {
+      const currentWeekNum = getISOWeekNum(undefined, lessonDayForProgress);
+      const topicName = `Hausaufgabe KW ${currentWeekNum}`;
+      const activeTId = userId || '';
+      
+      const { data: existing } = await supabase
+        .from('progress_matrix')
+        .select('id')
+        .eq('student_id', selectedStudentForProgress.id)
+        .eq('topic_name', topicName)
+        .maybeSingle();
+        
+      if (existing) {
+        await supabase
+          .from('progress_matrix')
+          .update({
+            homework_notes: JSON.stringify(updatedNotes),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existing.id);
+      } else {
+        await supabase
+          .from('progress_matrix')
+          .insert({
+            student_id: selectedStudentForProgress.id,
+            teacher_id: activeTId,
+            topic_name: topicName,
+            status: 'IN_PROGRESS',
+            is_current_homework: true,
+            teacher_notes: '',
+            homework_notes: JSON.stringify(updatedNotes),
+            updated_at: new Date().toISOString()
+          });
+      }
+    } catch (err) {
+      console.error('Error saving weekly homework note:', err);
+    }
+  };
+
+  const handleDeleteWeeklyHomeworkNote = async (idxToDelete: number) => {
+    if (!selectedStudentForProgress) return;
+    
+    const updatedNotes = weeklyHomeworkNotesList.filter((_, idx) => idx !== idxToDelete);
+    setWeeklyHomeworkNotesList(updatedNotes);
+    
+    try {
+      const currentWeekNum = getISOWeekNum(undefined, lessonDayForProgress);
+      const topicName = `Hausaufgabe KW ${currentWeekNum}`;
+      
+      const { data: existing } = await supabase
+        .from('progress_matrix')
+        .select('id')
+        .eq('student_id', selectedStudentForProgress.id)
+        .eq('topic_name', topicName)
+        .maybeSingle();
+        
+      if (existing) {
+        await supabase
+          .from('progress_matrix')
+          .update({
+            homework_notes: JSON.stringify(updatedNotes),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existing.id);
+      }
+    } catch (err) {
+      console.error('Error deleting weekly homework note:', err);
+    }
+  };
+
+  const [quickAddPageNum, setQuickAddPageNum] = useState<string>('');
   const [localProgress, setLocalProgress] = useState<any[]>(() => {
     try {
       const stored = localStorage.getItem('student_lehrwerke_progress');
@@ -207,6 +392,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     }
   });
   const [studentDetailSearch, setStudentDetailSearch] = useState('');
+  const [assignedStudentsSearchQuery, setAssignedStudentsSearchQuery] = useState('');
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
   const [draggedStationId, setDraggedStationId] = useState<string | null>(null);
   
@@ -6150,6 +6336,67 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           }
         };
 
+        const handleUpdatePageProgress = async (studentId: string, pageNum: number, status: string, notes: string) => {
+          try {
+            const stored = localStorage.getItem('student_lehrwerke_progress');
+            const parsed = stored ? JSON.parse(stored) : [];
+            const index = parsed.findIndex((p: any) => p.studentId === studentId && p.lehrwerkId === book.id);
+            if (index === -1) return;
+
+            const pageStates = parsed[index].pageStates || {};
+            pageStates[pageNum] = {
+              status: status,
+              notes: notes,
+              updatedAt: new Date().toISOString()
+            };
+
+            parsed[index].pageStates = pageStates;
+            localStorage.setItem('student_lehrwerke_progress', JSON.stringify(parsed));
+            setLocalProgress(parsed);
+
+            // Sync with Supabase progress_matrix
+            const supabaseStatus = status === 'mastered' ? 'MASTERED' : status === 'theory_done' ? 'THEORY_DONE' : 'IN_PROGRESS';
+            const isCurrentHomework = status === 'in_progress' || status === 'theory_done';
+            await supabase
+              .from('progress_matrix')
+              .upsert({
+                student_id: studentId,
+                topic_name: `${book.title} - Seite ${pageNum}`,
+                status: supabaseStatus,
+                is_current_homework: isCurrentHomework,
+                teacher_notes: notes,
+                updated_at: new Date().toISOString()
+              });
+          } catch (e) {
+            console.error(e);
+          }
+        };
+
+        const handleDeletePageProgress = async (studentId: string, pageNum: number) => {
+          try {
+            const stored = localStorage.getItem('student_lehrwerke_progress');
+            const parsed = stored ? JSON.parse(stored) : [];
+            const index = parsed.findIndex((p: any) => p.studentId === studentId && p.lehrwerkId === book.id);
+            if (index === -1) return;
+
+            const pageStates = parsed[index].pageStates || {};
+            delete pageStates[pageNum];
+
+            parsed[index].pageStates = pageStates;
+            localStorage.setItem('student_lehrwerke_progress', JSON.stringify(parsed));
+            setLocalProgress(parsed);
+
+            // Delete from Supabase progress_matrix
+            await supabase
+              .from('progress_matrix')
+              .delete()
+              .eq('student_id', studentId)
+              .eq('topic_name', `${book.title} - Seite ${pageNum}`);
+          } catch (e) {
+            console.error(e);
+          }
+        };
+
         return (
           <div style={{
             position: 'fixed',
@@ -6181,7 +6428,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               
               {/* Absolute Close Button */}
               <button
-                onClick={() => setSelectedLehrwerkForDetail(null)}
+                onClick={() => { setSelectedLehrwerkForDetail(null); setSelectedStudentForProgress(null); }}
                 style={{
                   position: 'absolute',
                   top: '24px',
@@ -6280,16 +6527,46 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     </div>
 
                     {/* List of working students */}
-                    <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: '20px 0 12px 0', borderBottom: '2px solid #cbd5e1', paddingBottom: '6px' }}>
-                      👥 Zugewiesene Schüler ({assignedStudents.length})
-                    </h3>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #cbd5e1', paddingBottom: '6px', margin: '20px 0 12px 0' }}>
+                      <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Users size={18} color="#0f172a" /> {selectedStudentForProgress ? 'Ausgewählter Schüler' : `Zugewiesene Schüler (${assignedStudents.length})`}
+                      </h3>
+                      {!selectedStudentForProgress && (
+                        <div style={{ position: 'relative', width: '226px' }}>
+                          <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+                          <input
+                            type="text"
+                            placeholder="Suchen..."
+                            value={studentDetailSearch}
+                            onChange={e => setStudentDetailSearch(e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '5px 10px 5px 30px',
+                              borderRadius: '8px',
+                              border: '1px solid #cbd5e1',
+                              fontSize: '0.78rem',
+                              fontWeight: 650,
+                              outline: 'none',
+                              background: 'white'
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
                     {assignedStudents.length === 0 ? (
                       <p style={{ fontStyle: 'italic', color: '#64748b', fontSize: '0.85rem', marginTop: '12px' }}>
                         Bisher arbeitet kein Schüler an diesem Buch.
                       </p>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {assignedStudents.map((s: any) => {
+                        {assignedStudents
+                          .filter((s: any) => !selectedStudentForProgress || s.id === selectedStudentForProgress.id)
+                          .filter((s: any) => {
+                            if (!studentDetailSearch.trim()) return true;
+                            const query = studentDetailSearch.toLowerCase();
+                            return `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase().includes(query);
+                          })
+                          .map((s: any) => {
                           const initials = `${s.first_name?.[0] || ''}${s.last_name?.[0] || ''}`.toUpperCase();
                           const assignment = assignedList.find((p: any) => p.studentId === s.id);
                           const masteredPages = Object.entries(assignment?.pageStates || {})
@@ -6297,16 +6574,20 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                             .map(([pageNum]) => parseInt(pageNum))
                             .sort((a, b) => a - b);
                           return (
-                            <div key={s.id} style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              background: 'rgba(255, 255, 255, 0.7)',
-                              border: '1px solid #e2e8f0',
-                              padding: '10px 14px',
-                              borderRadius: '14px',
-                              boxShadow: '0 2px 4px rgba(0,0,0,0.01)'
-                            }}>
+                            <div key={s.id} 
+                              onClick={() => setSelectedStudentForProgress(s)}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                background: selectedStudentForProgress?.id === s.id ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.7)',
+                                border: selectedStudentForProgress?.id === s.id ? `2px solid ${gradient.text}` : '1px solid #e2e8f0',
+                                padding: '10px 14px',
+                                borderRadius: '14px',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.01)',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <div style={{
                                   width: '32px',
@@ -6337,33 +6618,285 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                   )}
                                 </div>
                               </div>
-                              <button
-                                onClick={() => handleUnassign(s.id)}
-                                style={{
-                                  background: 'transparent',
-                                  border: 'none',
-                                  color: '#ef4444',
-                                  cursor: 'pointer',
-                                  fontSize: '0.85rem',
-                                  fontWeight: 800,
-                                  padding: '4px 8px',
-                                  borderRadius: '6px',
-                                  transition: 'all 0.2s'
-                                }}
-                                onMouseEnter={(e) => e.currentTarget.style.background = '#fee2e2'}
-                                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                              >
-                                Verbindung trennen
-                              </button>
+                              {selectedStudentForProgress ? (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setSelectedStudentForProgress(null); }}
+                                  style={{
+                                    background: '#f1f5f9',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    padding: '6px 12px',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 700,
+                                    color: '#475569',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    transition: 'all 0.2s'
+                                  }}
+                                  onMouseEnter={(e) => e.currentTarget.style.background = '#e2e8f0'}
+                                  onMouseLeave={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                                >
+                                  <ChevronLeft size={12} /> Zurück
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleUnassign(s.id); }}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: '#ef4444',
+                                    cursor: 'pointer',
+                                    width: '28px',
+                                    height: '28px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderRadius: '50%',
+                                    transition: 'all 0.2s'
+                                  }}
+                                  onMouseEnter={(e) => e.currentTarget.style.background = '#fee2e2'}
+                                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                  title="Verbindung trennen"
+                                >
+                                  <X size={16} strokeWidth={2.5} />
+                                </button>
+                              )}
                             </div>
                           );
                         })}
                       </div>
                     )}
+
+                    {/* Hausaufgaben KW 23 Ansicht */}
+                    {selectedStudentForProgress && (() => {
+                      const studentProgressObj = localProgress.find((p: any) => p.studentId === selectedStudentForProgress.id && p.lehrwerkId === book.id);
+                      const pageStates = studentProgressObj?.pageStates || {};
+                      const homeworkPages = Object.entries(pageStates)
+                        .map(([numStr, state]: [string, any]) => ({ num: parseInt(numStr, 10), ...state }))
+                        .filter(p => p.status === 'in_progress' || p.status === 'theory_done')
+                        .sort((a, b) => a.num - b.num);
+                        
+                      const hasActive = homeworkPages.length > 0;
+                      const hasNotes = weeklyHomeworkNotesList.length > 0;
+                      
+                      return (
+                        <>
+                          <div style={{
+                            background: '#fffbeb',
+                            border: '1.5px solid #fef08a',
+                            borderRadius: '16px',
+                            padding: '14px 16px',
+                            marginTop: '20px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '12px',
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #fef08a', paddingBottom: '8px' }}>
+                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#18181b', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                🗓️ Hausaufgaben KW {getISOWeekNum(undefined, lessonDayForProgress)}
+                              </span>
+                            </div>
+                            
+                            {!hasActive && !hasNotes ? (
+                              <span style={{ fontSize: '0.72rem', color: '#71717a', fontWeight: 550, fontStyle: 'italic', lineHeight: '1.4' }}>
+                                ✨ Keine aktiven Hausaufgaben erfasst. Markiere Lehrwerke oder Songs.
+                              </span>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                {hasActive && (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    <div style={{
+                                      fontSize: '0.88rem',
+                                      color: '#09090b',
+                                      fontWeight: 800,
+                                      letterSpacing: '-0.035em'
+                                    }}>
+                                      📖 <span>{book.title}</span> <span style={{ color: '#4b5563', fontWeight: 700, marginLeft: '4px' }}>· S. {homeworkPages.map(p => p.num).join(', ')}</span>
+                                    </div>
+                                    
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', paddingLeft: '2px' }}>
+                                      {homeworkPages.map(p => (
+                                        <div key={p.num} style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '5px',
+                                          background: '#ffffff',
+                                          color: '#475569',
+                                          padding: '4px 8px 4px 10px',
+                                          borderRadius: '6px',
+                                          fontSize: '0.76rem',
+                                          fontWeight: 900,
+                                          border: '1px solid #e2e8f0',
+                                          boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                                        }}>
+                                          <span>{p.status === 'theory_done' ? '🧠' : '📄'} S. {p.num}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {hasNotes && (
+                                  <div style={{ 
+                                    display: 'flex', 
+                                    flexDirection: 'column', 
+                                    gap: '6px',
+                                    borderTop: '1px solid #fef08a',
+                                    paddingTop: '8px',
+                                    marginTop: '2px'
+                                  }}>
+                                    {weeklyHomeworkNotesList.map((note, nIdx) => (
+                                      <div key={nIdx} style={{ 
+                                        display: 'flex', 
+                                        justifyContent: 'space-between',
+                                        alignItems: 'flex-start',
+                                        fontSize: '0.72rem', 
+                                        color: '#475569', 
+                                        fontWeight: 500, 
+                                        fontStyle: 'italic',
+                                        lineHeight: '1.35',
+                                        gap: '8px',
+                                        width: '100%'
+                                      }}>
+                                        <span style={{ whiteSpace: 'pre-line', flex: 1 }}>{note}</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteWeeklyHomeworkNote(nIdx)}
+                                          style={{ border: 'none', background: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.72rem', padding: '0 4px', fontWeight: 800, marginTop: '1px', flexShrink: 0 }}
+                                        >
+                                          ✕
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Notizen und Textbausteine Block */}
+                          <div style={{
+                            background: '#ffffff',
+                            border: '1.5px solid #e2e8f0',
+                            borderRadius: '16px',
+                            padding: '16px',
+                            marginTop: '20px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '12px',
+                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)'
+                          }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>
+                                Hausaufgaben-Notizen
+                              </label>
+                              <textarea
+                                placeholder="Hausaufgaben, Übetipps oder Notizen für diese Woche..."
+                                value={newHomeworkNoteText}
+                                onChange={(e) => setNewHomeworkNoteText(e.target.value)}
+                                rows={3}
+                                style={{
+                                  width: '100%',
+                                  padding: '12px',
+                                  borderRadius: '12px',
+                                  border: '1px solid #cbd5e1',
+                                  fontSize: '0.82rem',
+                                  fontWeight: 600,
+                                  background: '#ffffff',
+                                  outline: 'none',
+                                  resize: 'vertical',
+                                  fontStyle: 'italic',
+                                  fontFamily: 'inherit'
+                                }}
+                              />
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={handleAddWeeklyHomeworkNote}
+                              disabled={!newHomeworkNoteText.trim()}
+                              style={{
+                                background: newHomeworkNoteText.trim() ? gradient.from : '#f1f5f9',
+                                color: newHomeworkNoteText.trim() ? gradient.text : '#94a3b8',
+                                border: newHomeworkNoteText.trim() ? `1px solid ${gradient.text}` : '1px solid #cbd5e1',
+                                borderRadius: '10px',
+                                padding: '8px 16px',
+                                fontSize: '0.78rem',
+                                fontWeight: 800,
+                                cursor: newHomeworkNoteText.trim() ? 'pointer' : 'not-allowed',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                transition: 'all 0.15s ease',
+                                alignSelf: 'flex-start'
+                              }}
+                              className={newHomeworkNoteText.trim() ? "hover-scale-mini" : ""}
+                            >
+                              ➕ Notiz hinzufügen
+                            </button>
+
+                            {/* Schnell-Textbausteine chips */}
+                            <div style={{ marginTop: '4px' }}>
+                              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '8px', textTransform: 'uppercase' }}>
+                                ⚡ Schnell-Textbausteine
+                              </span>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                {[
+                                  { label: '🐌 Schnecken-Tempo', text: 'Spiele die schwierige Passage ganz langsam wie eine Schnecke. Erst wenn deine Finger den Weg im Schlaf kennen, schalten wir den Turbo an!' },
+                                  { label: '🔂 Ritter-Dreierspiel', text: 'Wiederhole den kniffligen Übergang dreimal hintereinander fehlerfrei. Schaffst du das, hast du die Stelle gemeistert!' },
+                                  { label: '🎵 Laut-Leise Zauber', text: 'Lass das Stück lebendig klingen! Mache deutliche Unterschiede zwischen Flüsterlautstärke (piano) und Löwenbrüllen (forte).' },
+                                  { label: '⏱️ 10-Min.-Champion', text: 'Stelle dir einen Timer auf 10 Minuten. Übe diese Woche jeden Tag kurz und fokussiert, anstatt einmal ganz lang am Wochenende.' },
+                                  { label: '🌟 Eigener Remix', text: 'Du beherrschst die Noten super! Überlege dir bis zum nächsten Mal eine eigene coole Rhythmus-Variante für diesen Teil.' },
+                                  { label: '🕵️‍♂️ Noten-Detektiv', text: 'Lies die Noten laut mit und achte genau auf die Tonlängen. Sei wie ein Detektiv, dem keine Note entwischt!' },
+                                  { label: '👁️ Blind-Flug', text: 'Schließe beim Spielen mal die Augen. Fühle die Tasten/Saiten und spiele die Stelle ganz blind auswendig!' },
+                                  { label: '🥁 Puls-Master', text: 'Klatsche zuerst den Rhythmus und zähle laut mit, bevor du dein Instrument spielst. Der Rhythmus ist das Herz der Musik!' },
+                                  { label: '🧩 Puzzle-Taktik', text: 'Übe nicht das ganze Stück auf einmal. Nimm dir einen einzelnen Takt vor und setze ihn als perfektes Puzzleteil zusammen!' }
+                                ].map((tpl, i) => (
+                                  <button
+                                    key={i}
+                                    type="button"
+                                    onClick={() => {
+                                      setNewHomeworkNoteText(prev => prev ? `${prev}\n\n${tpl.text}` : tpl.text);
+                                    }}
+                                    style={{
+                                      background: '#ffffff',
+                                      color: '#4b5563',
+                                      border: '1px solid #e5e7eb',
+                                      padding: '6px 12px',
+                                      borderRadius: '9999px',
+                                      fontSize: '0.66rem',
+                                      fontWeight: 650,
+                                      cursor: 'pointer',
+                                      transition: 'all 0.12s ease-in-out',
+                                      boxShadow: '0 1px 2px rgba(0,0,0,0.01)'
+                                    }}
+                                    className="hover-scale-mini"
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.background = '#f9fafb';
+                                      e.currentTarget.style.borderColor = '#cbd5e1';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.background = '#ffffff';
+                                      e.currentTarget.style.borderColor = '#e5e7eb';
+                                    }}
+                                  >
+                                    {tpl.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
 
-                {/* Right Page (Assign Students Search & Add) */}
+                {/* Right Page (Assign Students Search & Add OR Selected Student Progress Editor) */}
                 <div style={{
                   flex: 1,
                   padding: '32px',
@@ -6396,71 +6929,189 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
                   {/* Content Container */}
                   <div style={{ paddingLeft: '12px' }}>
-                    <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: '0 0 12px 0', borderBottom: '2px solid #cbd5e1', paddingBottom: '6px' }}>
-                      ➕ Schüler hinzufügen
-                    </h3>
-                    
-                    {/* Search field */}
-                    <div style={{ position: 'relative', marginBottom: '16px' }}>
-                      <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                      <input
-                        type="text"
-                        placeholder="Schüler suchen..."
-                        value={studentDetailSearch}
-                        onChange={e => setStudentDetailSearch(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px 8px 36px',
-                          borderRadius: '10px',
-                          border: '1px solid #cbd5e1',
-                          fontSize: '0.85rem',
-                          fontWeight: 600,
-                          outline: 'none',
-                          background: 'white'
-                        }}
-                      />
-                    </div>
+                    {selectedStudentForProgress ? (() => {
+                      const studentProgressObj = localProgress.find((p: any) => p.studentId === selectedStudentForProgress.id && p.lehrwerkId === book.id);
+                      const pageStates = studentProgressObj?.pageStates || {};
+                      
+                      // Calculate progress stats
+                      const totalPages = book.totalPages || 50;
+                      const masteredPagesCount = Object.entries(pageStates)
+                        .filter(([_, state]: [string, any]) => state.status === 'mastered')
+                        .length;
+                      const percent = Math.round((masteredPagesCount / totalPages) * 100);
 
-                    {/* Unassigned Students List */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {unassignedStudents.map((s: any) => (
-                        <div key={s.id} style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          background: 'rgba(255, 255, 255, 0.5)',
-                          border: '1px dashed #cbd5e1',
-                          padding: '8px 12px',
-                          borderRadius: '12px'
-                        }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>
-                            {s.first_name} {s.last_name}
-                          </span>
-                          <button
-                            onClick={() => handleAssign(s.id)}
-                            style={{
-                              background: gradient.from,
-                              color: gradient.text,
-                              border: `1px solid ${gradient.text}`,
-                              borderRadius: '8px',
-                              padding: '5px 12px',
-                              fontSize: '0.75rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              transition: 'transform 0.1s'
-                            }}
-                            className="hover-scale-mini"
-                          >
-                            Hinzufügen
-                          </button>
+                      return (
+                        <div>
+                          {/* 1. Progress Bar */}
+                          <div style={{ background: 'white', border: '1px solid #e2e8f0', padding: '16px 20px', borderRadius: '20px', marginBottom: '20px', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Fortschritt</span>
+                              <span style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 700 }}>
+                                {totalPages} Seiten • {masteredPagesCount} gemeistert ({percent}%)
+                              </span>
+                            </div>
+                            <div style={{ width: '100%', height: '8px', background: '#f1f5f9', borderRadius: '9999px', overflow: 'hidden' }}>
+                              <div style={{ width: `${percent}%`, height: '100%', background: 'hsl(130, 60%, 52%)', borderRadius: '9999px', transition: 'width 0.3s ease' }} />
+                            </div>
+                          </div>
+
+                          {/* 2. Brush Tool */}
+                          <div style={{ background: 'white', border: '1px solid #e2e8f0', padding: '16px 20px', borderRadius: '20px', marginBottom: '20px', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 850, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                🖌️ Pinsel:
+                              </span>
+                              <div style={{ display: 'flex', gap: '10px' }}>
+                                {[
+                                  { type: 'unbearbeitet', color: 'hsl(355, 75%, 84%)', label: 'rot = unbearbeitet' },
+                                  { type: 'in_progress', color: 'hsl(47, 85%, 84%)', label: 'gelb = Hausaufgabe' },
+                                  { type: 'mastered', color: 'hsl(130, 65%, 82%)', label: 'grün = erledigt' },
+                                  { type: 'theory_done', color: 'hsl(255, 75%, 84%)', label: 'lila = Theorie' }
+                                ].map(b => (
+                                  <button
+                                    key={b.type}
+                                    type="button"
+                                    onClick={() => setSelectedBrush(b.type as any)}
+                                    style={{
+                                      width: '28px',
+                                      height: '28px',
+                                      borderRadius: '50%',
+                                      background: b.color,
+                                      border: selectedBrush === b.type ? '3px solid #0f172a' : '1.5px solid #cbd5e1',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s ease',
+                                      transform: selectedBrush === b.type ? 'scale(1.15)' : 'none'
+                                    }}
+                                    title={b.label}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                            
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', fontSize: '0.72rem', color: '#475569', fontWeight: 650, borderTop: '1px solid #e2e8f0', paddingTop: '10px', marginTop: '10px' }}>
+                              <span><span style={{ color: 'hsl(355, 75%, 84%)', marginRight: '4px' }}>●</span>rot = unbearbeitet</span>
+                              <span><span style={{ color: 'hsl(47, 85%, 84%)', marginRight: '4px' }}>●</span>gelb = Hausaufgabe</span>
+                              <span><span style={{ color: 'hsl(130, 65%, 82%)', marginRight: '4px' }}>●</span>erledigt</span>
+                              <span><span style={{ color: 'hsl(255, 75%, 84%)', marginRight: '4px' }}>●</span>lila = Theorie</span>
+                            </div>
+                          </div>
+
+                          {/* 3. Page Numbers (Farbige Zahlen des Buchs) */}
+                          <div style={{ background: 'white', border: '1px solid #e2e8f0', padding: '18px 20px', borderRadius: '24px', marginBottom: '20px', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                              <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Seitenübersicht</span>
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', maxHeight: '360px', overflowY: 'auto', paddingRight: '4px' }}>
+                              {Array.from({ length: totalPages }).map((_, idx) => {
+                                const pNum = idx + 1;
+                                const pageStateObj = pageStates[pNum];
+                                const status = pageStateObj?.status || 'unbearbeitet';
+                                
+                                let borderColor = 'hsl(355, 70%, 73%)'; // rot = unbearbeitet
+                                let textColor = 'hsl(355, 80%, 30%)';
+                                let bg = 'hsl(355, 80%, 94%)';
+                                
+                                if (status === 'in_progress') {
+                                  borderColor = 'hsl(47, 80%, 68%)'; // gelb = Hausaufgabe
+                                  textColor = 'hsl(47, 85%, 28%)';
+                                  bg = 'hsl(47, 90%, 93%)';
+                                } else if (status === 'mastered') {
+                                  borderColor = 'hsl(130, 60%, 70%)'; // grün = erledigt
+                                  textColor = 'hsl(130, 70%, 25%)';
+                                  bg = 'hsl(130, 70%, 93%)';
+                                } else if (status === 'theory_done') {
+                                  borderColor = 'hsl(255, 65%, 73%)'; // lila = Theorie
+                                  textColor = 'hsl(255, 75%, 32%)';
+                                  bg = 'hsl(255, 80%, 94%)';
+                                }
+                                
+                                return (
+                                  <button
+                                    key={pNum}
+                                    type="button"
+                                    onClick={() => {
+                                      if (selectedBrush === 'unbearbeitet') {
+                                        handleDeletePageProgress(selectedStudentForProgress.id, pNum);
+                                      } else {
+                                        const notes = pageStateObj?.notes || '';
+                                        handleUpdatePageProgress(selectedStudentForProgress.id, pNum, selectedBrush, notes);
+                                      }
+                                    }}
+                                    style={{
+                                      width: '38px',
+                                      height: '38px',
+                                      borderRadius: '50%',
+                                      border: `2px solid ${borderColor}`,
+                                      background: bg,
+                                      color: textColor,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '0.85rem',
+                                      fontWeight: 800,
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s ease-in-out',
+                                      outline: 'none'
+                                    }}
+                                    className="hover-scale-mini"
+                                  >
+                                    {pNum}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
                         </div>
-                      ))}
-                      {unassignedStudents.length === 0 && (
-                        <p style={{ fontStyle: 'italic', color: '#94a3b8', fontSize: '0.8rem', textAlign: 'center', marginTop: '12px' }}>
-                          Keine weiteren Schüler gefunden.
-                        </p>
-                      )}
-                    </div>
+                      );
+                    })() : (
+                      <div>
+                        <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: '0 0 12px 0', borderBottom: '2px solid #cbd5e1', paddingBottom: '6px' }}>
+                          ➕ Schüler hinzufügen
+                        </h3>
+
+                        {/* Unassigned Students List */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {unassignedStudents.map((s: any) => (
+                            <div key={s.id} style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              background: 'rgba(255, 255, 255, 0.5)',
+                              border: '1px dashed #cbd5e1',
+                              padding: '8px 12px',
+                              borderRadius: '12px'
+                            }}>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>
+                                {s.first_name} {s.last_name}
+                              </span>
+                              <button
+                                onClick={() => handleAssign(s.id)}
+                                style={{
+                                  background: gradient.from,
+                                  color: gradient.text,
+                                  border: `1px solid ${gradient.text}`,
+                                  borderRadius: '8px',
+                                  padding: '5px 12px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  transition: 'transform 0.1s'
+                                }}
+                                className="hover-scale-mini"
+                              >
+                                Hinzufügen
+                              </button>
+                            </div>
+                          ))}
+                          {unassignedStudents.length === 0 && (
+                            <p style={{ fontStyle: 'italic', color: '#94a3b8', fontSize: '0.8rem', textAlign: 'center', marginTop: '12px' }}>
+                              Keine weiteren Schüler gefunden.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 

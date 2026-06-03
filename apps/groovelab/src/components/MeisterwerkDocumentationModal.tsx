@@ -1809,13 +1809,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   </span>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     {[
-                      { mode: 'LOCKED', label: '🔴', color: '#ef4444' },
-                      { mode: 'HOMEWORK', label: '🟡', color: '#eab308' },
-                      { mode: 'MASTERED', label: '🟢', color: '#10b981' },
-                      { mode: 'THEORY', label: '🟣', color: '#af52de' }
+                      { mode: 'LOCKED', color: 'hsl(355, 75%, 84%)', label: 'rot = unbearbeitet' },
+                      { mode: 'HOMEWORK', color: 'hsl(47, 85%, 84%)', label: 'gelb = Hausaufgabe' },
+                      { mode: 'MASTERED', color: 'hsl(130, 65%, 82%)', label: 'grün = erledigt' },
+                      { mode: 'THEORY', color: 'hsl(255, 75%, 84%)', label: 'lila = Theorie' }
                     ].map(b => {
                       const isActive = activeBrush === b.mode;
-                      const btnSize = '38px';
+                      const btnSize = '28px';
                       return (
                         <button
                           key={b.mode}
@@ -1825,25 +1825,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             setActiveBrush(prev => prev === b.mode ? 'NONE' : b.mode as any);
                           }}
                           style={{
-                            border: 'none',
-                            background: isActive ? b.color : 'transparent',
-                            borderRadius: '50%',
                             width: btnSize,
                             height: btnSize,
-                            fontSize: '1.1rem',
-                            fontWeight: 900,
+                            borderRadius: '50%',
+                            background: b.color,
+                            border: isActive ? '3px solid #0f172a' : '1.5px solid #cbd5e1',
                             cursor: 'pointer',
-                            transition: 'all 0.15s',
-                            boxShadow: isActive ? `0 4px 10px ${b.color}40` : 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            transform: isActive ? 'scale(1.15)' : 'scale(1)'
+                            transition: 'all 0.15s ease',
+                            transform: isActive ? 'scale(1.15)' : 'none',
+                            outline: 'none'
                           }}
-                          className="hover-scale"
-                        >
-                          {b.label}
-                        </button>
+                          title={b.label}
+                        />
                       );
                     })}
                   </div>
@@ -1878,10 +1871,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
               {/* Apple-style thin split border and horizontal legend */}
               <div style={{ borderTop: '1px solid rgba(0, 0, 0, 0.05)', paddingTop: '8px', display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ color: '#ef4444' }}>●</span> rot = unbearbeitet</span>
-                <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ color: '#eab308' }}>●</span> gelb = Hausaufgabe</span>
-                <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ color: '#10b981' }}>●</span> erledigt</span>
-                <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ color: '#af52de' }}>●</span> lila = Theorie</span>
+                <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ color: 'hsl(355, 75%, 84%)' }}>●</span> rot = unbearbeitet</span>
+                <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ color: 'hsl(47, 85%, 84%)' }}>●</span> gelb = Hausaufgabe</span>
+                <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ color: 'hsl(130, 65%, 82%)' }}>●</span> erledigt</span>
+                <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ color: 'hsl(255, 75%, 84%)' }}>●</span> lila = Theorie</span>
               </div>
             </div>
 
@@ -2097,28 +2090,28 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   <button 
                                     type="button" 
                                     onClick={(e) => { e.stopPropagation(); triggerDirectSave(assigned.lehrwerkId, activePageNumber, 'IN_PROGRESS', false); }}
-                                    style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#ef4444', border: 'none', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
+                                    style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'hsl(355, 75%, 84%)', border: '1px solid #cbd5e1', cursor: 'pointer' }}
                                     title="Ungestartet (Rot)"
                                   />
                                   {/* Yellow */}
                                   <button 
                                     type="button" 
                                     onClick={(e) => { e.stopPropagation(); triggerDirectSave(assigned.lehrwerkId, activePageNumber, 'IN_PROGRESS', true); }}
-                                    style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#eab308', border: 'none', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
+                                    style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'hsl(47, 85%, 84%)', border: '1px solid #cbd5e1', cursor: 'pointer' }}
                                     title="Hausaufgabe (Gelb)"
                                   />
                                   {/* Green */}
                                   <button 
                                     type="button" 
                                     onClick={(e) => { e.stopPropagation(); triggerDirectSave(assigned.lehrwerkId, activePageNumber, 'MASTERED', false); }}
-                                    style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#10b981', border: 'none', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
+                                    style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'hsl(130, 65%, 82%)', border: '1px solid #cbd5e1', cursor: 'pointer' }}
                                     title="Meisterwerk (Grün)"
                                   />
                                   {/* Purple */}
                                   <button 
                                     type="button" 
                                     onClick={(e) => { e.stopPropagation(); triggerDirectSave(assigned.lehrwerkId, activePageNumber, 'THEORY_DONE', false); }}
-                                    style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#af52de', border: 'none', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
+                                    style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'hsl(255, 75%, 84%)', border: '1px solid #cbd5e1', cursor: 'pointer' }}
                                     title="Theorie (Lila)"
                                   />
                                 </div>
@@ -2162,31 +2155,31 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               const globalPage = book.globalPageStates?.[num] === 'purple';
                               const status = globalPage ? 'purple' : (pageState.status || 'locked');
 
-                              let borderColor = '#ef4444'; // locked / unstarted = rot
-                              let bg = '#fef2f2';
-                              let textColor = '#991b1b';
+                              let borderColor = 'hsl(355, 70%, 73%)'; // locked / unstarted = rot
+                              let bg = 'hsl(355, 80%, 94%)';
+                              let textColor = 'hsl(355, 80%, 30%)';
 
                               if (status === 'homework') {
-                                borderColor = '#eab308'; // homework = gold/gelb
-                                bg = '#fffbeb';
-                                textColor = '#92400e';
+                                borderColor = 'hsl(47, 80%, 68%)'; // homework = gold/gelb
+                                bg = 'hsl(47, 90%, 93%)';
+                                textColor = 'hsl(47, 85%, 28%)';
                               } else if (status === 'mastered') {
-                                borderColor = '#10b981'; // mastered = grün
-                                bg = '#f0fdf4';
-                                textColor = '#166534';
+                                borderColor = 'hsl(130, 60%, 70%)'; // mastered = grün
+                                bg = 'hsl(130, 70%, 93%)';
+                                textColor = 'hsl(130, 70%, 25%)';
                               } else if (status === 'purple') {
-                                borderColor = '#af52de'; // purple = lila
-                                bg = '#f5f3ff';
-                                textColor = '#6d28d9';
+                                borderColor = 'hsl(255, 65%, 73%)'; // purple = lila
+                                bg = 'hsl(255, 80%, 94%)';
+                                textColor = 'hsl(255, 75%, 32%)';
                               }
 
-                              let solidActiveBg = '#ef4444'; // locked/unstarted active
+                              let solidActiveBg = 'hsl(355, 75%, 84%)'; // locked/unstarted active
                               if (status === 'homework') {
-                                solidActiveBg = '#eab308';
+                                solidActiveBg = 'hsl(47, 85%, 84%)';
                               } else if (status === 'mastered') {
-                                solidActiveBg = '#10b981';
+                                solidActiveBg = 'hsl(130, 65%, 82%)';
                               } else if (status === 'purple') {
-                                solidActiveBg = '#af52de';
+                                solidActiveBg = 'hsl(255, 75%, 84%)';
                               }
 
                               const isPageActive = activePageNumber === num && activeLehrwerkId === assigned.lehrwerkId;
