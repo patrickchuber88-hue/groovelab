@@ -965,7 +965,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
         </div>
 
         {activeTab && setActiveTab && (
-          <div className="app-segmented-switch" style={{ margin: 0 }}>
+          <div className="app-segmented-switch" style={{ margin: 0, marginLeft: 'auto' }}>
             <button 
               onClick={() => setActiveTab('calendar')}
               className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`}
@@ -981,7 +981,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
           </div>
         )}
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end', marginLeft: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end' }}>
           <button 
             onClick={handleResetWeek}
             style={{ background: 'transparent', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}

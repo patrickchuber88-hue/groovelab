@@ -1006,7 +1006,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               </div>
             </div>
 
-            <div className="app-segmented-switch" style={{ margin: 0 }}>
+            <div className="app-segmented-switch" style={{ margin: 0, marginLeft: 'auto' }}>
               <button 
                 onClick={() => setActiveTab('calendar')}
                 className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`}
@@ -1021,7 +1021,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               </button>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end', marginLeft: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
               {hasSubmittedSchedule && scheduleStatus === 'approved' && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(209, 250, 229, 0.5)', border: '1px solid rgba(16, 185, 129, 0.15)', color: '#065f46', padding: '6px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700 }}>
                   <span style={{ color: '#10b981', fontSize: '0.8rem' }}>✓</span> 
