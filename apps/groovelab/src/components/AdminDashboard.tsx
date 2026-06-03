@@ -251,6 +251,17 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [tbLabel, setTbLabel] = useState('');
   const [tbText, setTbText] = useState('');
   const [tbType, setTbType] = useState<'songs' | 'lehrwerke' | 'both'>('both');
+  const [showTextbausteinModal, setShowTextbausteinModal] = useState<boolean>(false);
+
+  const handleDeleteTextbaustein = (id: string) => {
+    setTextbausteine(prev => prev.filter(tb => tb.id !== id));
+    if (editingTextbaustein?.id === id) {
+      setEditingTextbaustein(null);
+      setTbLabel('');
+      setTbText('');
+      setTbType('both');
+    }
+  };
 
   useEffect(() => {
     localStorage.setItem('groovelab_textbausteine', JSON.stringify(textbausteine));
@@ -4893,7 +4904,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         <div 
           className="glass-panel" 
           style={{ 
-            flex: '1 1 65%',
+            flex: 1,
             minWidth: '480px',
             background: 'white', 
             borderRadius: '20px', 
@@ -5406,208 +5417,101 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       <div 
         className="glass-panel" 
         style={{ 
-          flex: '1 1 30%',
-          minWidth: '320px',
+          flex: '0 0 240px',
+          width: '240px',
+          minWidth: '220px',
           background: 'white', 
           borderRadius: '20px', 
           border: '1px solid rgba(0, 0, 0, 0.05)', 
-          padding: '24px 20px', 
+          padding: '24px 16px', 
           boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
           display: 'flex', 
           flexDirection: 'column', 
-          gap: '20px',
+          gap: '16px',
           alignSelf: 'stretch'
         }}
       >
         {/* Title */}
         <div>
-          <h2 style={{ fontSize: '1.4rem', color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontWeight: 900 }}>
-            <span style={{ background: `${brandColor}15`, color: brandColor, padding: '5px 8px', borderRadius: '8px', display: 'flex', alignItems: 'center', fontSize: '1.1rem' }}>⚡</span>
-            <span>Textbausteine</span>
+          <h2 style={{ fontSize: '1.2rem', color: '#18181b', display: 'flex', alignItems: 'center', gap: '6px', margin: 0, fontWeight: 900 }}>
+            <span style={{ background: `${brandColor}15`, color: brandColor, padding: '4px 6px', borderRadius: '6px', display: 'flex', alignItems: 'center', fontSize: '1rem' }}>⚡</span>
+            <span>Schnell-Text</span>
           </h2>
-          <p style={{ color: '#64748b', fontSize: '0.78rem', margin: '4px 0 0 0', fontWeight: 600 }}>
-            Verwalte deine Unterrichts-Notizen.
+          <p style={{ color: '#64748b', fontSize: '0.72rem', margin: '4px 0 0 0', fontWeight: 600 }}>
+            Vorlagen für Hausaufgaben.
           </p>
         </div>
 
-        {/* Add / Edit Form */}
-        <form onSubmit={handleSaveTextbaustein} style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: '#f8fafc', padding: '16px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
-          <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
-            {editingTextbaustein ? '✏️ Textbaustein bearbeiten' : '➕ Neuer Textbaustein'}
-          </h4>
+        {/* Manage Button */}
+        <button
+          type="button"
+          onClick={() => setShowTextbausteinModal(true)}
+          style={{
+            width: '100%',
+            background: `${brandColor}10`,
+            border: `1px solid ${brandColor}30`,
+            borderRadius: '12px',
+            padding: '10px 12px',
+            fontSize: '0.78rem',
+            fontWeight: 800,
+            color: brandColor,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            transition: 'all 0.15s'
+          }}
+          className="hover-bg"
+        >
+          <Settings size={14} />
+          <span>Verwalten</span>
+        </button>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b' }}>Label / Emoji</label>
-            <input 
-              required 
-              placeholder="z.B. 🐌 Schnecken-Tempo" 
-              value={tbLabel} 
-              onChange={e => setTbLabel(e.target.value)} 
-              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, outline: 'none' }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b' }}>Inhalt des Textbausteins</label>
-            <textarea 
-              required 
-              placeholder="Text der eingefügt wird..." 
-              value={tbText} 
-              onChange={e => setTbText(e.target.value)} 
-              rows={3} 
-              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 650, outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b' }}>Bereich zuordnen</label>
-            <div style={{ display: 'flex', gap: '4px' }}>
-              {(['both', 'songs', 'lehrwerke'] as const).map(type => {
-                const labelMap = { both: 'Beide', songs: 'Songs', lehrwerke: 'Lehrwerke' };
-                const isSelected = tbType === type;
-                return (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => setTbType(type)}
-                    style={{
-                      flex: 1,
-                      padding: '6px 4px',
-                      borderRadius: '8px',
-                      fontSize: '0.72rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      border: isSelected ? `1.5px solid ${brandColor}` : '1.5px solid #e2e8f0',
-                      background: isSelected ? `${brandColor}10` : 'white',
-                      color: isSelected ? brandColor : '#475569',
-                      transition: 'all 0.15s'
-                    }}
-                  >
-                    {labelMap[type]}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-            <button 
-              type="submit" 
-              style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer' }}
-            >
-              Speichern
-            </button>
-            {editingTextbaustein && (
-              <button 
-                type="button" 
-                onClick={() => {
-                  setEditingTextbaustein(null);
-                  setTbLabel('');
-                  setTbText('');
-                  setTbType('both');
-                }} 
-                style={{ flex: 1, background: '#e2e8f0', color: '#475569', border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer' }}
-              >
-                Abbrechen
-              </button>
-            )}
-          </div>
-        </form>
-
-        {/* Existing templates header & list */}
+        {/* Templates List */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, minHeight: 0 }}>
-          <h4 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 800, color: '#475569', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Bestehende Bausteine</span>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', background: '#f1f5f9', padding: '2px 6px', borderRadius: '9999px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Deine Bausteine</span>
+            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', background: '#f1f5f9', padding: '2px 6px', borderRadius: '9999px' }}>
               {textbausteine.length}
             </span>
-          </h4>
+          </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', flex: 1, paddingRight: '4px', maxHeight: '420px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', flex: 1, maxHeight: '580px', paddingRight: '2px' }}>
             {textbausteine.map((tb: any) => {
               const badgeStyle = 
                 tb.type === 'songs' 
-                  ? { bg: '#fff7ed', text: '#c2410c', border: '#ffedd5', label: 'Songs' }
+                  ? { bg: '#fff7ed', text: '#c2410c', label: 'S' }
                   : tb.type === 'lehrwerke'
-                    ? { bg: '#f5f3ff', text: '#6d28d9', border: '#ede9fe', label: 'Lehrwerke' }
-                    : { bg: '#eff6ff', text: '#1d4ed8', border: '#dbeafe', label: 'Beide' };
+                    ? { bg: '#f5f3ff', text: '#6d28d9', label: 'L' }
+                    : { bg: '#eff6ff', text: '#1d4ed8', label: 'B' };
 
               return (
                 <div 
                   key={tb.id} 
                   style={{ 
                     border: '1px solid #e2e8f0', 
-                    borderRadius: '12px', 
-                    padding: '12px', 
+                    borderRadius: '10px', 
+                    padding: '10px', 
                     background: 'white',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '8px',
-                    opacity: tb.active ? 1 : 0.65,
-                    transition: 'opacity 0.2s',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                    gap: '4px',
+                    opacity: tb.active ? 1 : 0.55,
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.01)'
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
-                      {tb.label}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
+                      {tb.active ? '🟢 ' : '⚪ '}{tb.label}
                     </span>
-                    <span style={{ fontSize: '0.62rem', fontWeight: 800, background: badgeStyle.bg, color: badgeStyle.text, border: `1px solid ${badgeStyle.border}`, padding: '2px 6px', borderRadius: '6px', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: '0.6rem', fontWeight: 900, background: badgeStyle.bg, color: badgeStyle.text, padding: '1px 4px', borderRadius: '4px', transform: 'scale(0.95)' }} title={tb.type === 'both' ? 'Beide' : tb.type === 'songs' ? 'Songs' : 'Lehrwerke'}>
                       {badgeStyle.label}
                     </span>
                   </div>
-
-                  <p style={{ margin: 0, fontSize: '0.78rem', color: '#4b5563', lineHeight: '1.35', fontWeight: 650, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'break-word' }}>
+                  <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', lineHeight: '1.3', fontWeight: 600, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                     {tb.text}
                   </p>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', borderTop: '1px dashed #f1f5f9', paddingTop: '8px' }}>
-                    <button
-                      type="button"
-                      onClick={() => handleToggleTextbausteinActive(tb.id)}
-                      style={{
-                        background: tb.active ? '#f0fdf4' : '#f1f5f9',
-                        color: tb.active ? '#16a34a' : '#64748b',
-                        border: tb.active ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                        padding: '4px 8px',
-                        borderRadius: '9999px',
-                        fontSize: '0.68rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        transition: 'all 0.15s'
-                      }}
-                    >
-                      {tb.active ? '🟢 Aktiv' : '⚪ Inaktiv'}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingTextbaustein(tb);
-                        setTbLabel(tb.label);
-                        setTbText(tb.text);
-                        setTbType(tb.type);
-                      }}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#64748b',
-                        cursor: 'pointer',
-                        padding: '4px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: '6px',
-                        transition: 'background 0.15s'
-                      }}
-                      className="hover-bg"
-                    >
-                      <Pencil size={13} />
-                    </button>
-                  </div>
                 </div>
               );
             })}
@@ -9173,6 +9077,249 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             </div>
           </div>
         )})()}
+
+      {showTextbausteinModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div className="glass-panel animation-slide-up" style={{ background: 'white', padding: '32px', borderRadius: '32px', maxWidth: '750px', width: '100%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 style={{ fontSize: '1.6rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>⚡</span>
+                  <span>Textbausteine verwalten</span>
+                </h2>
+                <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '4px 0 0 0', fontWeight: 600 }}>
+                  Erstelle, bearbeite oder lösche deine Schnell-Notizvorlagen.
+                </p>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => {
+                  setShowTextbausteinModal(false);
+                  setEditingTextbaustein(null);
+                  setTbLabel('');
+                  setTbText('');
+                  setTbType('both');
+                }} 
+                style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Content: Form and List in Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '24px', minHeight: 0, flex: 1 }}>
+              
+              {/* Form Column */}
+              <form onSubmit={handleSaveTextbaustein} style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: '#f8fafc', padding: '20px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#1e293b' }}>
+                  {editingTextbaustein ? '✏️ Baustein bearbeiten' : '➕ Neuer Baustein'}
+                </h3>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>Label / Emoji</label>
+                  <input 
+                    required 
+                    placeholder="z.B. 🐌 Schnecken-Tempo" 
+                    value={tbLabel} 
+                    onChange={e => setTbLabel(e.target.value)} 
+                    style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 600, outline: 'none' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>Inhalt des Textbausteins</label>
+                  <textarea 
+                    required 
+                    placeholder="Dieser Text wird beim Klicken eingefügt..." 
+                    value={tbText} 
+                    onChange={e => setTbText(e.target.value)} 
+                    rows={4} 
+                    style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 650, outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>Bereich zuordnen</label>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {(['both', 'songs', 'lehrwerke'] as const).map(type => {
+                      const labelMap = { both: 'Beide', songs: 'Songs', lehrwerke: 'Lehrwerke' };
+                      const isSelected = tbType === type;
+                      return (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setTbType(type)}
+                          style={{
+                            flex: 1,
+                            padding: '8px 6px',
+                            borderRadius: '10px',
+                            fontSize: '0.75rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            border: isSelected ? `1.5px solid ${brandColor}` : '1.5px solid #e2e8f0',
+                            background: isSelected ? `${brandColor}10` : 'white',
+                            color: isSelected ? brandColor : '#475569',
+                            transition: 'all 0.15s'
+                          }}
+                        >
+                          {labelMap[type]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', marginTop: 'auto', paddingTop: '10px' }}>
+                  <button 
+                    type="submit" 
+                    style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer' }}
+                  >
+                    Speichern
+                  </button>
+                  {editingTextbaustein && (
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        setEditingTextbaustein(null);
+                        setTbLabel('');
+                        setTbText('');
+                        setTbType('both');
+                      }} 
+                      style={{ flex: 1, background: '#e2e8f0', color: '#475569', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer' }}
+                    >
+                      Abbrechen
+                    </button>
+                  )}
+                </div>
+              </form>
+
+              {/* List Column */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', minHeight: 0 }}>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#475569', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Bestehende Bausteine</span>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', background: '#f1f5f9', padding: '4px 10px', borderRadius: '9999px' }}>
+                    {textbausteine.length}
+                  </span>
+                </h3>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', flex: 1, paddingRight: '6px' }}>
+                  {textbausteine.map((tb: any) => {
+                    const badgeStyle = 
+                      tb.type === 'songs' 
+                        ? { bg: '#fff7ed', text: '#c2410c', border: '#ffedd5', label: 'Songs' }
+                        : tb.type === 'lehrwerke'
+                          ? { bg: '#f5f3ff', text: '#6d28d9', border: '#ede9fe', label: 'Lehrwerke' }
+                          : { bg: '#eff6ff', text: '#1d4ed8', border: '#dbeafe', label: 'Beide' };
+
+                    return (
+                      <div 
+                        key={tb.id} 
+                        style={{ 
+                          border: '1px solid #e2e8f0', 
+                          borderRadius: '16px', 
+                          padding: '14px', 
+                          background: 'white',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '10px',
+                          opacity: tb.active ? 1 : 0.6,
+                          transition: 'opacity 0.2s',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                          <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>
+                            {tb.label}
+                          </span>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, background: badgeStyle.bg, color: badgeStyle.text, border: `1px solid ${badgeStyle.border}`, padding: '3px 8px', borderRadius: '8px' }}>
+                            {badgeStyle.label}
+                          </span>
+                        </div>
+
+                        <p style={{ margin: 0, fontSize: '0.8rem', color: '#4b5563', lineHeight: '1.4', fontWeight: 650 }}>
+                          {tb.text}
+                        </p>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', borderTop: '1px dashed #f1f5f9', paddingTop: '10px' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleTextbausteinActive(tb.id)}
+                            style={{
+                              background: tb.active ? '#f0fdf4' : '#f1f5f9',
+                              color: tb.active ? '#16a34a' : '#64748b',
+                              border: tb.active ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                              padding: '6px 12px',
+                              borderRadius: '9999px',
+                              fontSize: '0.72rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              transition: 'all 0.15s'
+                            }}
+                          >
+                            {tb.active ? '🟢 Aktiv' : '⚪ Inaktiv'}
+                          </button>
+
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingTextbaustein(tb);
+                                setTbLabel(tb.label);
+                                setTbText(tb.text);
+                                setTbType(tb.type);
+                              }}
+                              style={{
+                                background: '#f8fafc',
+                                border: '1px solid #e2e8f0',
+                                color: '#64748b',
+                                cursor: 'pointer',
+                                padding: '6px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: '8px',
+                                transition: 'all 0.15s'
+                              }}
+                              className="hover-bg"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteTextbaustein(tb.id)}
+                              style={{
+                                background: '#fff1f2',
+                                border: 'none',
+                                color: '#ef4444',
+                                cursor: 'pointer',
+                                padding: '6px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: '8px',
+                                transition: 'all 0.15s'
+                              }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {showTageskompassModal && selectedStudentForTageskompass && (
         <MeisterwerkDocumentationModal
