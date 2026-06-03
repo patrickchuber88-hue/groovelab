@@ -8,6 +8,8 @@ interface Student {
   first_name: string;
   last_name: string;
   photo_url?: string;
+  school_id?: string;
+  schoolId?: string;
 }
 
 interface MeisterwerkDocumentationModalProps {
@@ -125,6 +127,7 @@ export const formatPageNumbers = (pages: number[]): string => {
 
 export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationModalProps> = ({ student, onClose, teacherId, initialLehrwerkId }) => {
   const [studentInstrument, setStudentInstrument] = useState<string | null>(null);
+  const [studentSchoolId, setStudentSchoolId] = useState<string | null>(null);
   const [progressItems, setProgressItems] = useState<ProgressItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -297,13 +300,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   }, [student.id]);
 
   // Load Lehrwerke data from Supabase
-  const loadLehrwerke = async () => {
+  const loadLehrwerke = async (resolvedSchoolId?: string) => {
     try {
       const activeTId = await getCurrentTeacherId();
       
       let query = supabase.from('lehrwerke').select('*');
-      if (activeTId) {
-        query = query.eq('teacher_id', activeTId);
+      const schoolId = resolvedSchoolId || student?.school_id || student?.schoolId || studentSchoolId;
+      if (schoolId) {
+        query = query.eq('school_id', schoolId);
       }
       const { data: lehrwerkeData, error } = await query.order('title');
       if (error) throw error;
@@ -435,11 +439,17 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         try {
           const { data, error } = await supabase
             .from('users')
-            .select('instrument')
+            .select('instrument, school_id')
             .eq('id', student.id)
             .single();
-          if (!error && data?.instrument) {
-            setStudentInstrument(data.instrument);
+          if (!error && data) {
+            if (data.instrument) {
+              setStudentInstrument(data.instrument);
+            }
+            if (data.school_id) {
+              setStudentSchoolId(data.school_id);
+              loadLehrwerke(data.school_id);
+            }
           }
         } catch (e) {
           console.error('Error loading student profile in modal:', e);
@@ -1043,8 +1053,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
   };
 
-  const handleSave = async (e?: React.FormEvent) => {
-    e?.preventDefault();
+  const handleSave = async (e?: React.FormEvent | boolean, keepOpenParam?: boolean) => {
+    let keepOpen = false;
+    if (typeof e === 'boolean') {
+      keepOpen = e;
+    } else {
+      e?.preventDefault();
+      if (typeof keepOpenParam === 'boolean') {
+        keepOpen = keepOpenParam;
+      }
+    }
     const currentWeekNum = getISOWeek().split('-W')[1] || '';
     const defaultTitle = `Hausaufgabe KW ${currentWeekNum}`;
     const finalTopicName = topicName.trim() || defaultTitle;
@@ -1178,8 +1196,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
         await fetchProgress();
         notifyHomeworkChange();
-        setActiveItem(null);
-        onClose(); // Automatically close window on save success
+        if (!keepOpen) {
+          setActiveItem(null);
+          setActiveSubView('hub');
+          setActiveLehrwerkId(null);
+          setActivePageNumber(null);
+        }
+        setHasChanges(false);
         return;
       }
 
@@ -1245,8 +1268,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       await fetchProgress();
       notifyHomeworkChange();
-      setActiveItem(null);
-      onClose(); // Automatically close window on save success
+      if (!keepOpen) {
+        setActiveItem(null);
+        setActiveSubView('hub');
+        setActiveLehrwerkId(null);
+        setActivePageNumber(null);
+      }
+      setHasChanges(false);
     } catch (err: any) {
       console.error('Error saving progress:', err);
       setError('Fehler beim Speichern des Fortschritts.');
@@ -1817,45 +1845,58 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       </div>
                     </div>
 
-                    {/* Student Info & Back Button */}
+                    {/* Brushes Panel for Textbooks - Moved to left page */}
                     <div style={{
-                      background: 'white',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '24px',
-                      padding: '16px 20px',
                       display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.02)'
+                      flexDirection: 'column',
+                      gap: '8px',
+                      background: 'white',
+                      borderRadius: '18px',
+                      padding: '12px 16px',
+                      border: '1px solid rgba(0, 0, 0, 0.08)',
+                      boxShadow: '0 4px 15px rgba(0,0,0,0.02)'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{
-                          width: '36px', height: '36px', borderRadius: '50%', background: '#f1f5f9',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', border: '1px solid #e2e8f0'
-                        }}>
-                          {student.first_name?.charAt(0)}{student.last_name?.charAt(0)}
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '0.84rem', fontWeight: 900, color: '#0f172a' }}>{student.first_name} {student.last_name}</div>
-                          <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>Aktiver Schüler</div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#4b5563', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span>🖌️</span> Pinsel zum Einfärben:
+                        </span>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          {[
+                            { mode: 'LOCKED', color: 'hsl(355, 75%, 84%)', label: 'rot = unbearbeitet' },
+                            { mode: 'HOMEWORK', color: 'hsl(47, 85%, 84%)', label: 'gelb = Hausaufgabe' },
+                            { mode: 'MASTERED', color: 'hsl(130, 65%, 82%)', label: 'grün = erledigt' }
+                          ].map(b => {
+                            const isActive = activeBrush === b.mode;
+                            return (
+                              <button
+                                key={b.mode}
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveBrush(prev => prev === b.mode ? 'NONE' : b.mode as any);
+                                }}
+                                style={{
+                                  width: '28px',
+                                  height: '28px',
+                                  borderRadius: '50%',
+                                  background: b.color,
+                                  border: isActive ? '3px solid #0f172a' : '1.5px solid #cbd5e1',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease',
+                                  transform: isActive ? 'scale(1.15)' : 'none',
+                                  outline: 'none'
+                                }}
+                                title={b.label}
+                              />
+                            );
+                          })}
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveSubView('hub');
-                          setActiveLehrwerkId(null);
-                          setActivePageNumber(null);
-                        }}
-                        style={{
-                          background: '#fee2e2', border: '1.5px solid #fca5a5', color: '#b91c1c',
-                          padding: '8px 14px', borderRadius: '12px', fontSize: '0.76rem', fontWeight: 800, cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', gap: '4px', transition: 'all 0.15s ease'
-                        }}
-                        className="hover-scale"
-                      >
-                        ◀ Zurück
-                      </button>
+                      <div style={{ borderTop: '1px solid rgba(0, 0, 0, 0.05)', paddingTop: '8px', display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: 'hsl(355, 75%, 84%)' }}>●</span> Rot (unbearbeitet)</span>
+                        <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: 'hsl(47, 85%, 84%)' }}>●</span> Gelb (Hausaufgabe)</span>
+                        <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: 'hsl(130, 65%, 82%)' }}>●</span> Grün (erledigt)</span>
+                      </div>
                     </div>
 
                     {/* Page Grid preview scroll for active textbook */}
@@ -1869,7 +1910,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             style={{ background: 'transparent', border: 'none', color: '#10b981', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
                             className="hover-scale"
                           >
-                            <span>📱</span> Ganzes Lehrwerk anzeigen
+                            Ganzes Lehrwerk anzeigen
                           </button>
                         </div>
                         <div style={{
@@ -2705,118 +2746,64 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             {activeSubView === 'lehrwerk' && activeLehrwerkId ? (
               // textbook detail notebook view
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease' }}>
-                <div>
-                  <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    📖 Lehrwerk-Notizbuch
-                  </span>
-                  <h3 style={{ margin: '4px 0 0 0', fontSize: '1.25rem', fontWeight: 900, color: '#000' }}>
-                    {activePageNumber ? `Seite ${activePageNumber}` : 'Keine Seite ausgewählt'}
-                  </h3>
-                </div>
-
-                {/* Brushes Panel for Textbooks */}
-                <div style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                  background: 'white',
-                  borderRadius: '18px',
-                  padding: '12px 16px',
-                  border: '1px solid rgba(0, 0, 0, 0.08)',
-                  boxShadow: '0 4px 15px rgba(0,0,0,0.02)'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#4b5563', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span>🖌️</span> Pinsel zum Einfärben:
-                    </span>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      {[
-                        { mode: 'LOCKED', color: 'hsl(355, 75%, 84%)', label: 'rot = unbearbeitet' },
-                        { mode: 'HOMEWORK', color: 'hsl(47, 85%, 84%)', label: 'gelb = Hausaufgabe' },
-                        { mode: 'MASTERED', color: 'hsl(130, 65%, 82%)', label: 'grün = erledigt' },
-                        { mode: 'THEORY', color: 'hsl(255, 75%, 84%)', label: 'lila = Theorie' }
-                      ].map(b => {
-                        const isActive = activeBrush === b.mode;
-                        return (
-                          <button
-                            key={b.mode}
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveBrush(prev => prev === b.mode ? 'NONE' : b.mode as any);
-                            }}
-                            style={{
-                              width: '28px',
-                              height: '28px',
-                              borderRadius: '50%',
-                              background: b.color,
-                              border: isActive ? '3px solid #0f172a' : '1.5px solid #cbd5e1',
-                              cursor: 'pointer',
-                              transition: 'all 0.15s ease',
-                              transform: isActive ? 'scale(1.15)' : 'none',
-                              outline: 'none'
-                            }}
-                            title={b.label}
-                          />
-                        );
-                      })}
-                    </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                    {/* 6. Current status color circle before the page number */}
+                    <div style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      background: status === 'MASTERED' ? 'hsl(130, 65%, 82%)' : (isCurrentHomework ? 'hsl(47, 85%, 84%)' : 'hsl(355, 75%, 84%)'),
+                      border: '1.5px solid rgba(0,0,0,0.1)',
+                      boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)',
+                      flexShrink: 0
+                    }} />
+                    <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#000' }}>
+                      {activePageNumber ? `Seite ${activePageNumber}` : 'Keine Seite ausgewählt'}
+                    </h3>
                   </div>
-                  <div style={{ borderTop: '1px solid rgba(0, 0, 0, 0.05)', paddingTop: '8px', display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: 'hsl(355, 75%, 84%)' }}>●</span> Rot (unbearbeitet)</span>
-                    <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: 'hsl(47, 85%, 84%)' }}>●</span> Gelb (Hausaufgabe)</span>
-                    <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: 'hsl(130, 65%, 82%)' }}>●</span> Grün (erledigt)</span>
-                    <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: 'hsl(255, 75%, 84%)' }}>●</span> Lila (Theorie)</span>
+
+                  {/* 7. Color buttons inline, right aligned */}
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+                    {[
+                      { mode: 'LOCKED', color: 'hsl(355, 75%, 84%)', label: 'Rot (unbearbeitet)', getActive: () => status === 'IN_PROGRESS' && !isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(false); setHasChanges(true); } },
+                      { mode: 'HOMEWORK', color: 'hsl(47, 85%, 84%)', label: 'Gelb (Hausaufgabe)', getActive: () => status === 'IN_PROGRESS' && isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(true); setHasChanges(true); } },
+                      { mode: 'MASTERED', color: 'hsl(130, 65%, 82%)', label: 'Grün (erledigt)', getActive: () => status === 'MASTERED', action: () => { setStatus('MASTERED'); setIsCurrentHomework(false); setHasChanges(true); } }
+                    ].map(b => {
+                      const isActive = b.getActive();
+                      return (
+                        <button
+                          key={b.mode}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            b.action();
+                          }}
+                          style={{
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            background: b.color,
+                            border: isActive ? '3.5px solid #0f172a' : '1px solid rgba(0,0,0,0.15)',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            transform: isActive ? 'scale(1.1)' : 'none',
+                            outline: 'none',
+                            boxShadow: '0 2px 5px rgba(0,0,0,0.05)'
+                          }}
+                          title={b.label}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
 
                 {/* textbook page documentation form */}
-                <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>
-                      Status der aktuellen Seite:
-                    </label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      {[
-                        { value: 'IN_PROGRESS', label: 'In Arbeit', color: '#64748b' },
-                        { value: 'THEORY_DONE', label: 'Theorie fertig', color: '#8b5cf6' },
-                        { value: 'MASTERED', label: 'Meisterwerk', color: '#10b981' }
-                      ].map((s) => {
-                        const isSel = status === s.value;
-                        return (
-                          <button
-                            key={s.value}
-                            type="button"
-                            onClick={() => setStatus(s.value as any)}
-                            style={{
-                              flex: 1, padding: '10px', borderRadius: '12px', border: 'none',
-                              background: isSel ? s.color : '#f1f5f9', color: isSel ? 'white' : '#475569',
-                              fontWeight: 800, fontSize: '0.76rem', cursor: 'pointer', transition: 'all 0.15s ease'
-                            }}
-                          >
-                            {s.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <input
-                      type="checkbox"
-                      id="lw-homework-check"
-                      checked={isCurrentHomework}
-                      onChange={(e) => setIsCurrentHomework(e.target.checked)}
-                      style={{ cursor: 'pointer', width: '16px', height: '16px' }}
-                    />
-                    <label htmlFor="lw-homework-check" style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b', cursor: 'pointer' }}>
-                      Als aktive Hausaufgabe markieren ⭐
-                    </label>
-                  </div>
-
+                <form onSubmit={(e) => handleSave(e, false)} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* 4. Hausaufgabe & Notizen Widget prominent style */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>
-                      📝 Hausaufgabe & Notiz für diese Seite
+                    <label style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      📝 Hausaufgabe & Notiz für diese Seite:
                     </label>
                     <textarea
                       placeholder="Trage hier die Hausaufgabe oder Notizen für diese Seite ein..."
@@ -2826,33 +2813,78 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         setHasChanges(true);
                       }}
                       style={{
-                        width: '100%', height: '90px', padding: '12px 14px', borderRadius: '16px',
-                        border: '1px solid #cbd5e1', fontSize: '0.8rem', fontWeight: 600, outline: 'none', resize: 'none', background: 'white'
+                        width: '100%',
+                        height: '180px',
+                        padding: '16px',
+                        borderRadius: '20px',
+                        border: '1.5px solid #cbd5e1',
+                        fontSize: '0.88rem',
+                        fontWeight: 650,
+                        lineHeight: '1.5',
+                        outline: 'none',
+                        resize: 'none',
+                        background: '#fefdf8',
+                        color: '#1e293b',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.02), inset 0 2px 4px rgba(0,0,0,0.02)',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onFocus={e => {
+                        e.currentTarget.style.borderColor = '#456355';
+                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(69, 99, 85, 0.15)';
+                      }}
+                      onBlur={e => {
+                        e.currentTarget.style.borderColor = '#cbd5e1';
+                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02), inset 0 2px 4px rgba(0,0,0,0.02)';
                       }}
                     />
-                    {/* Schnell-Textbausteine */}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                      {[
-                        { label: '🐌 Schnecke', text: 'Spiele die schwierige Passage ganz langsam wie eine Schnecke.' },
-                        { label: '🔂 Ritter-Drei', text: 'Wiederhole den kniffligen Übergang dreimal hintereinander fehlerfrei.' },
-                        { label: '🎵 Laut-Leise', text: 'Lass das Stück lebendig klingen! Mache deutliche Unterschiede.' },
-                        { label: '⏱️ 10-Min.', text: 'Stelle dir einen Timer auf 10 Minuten. Übe jeden Tag.' }
-                      ].map((tpl, i) => (
-                        <button
-                          key={i}
-                          type="button"
-                          onClick={() => {
-                            setHomeworkNotes(prev => prev ? `${prev}\n\n${tpl.text}` : tpl.text);
-                            setHasChanges(true);
-                          }}
-                          style={{
-                            background: '#ffffff', color: '#475569', border: '1px solid #e2e8f0',
-                            padding: '4px 8px', borderRadius: '9999px', fontSize: '0.62rem', fontWeight: 700, cursor: 'pointer'
-                          }}
-                        >
-                          {tpl.label}
-                        </button>
-                      ))}
+                    
+                    {/* 9. Notizen speichern button right below textarea / templates */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
+                      {/* Schnell-Textbausteine */}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                        {[
+                          { label: '🐌 Schnecke', text: 'Spiele die schwierige Passage ganz langsam wie eine Schnecke.' },
+                          { label: '🔂 Ritter-Drei', text: 'Wiederhole den kniffligen Übergang dreimal hintereinander fehlerfrei.' },
+                          { label: '🎵 Laut-Leise', text: 'Lass das Stück lebendig klingen! Mache deutliche Unterschiede.' },
+                          { label: '⏱️ 10-Min.', text: 'Stelle dir einen Timer auf 10 Minuten. Übe jeden Tag.' }
+                        ].map((tpl, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => {
+                              setHomeworkNotes(prev => prev ? `${prev}\n\n${tpl.text}` : tpl.text);
+                              setHasChanges(true);
+                            }}
+                            style={{
+                              background: '#ffffff', color: '#475569', border: '1px solid #e2e8f0',
+                              padding: '4px 8px', borderRadius: '9999px', fontSize: '0.62rem', fontWeight: 700, cursor: 'pointer'
+                            }}
+                          >
+                            {tpl.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleSave(true)}
+                        style={{
+                          background: '#456355',
+                          color: 'white',
+                          border: 'none',
+                          padding: '6px 12px',
+                          borderRadius: '8px',
+                          fontSize: '0.74rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                        }}
+                      >
+                        Notizen speichern
+                      </button>
                     </div>
                   </div>
 
@@ -2874,7 +2906,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     />
                   </div>
 
-                  <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
                     <button
                       type="button"
                       onClick={() => {
@@ -2883,18 +2915,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         setActivePageNumber(null);
                       }}
                       style={{
-                        flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid #cbd5e1',
-                        background: 'white', color: '#475569', fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer'
+                        flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid #456355',
+                        background: 'white', color: '#456355', fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer'
                       }}
                     >
-                      Abbrechen
+                      Zurück
                     </button>
                     <button
                       type="submit"
                       disabled={saving}
                       style={{
                         flex: 2, padding: '12px', borderRadius: '12px', border: 'none',
-                        background: '#10b981', color: 'white', fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer'
+                        background: '#456355', color: 'white', fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer'
                       }}
                     >
                       {saving ? 'Speichert...' : 'Seite speichern'}
@@ -2909,129 +2941,76 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 if (!skill) return null;
 
                 return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease' }}>
-                    <div>
-                      <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                        🎵 Song-Notizbuch
-                      </span>
-                      <h3 style={{ margin: '4px 0 0 0', fontSize: '1.25rem', fontWeight: 900, color: '#000' }}>
-                        {skill.songs?.title || 'Song Details'}
-                      </h3>
-                    </div>
-
-                    {/* Progress Slider (0-100%) */}
-                    <div style={{
-                      background: 'white',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '20px',
-                      padding: '16px 20px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '10px'
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 850, color: '#1e293b' }}>
-                          Song-Fortschritt:
-                        </span>
-                        <span style={{ fontSize: '0.9rem', fontWeight: 900, color: status === 'MASTERED' ? '#10b981' : '#000' }}>
-                          {status === 'MASTERED' ? '100% (Bühnenreif)' : `${songProgressPercent}%`}
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        step="5"
-                        value={status === 'MASTERED' ? 100 : songProgressPercent}
-                        disabled={status === 'MASTERED'}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value, 10);
-                          setSongProgressPercent(val);
-                          if (val >= 100) {
-                            setStatus('MASTERED');
-                          } else if (val >= 60) {
-                            setStatus('THEORY_DONE');
-                          } else {
-                            setStatus('IN_PROGRESS');
-                          }
-                          setHasChanges(true);
-                        }}
-                        style={{
-                          width: '100%',
-                          height: '6px',
-                          borderRadius: '3px',
-                          outline: 'none',
-                          cursor: status === 'MASTERED' ? 'not-allowed' : 'pointer',
-                          accentColor: '#000'
-                        }}
-                      />
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#94a3b8', fontWeight: 700 }}>
-                        <span>0% (Beginner)</span>
-                        <span>50% (Halbzeit)</span>
-                        <span>100% (Meister)</span>
-                      </div>
-                    </div>
-
-                    {/* Stage-Ready Toggle Switch */}
-                    <div style={{
-                      background: 'white',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '20px',
-                      padding: '14px 18px',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}>
-                      <div>
-                        <div style={{ fontSize: '0.82rem', fontWeight: 900, color: '#1e293b' }}>🏆 Bühnenreif markieren</div>
-                        <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>Bereit für das Vorspielen auf der Bühne</div>
-                      </div>
-                      <label style={{ position: 'relative', display: 'inline-block', width: '48px', height: '24px' }}>
-                        <input
-                          type="checkbox"
-                          checked={status === 'MASTERED'}
-                          onChange={(e) => {
-                            setStatus(e.target.checked ? 'MASTERED' : 'IN_PROGRESS');
-                            if (e.target.checked) {
-                              setSongProgressPercent(100);
-                            } else {
-                              setSongProgressPercent(75); // Reset to active progress
-                            }
-                            setHasChanges(true);
-                          }}
-                          style={{ opacity: 0, width: 0, height: 0 }}
-                        />
-                        <span style={{
-                          position: 'absolute', cursor: 'pointer', inset: 0,
-                          backgroundColor: status === 'MASTERED' ? '#10b981' : '#ccc',
-                          borderRadius: '24px', transition: '0.3s',
-                          display: 'flex', alignItems: 'center', padding: '2px'
-                        }}>
-                          <span style={{
-                            width: '20px', height: '20px', borderRadius: '50%', backgroundColor: 'white',
-                            transition: '0.3s', transform: status === 'MASTERED' ? 'translateX(24px)' : 'translateX(0)'
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', animation: 'fadeIn 0.25s ease' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                          <div style={{
+                            width: '18px',
+                            height: '18px',
+                            borderRadius: '50%',
+                            background: status === 'MASTERED' ? 'hsl(130, 65%, 82%)' : (isCurrentHomework ? 'hsl(47, 85%, 84%)' : 'hsl(355, 75%, 84%)'),
+                            border: '1.5px solid rgba(0,0,0,0.1)',
+                            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)',
+                            flexShrink: 0
                           }} />
-                        </span>
-                      </label>
-                    </div>
+                          <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#000' }}>
+                            {skill.songs?.title || 'Song Details'}
+                          </h3>
+                        </div>
 
-                    <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <input
-                          type="checkbox"
-                          id="song-homework-check"
-                          checked={isCurrentHomework}
-                          onChange={(e) => setIsCurrentHomework(e.target.checked)}
-                          style={{ cursor: 'pointer', width: '16px', height: '16px' }}
-                        />
-                        <label htmlFor="song-homework-check" style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b', cursor: 'pointer' }}>
-                          Als aktive Hausaufgabe markieren ⭐
-                        </label>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+                          {[
+                            { mode: 'LOCKED', color: 'hsl(355, 75%, 84%)', label: 'Rot (unbearbeitet)', getActive: () => status === 'IN_PROGRESS' && !isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(false); setSongProgressPercent(25); setHasChanges(true); } },
+                            { mode: 'HOMEWORK', color: 'hsl(47, 85%, 84%)', label: 'Gelb (Hausaufgabe)', getActive: () => status === 'IN_PROGRESS' && isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(true); setSongProgressPercent(25); setHasChanges(true); } },
+                            { mode: 'MASTERED', color: 'hsl(130, 65%, 82%)', label: 'Grün (erledigt)', getActive: () => status === 'MASTERED', action: () => { setStatus('MASTERED'); setIsCurrentHomework(false); setSongProgressPercent(100); setHasChanges(true); } }
+                          ].map(b => {
+                            const isActive = b.getActive();
+                            return (
+                              <button
+                                key={b.mode}
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  b.action();
+                                }}
+                                style={{
+                                  width: '24px',
+                                  height: '24px',
+                                  borderRadius: '50%',
+                                  background: b.color,
+                                  border: isActive ? '3.5px solid #0f172a' : '1px solid rgba(0,0,0,0.15)',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease',
+                                  transform: isActive ? 'scale(1.1)' : 'none',
+                                  outline: 'none',
+                                  boxShadow: '0 2px 5px rgba(0,0,0,0.05)'
+                                }}
+                                title={b.label}
+                              />
+                            );
+                          })}
+                        </div>
                       </div>
 
+                      {/* Legende rechtsbündig unter den Kreisen */}
+                      <div style={{ display: 'flex', gap: '12px', flexWrap: 'nowrap', justifyContent: 'flex-end', paddingRight: '4px', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+                          <span style={{ color: 'hsl(355, 75%, 84%)', fontSize: '0.85rem' }}>●</span> Rot (unbearbeitet)
+                        </span>
+                        <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+                          <span style={{ color: 'hsl(47, 85%, 84%)', fontSize: '0.85rem' }}>●</span> Gelb (Hausaufgabe)
+                        </span>
+                        <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+                          <span style={{ color: 'hsl(130, 65%, 82%)', fontSize: '0.85rem' }}>●</span> Grün (gemeistert)
+                        </span>
+                      </div>
+                    </div>
+
+                    <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>
-                          📝 Übungs-Fahrplan & Hausaufgabe
+                        <label style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          📝 Übungs-Fahrplan & Hausaufgabe:
                         </label>
                         <textarea
                           placeholder="Passagen, Anschlagstechniken oder Rhythmen eintragen..."
@@ -3041,12 +3020,32 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             setHasChanges(true);
                           }}
                           style={{
-                            width: '100%', height: '90px', padding: '12px 14px', borderRadius: '16px',
-                            border: '1px solid #cbd5e1', fontSize: '0.8rem', fontWeight: 600, outline: 'none', resize: 'none', background: 'white'
+                            width: '100%',
+                            height: '140px',
+                            padding: '16px',
+                            borderRadius: '20px',
+                            border: '1.5px solid #cbd5e1',
+                            fontSize: '0.88rem',
+                            fontWeight: 650,
+                            lineHeight: '1.5',
+                            outline: 'none',
+                            resize: 'none',
+                            background: '#fefdf8',
+                            color: '#1e293b',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.02), inset 0 2px 4px rgba(0,0,0,0.02)',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onFocus={e => {
+                            e.currentTarget.style.borderColor = 'var(--primary-color, #10b981)';
+                            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.15)';
+                          }}
+                          onBlur={e => {
+                            e.currentTarget.style.borderColor = '#cbd5e1';
+                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02), inset 0 2px 4px rgba(0,0,0,0.02)';
                           }}
                         />
                         {/* Schnell-Textbausteine */}
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
                           {[
                             { label: '🐌 Schnecke', text: 'Spiele die schwierige Passage ganz langsam wie eine Schnecke.' },
                             { label: '🔂 Ritter-Drei', text: 'Wiederhole den kniffligen Übergang dreimal hintereinander fehlerfrei.' },
@@ -3061,8 +3060,24 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 setHasChanges(true);
                               }}
                               style={{
-                                background: '#ffffff', color: '#475569', border: '1px solid #e2e8f0',
-                                padding: '4px 8px', borderRadius: '9999px', fontSize: '0.62rem', fontWeight: 700, cursor: 'pointer'
+                                background: '#f8fafc',
+                                color: '#475569',
+                                border: '1.5px solid #e2e8f0',
+                                padding: '6px 12px',
+                                borderRadius: '99px',
+                                fontSize: '0.72rem',
+                                fontWeight: 750,
+                                cursor: 'pointer',
+                                transition: 'all 0.15s'
+                              }}
+                              className="hover-scale"
+                              onMouseEnter={e => {
+                                e.currentTarget.style.background = '#f1f5f9';
+                                e.currentTarget.style.borderColor = '#cbd5e1';
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.background = '#f8fafc';
+                                e.currentTarget.style.borderColor = '#e2e8f0';
                               }}
                             >
                               {tpl.label}
@@ -3072,8 +3087,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       </div>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>
-                          🔒 Interne Notiz (nur für Lehrer)
+                        <label style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          🔒 Interne Notiz (nur für Lehrer):
                         </label>
                         <textarea
                           placeholder="Interne Bemerkungen..."
@@ -3083,13 +3098,33 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             setHasChanges(true);
                           }}
                           style={{
-                            width: '100%', height: '70px', padding: '12px 14px', borderRadius: '16px',
-                            border: '1px solid #cbd5e1', fontSize: '0.8rem', fontWeight: 600, outline: 'none', resize: 'none', background: 'white'
+                            width: '100%',
+                            height: '100px',
+                            padding: '16px',
+                            borderRadius: '20px',
+                            border: '1.5px solid #cbd5e1',
+                            fontSize: '0.88rem',
+                            fontWeight: 650,
+                            lineHeight: '1.5',
+                            outline: 'none',
+                            resize: 'none',
+                            background: '#fefdf8',
+                            color: '#1e293b',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.02), inset 0 2px 4px rgba(0,0,0,0.02)',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onFocus={e => {
+                            e.currentTarget.style.borderColor = 'var(--primary-color, #10b981)';
+                            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.15)';
+                          }}
+                          onBlur={e => {
+                            e.currentTarget.style.borderColor = '#cbd5e1';
+                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02), inset 0 2px 4px rgba(0,0,0,0.02)';
                           }}
                         />
                       </div>
 
-                      <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
+                      <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
                         <button
                           type="button"
                           onClick={() => {
@@ -3097,19 +3132,39 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             setSelectedActiveSongId('');
                           }}
                           style={{
-                            flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid #cbd5e1',
-                            background: 'white', color: '#475569', fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer'
+                            flex: 1,
+                            padding: '14px',
+                            borderRadius: '14px',
+                            border: '1px solid #cbd5e1',
+                            background: 'white',
+                            color: '#475569',
+                            fontWeight: 800,
+                            fontSize: '0.82rem',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
+                            transition: 'all 0.15s ease'
                           }}
+                          className="hover-scale"
                         >
-                          Abbrechen
+                          Zurück
                         </button>
                         <button
                           type="submit"
                           disabled={saving}
                           style={{
-                            flex: 2, padding: '12px', borderRadius: '12px', border: 'none',
-                            background: '#10b981', color: 'white', fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer'
+                            flex: 2,
+                            padding: '14px',
+                            borderRadius: '14px',
+                            border: 'none',
+                            background: '#10b981',
+                            color: 'white',
+                            fontWeight: 800,
+                            fontSize: '0.82rem',
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 10px rgba(16, 185, 129, 0.2)',
+                            transition: 'all 0.15s ease'
                           }}
+                          className="hover-scale"
                         >
                           {saving ? 'Speichert...' : 'Song speichern'}
                         </button>
