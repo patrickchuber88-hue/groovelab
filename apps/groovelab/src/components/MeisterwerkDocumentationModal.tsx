@@ -2192,10 +2192,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           }}
                           style={{
                             flex: 1,
-                            accentColor: '#456355',
+                            accentColor: '#000000',
                             height: '6px',
                             borderRadius: '3px',
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            background: `linear-gradient(to right, #000000 0%, #000000 ${songProgressPercent}%, #e8e8ed ${songProgressPercent}%, #e8e8ed 100%)`,
+                            WebkitAppearance: 'none',
+                            outline: 'none'
                           }}
                         />
                       </div>
@@ -2211,9 +2214,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           animation: 'fadeIn 0.2s ease'
                         }}>
                           {[
-                            { label: 'Rhythmus', value: rhythmVal, type: 'rhythm' },
-                            { label: 'Finger', value: fingerVal, type: 'finger' },
-                            { label: 'Ausdruck', value: expressionVal, type: 'expression' }
+                            { label: 'Rhythmus', value: rhythmVal, type: 'rhythm', color: '#ef4444' },
+                            { label: 'Finger', value: fingerVal, type: 'finger', color: '#eab308' },
+                            { label: 'Ausdruck', value: expressionVal, type: 'expression', color: '#10b981' }
                           ].map(sub => (
                             <div key={sub.type} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', fontWeight: 800, color: '#4b5563' }}>
@@ -2251,10 +2254,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 }}
                                 style={{
                                   width: '100%',
-                                  accentColor: '#456355',
+                                  accentColor: sub.color,
                                   height: '4px',
                                   borderRadius: '2px',
-                                  cursor: 'pointer'
+                                  cursor: 'pointer',
+                                  background: `linear-gradient(to right, ${sub.color} 0%, ${sub.color} ${sub.value}%, #e8e8ed ${sub.value}%, #e8e8ed 100%)`,
+                                  WebkitAppearance: 'none',
+                                  outline: 'none'
                                 }}
                               />
                             </div>
