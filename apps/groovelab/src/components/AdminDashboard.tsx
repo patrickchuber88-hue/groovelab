@@ -4462,10 +4462,14 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   fontSize: '0.85rem',
                   cursor: 'pointer',
                   boxShadow: mediathekTab === 'songs' ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
-                  transition: 'all 0.2s'
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
                 }}
               >
-                🎵 Songs
+                <Music size={15} color={mediathekTab === 'songs' ? '#1e293b' : '#64748b'} />
+                Songs
               </button>
               <button 
                 type="button"
@@ -4480,10 +4484,14 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   fontSize: '0.85rem',
                   cursor: 'pointer',
                   boxShadow: mediathekTab === 'lehrwerke' ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
-                  transition: 'all 0.2s'
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
                 }}
               >
-                📚 Lehrwerke
+                <Library size={15} color={mediathekTab === 'lehrwerke' ? '#1e293b' : '#64748b'} />
+                Lehrwerke
               </button>
             </div>
           )}
