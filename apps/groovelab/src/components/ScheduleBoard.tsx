@@ -993,7 +993,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             alignItems: 'center', 
             gap: '16px'
           }}>
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0, width: '264px' }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
               <div style={{ height: '40px', width: '40px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.15)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Calendar size={20} />
               </div>
@@ -1001,9 +1001,6 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
                   Stundenplan-Designer
                 </h2>
-                <p style={{ color: '#86868b', fontSize: '0.78rem', fontWeight: 500, marginTop: '1px', whiteSpace: 'nowrap', visibility: 'hidden', userSelect: 'none', margin: '1px 0 0 0' }}>
-                  Placeholder
-                </p>
               </div>
             </div>
 
