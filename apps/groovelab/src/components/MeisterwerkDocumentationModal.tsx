@@ -825,7 +825,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     // Auto-populate form
     setTopicName(topicNameStr);
     setTeacherNotes(dbItem ? (dbItem.teacher_notes || '') : (pageState.notes || ''));
-    setHomeworkNotes('');
+    setHomeworkNotes(pageState.homeworkNotes || pageState.homework_notes || '');
 
     // Map textbook page statuses to Supabase/form states
     const bookPageStatus = pageState.status || 'locked';
@@ -959,8 +959,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             pageStates: {
               ...item.pageStates,
               [pageNum]: {
+                ...(item.pageStates?.[pageNum] || {}),
                 status: pageStatus,
-                notes: teacherNotes.trim(),
                 updatedAt: new Date().toISOString()
               }
             }
@@ -1169,6 +1169,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 [activePageNumber]: {
                   status: pageStatus,
                   notes: teacherNotes.trim(),
+                  homeworkNotes: homeworkNotes.trim(),
                   updatedAt: new Date().toISOString()
                 }
               }
@@ -3329,6 +3330,70 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   })()}
                                   <span>{title}</span> · <span style={{ color: '#4b5563', fontWeight: 700 }}>S. {info.pages.join(', ')}</span>
                                 </div>
+                                {(() => {
+                                  const bookObj = globalLehrwerke.find(b => b.title === title);
+                                  const assignedBook = bookObj ? assignedLehrwerke.find(a => a.lehrwerkId === bookObj.id) : null;
+                                  if (!assignedBook) return null;
+                                  
+                                  const pagesWithNotes = info.pages.filter(p => {
+                                    const pState = assignedBook.pageStates?.[p];
+                                    if (pState?.homeworkNotes && pState.homeworkNotes.trim() !== '') return true;
+                                    if (pState?.homework_notes && pState.homework_notes.trim() !== '') return true;
+                                    
+                                    const dbItem = weekItems.find(x => x.topic_name === `${title} - Seite ${p}`);
+                                    if (dbItem?.homework_notes && dbItem.homework_notes.trim() !== '') {
+                                      try {
+                                        const parsed = JSON.parse(dbItem.homework_notes);
+                                        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].trim() !== '') return true;
+                                        if (typeof parsed === 'string' && parsed.trim() !== '') return true;
+                                      } catch {
+                                        return true;
+                                      }
+                                    }
+                                    return false;
+                                  });
+                                  
+                                  if (pagesWithNotes.length === 0) return null;
+                                  
+                                  return (
+                                    <div style={{
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '4px',
+                                      padding: '8px 12px',
+                                      background: '#ffffff',
+                                      border: '1px solid rgba(251, 191, 36, 0.15)',
+                                      borderRadius: '12px',
+                                      marginTop: '6px',
+                                      marginLeft: '22px',
+                                      boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
+                                    }}>
+                                      {pagesWithNotes.map(p => {
+                                        const pState = assignedBook.pageStates?.[p];
+                                        let noteText = pState?.homeworkNotes || pState?.homework_notes || '';
+                                        
+                                        if (!noteText) {
+                                          const dbItem = weekItems.find(x => x.topic_name === `${title} - Seite ${p}`);
+                                          if (dbItem?.homework_notes) {
+                                            try {
+                                              const parsed = JSON.parse(dbItem.homework_notes);
+                                              noteText = Array.isArray(parsed) ? parsed.join('\n') : String(parsed);
+                                            } catch {
+                                              noteText = dbItem.homework_notes;
+                                            }
+                                          }
+                                        }
+                                        
+                                        return (
+                                          <div key={`p-note-${p}`} style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', fontSize: '0.74rem', color: '#475569', lineHeight: '1.4' }}>
+                                            <span style={{ fontWeight: 800, color: '#b45309', flexShrink: 0 }}>S. {p}:</span>
+                                            <span style={{ fontWeight: 650, color: '#1e293b' }}>{noteText}</span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             ))}
                             {otherHWs.length > 0 && (
@@ -4118,6 +4183,69 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                         );
                                       })}
                                     </div>
+                                    {(() => {
+                                      const bookObj = globalLehrwerke.find(b => b.title === item.title);
+                                      const assignedBook = bookObj ? assignedLehrwerke.find(a => a.lehrwerkId === bookObj.id) : null;
+                                      if (!assignedBook) return null;
+                                      
+                                      const pagesWithNotes = item.pages.filter(p => {
+                                        const pState = assignedBook.pageStates?.[p];
+                                        if (pState?.homeworkNotes && pState.homeworkNotes.trim() !== '') return true;
+                                        if (pState?.homework_notes && pState.homework_notes.trim() !== '') return true;
+                                        
+                                        const dbItem = allActive.find(x => x.topic_name === `${item.title} - Seite ${p}`);
+                                        if (dbItem?.homework_notes && dbItem.homework_notes.trim() !== '') {
+                                          try {
+                                            const parsed = JSON.parse(dbItem.homework_notes);
+                                            if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].trim() !== '') return true;
+                                            if (typeof parsed === 'string' && parsed.trim() !== '') return true;
+                                          } catch {
+                                            return true;
+                                          }
+                                        }
+                                        return false;
+                                      });
+                                      
+                                      if (pagesWithNotes.length === 0) return null;
+                                      
+                                      return (
+                                        <div style={{
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          gap: '4px',
+                                          padding: '8px 12px',
+                                          background: '#ffffff',
+                                          border: '1px solid rgba(251, 191, 36, 0.15)',
+                                          borderRadius: '12px',
+                                          marginTop: '6px',
+                                          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
+                                        }}>
+                                          {pagesWithNotes.map(p => {
+                                            const pState = assignedBook.pageStates?.[p];
+                                            let noteText = pState?.homeworkNotes || pState?.homework_notes || '';
+                                            
+                                            if (!noteText) {
+                                              const dbItem = allActive.find(x => x.topic_name === `${item.title} - Seite ${p}`);
+                                              if (dbItem?.homework_notes) {
+                                                try {
+                                                  const parsed = JSON.parse(dbItem.homework_notes);
+                                                  noteText = Array.isArray(parsed) ? parsed.join('\n') : String(parsed);
+                                                } catch {
+                                                  noteText = dbItem.homework_notes;
+                                                }
+                                              }
+                                            }
+                                            
+                                            return (
+                                              <div key={`p-note-${p}`} style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', fontSize: '0.74rem', color: '#475569', lineHeight: '1.4' }}>
+                                                <span style={{ fontWeight: 800, color: '#b45309', flexShrink: 0 }}>S. {p}:</span>
+                                                <span style={{ fontWeight: 650, color: '#1e293b' }}>{noteText}</span>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      );
+                                    })()}
                                   </div>
                                 ))}
 
