@@ -3743,7 +3743,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   {/* Sticky Note Button for History */}
                   <div 
                     style={{
-                      filter: 'drop-shadow(0 6px 12px rgba(0,0,0,0.08)) drop-shadow(0 2px 4px rgba(0,0,0,0.06))',
+                      filter: 'drop-shadow(0 5px 10px rgba(0,0,0,0.08)) drop-shadow(0 2px 4px rgba(0,0,0,0.05))',
                       transition: 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                       transform: 'rotate(3deg)',
                       flexShrink: 0,
@@ -3757,7 +3757,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       e.currentTarget.style.transform = 'rotate(3deg)';
                     }}
                   >
-                    {/* 3D Pushpin positioned on top of the paper */}
+                    {/* Matte Pushpin positioned on top of the paper */}
                     <div style={{
                       position: 'absolute',
                       top: '-10px',
@@ -3773,26 +3773,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         width: '14px',
                         height: '14px',
                         borderRadius: '50%',
-                        background: 'radial-gradient(circle at 4px 4px, #f87171 0%, #dc2626 60%, #991b1b 100%)',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.25), inset 0 -1px 3px rgba(0,0,0,0.4)',
+                        background: 'radial-gradient(circle at 4px 4px, #ef4444 0%, #b91c1c 80%, #7f1d1d 100%)', // Matte red pin
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.2), inset 0 -1px 2px rgba(0,0,0,0.3)',
                         position: 'relative'
-                      }}>
-                        <div style={{
-                          position: 'absolute',
-                          top: '2.5px',
-                          left: '2.5px',
-                          width: '4.5px',
-                          height: '4.5px',
-                          borderRadius: '50%',
-                          background: 'rgba(255,255,255,0.75)'
-                        }} />
-                      </div>
+                      }} />
                       <div style={{
                         width: '2px',
                         height: '10px',
-                        background: 'linear-gradient(90deg, #cbd5e1 0%, #64748b 100%)',
+                        background: 'linear-gradient(90deg, #94a3b8 0%, #475569 100%)', // Toned-down metal shaft
                         marginTop: '-1px',
-                        boxShadow: '1px 1px 2px rgba(0,0,0,0.15)'
+                        boxShadow: '1px 1px 2px rgba(0,0,0,0.1)'
                       }} />
                     </div>
 
@@ -3810,10 +3800,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         }
                       }}
                       style={{
-                        background: 'repeating-linear-gradient(45deg, rgba(0,0,0,0.005) 0px, rgba(0,0,0,0.005) 1px, transparent 1px, transparent 4px), linear-gradient(135deg, #fffdf2 0%, #fefcbf 70%, #fef08a 100%)',
+                        // Layered very thin fold lines to simulate a finely crumpled paper (feiner geknicktes Papier)
+                        background: 'linear-gradient(120deg, transparent 49.8%, rgba(0,0,0,0.04) 50%, rgba(255,255,255,0.08) 50.1%, transparent 50.3%), linear-gradient(35deg, transparent 29.8%, rgba(0,0,0,0.04) 30%, rgba(255,255,255,0.08) 30.1%, transparent 30.3%), linear-gradient(165deg, transparent 74.8%, rgba(0,0,0,0.03) 75%, rgba(255,255,255,0.08) 75.1%, transparent 75.3%), linear-gradient(85deg, transparent 59.8%, rgba(0,0,0,0.03) 60%, rgba(255,255,255,0.08) 60.1%, transparent 60.3%), repeating-linear-gradient(45deg, rgba(0,0,0,0.003) 0px, rgba(0,0,0,0.003) 1px, transparent 1px, transparent 4px), linear-gradient(135deg, #fef9c3 0%, #fef08a 100%)',
                         border: 'none',
                         clipPath: 'polygon(2% 2%, 23% 1%, 43% 3%, 63% 1%, 83% 2%, 98% 1%, 99% 19%, 97% 38%, 99% 58%, 98% 78%, 99% 98%, 79% 97%, 59% 99%, 39% 97%, 19% 98%, 2% 99%, 1% 79%, 3% 59%, 1% 39%, 2% 19%)',
-                        padding: '22px 14px 12px 14px', // Increased top padding to clear the pin base
+                        padding: '22px 14px 12px 14px',
                         cursor: 'pointer',
                         display: 'flex',
                         flexDirection: 'column',
