@@ -209,6 +209,21 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [studentDetailSearch, setStudentDetailSearch] = useState('');
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
   const [draggedStationId, setDraggedStationId] = useState<string | null>(null);
+
+  const getLehrwerkColor = (title: string) => {
+    const trimmed = (title || '').trim();
+    const firstChar = trimmed.charAt(0).toUpperCase();
+    const charCode = firstChar.charCodeAt(0) || 65;
+    const clampedCode = Math.max(65, Math.min(90, charCode));
+    const hue = Math.round(((clampedCode - 65) / 25) * 360);
+    return {
+      from: `hsl(${hue}, 85%, 94%)`,
+      to: `hsl(${hue}, 80%, 84%)`,
+      text: `hsl(${hue}, 90%, 25%)`,
+      shadowFrom: `hsla(${hue}, 85%, 50%, 0.2)`,
+      shadowTo: `hsla(${hue}, 80%, 40%, 0.15)`
+    };
+  };
   const [dragOverStationId, setDragOverStationId] = useState<string | null>(null);
 
   const handleStationDragStart = (e: React.DragEvent, id: string) => {
@@ -4121,21 +4136,6 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
   const renderSongsTab = () => {
     const renderLehrwerkeSection = () => {
-      const getLehrwerkColor = (title: string) => {
-        const trimmed = (title || '').trim();
-        const firstChar = trimmed.charAt(0).toUpperCase();
-        const charCode = firstChar.charCodeAt(0) || 65;
-        const clampedCode = Math.max(65, Math.min(90, charCode));
-        const hue = Math.round(((clampedCode - 65) / 25) * 360);
-        return {
-          from: `hsl(${hue}, 85%, 94%)`,
-          to: `hsl(${hue}, 80%, 84%)`,
-          text: `hsl(${hue}, 90%, 25%)`,
-          shadowFrom: `hsla(${hue}, 85%, 50%, 0.2)`,
-          shadowTo: `hsla(${hue}, 80%, 40%, 0.15)`
-        };
-      };
-
       const filteredLehrwerke = lehrwerke.filter(item => 
         item.title.toLowerCase().includes(songSearch.toLowerCase()) || 
         (item.author || '').toLowerCase().includes(songSearch.toLowerCase())
@@ -4410,380 +4410,6 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             ))}
           </div>
 
-          {/* Notebook Lehrwerk Detail Modal */}
-          {selectedLehrwerkForDetail && (() => {
-            const book = selectedLehrwerkForDetail;
-            const gradient = getLehrwerkColor(book.title);
-            
-            // Get list of assigned students
-            const assignedList = localProgress.filter((p: any) => p.lehrwerkId === book.id);
-            const assignedStudents = students.filter((s: any) => assignedList.some((a: any) => a.studentId === s.id));
-            
-            // Get list of unassigned students
-            const unassignedStudents = students.filter((s: any) => 
-              !assignedList.some((a: any) => a.studentId === s.id) &&
-              (`${s.first_name || ''} ${s.last_name || ''}`).toLowerCase().includes(studentDetailSearch.toLowerCase())
-            );
-
-            const handleAssign = (studentId: string) => {
-              try {
-                const stored = localStorage.getItem('student_lehrwerke_progress');
-                const parsed = stored ? JSON.parse(stored) : [];
-                if (parsed.some((a: any) => a.studentId === studentId && a.lehrwerkId === book.id)) return;
-
-                const newAssignment = {
-                  studentId: studentId,
-                  lehrwerkId: book.id,
-                  assignedAt: new Date().toISOString(),
-                  pageStates: {}
-                };
-                const updated = [...parsed, newAssignment];
-                localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
-                setLocalProgress(updated);
-              } catch (e) {
-                console.error(e);
-              }
-            };
-
-            const handleUnassign = (studentId: string) => {
-              try {
-                const stored = localStorage.getItem('student_lehrwerke_progress');
-                const parsed = stored ? JSON.parse(stored) : [];
-                const updated = parsed.filter((a: any) => !(a.studentId === studentId && a.lehrwerkId === book.id));
-                localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
-                setLocalProgress(updated);
-              } catch (e) {
-                console.error(e);
-              }
-            };
-
-            return (
-              <div style={{
-                position: 'fixed',
-                inset: 0,
-                zIndex: 4000,
-                background: 'rgba(9, 9, 11, 0.65)',
-                backdropFilter: 'blur(20px)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '20px',
-                fontFamily: '"Inter", sans-serif'
-              }}>
-                <div style={{
-                  // The notebook frame/cover matches the book cover's gradient!
-                  background: `radial-gradient(circle, ${gradient.from} 0%, ${gradient.to} 100%)`,
-                  borderRadius: '32px',
-                  width: '100%',
-                  maxWidth: '1100px',
-                  height: '80vh',
-                  boxShadow: '0 30px 80px rgba(0, 0, 0, 0.5), inset 0 0 30px rgba(0,0,0,0.3)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  overflow: 'hidden',
-                  border: `2px solid ${gradient.text}`,
-                  padding: '12px',
-                  position: 'relative'
-                }} className="animation-slide-up">
-                  
-                  {/* Top Bar / Header of the cover */}
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '8px 24px 16px 24px',
-                    color: gradient.text,
-                    fontWeight: 800
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <BookOpen size={20} color={gradient.text} />
-                      <span style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: gradient.text }}>
-                        Lehrwerk-Notizbuch
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => setSelectedLehrwerkForDetail(null)}
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.4)',
-                        border: 'none',
-                        borderRadius: '50%',
-                        width: '32px',
-                        height: '32px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        color: gradient.text,
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-
-                  {/* Inside Pages of the Notebook (Left/Right Pages) */}
-                  <div style={{
-                    display: 'flex',
-                    flex: 1,
-                    overflow: 'hidden',
-                    borderRadius: '20px',
-                    boxShadow: 'inset 0 10px 30px rgba(0,0,0,0.1)'
-                  }}>
-                    
-                    {/* Left Page (Information & Assigned Students) */}
-                    <div style={{
-                      flex: 1,
-                      padding: '32px',
-                      overflowY: 'auto',
-                      background: '#faf8f2',
-                      backgroundImage: 'repeating-linear-gradient(#faf8f2, #faf8f2 27px, #e5e0d4 27px, #e5e0d4 28px)',
-                      borderRight: '1px dashed #cbd5e1',
-                      position: 'relative'
-                    }}>
-                      {/* Left binder holes on the right edge */}
-                      <div style={{
-                        position: 'absolute',
-                        top: '20px',
-                        bottom: '20px',
-                        right: '4px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-around',
-                        zIndex: 25
-                      }}>
-                        {Array.from({ length: 8 }).map((_, idx) => (
-                          <div key={idx} style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            background: '#121214',
-                            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)'
-                          }} />
-                        ))}
-                      </div>
-
-                      {/* Content Container (shifted to not overlap binder holes) */}
-                      <div style={{ paddingRight: '12px' }}>
-                        {/* Book Cover / Header info */}
-                        <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '24px' }}>
-                          <div style={{ 
-                            width: '80px', 
-                            height: '105px', 
-                            background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`, 
-                            borderRadius: '4px', 
-                            border: `1.5px solid ${gradient.text}`,
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center', 
-                            boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
-                          }}>
-                            <BookOpen size={36} color={gradient.text} />
-                          </div>
-                          <div>
-                            <h2 style={{ margin: '0 0 6px 0', fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                              {book.title}
-                            </h2>
-                            {book.author && (
-                              <p style={{ margin: '0 0 4px 0', fontSize: '0.9rem', color: '#475569', fontWeight: 600 }}>
-                                von {book.author}
-                              </p>
-                            )}
-                            <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700 }}>
-                              📖 {book.totalPages || 50} Seiten
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* List of working students */}
-                        <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: '20px 0 12px 0', borderBottom: '2px solid #cbd5e1', paddingBottom: '6px' }}>
-                          👥 Zugewiesene Schüler ({assignedStudents.length})
-                        </h3>
-                        {assignedStudents.length === 0 ? (
-                          <p style={{ fontStyle: 'italic', color: '#64748b', fontSize: '0.85rem', marginTop: '12px' }}>
-                            Bisher arbeitet kein Schüler an diesem Buch.
-                          </p>
-                        ) : (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            {assignedStudents.map((s: any) => {
-                              const initials = `${s.first_name?.[0] || ''}${s.last_name?.[0] || ''}`.toUpperCase();
-                              const assignment = assignedList.find((p: any) => p.studentId === s.id);
-                              const masteredPages = Object.entries(assignment?.pageStates || {})
-                                .filter(([_, state]: [string, any]) => state.status === 'mastered')
-                                .map(([pageNum]) => parseInt(pageNum))
-                                .sort((a, b) => a - b);
-                              return (
-                                <div key={s.id} style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  background: 'rgba(255, 255, 255, 0.7)',
-                                  border: '1px solid #e2e8f0',
-                                  padding: '10px 14px',
-                                  borderRadius: '14px',
-                                  boxShadow: '0 2px 4px rgba(0,0,0,0.01)'
-                                }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <div style={{
-                                      width: '32px',
-                                      height: '32px',
-                                      borderRadius: '50%',
-                                      background: gradient.from,
-                                      color: gradient.text,
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      fontSize: '0.75rem',
-                                      fontWeight: 800,
-                                      flexShrink: 0
-                                    }}>
-                                      {initials}
-                                    </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a' }}>
-                                        {s.first_name} {s.last_name}
-                                      </span>
-                                      <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 650 }}>
-                                        {masteredPages.length} / {book.totalPages || 50} Seiten geschafft
-                                      </span>
-                                      {masteredPages.length > 0 && (
-                                        <span style={{ fontSize: '0.68rem', color: '#64748b', fontStyle: 'italic', display: 'block', maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`Seiten: ${masteredPages.join(', ')}`}>
-                                          Seiten: {masteredPages.join(', ')}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <button
-                                    onClick={() => handleUnassign(s.id)}
-                                    style={{
-                                      background: 'transparent',
-                                      border: 'none',
-                                      color: '#ef4444',
-                                      cursor: 'pointer',
-                                      fontSize: '0.85rem',
-                                      fontWeight: 800,
-                                      padding: '4px 8px',
-                                      borderRadius: '6px',
-                                      transition: 'all 0.2s'
-                                    }}
-                                    onMouseEnter={(e) => e.currentTarget.style.background = '#fee2e2'}
-                                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                                  >
-                                    Verbindung trennen
-                                  </button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Right Page (Assign Students Search & Add) */}
-                    <div style={{
-                      flex: 1,
-                      padding: '32px',
-                      overflowY: 'auto',
-                      background: '#faf8f2',
-                      backgroundImage: 'repeating-linear-gradient(#faf8f2, #faf8f2 27px, #e5e0d4 27px, #e5e0d4 28px)',
-                      position: 'relative'
-                    }}>
-                      {/* Right binder holes on the left edge */}
-                      <div style={{
-                        position: 'absolute',
-                        top: '20px',
-                        bottom: '20px',
-                        left: '4px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-around',
-                        zIndex: 25
-                      }}>
-                        {Array.from({ length: 8 }).map((_, idx) => (
-                          <div key={idx} style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            background: '#121214',
-                            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)'
-                          }} />
-                        ))}
-                      </div>
-
-                      {/* Content Container */}
-                      <div style={{ paddingLeft: '12px' }}>
-                        <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: '0 0 12px 0', borderBottom: '2px solid #cbd5e1', paddingBottom: '6px' }}>
-                          ➕ Schüler zuweisen
-                        </h3>
-                        
-                        {/* Search field */}
-                        <div style={{ position: 'relative', marginBottom: '16px' }}>
-                          <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                          <input
-                            type="text"
-                            placeholder="Schüler suchen..."
-                            value={studentDetailSearch}
-                            onChange={e => setStudentDetailSearch(e.target.value)}
-                            style={{
-                              width: '100%',
-                              padding: '8px 12px 8px 36px',
-                              borderRadius: '10px',
-                              border: '1px solid #cbd5e1',
-                              fontSize: '0.85rem',
-                              fontWeight: 600,
-                              outline: 'none',
-                              background: 'white'
-                            }}
-                          />
-                        </div>
-
-                        {/* Unassigned Students List */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          {unassignedStudents.map((s: any) => (
-                            <div key={s.id} style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              background: 'rgba(255, 255, 255, 0.5)',
-                              border: '1px dashed #cbd5e1',
-                              padding: '8px 12px',
-                              borderRadius: '12px'
-                            }}>
-                              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>
-                                {s.first_name} {s.last_name}
-                              </span>
-                              <button
-                                onClick={() => handleAssign(s.id)}
-                                style={{
-                                  background: gradient.from,
-                                  color: gradient.text,
-                                  border: `1px solid ${gradient.text}`,
-                                  borderRadius: '8px',
-                                  padding: '5px 12px',
-                                  fontSize: '0.75rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer',
-                                  transition: 'transform 0.1s'
-                                }}
-                                className="hover-scale-mini"
-                              >
-                                Zuweisen
-                              </button>
-                            </div>
-                          ))}
-                          {unassignedStudents.length === 0 && (
-                            <p style={{ fontStyle: 'italic', color: '#94a3b8', fontSize: '0.8rem', textAlign: 'center', marginTop: '12px' }}>
-                              Keine weiteren Schüler gefunden.
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
         </div>
       );
     };
@@ -6463,6 +6089,420 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       {renderRoomLayoutModal()}
       {renderBatchiPadModal()}
       {renderLogoutDialog()}
+
+      {/* Notebook Lehrwerk Detail Modal */}
+      {selectedLehrwerkForDetail && (() => {
+        const book = selectedLehrwerkForDetail;
+        const gradient = getLehrwerkColor(book.title);
+        
+        // Get list of assigned students
+        const assignedList = localProgress.filter((p: any) => p.lehrwerkId === book.id);
+        const assignedStudents = students.filter((s: any) => assignedList.some((a: any) => a.studentId === s.id));
+        
+        // Get list of unassigned students
+        const unassignedStudents = students.filter((s: any) => 
+          !assignedList.some((a: any) => a.studentId === s.id) &&
+          (`${s.first_name || ''} ${s.last_name || ''}`).toLowerCase().includes(studentDetailSearch.toLowerCase())
+        );
+
+        const handleAssign = (studentId: string) => {
+          try {
+            const stored = localStorage.getItem('student_lehrwerke_progress');
+            const parsed = stored ? JSON.parse(stored) : [];
+            if (parsed.some((a: any) => a.studentId === studentId && a.lehrwerkId === book.id)) return;
+
+            const newAssignment = {
+              studentId: studentId,
+              lehrwerkId: book.id,
+              assignedAt: new Date().toISOString(),
+              pageStates: {}
+            };
+            const updated = [...parsed, newAssignment];
+            localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
+            setLocalProgress(updated);
+          } catch (e) {
+            console.error(e);
+          }
+        };
+
+        const handleUnassign = (studentId: string) => {
+          try {
+            const stored = localStorage.getItem('student_lehrwerke_progress');
+            const parsed = stored ? JSON.parse(stored) : [];
+            const updated = parsed.filter((a: any) => !(a.studentId === studentId && a.lehrwerkId === book.id));
+            localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
+            setLocalProgress(updated);
+          } catch (e) {
+            console.error(e);
+          }
+        };
+
+        return (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 4000,
+            background: 'rgba(9, 9, 11, 0.65)',
+            backdropFilter: 'blur(20px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            fontFamily: '"Inter", sans-serif'
+          }}>
+            <div style={{
+              // The notebook frame/cover matches the book cover's gradient!
+              background: `radial-gradient(circle, ${gradient.from} 0%, ${gradient.to} 100%)`,
+              borderRadius: '32px',
+              width: '100%',
+              maxWidth: '1100px',
+              height: '80vh',
+              boxShadow: '0 30px 80px rgba(0, 0, 0, 0.5), inset 0 0 30px rgba(0,0,0,0.3)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              border: `2px solid ${gradient.text}`,
+              padding: '12px',
+              position: 'relative'
+            }} className="animation-slide-up">
+              
+              {/* Top Bar / Header of the cover */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '8px 24px 16px 24px',
+                color: gradient.text,
+                fontWeight: 800
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <BookOpen size={20} color={gradient.text} />
+                  <span style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: gradient.text }}>
+                    Lehrwerk-Notizbuch
+                  </span>
+                </div>
+                <button
+                  onClick={() => setSelectedLehrwerkForDetail(null)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.4)',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: gradient.text,
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Inside Pages of the Notebook (Left/Right Pages) */}
+              <div style={{
+                display: 'flex',
+                flex: 1,
+                overflow: 'hidden',
+                borderRadius: '20px',
+                boxShadow: 'inset 0 10px 30px rgba(0,0,0,0.1)',
+                position: 'relative'
+              }}>
+                
+                {/* Left Page (Information & Assigned Students) */}
+                <div style={{
+                  flex: 1,
+                  padding: '32px',
+                  overflowY: 'auto',
+                  background: '#faf8f2',
+                  backgroundImage: 'repeating-linear-gradient(#faf8f2, #faf8f2 27px, #e5e0d4 27px, #e5e0d4 28px)',
+                  borderRight: '1px dashed #cbd5e1',
+                  position: 'relative'
+                }}>
+                  {/* Left binder holes on the right edge */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '20px',
+                    bottom: '20px',
+                    right: '4px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-around',
+                    zIndex: 25
+                  }}>
+                    {Array.from({ length: 8 }).map((_, idx) => (
+                      <div key={idx} style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: '#121214',
+                        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)'
+                      }} />
+                    ))}
+                  </div>
+
+                  {/* Content Container (shifted to not overlap binder holes) */}
+                  <div style={{ paddingRight: '12px' }}>
+                    {/* Book Cover / Header info */}
+                    <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '24px' }}>
+                      <div style={{ 
+                        width: '80px', 
+                        height: '105px', 
+                        background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`, 
+                        borderRadius: '4px', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
+                      }}>
+                        <BookOpen size={36} color={gradient.text} />
+                      </div>
+                      <div>
+                        <h2 style={{ margin: '0 0 6px 0', fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                          {book.title}
+                        </h2>
+                        {book.author && (
+                          <p style={{ margin: '0 0 4px 0', fontSize: '0.9rem', color: '#475569', fontWeight: 600 }}>
+                            von {book.author}
+                          </p>
+                        )}
+                        <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700 }}>
+                          📖 {book.totalPages || 50} Seiten
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* List of working students */}
+                    <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: '20px 0 12px 0', borderBottom: '2px solid #cbd5e1', paddingBottom: '6px' }}>
+                      👥 Zugewiesene Schüler ({assignedStudents.length})
+                    </h3>
+                    {assignedStudents.length === 0 ? (
+                      <p style={{ fontStyle: 'italic', color: '#64748b', fontSize: '0.85rem', marginTop: '12px' }}>
+                        Bisher arbeitet kein Schüler an diesem Buch.
+                      </p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {assignedStudents.map((s: any) => {
+                          const initials = `${s.first_name?.[0] || ''}${s.last_name?.[0] || ''}`.toUpperCase();
+                          const assignment = assignedList.find((p: any) => p.studentId === s.id);
+                          const masteredPages = Object.entries(assignment?.pageStates || {})
+                            .filter(([_, state]: [string, any]) => state.status === 'mastered')
+                            .map(([pageNum]) => parseInt(pageNum))
+                            .sort((a, b) => a - b);
+                          return (
+                            <div key={s.id} style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              background: 'rgba(255, 255, 255, 0.7)',
+                              border: '1px solid #e2e8f0',
+                              padding: '10px 14px',
+                              borderRadius: '14px',
+                              boxShadow: '0 2px 4px rgba(0,0,0,0.01)'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{
+                                  width: '32px',
+                                  height: '32px',
+                                  borderRadius: '50%',
+                                  background: gradient.from,
+                                  color: gradient.text,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 800,
+                                  flexShrink: 0
+                                }}>
+                                  {initials}
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a' }}>
+                                    {s.first_name} {s.last_name}
+                                  </span>
+                                  <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 650 }}>
+                                    {masteredPages.length} / {book.totalPages || 50} Seiten geschafft
+                                  </span>
+                                  {masteredPages.length > 0 && (
+                                    <span style={{ fontSize: '0.68rem', color: '#64748b', fontStyle: 'italic', display: 'block', maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`Seiten: ${masteredPages.join(', ')}`}>
+                                      Seiten: {masteredPages.join(', ')}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => handleUnassign(s.id)}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: '#ef4444',
+                                  cursor: 'pointer',
+                                  fontSize: '0.85rem',
+                                  fontWeight: 800,
+                                  padding: '4px 8px',
+                                  borderRadius: '6px',
+                                  transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.background = '#fee2e2'}
+                                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                              >
+                                Verbindung trennen
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right Page (Assign Students Search & Add) */}
+                <div style={{
+                  flex: 1,
+                  padding: '32px',
+                  overflowY: 'auto',
+                  background: '#faf8f2',
+                  backgroundImage: 'repeating-linear-gradient(#faf8f2, #faf8f2 27px, #e5e0d4 27px, #e5e0d4 28px)',
+                  position: 'relative'
+                }}>
+                  {/* Right binder holes on the left edge */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '20px',
+                    bottom: '20px',
+                    left: '4px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-around',
+                    zIndex: 25
+                  }}>
+                    {Array.from({ length: 8 }).map((_, idx) => (
+                      <div key={idx} style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: '#121214',
+                        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)'
+                      }} />
+                    ))}
+                  </div>
+
+                  {/* Content Container */}
+                  <div style={{ paddingLeft: '12px' }}>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: '0 0 12px 0', borderBottom: '2px solid #cbd5e1', paddingBottom: '6px' }}>
+                      ➕ Schüler zuweisen
+                    </h3>
+                    
+                    {/* Search field */}
+                    <div style={{ position: 'relative', marginBottom: '16px' }}>
+                      <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                      <input
+                        type="text"
+                        placeholder="Schüler suchen..."
+                        value={studentDetailSearch}
+                        onChange={e => setStudentDetailSearch(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px 8px 36px',
+                          borderRadius: '10px',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
+                          outline: 'none',
+                          background: 'white'
+                        }}
+                      />
+                    </div>
+
+                    {/* Unassigned Students List */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {unassignedStudents.map((s: any) => (
+                        <div key={s.id} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          background: 'rgba(255, 255, 255, 0.5)',
+                          border: '1px dashed #cbd5e1',
+                          padding: '8px 12px',
+                          borderRadius: '12px'
+                        }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>
+                            {s.first_name} {s.last_name}
+                          </span>
+                          <button
+                            onClick={() => handleAssign(s.id)}
+                            style={{
+                              background: gradient.from,
+                              color: gradient.text,
+                              border: `1px solid ${gradient.text}`,
+                              borderRadius: '8px',
+                              padding: '5px 12px',
+                              fontSize: '0.75rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              transition: 'transform 0.1s'
+                            }}
+                            className="hover-scale-mini"
+                          >
+                            Zuweisen
+                          </button>
+                        </div>
+                      ))}
+                      {unassignedStudents.length === 0 && (
+                        <p style={{ fontStyle: 'italic', color: '#94a3b8', fontSize: '0.8rem', textAlign: 'center', marginTop: '12px' }}>
+                          Keine weiteren Schüler gefunden.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Ringbook Spine overlay (Golden Rings) */}
+                <div style={{
+                  position: 'absolute',
+                  top: '20px',
+                  bottom: '20px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: '32px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-around',
+                  zIndex: 30,
+                  pointerEvents: 'none'
+                }}>
+                  {Array.from({ length: 8 }).map((_, idx) => (
+                    <div key={idx} style={{
+                      position: 'relative',
+                      width: '100%',
+                      height: '16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <div style={{
+                        width: '28px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        background: 'transparent',
+                        border: '3px solid #d4af37',
+                        borderTopColor: '#ffe57f',
+                        borderLeftColor: '#ffc107',
+                        borderRightColor: '#ffc107',
+                        borderBottomColor: '#b78a02',
+                        boxShadow: '0 3px 5px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.4)',
+                        transform: 'scaleY(0.8)'
+                      }} />
+                    </div>
+                  ))}
+                </div>
+
+              </div>
+            </div>
+          </div>
+        )})()}
 
       {/* Modals for Band Editing (Teacher Sonderrecht) */}
       {editingBand && (
