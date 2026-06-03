@@ -3755,36 +3755,94 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       }
                     }}
                     style={{
-                      background: 'none',
-                      border: 'none',
-                      padding: 0,
+                      background: '#fef9c3', // Warm soft yellow post-it color
+                      border: '1px solid #fef08a',
+                      borderRadius: '2px 4px 16px 2px / 4px 16px 2px 20px', // Organic paper look
+                      padding: '16px 14px 10px 14px',
+                      boxShadow: '0 6px 15px rgba(0,0,0,0.05), inset 0 -2px 5px rgba(254, 240, 138, 0.4)',
+                      transform: 'rotate(3deg)',
                       cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '2px',
+                      fontFamily: '"Helvetica Neue", Helvetica, Inter, Arial, sans-serif',
                       transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                       flexShrink: 0,
-                      width: '90px',
-                      height: '90px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
+                      position: 'relative',
+                      minWidth: '96px',
+                      minHeight: '76px'
                     }}
                     className="hover-scale"
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-4px) rotate(4deg) scale(1.08)';
+                      e.currentTarget.style.transform = 'translateY(-3px) rotate(4deg) scale(1.05)';
+                      e.currentTarget.style.boxShadow = '0 10px 20px rgba(0,0,0,0.08), inset 0 -2px 5px rgba(254, 240, 138, 0.4)';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'none';
+                      e.currentTarget.style.transform = 'rotate(3deg)';
+                      e.currentTarget.style.boxShadow = '0 6px 15px rgba(0,0,0,0.05), inset 0 -2px 5px rgba(254, 240, 138, 0.4)';
                     }}
                   >
-                    <img 
-                      src="/sticky_note_archive.png" 
-                      alt="Hausaufgaben Archiv" 
-                      style={{ 
-                        width: '100%', 
-                        height: '100%', 
-                        objectFit: 'contain',
-                        filter: 'drop-shadow(0 6px 12px rgba(0,0,0,0.15))'
-                      }} 
-                    />
+                    {/* 3D Pushpin on top */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '-10px',
+                      left: '50%',
+                      transform: 'translateX(-50%) rotate(-8deg)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      zIndex: 10,
+                      pointerEvents: 'none'
+                    }}>
+                      <div style={{
+                        width: '12px',
+                        height: '12px',
+                        borderRadius: '50%',
+                        background: 'radial-gradient(circle at 4px 4px, #f87171 0%, #dc2626 60%, #991b1b 100%)',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.25), inset 0 -1px 3px rgba(0,0,0,0.4)',
+                        position: 'relative'
+                      }}>
+                        <div style={{
+                          position: 'absolute',
+                          top: '2px',
+                          left: '2px',
+                          width: '4px',
+                          height: '4px',
+                          borderRadius: '50%',
+                          background: 'rgba(255,255,255,0.7)'
+                        }} />
+                      </div>
+                      <div style={{
+                        width: '2px',
+                        height: '8px',
+                        background: 'linear-gradient(90deg, #cbd5e1 0%, #64748b 100%)',
+                        marginTop: '-1px'
+                      }} />
+                    </div>
+
+                    <span style={{ 
+                      fontSize: '0.66rem', 
+                      fontWeight: 700, 
+                      color: '#a16207', 
+                      textTransform: 'uppercase', 
+                      letterSpacing: '0.04em', 
+                      lineHeight: 1 
+                    }}>
+                      Hausaufgaben
+                    </span>
+                    <span style={{ 
+                      fontSize: '0.86rem', 
+                      fontWeight: 900, 
+                      color: '#854d0e', 
+                      textTransform: 'uppercase', 
+                      letterSpacing: '0.06em', 
+                      lineHeight: 1.1,
+                      marginTop: '1px'
+                    }}>
+                      Archiv
+                    </span>
                   </button>
                 </div>
 
