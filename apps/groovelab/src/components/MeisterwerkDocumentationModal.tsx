@@ -2210,8 +2210,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           flexDirection: 'column',
                           gap: '26px',
                           borderTop: '1px solid rgba(0, 0, 0, 0.06)',
-                          paddingTop: '20px',
-                          marginTop: '8px',
+                          padding: '16px',
+                          marginTop: '12px',
+                          background: '#f8fafc',
+                          borderRadius: '12px',
+                          border: '1px solid rgba(0, 0, 0, 0.03)',
                           animation: 'fadeIn 0.2s ease'
                         }}>
                           {[
