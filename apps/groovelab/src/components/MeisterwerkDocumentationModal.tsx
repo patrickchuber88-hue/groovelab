@@ -2058,44 +2058,58 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       </div>
                     </div>
 
-                    {/* Student Info & Back Button */}
+                    {/* Brushes Panel for Songs */}
                     <div style={{
-                      background: 'white',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '24px',
-                      padding: '16px 20px',
                       display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.02)'
+                      flexDirection: 'column',
+                      gap: '8px',
+                      background: 'white',
+                      borderRadius: '18px',
+                      padding: '12px 16px',
+                      border: '1px solid rgba(0, 0, 0, 0.08)',
+                      boxShadow: '0 4px 15px rgba(0,0,0,0.02)'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{
-                          width: '36px', height: '36px', borderRadius: '50%', background: '#f1f5f9',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', border: '1px solid #e2e8f0'
-                        }}>
-                          {student.first_name?.charAt(0)}{student.last_name?.charAt(0)}
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '0.84rem', fontWeight: 900, color: '#0f172a' }}>{student.first_name} {student.last_name}</div>
-                          <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>Aktiver Schüler</div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#4b5563', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span>🖌️</span> Pinsel zum Einfärben:
+                        </span>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          {[
+                            { mode: 'LOCKED', color: 'hsl(355, 75%, 84%)', label: 'Rot (unbearbeitet)', getActive: () => status === 'IN_PROGRESS' && !isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(false); setSongProgressPercent(25); setHasChanges(true); } },
+                            { mode: 'HOMEWORK', color: 'hsl(47, 85%, 84%)', label: 'Gelb (Hausaufgabe)', getActive: () => status === 'IN_PROGRESS' && isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(true); setSongProgressPercent(25); setHasChanges(true); } },
+                            { mode: 'MASTERED', color: 'hsl(130, 65%, 82%)', label: 'Grün (gemeistert)', getActive: () => status === 'MASTERED', action: () => { setStatus('MASTERED'); setIsCurrentHomework(false); setSongProgressPercent(100); setHasChanges(true); } }
+                          ].map(b => {
+                            const isActive = b.getActive();
+                            return (
+                              <button
+                                key={b.mode}
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  b.action();
+                                }}
+                                style={{
+                                  width: '28px',
+                                  height: '28px',
+                                  borderRadius: '50%',
+                                  background: b.color,
+                                  border: isActive ? '3px solid #0f172a' : '1.5px solid #cbd5e1',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease',
+                                  transform: isActive ? 'scale(1.15)' : 'none',
+                                  outline: 'none'
+                                }}
+                                title={b.label}
+                              />
+                            );
+                          })}
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveSubView('hub');
-                          setSelectedActiveSongId('');
-                        }}
-                        style={{
-                          background: '#fee2e2', border: '1.5px solid #fca5a5', color: '#b91c1c',
-                          padding: '8px 14px', borderRadius: '12px', fontSize: '0.76rem', fontWeight: 800, cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', gap: '4px', transition: 'all 0.15s ease'
-                        }}
-                        className="hover-scale"
-                      >
-                        ◀ Zurück
-                      </button>
+                      <div style={{ borderTop: '1px solid rgba(0, 0, 0, 0.05)', paddingTop: '8px', display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: 'hsl(355, 75%, 84%)' }}>●</span> Rot (unbearbeitet)</span>
+                        <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: 'hsl(47, 85%, 84%)' }}>●</span> Gelb (Hausaufgabe)</span>
+                        <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: 'hsl(130, 65%, 82%)' }}>●</span> Grün (gemeistert)</span>
+                      </div>
                     </div>
                   </div>
                 );
@@ -2991,19 +3005,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             );
                           })}
                         </div>
-                      </div>
-
-                      {/* Legende rechtsbündig unter den Kreisen */}
-                      <div style={{ display: 'flex', gap: '12px', flexWrap: 'nowrap', justifyContent: 'flex-end', paddingRight: '4px', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
-                          <span style={{ color: 'hsl(355, 75%, 84%)', fontSize: '0.85rem' }}>●</span> Rot (unbearbeitet)
-                        </span>
-                        <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
-                          <span style={{ color: 'hsl(47, 85%, 84%)', fontSize: '0.85rem' }}>●</span> Gelb (Hausaufgabe)
-                        </span>
-                        <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
-                          <span style={{ color: 'hsl(130, 65%, 82%)', fontSize: '0.85rem' }}>●</span> Grün (gemeistert)
-                        </span>
                       </div>
                     </div>
 
