@@ -4114,18 +4114,44 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       const getLehrwerkColor = (title: string) => {
         const firstLetter = (title || 'A').trim().charAt(0).toUpperCase();
         const charCode = firstLetter.charCodeAt(0);
-        const colors = [
-          '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', 
-          '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', 
-          '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', 
-          '#f43f5e', '#64748b', '#475569', '#334155', '#4b5563',
-          '#374151', '#1f2937', '#111827', '#030712', '#7c2d12',
-          '#7f1d1d'
+        
+        // Curated luxury gradient presets
+        const gradients = [
+          { from: '#ff5e62', to: '#ff9966' }, // A: Sunset Peach
+          { from: '#ec4899', to: '#f43f5e' }, // B: Pink Velvet
+          { from: '#d946ef', to: '#a100f2' }, // C: Violet Orchidee
+          { from: '#a855f7', to: '#6366f1' }, // D: Royal Iris
+          { from: '#6366f1', to: '#3b82f6' }, // E: Indigo Blue
+          { from: '#3b82f6', to: '#00d2ff' }, // F: Sky Electric
+          { from: '#0ea5e9', to: '#00a8cc' }, // G: Azure Aquamarine
+          { from: '#06b6d4', to: '#14b8a6' }, // H: Ocean Teal
+          { from: '#14b8a6', to: '#059669' }, // I: Jungle Forest
+          { from: '#10b981', to: '#047857' }, // J: Emerald Jade
+          { from: '#22c55e', to: '#16502d' }, // K: Fresh Clover
+          { from: '#84cc16', to: '#a3e635' }, // L: Olive Lime
+          { from: '#f59e0b', to: '#d97706' }, // M: Warm Honey
+          { from: '#f97316', to: '#ea580c' }, // N: Canyon Clay
+          { from: '#ef4444', to: '#b91c1c' }, // O: Crimson Red
+          { from: '#64748b', to: '#475569' }, // P: Slate Stone
+          { from: '#475569', to: '#334155' }, // Q: Charcoal Iron
+          { from: '#8b5cf6', to: '#7c3aed' }, // R: Grape Violet
+          { from: '#0d9488', to: '#115e59' }, // S: Spruce Pine
+          { from: '#9f1239', to: '#e11d48' }, // T: Burgundy Rose
+          { from: '#0284c7', to: '#0369a1' }, // U: Deep Sea
+          { from: '#4f46e5', to: '#312e81' }, // V: Ink Blue
+          { from: '#c2410c', to: '#7c2d12' }, // W: Terracotta
+          { from: '#7c3aed', to: '#4c1d95' }, // X: Imperial Purple
+          { from: '#1e3a8a', to: '#1e1b4b' }, // Y: Navy Pearl
+          { from: '#52525b', to: '#27272a' }  // Z: Charcoal Coal
         ];
+        
+        let index = 0;
         if (charCode >= 65 && charCode <= 90) {
-          return colors[charCode - 65];
+          index = charCode - 65;
+        } else {
+          index = charCode % gradients.length;
         }
-        return colors[charCode % colors.length];
+        return gradients[index];
       };
 
       const filteredLehrwerke = lehrwerke.filter(item => 
@@ -4351,18 +4377,18 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 }}
               >
                 {(() => {
-                  const coverColor = getLehrwerkColor(item.title);
+                  const gradient = getLehrwerkColor(item.title);
                   return (
                     <div style={{ 
                       width: '64px', 
                       height: '84px', 
-                      background: `linear-gradient(135deg, ${coverColor}, ${coverColor}dd)`, 
+                      background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`, 
                       borderRadius: '8px', 
                       display: 'flex', 
                       alignItems: 'center', 
                       justifyContent: 'center', 
                       color: 'white', 
-                      boxShadow: `0 4px 12px ${coverColor}30` 
+                      boxShadow: `0 6px 16px ${gradient.from}33, 0 2px 4px ${gradient.to}22` 
                     }}>
                       <BookOpen size={24} color="white" />
                     </div>
