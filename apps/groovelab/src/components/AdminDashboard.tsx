@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, ChevronLeft, ChevronRight, GripVertical } from 'lucide-react';
+import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, ChevronLeft, ChevronRight, GripVertical, BookOpen } from 'lucide-react';
 import { 
   ResponsiveContainer,
   BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell,
@@ -4111,6 +4111,23 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
   const renderSongsTab = () => {
     const renderLehrwerkeSection = () => {
+      const getLehrwerkColor = (title: string) => {
+        const firstLetter = (title || 'A').trim().charAt(0).toUpperCase();
+        const charCode = firstLetter.charCodeAt(0);
+        const colors = [
+          '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', 
+          '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', 
+          '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', 
+          '#f43f5e', '#64748b', '#475569', '#334155', '#4b5563',
+          '#374151', '#1f2937', '#111827', '#030712', '#7c2d12',
+          '#7f1d1d'
+        ];
+        if (charCode >= 65 && charCode <= 90) {
+          return colors[charCode - 65];
+        }
+        return colors[charCode % colors.length];
+      };
+
       const filteredLehrwerke = lehrwerke.filter(item => 
         item.title.toLowerCase().includes(songSearch.toLowerCase()) || 
         (item.author || '').toLowerCase().includes(songSearch.toLowerCase())
@@ -4333,21 +4350,24 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   transition: 'all 0.2s ease'
                 }}
               >
-                <div style={{ 
-                  width: '64px', 
-                  height: '84px', 
-                  background: `linear-gradient(135deg, ${brandColor}, ${brandColor}dd)`, 
-                  borderRadius: '8px', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  color: 'white', 
-                  fontSize: '24px', 
-                  fontWeight: 900, 
-                  boxShadow: `0 4px 12px ${brandColor}30` 
-                }}>
-                  📚
-                </div>
+                {(() => {
+                  const coverColor = getLehrwerkColor(item.title);
+                  return (
+                    <div style={{ 
+                      width: '64px', 
+                      height: '84px', 
+                      background: `linear-gradient(135deg, ${coverColor}, ${coverColor}dd)`, 
+                      borderRadius: '8px', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      color: 'white', 
+                      boxShadow: `0 4px 12px ${coverColor}30` 
+                    }}>
+                      <BookOpen size={24} color="white" />
+                    </div>
+                  );
+                })()}
                 <div style={{ flex: 1 }}>
                   <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>{item.title}</h4>
                   {item.author && <p style={{ margin: '0 0 4px 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>von {item.author}</p>}
