@@ -1433,20 +1433,29 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   }, [forceTab]);
 
   const fetchData = async () => {
-    const { data: adminData } = await supabase
-      .from('users')
-      .select('*, schools(*)')
-      .eq('id', userId)
-      .single();
-    setAdmin(adminData);
+    let currentAdmin = admin;
+    if (!currentAdmin) {
+      const { data: adminData } = await supabase
+        .from('users')
+        .select('*, schools(*)')
+        .eq('id', userId)
+        .single();
+      if (adminData) {
+        setAdmin(adminData);
+        currentAdmin = adminData;
+      }
+    }
 
-    if (adminData?.school_id) {
-      // Fetch kiosks for the school
-      const { data: kiosksData } = await supabase
-        .from('kiosks')
-        .select('*')
-        .eq('school_id', adminData.school_id);
-      setKiosks(kiosksData || []);
+    if (currentAdmin?.school_id) {
+      // Fetch kiosks for the school only if not loaded yet
+      if (!kiosks || kiosks.length === 0) {
+        const { data: kiosksData } = await supabase
+          .from('kiosks')
+          .select('*')
+          .eq('school_id', currentAdmin.school_id);
+        setKiosks(kiosksData || []);
+      }
+      const adminData = currentAdmin;
 
       if (activeTab === 'live') {
         const { data: sData } = await supabase
