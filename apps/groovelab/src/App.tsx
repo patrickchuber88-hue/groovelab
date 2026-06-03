@@ -1589,6 +1589,45 @@ function App() {
     loadKiosk();
   }, []);
 
+  // Clean up legacy local storage dummy data and delete dummy textbooks/progress from Supabase
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('campus_lehrwerke');
+    }
+    
+    async function cleanupDummies() {
+      try {
+        const dummyTitles = [
+          'GrooveLab Guitar Vol. 1',
+          'GrooveLab Drums Vol. 1',
+          'GrooveLab Guitar Vol. 2',
+          'GrooveLab Drums Vol. 2',
+          'GrooveLab Bass Vol. 1',
+          'GrooveLab Keyboard Vol. 1',
+          'GrooveLab Keys Vol. 1',
+          'GrooveLab Vocals Vol. 1'
+        ];
+        
+        // Delete textbook entries
+        await supabase
+          .from('lehrwerke')
+          .delete()
+          .in('title', dummyTitles);
+
+        // Delete progress items referencing dummy textbooks
+        for (const title of dummyTitles) {
+          await supabase
+            .from('progress_matrix')
+            .delete()
+            .like('topic_name', `${title} - %`);
+        }
+      } catch (err) {
+        console.error('[Cleanup] Failed to clean up dummy textbooks:', err);
+      }
+    }
+    cleanupDummies();
+  }, []);
+
   // Kiosk Room Auto-Bootstrap: when kiosk_room_id is in the URL WITHOUT kiosk_setup=1,
   // automatically resolve a station ID for that room and go directly to the QR-scanner.
   // When kiosk_setup=1 is present (= came from "Beenden" button), show DeviceSetupScreen instead.
