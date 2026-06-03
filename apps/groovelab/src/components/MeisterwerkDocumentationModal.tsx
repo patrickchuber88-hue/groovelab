@@ -1578,7 +1578,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       }} className="animation-slide-up">
         {/* Header - Apple-style compact redesign */}
         <div style={{
-          padding: '12px 20px',
+          padding: '16px 20px',
           background: useNotebookLayout 
             ? '#456355' 
             : 'rgba(255, 255, 255, 0.82)',
@@ -1879,7 +1879,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 const pages = Array.from({ length: book.totalPages || 50 }, (_, i) => i + 1);
 
                 return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease', flex: 1, overflowY: 'auto', padding: '24px' }}>
                     <button
                       type="button"
                       onClick={() => setActiveSubView('hub')}
@@ -2125,7 +2125,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 const progress = songProgressPercent;
 
                 return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease', flex: 1, overflowY: 'auto', padding: '24px' }}>
                     <button
                       type="button"
                       onClick={() => setActiveSubView('hub')}
