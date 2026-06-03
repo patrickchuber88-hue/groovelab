@@ -5087,7 +5087,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         {/* Two Columns Layout */}
         <div style={{ 
           display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', 
+          gridTemplateColumns: activePlatform === 'campus' ? 'repeat(auto-fit, minmax(420px, 1fr))' : '1fr', 
           gap: '30px', 
           alignItems: 'flex-start' 
         }}>
@@ -5218,7 +5218,12 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 const matchesSearch = songSearch === '' || 
                   song.title?.toLowerCase().includes(songSearch.toLowerCase()) || 
                   song.artist?.toLowerCase().includes(songSearch.toLowerCase());
-                return matchesSearch;
+                
+                const matchesPlatform = activePlatform === 'campus' 
+                  ? song.is_campus_active 
+                  : song.is_groovelab_active;
+                  
+                return matchesSearch && matchesPlatform;
               }).map(song => {
                 const lwColor = getSongColor(song.title || '');
                 const coverBg = `linear-gradient(135deg, ${lwColor.from} 0%, ${lwColor.to} 100%)`;
@@ -5316,6 +5321,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           </div>
 
           {/* Right Column: Lehrwerke */}
+          {activePlatform === 'campus' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -5539,6 +5545,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               })}
             </div>
           </div>
+          )}
         </div>
       </div>
 
