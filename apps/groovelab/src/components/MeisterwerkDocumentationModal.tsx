@@ -1576,33 +1576,36 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         padding: useNotebookLayout ? '6px' : '0',
         position: 'relative'
       }} className="animation-slide-up">
-        {/* Header - Apple-style Translucent/White Header (5% Darker Hybrid Forest-Sage Green Design in Notebook Layout) */}
+        {/* Header - Apple-style compact redesign */}
         <div style={{
-          padding: '18px 24px',
+          padding: '12px 20px',
           background: useNotebookLayout 
             ? '#456355' 
-            : 'rgba(255, 255, 255, 0.72)',
+            : 'rgba(255, 255, 255, 0.82)',
           backdropFilter: useNotebookLayout ? 'none' : 'blur(20px) saturate(190%)',
           borderBottom: useNotebookLayout 
-            ? '2px solid #32483e' 
+            ? '1px solid rgba(50, 72, 62, 0.8)' 
             : '1px solid rgba(0, 0, 0, 0.06)',
           borderRadius: useNotebookLayout ? '24px 24px 0 0' : '0',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          gap: '16px',
           zIndex: 50,
           boxShadow: useNotebookLayout 
-            ? '0 4px 12px rgba(0,0,0,0.1)' 
-            : '0 1px 2px rgba(0, 0, 0, 0.01)'
+            ? '0 2px 8px rgba(0,0,0,0.12)' 
+            : '0 1px 0 rgba(0,0,0,0.04)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          {/* Left: Avatar + Student Info */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
             <div style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '12px',
+              width: '38px',
+              height: '38px',
+              borderRadius: '10px',
               overflow: 'hidden',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-              border: useNotebookLayout ? '1.5px solid rgba(255, 213, 79, 0.25)' : '1px solid rgba(0, 0, 0, 0.05)'
+              flexShrink: 0,
+              boxShadow: useNotebookLayout ? '0 2px 6px rgba(0,0,0,0.25)' : '0 1px 4px rgba(0,0,0,0.08)',
+              border: useNotebookLayout ? '1.5px solid rgba(255, 213, 79, 0.2)' : '1px solid rgba(0,0,0,0.06)'
             }}>
               <img
                 src={getInstrumentAvatarUrl(studentInstrument)}
@@ -1610,134 +1613,98 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 alt=""
               />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ 
-                  fontSize: '0.62rem', 
-                  color: useNotebookLayout ? '#c5d8cf' : '#8e8e93', 
-                  fontWeight: 700, 
-                  textTransform: 'uppercase', 
-                  letterSpacing: '0.08em' 
-                }}>
-                  Tageskompass
-                </span>
-              </div>
-              <h2 className="swiss-h2" style={{ 
-                margin: 0, 
-                fontSize: '1.2rem', 
-                color: useNotebookLayout ? '#ffffff' : '#1d1d1f', 
-                fontWeight: 800, 
-                letterSpacing: '-0.025em', 
-                lineHeight: 1.15
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
+              <h2 style={{
+                margin: 0,
+                fontSize: '1rem',
+                fontWeight: 700,
+                color: useNotebookLayout ? '#ffffff' : '#1d1d1f',
+                letterSpacing: '-0.02em',
+                lineHeight: 1.2,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
+                {student.first_name} {student.last_name}
+              </h2>
+              <span style={{
+                fontSize: '0.68rem',
+                color: useNotebookLayout ? 'rgba(197,216,207,0.85)' : '#8e8e93',
+                fontWeight: 500,
+                letterSpacing: '0.01em'
               }}>
                 Schüler-Protokoll
-              </h2>
-              <p style={{ fontSize: '0.78rem', color: useNotebookLayout ? '#c5d8cf' : '#86868b', margin: '1px 0 0 0', fontWeight: 500 }}>
-                Aktive Begleitung für: <strong style={{ color: useNotebookLayout ? '#ffffff' : '#1d1d1f', fontWeight: 600 }}>{student.first_name} {student.last_name}</strong>
-              </p>
+              </span>
             </div>
           </div>
 
-          {/* Swiss Modernist Tab & Toggle Control Group */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              display: 'inline-flex',
-              background: useNotebookLayout ? 'rgba(0, 0, 0, 0.2)' : 'rgba(120, 120, 128, 0.08)',
-              padding: '2.5px',
-              borderRadius: '20px',
-              border: useNotebookLayout ? '1px solid rgba(255, 255, 255, 0.08)' : 'none'
-            }}>
-              <button
-                type="button"
-                onClick={() => setActiveModalTab('document')}
-                style={{
-                  background: activeModalTab === 'document' 
-                    ? (useNotebookLayout ? '#ffffff' : 'white') 
-                    : 'transparent',
-                  border: 'none',
-                  color: activeModalTab === 'document' 
-                    ? (useNotebookLayout ? '#1c1c1e' : '#1d1d1f') 
-                    : (useNotebookLayout ? '#c5d8cf' : '#86868b'),
-                  padding: '6px 14px',
-                  borderRadius: '17px',
-                  fontSize: '0.76rem',
-                  fontWeight: 650,
-                  cursor: 'pointer',
-                  boxShadow: activeModalTab === 'document' 
-                    ? (useNotebookLayout ? '0 1px 3px rgba(0,0,0,0.06)' : '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)') 
-                    : 'none',
-                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px'
-                }}
-              >
-                <BookOpen size={13} style={{ opacity: activeModalTab === 'document' ? 1 : 0.8 }} />
-                <span>Unterricht dokumentieren</span>
-              </button>
-            </div>
-
-            {/* Premium Notebook / Modern Design Toggle Button */}
+          {/* Right: Design Toggle + Close */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+            {/* Compact Design Toggle */}
             <button
               type="button"
+              title={useNotebookLayout ? 'Modernes Design' : 'Notizbuch-Design'}
               onClick={() => {
                 const nextVal = !useNotebookLayout;
                 setUseNotebookLayout(nextVal);
                 localStorage.setItem('meisterwerk_notebook_layout', String(nextVal));
               }}
               style={{
-                background: useNotebookLayout ? 'rgba(0, 0, 0, 0.2)' : 'rgba(120, 120, 128, 0.08)',
-                border: useNotebookLayout ? '1px solid rgba(255, 255, 255, 0.08)' : 'none',
-                color: useNotebookLayout ? '#ffffff' : '#1d1d1f',
-                padding: '6px 14px',
-                borderRadius: '17px',
-                fontSize: '0.76rem',
+                background: useNotebookLayout ? 'rgba(0,0,0,0.18)' : 'rgba(120,120,128,0.08)',
+                border: useNotebookLayout ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.07)',
+                color: useNotebookLayout ? '#e0ede7' : '#3c3c43',
+                padding: '6px 12px',
+                borderRadius: '20px',
+                fontSize: '0.72rem',
                 fontWeight: 600,
                 cursor: 'pointer',
-                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                transition: 'all 0.18s ease',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '5px'
+                gap: '5px',
+                letterSpacing: '0.01em'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = useNotebookLayout ? 'rgba(0, 0, 0, 0.3)' : 'rgba(120, 120, 128, 0.14)';
+                e.currentTarget.style.background = useNotebookLayout ? 'rgba(0,0,0,0.28)' : 'rgba(120,120,128,0.14)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = useNotebookLayout ? 'rgba(0, 0, 0, 0.2)' : 'rgba(120, 120, 128, 0.08)';
+                e.currentTarget.style.background = useNotebookLayout ? 'rgba(0,0,0,0.18)' : 'rgba(120,120,128,0.08)';
               }}
             >
-              <Book size={13} style={{ opacity: 0.8 }} />
-              <span>{useNotebookLayout ? 'Modernes Design' : 'Notizbuch-Design'}</span>
+              <Book size={12} style={{ opacity: 0.85 }} />
+              <span>{useNotebookLayout ? 'Modern' : 'Notizbuch'}</span>
+            </button>
+
+            {/* Close Button */}
+            <button
+              onClick={handleClose}
+              style={{
+                background: useNotebookLayout ? 'rgba(0,0,0,0.18)' : 'rgba(120,120,128,0.08)',
+                border: useNotebookLayout ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.05)',
+                borderRadius: '50%',
+                width: '30px',
+                height: '30px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: useNotebookLayout ? '#c5d8cf' : '#8e8e93',
+                transition: 'all 0.18s ease',
+                flexShrink: 0
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = useNotebookLayout ? 'rgba(0,0,0,0.3)' : 'rgba(120,120,128,0.16)';
+                e.currentTarget.style.color = useNotebookLayout ? '#ffd54f' : '#1d1d1f';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = useNotebookLayout ? 'rgba(0,0,0,0.18)' : 'rgba(120,120,128,0.08)';
+                e.currentTarget.style.color = useNotebookLayout ? '#c5d8cf' : '#8e8e93';
+              }}
+              className="hover-scale"
+            >
+              <X size={13} />
             </button>
           </div>
-
-          <button
-            onClick={handleClose}
-            style={{
-              background: useNotebookLayout ? 'rgba(0, 0, 0, 0.2)' : 'rgba(120, 120, 128, 0.08)',
-              border: useNotebookLayout ? '1px solid rgba(255, 255, 255, 0.08)' : 'none',
-              borderRadius: '50%',
-              width: '32px',
-              height: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              color: useNotebookLayout ? '#c5d8cf' : '#86868b',
-              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = useNotebookLayout ? 'rgba(0, 0, 0, 0.3)' : 'rgba(120, 120, 128, 0.16)';
-              e.currentTarget.style.color = useNotebookLayout ? '#ffd54f' : '#1d1d1f';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = useNotebookLayout ? 'rgba(0, 0, 0, 0.2)' : 'rgba(120, 120, 128, 0.08)';
-              e.currentTarget.style.color = useNotebookLayout ? '#c5d8cf' : '#86868b';
-            }}
-            className="hover-scale"
-          >
-            <X size={15} />
-          </button>
         </div>
 
         {/* Modal Content - Side-by-side Columns or Logbook */}
