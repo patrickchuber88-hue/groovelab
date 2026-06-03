@@ -6346,8 +6346,15 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           }
         };
 
-        const handleUnassign = (studentId: string) => {
+        const handleUnassign = async (studentId: string) => {
+          if (!window.confirm('Bist du sicher, dass du das Lehrwerk und somit den bereits erreichten Fortschritt löschen möchtest?')) return;
           try {
+            await supabase
+              .from('progress_matrix')
+              .delete()
+              .eq('student_id', studentId)
+              .like('topic_name', `${book.title} - Seite %`);
+
             const stored = localStorage.getItem('student_lehrwerke_progress');
             const parsed = stored ? JSON.parse(stored) : [];
             const updated = parsed.filter((a: any) => !(a.studentId === studentId && a.lehrwerkId === book.id));

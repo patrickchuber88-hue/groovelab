@@ -239,8 +239,9 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     const fetchLehrwerke = async () => {
       try {
         let query = supabase.from('lehrwerke').select('*');
-        if (currentTeacherId) {
-          query = query.eq('teacher_id', currentTeacherId);
+        const schoolId = student.school_id || student.schoolId;
+        if (schoolId) {
+          query = query.eq('school_id', schoolId);
         }
         const { data: lehrwerkeData, error } = await query.order('title');
         if (error) throw error;
@@ -305,9 +306,18 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     }
   };
 
-  const handleUnassignLehrwerk = (lehrwerkId: string) => {
-    if (!window.confirm('Möchtest du dieses Lehrwerk wirklich vom Profil des Schülers entfernen? Alle Lernpfad-Fortschritte gehen verloren.')) return;
+  const handleUnassignLehrwerk = async (lehrwerkId: string) => {
+    if (!window.confirm('Möchtest du dieses Lehrwerk wirklich vom Profil des Schülers entfernen? Der gesamte bereits erreichte Fortschritt für dieses Lehrwerk wird gelöscht.')) return;
     try {
+      const book = globalLehrwerke.find(b => b.id === lehrwerkId);
+      if (book) {
+        await supabase
+          .from('progress_matrix')
+          .delete()
+          .eq('student_id', student.id)
+          .like('topic_name', `${book.title} - Seite %`);
+      }
+
       const stored = localStorage.getItem('student_lehrwerke_progress');
       if (stored) {
         const parsed = JSON.parse(stored);

@@ -159,7 +159,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [assignedLehrwerke, setAssignedLehrwerke] = useState<any[]>([]);
   const [activeLehrwerkId, setActiveLehrwerkId] = useState<string | null>(null);
   const [activePageNumber, setActivePageNumber] = useState<number | null>(null);
-  const [activeSubView, setActiveSubView] = useState<'hub' | 'lehrwerk' | 'song'>('hub');
+  const [activeSubView, setActiveSubView] = useState<'hub' | 'lehrwerk' | 'song' | 'history'>('hub');
+  const [selectedHistoryWeek, setSelectedHistoryWeek] = useState<string | null>(null);
   const [songProgressPercent, setSongProgressPercent] = useState<number>(25);
 
   const getLehrwerkColor = (title: string) => {
@@ -1533,7 +1534,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         background: useNotebookLayout 
           ? (bookColor 
               ? `radial-gradient(circle, ${bookColor.from} 0%, ${bookColor.to} 100%)` 
-              : 'radial-gradient(circle, #3a3a44 0%, #1a1a22 100%)') 
+              : 'radial-gradient(circle, #5c4d40 0%, #30261f 100%)') 
           : '#f3f3f6', // Zurich neutral gray background canvas or tactile book cover
         borderRadius: '32px',
         width: '100%',
@@ -1544,7 +1545,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         flexDirection: 'column',
         overflow: 'hidden',
         border: useNotebookLayout 
-          ? (bookColor ? `2px solid ${bookColor.text}` : '1px solid #2e2e38') 
+          ? 'none' 
           : '1px solid rgba(0, 0, 0, 0.05)',
         padding: useNotebookLayout ? '6px' : '0',
         position: 'relative'
@@ -1750,7 +1751,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           background: useNotebookLayout 
             ? (bookColor 
                 ? `radial-gradient(circle, ${bookColor.from} 0%, ${bookColor.to} 100%)` 
-                : 'radial-gradient(circle, #3a3a44 0%, #1a1a22 100%)') 
+                : 'radial-gradient(circle, #5c4d40 0%, #30261f 100%)') 
             : 'transparent',
           padding: '0',
           position: 'relative'
@@ -1813,7 +1814,99 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               </div>
             )}
 
-            {activeSubView === 'lehrwerk' && activeLehrwerkId ? (
+            {activeSubView === 'history' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease', height: '100%' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
+                    📚 Hausaufgaben-Archiv
+                  </h3>
+                  <p style={{ margin: '3px 0 0 0', fontSize: '0.76rem', color: '#64748b', fontWeight: 650 }}>
+                    Hier findest du alle vergangenen, archivierten Hausaufgaben-Wochen.
+                  </p>
+                </div>
+                
+                <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '4px' }}>
+                  {(() => {
+                    const weeks = Array.from(new Set(progressItems
+                      .filter(item => item.updated_at)
+                      .map(item => getISOWeek(item.updated_at))
+                    )).sort().reverse();
+                    
+                    if (weeks.length === 0) {
+                      return (
+                        <div style={{ padding: '24px', textAlign: 'center', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1', color: '#64748b', fontSize: '0.8rem' }}>
+                          Keine vergangenen Hausaufgaben gefunden.
+                        </div>
+                      );
+                    }
+                    
+                    return weeks.map(wk => {
+                      const isSelected = selectedHistoryWeek === wk;
+                      const weekNum = wk.split('-W')[1] || '';
+                      
+                      // Count how many items were checked or active in this week
+                      const weekItems = progressItems.filter(item => item.updated_at && getISOWeek(item.updated_at) === wk);
+                      const homeworkItemsCount = weekItems.filter(item => item.is_current_homework && !item.topic_name.startsWith('Hausaufgabe KW ')).length;
+                      
+                      return (
+                        <div
+                          key={wk}
+                          onClick={() => setSelectedHistoryWeek(wk)}
+                          style={{
+                            background: isSelected ? '#f1f5f9' : 'white',
+                            border: isSelected ? '1.5px solid #456355' : '1px solid #cbd5e1',
+                            borderRadius: '16px',
+                            padding: '16px',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px',
+                            boxShadow: isSelected ? '0 4px 12px rgba(69, 99, 85, 0.08)' : '0 2px 4px rgba(0,0,0,0.01)'
+                          }}
+                          className="hover-scale"
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.86rem', fontWeight: 900, color: isSelected ? '#456355' : '#0f172a' }}>
+                              KW {weekNum}
+                            </span>
+                            <span style={{ fontSize: '0.68rem', background: isSelected ? '#456355' : '#f1f5f9', color: isSelected ? 'white' : '#4b5563', padding: '2px 8px', borderRadius: '10px', fontWeight: 800 }}>
+                              {homeworkItemsCount} Aufgaben
+                            </span>
+                          </div>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
+                            Dokumentiert in Woche {weekNum}
+                          </span>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+
+                {/* Back button to active hub */}
+                <button
+                  type="button"
+                  onClick={() => setActiveSubView('hub')}
+                  style={{
+                    background: '#456355',
+                    color: 'white',
+                    border: 'none',
+                    padding: '12px',
+                    borderRadius: '14px',
+                    fontSize: '0.8rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 10px rgba(69, 99, 85, 0.2)',
+                    transition: 'all 0.15s ease',
+                    width: '100%',
+                    textAlign: 'center'
+                  }}
+                  className="hover-scale"
+                >
+                  Zurück zum aktuellen Tag
+                </button>
+              </div>
+            ) : activeSubView === 'lehrwerk' && activeLehrwerkId ? (
               (() => {
                 const book = globalLehrwerke.find(g => g.id === activeLehrwerkId);
                 if (!book) return null;
@@ -1824,6 +1917,30 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease' }}>
+                    <button
+                      type="button"
+                      onClick={() => setActiveSubView('hub')}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: '#f1f5f9',
+                        border: 'none',
+                        color: '#475569',
+                        padding: '8px 14px',
+                        borderRadius: '20px',
+                        fontSize: '0.74rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        width: 'fit-content',
+                        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                        transition: 'all 0.15s ease'
+                      }}
+                      className="hover-scale"
+                    >
+                      <span>← Zurück zum Hub</span>
+                    </button>
+
                     {/* Textbook Cover Card */}
                     <div style={{
                       background: 'white',
@@ -2023,6 +2140,30 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease' }}>
+                    <button
+                      type="button"
+                      onClick={() => setActiveSubView('hub')}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: '#f1f5f9',
+                        border: 'none',
+                        color: '#475569',
+                        padding: '8px 14px',
+                        borderRadius: '20px',
+                        fontSize: '0.74rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        width: 'fit-content',
+                        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                        transition: 'all 0.15s ease'
+                      }}
+                      className="hover-scale"
+                    >
+                      <span>← Zurück zum Hub</span>
+                    </button>
+
                     {/* Song Cover Card */}
                     <div style={{
                       background: 'white',
@@ -3009,7 +3150,167 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               </div>
             )}
 
-            {activeSubView === 'lehrwerk' && activeLehrwerkId ? (
+            {activeSubView === 'history' ? (
+              (() => {
+                if (!selectedHistoryWeek) {
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#64748b', fontSize: '0.86rem', fontStyle: 'italic' }}>
+                      Wähle links eine Unterrichtswoche aus.
+                    </div>
+                  );
+                }
+
+                const weekNum = selectedHistoryWeek.split('-W')[1] || '';
+                const weekItems = progressItems.filter(item => 
+                  item.updated_at && getISOWeek(item.updated_at) === selectedHistoryWeek
+                );
+
+                // Group page numbers by book title
+                const groupedLehrwerke: Record<string, { pages: number[] }> = {};
+                const otherHWs: any[] = [];
+                const allActive = weekItems.filter(item => item.is_current_homework || item.status === 'THEORY_DONE');
+
+                allActive.forEach(item => {
+                  if (item.topic_name.includes(' - Seite ')) {
+                    const parts = item.topic_name.split(' - Seite ');
+                    const bookTitle = parts[0].trim();
+                    const pageNum = parseInt(parts[1], 10);
+                    if (!groupedLehrwerke[bookTitle]) {
+                      groupedLehrwerke[bookTitle] = { pages: [] };
+                    }
+                    if (!isNaN(pageNum) && !groupedLehrwerke[bookTitle].pages.includes(pageNum)) {
+                      groupedLehrwerke[bookTitle].pages.push(pageNum);
+                    }
+                  } else {
+                    otherHWs.push(item);
+                  }
+                });
+
+                // Extract unique non-empty homework notes
+                const uniqueHomeworkNotes: string[] = [];
+                weekItems.forEach(item => {
+                  if (item.homework_notes && item.homework_notes.trim() !== '') {
+                    try {
+                      const parsed = JSON.parse(item.homework_notes);
+                      if (Array.isArray(parsed)) {
+                        parsed.forEach((n: string) => {
+                          if (n.trim() !== '' && !uniqueHomeworkNotes.includes(n.trim())) {
+                            uniqueHomeworkNotes.push(n.trim());
+                          }
+                        });
+                      } else if (typeof parsed === 'string' && parsed.trim() !== '' && !uniqueHomeworkNotes.includes(parsed.trim())) {
+                        uniqueHomeworkNotes.push(parsed.trim());
+                      }
+                    } catch (e) {
+                      if (!uniqueHomeworkNotes.includes(item.homework_notes.trim())) {
+                        uniqueHomeworkNotes.push(item.homework_notes.trim());
+                      }
+                    }
+                  }
+                });
+
+                // Extract teacher notes
+                const weekTeacherNotes = weekItems
+                  .map(item => item.teacher_notes)
+                  .filter(n => n && n.trim() !== '')
+                  .join('\n\n');
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease', height: '100%' }}>
+                    <div>
+                      <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        🗓️ Details KW {weekNum}
+                      </span>
+                      <p style={{ margin: '3px 0 0 0', fontSize: '0.76rem', color: '#71717a', fontWeight: 550, lineHeight: '1.3' }}>
+                        Hausaufgaben und Notizen aus dieser Woche (Schreibgeschützt).
+                      </p>
+                    </div>
+
+                    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px', paddingRight: '4px' }}>
+                      {/* Active Homework Items Box */}
+                      <div style={{
+                        background: '#fffbeb',
+                        border: '1px solid #fef08a',
+                        borderRadius: '16px',
+                        padding: '14px 16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
+                      }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#18181b' }}>
+                          Hausaufgaben KW {weekNum}
+                        </span>
+
+                        {Object.keys(groupedLehrwerke).length === 0 && otherHWs.length === 0 ? (
+                          <span style={{ fontSize: '0.72rem', color: '#71717a', fontStyle: 'italic' }}>
+                            Keine Hausaufgaben erfasst.
+                          </span>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {Object.entries(groupedLehrwerke).map(([title, info]) => (
+                              <div key={title} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <div style={{ fontSize: '0.92rem', color: '#09090b', fontWeight: 900 }}>
+                                  📖 {title} · <span style={{ color: '#4b5563', fontWeight: 700 }}>S. {info.pages.join(', ')}</span>
+                                </div>
+                              </div>
+                            ))}
+                            {otherHWs.length > 0 && (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', borderTop: '1px solid rgba(251, 191, 36, 0.2)', paddingTop: '8px' }}>
+                                {otherHWs.map((item, idx) => (
+                                  <div key={idx} style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px',
+                                    background: '#ffffff',
+                                    color: '#475569',
+                                    padding: '4px 10px',
+                                    borderRadius: '20px',
+                                    fontSize: '0.76rem',
+                                    fontWeight: 900,
+                                    boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
+                                  }}>
+                                    <span>🎵 {item.topic_name}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Homework notes */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>
+                          📝 Hausaufgaben-Bemerkungen
+                        </label>
+                        <div style={{
+                          width: '100%', minHeight: '80px', padding: '12px 14px', borderRadius: '16px',
+                          border: '1px solid #e2e8f0', fontSize: '0.8rem', fontWeight: 600, background: '#fafafa', color: '#4b5563',
+                          whiteSpace: 'pre-wrap'
+                        }}>
+                          {uniqueHomeworkNotes.join('\n\n') || 'Keine Bemerkungen hinterlegt.'}
+                        </div>
+                      </div>
+
+                      {/* Internal teacher notes */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>
+                          🔒 Interne Notiz (nur für Lehrer)
+                        </label>
+                        <div style={{
+                          width: '100%', minHeight: '60px', padding: '12px 14px', borderRadius: '16px',
+                          border: '1px solid #e2e8f0', fontSize: '0.8rem', fontWeight: 600, background: '#fafafa', color: '#4b5563',
+                          whiteSpace: 'pre-wrap'
+                        }}>
+                          {weekTeacherNotes || 'Keine internen Notizen.'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()
+            ) : activeSubView === 'lehrwerk' && activeLehrwerkId ? (
               // textbook detail notebook view
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '16px' }}>
@@ -3429,13 +3730,56 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             ) : (
               // GENERAL HUB VIEW (only homework Checklist + general notes textarea)
               <>
-                <div>
-                  <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    ✍️ Eintrag & Hausaufgabe
-                  </span>
-                  <p style={{ margin: '3px 0 0 0', fontSize: '0.76rem', color: '#71717a', fontWeight: 550, lineHeight: '1.3' }}>
-                    Dokumentiere den heutigen Unterricht für den Schüler.
-                  </p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                  <div>
+                    <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      ✍️ Eintrag & Hausaufgabe
+                    </span>
+                    <p style={{ margin: '3px 0 0 0', fontSize: '0.76rem', color: '#71717a', fontWeight: 550, lineHeight: '1.3' }}>
+                      Dokumentiere den heutigen Unterricht für den Schüler.
+                    </p>
+                  </div>
+                  
+                  {/* Sticky Note Button for History */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveSubView('history');
+                      // Pre-select the most recent week if available
+                      const weeks = Array.from(new Set(progressItems
+                        .filter(item => item.updated_at)
+                        .map(item => getISOWeek(item.updated_at))
+                      )).sort().reverse();
+                      if (weeks.length > 0) {
+                        setSelectedHistoryWeek(weeks[0]);
+                      }
+                    }}
+                    style={{
+                      background: '#fef08a',
+                      border: '1px solid #fde047',
+                      borderRadius: '4px',
+                      padding: '6px 12px',
+                      boxShadow: '2px 3px 6px rgba(0,0,0,0.08)',
+                      transform: 'rotate(3deg)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '2px',
+                      fontSize: '0.72rem',
+                      fontWeight: 900,
+                      color: '#854d0e',
+                      fontFamily: '"Comic Sans MS", "Marker Felt", sans-serif',
+                      transition: 'all 0.15s ease',
+                      flexShrink: 0
+                    }}
+                    className="hover-scale"
+                  >
+                    <span style={{ fontSize: '0.9rem', lineHeight: '1' }}>📌</span>
+                    <span style={{ textDecoration: 'underline' }}>Hausaufgaben</span>
+                    <span>Archiv</span>
+                  </button>
                 </div>
 
                 {/* The Main Input Form Card */}
@@ -3602,17 +3946,17 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                             gap: '5px',
                                             background: '#ffffff',
                                             color: '#475569',
-                                            padding: '4px 8px 4px 10px',
-                                            borderRadius: '6px',
+                                            padding: '4px 10px 4px 12px',
+                                            borderRadius: '20px',
                                             fontSize: '0.76rem',
                                             fontWeight: 900,
-                                            border: '1px solid #e2e8f0',
+                                            border: 'none',
                                             fontFamily: '"Helvetica Neue", Helvetica, Inter, Arial, sans-serif',
                                             letterSpacing: '-0.02em',
-                                            boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                                            boxShadow: '0 2px 6px rgba(0,0,0,0.03), 0 0 8px rgba(251, 191, 36, 0.18)'
                                           }}>
                                             <span>📄 S. {p}</span>
-                                            {original?.id && (
+                                            {original?.id && !(original?.updated_at && getISOWeek(original.updated_at) !== getISOWeek()) && (
                                               <button
                                                 type="button"
                                                 onClick={() => handleRemoveHomeworkItem(original.id!, item.title, p)}
@@ -3653,33 +3997,35 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                           gap: '5px',
                                           background: '#ffffff',
                                           color: '#475569',
-                                          padding: '4px 8px 4px 10px',
-                                          borderRadius: '6px',
+                                          padding: '4px 10px 4px 12px',
+                                          borderRadius: '20px',
                                           fontSize: '0.76rem',
                                           fontWeight: 900,
-                                          border: '1px solid #e2e8f0',
-                                          boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                                          border: 'none',
+                                          boxShadow: '0 2px 6px rgba(0,0,0,0.03), 0 0 8px rgba(251, 191, 36, 0.18)'
                                         }}>
                                           <span>🎵 {item.topic_name}</span>
-                                          <button
-                                            type="button"
-                                            onClick={() => handleRemoveHomeworkItem(item.id!)}
-                                            style={{
-                                              border: 'none',
-                                              background: 'none',
-                                              color: '#ef4444',
-                                              cursor: 'pointer',
-                                              fontSize: '0.74rem',
-                                              fontWeight: 800,
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center',
-                                              padding: '2px',
-                                              marginLeft: '2px'
-                                            }}
-                                          >
-                                            ✕
-                                          </button>
+                                          {!(item.updated_at && getISOWeek(item.updated_at) !== getISOWeek()) && (
+                                            <button
+                                              type="button"
+                                              onClick={() => handleRemoveHomeworkItem(item.id!)}
+                                              style={{
+                                                border: 'none',
+                                                background: 'none',
+                                                color: '#ef4444',
+                                                cursor: 'pointer',
+                                                fontSize: '0.74rem',
+                                                fontWeight: 800,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                padding: '2px',
+                                                marginLeft: '2px'
+                                              }}
+                                            >
+                                              ✕
+                                            </button>
+                                          )}
                                         </div>
                                       ))}
                                     </div>
