@@ -1675,34 +1675,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 <BookOpen size={13} style={{ opacity: activeModalTab === 'document' ? 1 : 0.8 }} />
                 <span>Unterricht dokumentieren</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setActiveModalTab('logbook')}
-                style={{
-                  background: activeModalTab === 'logbook' 
-                    ? (useNotebookLayout ? '#ffffff' : 'white') 
-                    : 'transparent',
-                  border: 'none',
-                  color: activeModalTab === 'logbook' 
-                    ? (useNotebookLayout ? '#1c1c1e' : '#1d1d1f') 
-                    : (useNotebookLayout ? '#c5d8cf' : '#86868b'),
-                  padding: '6px 14px',
-                  borderRadius: '17px',
-                  fontSize: '0.76rem',
-                  fontWeight: 650,
-                  cursor: 'pointer',
-                  boxShadow: activeModalTab === 'logbook' 
-                    ? (useNotebookLayout ? '0 1px 3px rgba(0,0,0,0.06)' : '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)') 
-                    : 'none',
-                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px'
-                }}
-              >
-                <Award size={13} style={{ opacity: activeModalTab === 'logbook' ? 1 : 0.8 }} />
-                <span>Meisterwerk-Logbuch</span>
-              </button>
             </div>
 
             {/* Premium Notebook / Modern Design Toggle Button */}
@@ -1805,11 +1777,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           `}} />
           <div style={{
             flex: '1 1 0%',
-            padding: '24px',
-            overflowY: 'auto',
+            overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
-            gap: '20px',
             background: useNotebookLayout ? '#faf8f2' : 'white',
             borderRadius: useNotebookLayout ? '0 0 0 20px' : '0',
             boxShadow: useNotebookLayout ? '-10px 10px 20px rgba(0,0,0,0.15)' : 'none',
@@ -1841,7 +1811,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             )}
 
             {activeSubView === 'history' ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease', height: '100%' }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease', overflowY: 'auto', padding: '24px' }}>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
                     📚 Hausaufgaben-Archiv
@@ -2558,6 +2528,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               })()
             ) : (
               <>
+                {/* Hub-view inner scrollable area */}
+                <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px', padding: '24px', paddingBottom: '12px' }}>
                 {/* Clean Apple-style Header Row */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                   <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#000', letterSpacing: '-0.02em', textTransform: 'uppercase' }}>
@@ -3109,7 +3081,27 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 </div>
               )}
             </div>
-          </>
+                </div>{/* close inner scrollable div */}
+
+                {/* Meisterwerke Button - pinned at bottom, same line as Eintrag speichern */}
+                <div style={{ padding: '12px 24px 24px 24px', display: 'flex', gap: '12px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveModalTab('logbook')}
+                    style={{
+                      flex: 1, padding: '14px', borderRadius: '14px', border: 'none',
+                      background: '#456355', color: 'white', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer',
+                      boxShadow: '0 4px 10px rgba(69, 99, 85, 0.2)',
+                      transition: 'all 0.15s ease',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                    }}
+                    className="hover-scale"
+                  >
+                    <Award size={15} />
+                    Deine Meisterwerke
+                  </button>
+                </div>
+              </>
         )}
       </div>
 
@@ -4346,7 +4338,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               letterSpacing: '0.05em',
               fontFamily: '"Helvetica Neue", Helvetica, Inter, Arial, sans-serif'
             }}>
-              Meisterwerk-Logbuch
+              Meisterwerke
             </span>
           </div>
 
