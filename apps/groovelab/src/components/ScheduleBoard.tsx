@@ -988,7 +988,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             padding: '16px 20px', 
             border: '1px solid rgba(255, 255, 255, 0.5)', 
             boxShadow: '0 8px 32px rgba(0, 0, 0, 0.03)', 
-            display: 'flex', 
+            display: 'grid', 
+            gridTemplateColumns: '1fr auto 540px', 
             alignItems: 'center', 
             gap: '16px'
           }}>
@@ -1006,7 +1007,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               </div>
             </div>
 
-            <div className="app-segmented-switch" style={{ margin: 0, marginLeft: 'auto' }}>
+            <div className="app-segmented-switch" style={{ margin: 0 }}>
               <button 
                 onClick={() => setActiveTab('calendar')}
                 className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`}
