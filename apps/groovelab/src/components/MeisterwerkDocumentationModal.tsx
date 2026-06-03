@@ -3271,8 +3271,43 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                             {Object.entries(groupedLehrwerke).map(([title, info]) => (
                               <div key={title} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                <div style={{ fontSize: '0.92rem', color: '#09090b', fontWeight: 900 }}>
-                                  📖 {title} · <span style={{ color: '#4b5563', fontWeight: 700 }}>S. {info.pages.join(', ')}</span>
+                                <div style={{ 
+                                  fontSize: '0.92rem', 
+                                  color: '#09090b', 
+                                  fontWeight: 900,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px'
+                                }}>
+                                  {(() => {
+                                    const bookColor = getLehrwerkColor(title);
+                                    return (
+                                      <div style={{
+                                        width: '16px',
+                                        height: '20px',
+                                        background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
+                                        borderRadius: '3px',
+                                        border: 'none',
+                                        position: 'relative',
+                                        flexShrink: 0,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                      }}>
+                                        <BookOpen size={9} color={bookColor.text} />
+                                        <div style={{
+                                          position: 'absolute',
+                                          left: 0,
+                                          top: 0,
+                                          bottom: 0,
+                                          width: '2px',
+                                          background: 'rgba(0,0,0,0.08)',
+                                          borderRight: '1px solid rgba(255,255,255,0.05)'
+                                        }} />
+                                      </div>
+                                    );
+                                  })()}
+                                  <span>{title}</span> · <span style={{ color: '#4b5563', fontWeight: 700 }}>S. {info.pages.join(', ')}</span>
                                 </div>
                               </div>
                             ))}
