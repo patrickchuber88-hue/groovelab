@@ -6162,44 +6162,36 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               flexDirection: 'column',
               overflow: 'hidden',
               border: `2px solid ${gradient.text}`,
-              padding: '12px',
+              padding: '10px',
               position: 'relative'
             }} className="animation-slide-up">
               
-              {/* Top Bar / Header of the cover */}
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '8px 24px 16px 24px',
-                color: gradient.text,
-                fontWeight: 800
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <BookOpen size={20} color={gradient.text} />
-                  <span style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: gradient.text }}>
-                    Lehrwerk-Notizbuch
-                  </span>
-                </div>
-                <button
-                  onClick={() => setSelectedLehrwerkForDetail(null)}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.4)',
-                    border: 'none',
-                    borderRadius: '50%',
-                    width: '32px',
-                    height: '32px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    color: gradient.text,
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  <X size={16} />
-                </button>
-              </div>
+              {/* Absolute Close Button */}
+              <button
+                onClick={() => setSelectedLehrwerkForDetail(null)}
+                style={{
+                  position: 'absolute',
+                  top: '24px',
+                  right: '24px',
+                  zIndex: 100,
+                  background: 'rgba(255, 255, 255, 0.7)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#475569',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#ffffff'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.7)'}
+              >
+                <X size={16} />
+              </button>
 
               {/* Inside Pages of the Notebook (Left/Right Pages) */}
               <div style={{
