@@ -1,27 +1,15 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js'
+import fs from 'fs'
 
-const supabaseUrl = 'https://supabase.campus-groovelab.de';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzc5NTUzODQzLCJleHAiOjE5MzcyMzM4NDN9.NPFKhuj3WiiJ7pqG7w91QAEy1V696kfTcEunScUAAoI';
+const env = fs.readFileSync('apps/groovelab/.env.local', 'utf-8');
+const url = env.match(/VITE_SUPABASE_URL=(.*)/)[1].trim();
+const key = env.match(/VITE_SUPABASE_ANON_KEY=(.*)/)[1].trim();
+const supabase = createClient(url, key);
 
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-async function checkSchema() {
-  const { data, error } = await supabase
-    .from('users')
-    .select('*')
-    .limit(1);
-
+supabase.from('users').select('*').limit(1).then(({data, error}) => {
   if (error) {
-    console.error('Error fetching:', error);
-    return;
-  }
-  
-  if (data && data.length > 0) {
-    console.log('Columns in users table:', Object.keys(data[0]));
-    console.log('Sample user data:', data[0]);
+    console.error("Error:", error);
   } else {
-    console.log('No user data found');
+    console.log("Users record keys:", data && data.length > 0 ? Object.keys(data[0]) : "No records found");
   }
-}
-
-checkSchema();
+});

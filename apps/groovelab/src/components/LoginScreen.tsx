@@ -45,6 +45,12 @@ const cleanRoomName = (name: string | null | undefined): string => {
 
 export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [loading, setLoading] = useState(false);
+  const [pinSetupUser, setPinSetupUser] = useState<any>(null);
+  const [pinVerificationUser, setPinVerificationUser] = useState<any>(null);
+  const [pinSetupInput, setPinSetupInput] = useState('');
+  const [pinVerificationInput, setPinVerificationInput] = useState('');
+  const [pinVerificationIsWithinRoom, setPinVerificationIsWithinRoom] = useState(false);
+
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [error, setError] = useState<string | null>(null);
   const [showPrivacy, setShowPrivacy] = useState(false);
@@ -696,6 +702,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       const userSchool = Array.isArray(user.schools) ? user.schools[0] : user.schools;
       const isMaster = user.is_master_admin === true;
+
+
+
       const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
       
       if (!isMaster) {
@@ -929,6 +938,74 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     fetchKioskData();
   }, [schoolData]);
 
+
+  const handleKeypadPress = (val: string, type: 'setup' | 'verify') => {
+    if (type === 'setup') {
+      if (val === 'back') {
+        setPinSetupInput(prev => prev.slice(0, -1));
+      } else if (pinSetupInput.length < 4) {
+        setPinSetupInput(prev => prev + val);
+      }
+    } else {
+      if (val === 'back') {
+        setPinVerificationInput(prev => prev.slice(0, -1));
+      } else if (pinVerificationInput.length < 4) {
+        setPinVerificationInput(prev => prev + val);
+      }
+    }
+  };
+
+  const renderKeypad = (type: 'setup' | 'verify') => {
+    const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'];
+    return (
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: '12px',
+        width: '100%',
+        maxWidth: '280px',
+        margin: '20px auto 0 auto'
+      }}>
+        {keys.map((k) => {
+          return (
+            <button
+              key={k}
+              type="button"
+              onClick={() => {
+                if (k === 'C') {
+                  if (type === 'setup') setPinSetupInput('');
+                  else setPinVerificationInput('');
+                } else if (k === '⌫') {
+                  handleKeypadPress('back', type);
+                } else {
+                  handleKeypadPress(k, type);
+                }
+              }}
+              style={{
+                height: '56px',
+                borderRadius: '16px',
+                border: '1px solid #e2e8f0',
+                background: '#f8fafc',
+                color: '#0f172a',
+                fontSize: '1.25rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
+                outline: 'none',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+              }}
+            >
+              {k}
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+
   const handlePinLogin = async (pin: string) => {
     if (!pin.trim() || loading) return;
     setLoading(true);
@@ -940,17 +1017,17 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         .select('*, schools(*)');
       
       const cleanPin = pin.trim();
-      if (cleanPin.startsWith('t_')) {
-        query = query.eq('teacher_qr_token', cleanPin);
-      } else if (cleanPin.includes('-') && cleanPin.length > 20) {
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanPin);
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanPin);
+      const isTokenLogin = cleanPin.startsWith('t_') || isUuid;
+
+      if (isTokenLogin) {
         if (isUuid) {
           query = query.eq('qr_token', cleanPin);
         } else {
           query = query.eq('teacher_qr_token', cleanPin);
         }
       } else {
-        query = query.eq('ausweis_nummer', cleanPin);
+        query = query.eq('ausweis_nummer', cleanPin.toUpperCase());
       }
 
       const { data: user, error: userErr } = await query.maybeSingle();
@@ -1027,6 +1104,23 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               isWithinAnyRoom = true;
             }
           }
+        }
+      }
+      // Intercept login for PIN setup or verification if it's an Ausweis ID login
+      const isQrLogin = cleanPin.startsWith('t_') || (cleanPin.includes('-') && cleanPin.length > 20);
+      if (!isQrLogin) {
+        if (!user.is_pin_activated) {
+          setPinSetupUser(user);
+          setPinVerificationIsWithinRoom(isWithinAnyRoom);
+          setPinSetupInput('');
+          setLoading(false);
+          return;
+        } else {
+          setPinVerificationUser(user);
+          setPinVerificationIsWithinRoom(isWithinAnyRoom);
+          setPinVerificationInput('');
+          setLoading(false);
+          return;
         }
       }
 
@@ -1256,6 +1350,15 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       console.log(`[Login] Scan successful. Geofence match: ${isWithinAnyRoom}`);
       
+      // If the user's PIN is not activated yet, they MUST set their personal PIN first to secure the manual login path
+      if (!user.is_pin_activated) {
+        setPinSetupUser(user);
+        setPinVerificationIsWithinRoom(isWithinAnyRoom);
+        setPinSetupInput('');
+        setLoading(false);
+        return;
+      }
+
       const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
       if (isTeacher) {
         if (user.is_observer) {
@@ -1725,7 +1828,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           )}
         </div>
 
-        {/* iOS-Style QR Image Upload & Passwort Anmeldung side-by-side */}
+        {/* iOS-Style QR Image Upload & Ausweis ID Login side-by-side */}
         <div style={{ display: 'flex', gap: '12px', marginTop: '16px', width: '100%' }}>
           <div style={{ flex: 1 }}>
             <label 
@@ -1837,7 +1940,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             type="text"
             value={pinInput}
             onChange={(e) => setPinInput(e.target.value)}
-            placeholder="Support-PIN oder QR-Token..."
+            placeholder="Ausweis ID..."
             style={{
               flex: 1,
               padding: '12px 16px',
@@ -2691,6 +2794,236 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
       `}</style>
+      {/* PIN Setup Modal */}
+      {pinSetupUser && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.4)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '20px',
+          fontFamily: 'Inter, system-ui, sans-serif'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '32px',
+            padding: '32px',
+            width: '100%',
+            maxWidth: '360px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
+            border: '1px solid #f1f5f9',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            textAlign: 'center'
+          }}>
+            <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d97706', marginBottom: '16px' }}>
+              <Key size={28} />
+            </div>
+            
+            <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>Persönliche PIN einrichten</h3>
+            <p style={{ margin: '8px 0 20px 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: '1.4' }}>
+              Erster Login für <strong>{pinSetupUser.first_name} {pinSetupUser.last_name}</strong> ({pinSetupUser.ausweis_nummer}).<br/>
+              Bitte lege eine geheime 4-stellige PIN fest.
+            </p>
+
+            <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
+              {[0, 1, 2, 3].map((idx) => (
+                <div key={idx} style={{
+                  width: '18px',
+                  height: '18px',
+                  borderRadius: '50%',
+                  border: '2px solid #cbd5e1',
+                  background: pinSetupInput.length > idx ? '#cbd5e1' : 'transparent',
+                  transition: 'all 0.15s ease'
+                }} />
+              ))}
+            </div>
+
+            {renderKeypad('setup')}
+
+            <button
+              onClick={async () => {
+                if (pinSetupInput.length !== 4) return;
+                setLoading(true);
+                try {
+                  const { error } = await supabase
+                    .from('users')
+                    .update({
+                      personal_pin: pinSetupInput,
+                      is_pin_activated: true
+                    })
+                    .eq('id', pinSetupUser.id);
+
+                  if (error) throw error;
+                  
+                  const user = pinSetupUser;
+                  setPinSetupUser(null);
+                  
+                  const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
+                  if (isTeacher) {
+                    if (user.is_observer) {
+                      await finalizeLogin(user, effectiveStationId, false, true);
+                    } else if (pinVerificationIsWithinRoom) {
+                      setPendingTeacherUser({ user, isWithinAnyRoom: true });
+                      setShowTeacherChoiceModal(true);
+                      setLoading(false);
+                    } else {
+                      await finalizeLogin(user, effectiveStationId, false, true);
+                    }
+                  } else {
+                    await finalizeLogin(user, effectiveStationId, pinVerificationIsWithinRoom);
+                  }
+                } catch (err: any) {
+                  alert('Fehler beim Einrichten der PIN: ' + err.message);
+                  setLoading(false);
+                }
+              }}
+              disabled={pinSetupInput.length !== 4 || loading}
+              style={{
+                width: '100%',
+                padding: '14px',
+                borderRadius: '16px',
+                background: pinSetupInput.length === 4 ? (schoolData?.primary_color || '#eab308') : '#cbd5e1',
+                color: '#0f172a',
+                fontWeight: 800,
+                border: 'none',
+                marginTop: '24px',
+                cursor: pinSetupInput.length === 4 ? 'pointer' : 'not-allowed',
+                transition: 'all 0.2s'
+              }}
+            >
+              PIN aktivieren &amp; Einloggen
+            </button>
+            
+            <button
+              onClick={() => {
+                setPinSetupUser(null);
+                setLoading(false);
+              }}
+              style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', marginTop: '16px', cursor: 'pointer' }}
+            >
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* PIN Verification Modal */}
+      {pinVerificationUser && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.4)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '20px',
+          fontFamily: 'Inter, system-ui, sans-serif'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '32px',
+            padding: '32px',
+            width: '100%',
+            maxWidth: '360px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
+            border: '1px solid #f1f5f9',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            textAlign: 'center'
+          }}>
+            <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb', marginBottom: '16px' }}>
+              <Key size={28} />
+            </div>
+            
+            <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>Persönliche PIN eingeben</h3>
+            <p style={{ margin: '8px 0 20px 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: '1.4' }}>
+              Login für <strong>{pinVerificationUser.first_name} {pinVerificationUser.last_name}</strong> ({pinVerificationUser.ausweis_nummer}).<br/>
+              Bitte gib deine 4-stellige PIN ein.
+            </p>
+
+            <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
+              {[0, 1, 2, 3].map((idx) => (
+                <div key={idx} style={{
+                  width: '18px',
+                  height: '18px',
+                  borderRadius: '50%',
+                  border: '2px solid #cbd5e1',
+                  background: pinVerificationInput.length > idx ? '#cbd5e1' : 'transparent',
+                  transition: 'all 0.15s ease'
+                }} />
+              ))}
+            </div>
+
+            {renderKeypad('verify')}
+
+            <button
+              onClick={async () => {
+                if (pinVerificationInput.length !== 4) return;
+                
+                if (pinVerificationInput === pinVerificationUser.personal_pin) {
+                  const user = pinVerificationUser;
+                  setPinVerificationUser(null);
+                  
+                  const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
+                  if (isTeacher) {
+                    if (user.is_observer) {
+                      await finalizeLogin(user, effectiveStationId, false, true);
+                    } else if (pinVerificationIsWithinRoom) {
+                      setPendingTeacherUser({ user, isWithinAnyRoom: true });
+                      setShowTeacherChoiceModal(true);
+                      setLoading(false);
+                    } else {
+                      await finalizeLogin(user, effectiveStationId, false, true);
+                    }
+                  } else {
+                    await finalizeLogin(user, effectiveStationId, pinVerificationIsWithinRoom);
+                  }
+                } else {
+                  alert('Die eingegebene PIN ist nicht korrekt.');
+                  setPinVerificationInput('');
+                }
+              }}
+              disabled={pinVerificationInput.length !== 4}
+              style={{
+                width: '100%',
+                padding: '14px',
+                borderRadius: '16px',
+                background: pinVerificationInput.length === 4 ? (schoolData?.primary_color || '#eab308') : '#cbd5e1',
+                color: '#0f172a',
+                fontWeight: 800,
+                border: 'none',
+                marginTop: '24px',
+                cursor: pinVerificationInput.length === 4 ? 'pointer' : 'not-allowed',
+                transition: 'all 0.2s'
+              }}
+            >
+              Verifizieren &amp; Einloggen
+            </button>
+            
+            <button
+              onClick={() => {
+                setPinVerificationUser(null);
+                setLoading(false);
+              }}
+              style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', marginTop: '16px', cursor: 'pointer' }}
+            >
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

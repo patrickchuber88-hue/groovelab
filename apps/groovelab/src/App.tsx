@@ -4968,7 +4968,7 @@ function App() {
   const hasInviteSchoolId = new URLSearchParams(window.location.search).has('invite_school_id');
 
   const handleLogin = async (userId: string, isHome?: boolean) => {
-    const { data: userToLogin } = await supabase.from('users').select('role, contract_ends_at, contract_decision_made').eq('id', userId).single();
+    const { data: userToLogin } = await supabase.from('users').select('role, contract_ends_at, contract_decision_made, is_external_vocalist').eq('id', userId).single();
     if (userToLogin?.role === 'student' && userToLogin.contract_ends_at) {
       const endsAt = new Date(userToLogin.contract_ends_at).getTime();
       if (Date.now() > endsAt) {
@@ -4998,9 +4998,11 @@ function App() {
     sessionStorage.setItem('groovelab_location_mode', mode);
 
     // Default start tab
-    let startTab = mode === 'home' ? 'practice' : 'live';
+    let startTab = 'live';
     if (userToLogin?.role === 'student') {
-      startTab = 'briefing';
+      startTab = mode === 'home' 
+        ? (userToLogin.is_external_vocalist ? 'repertoire' : 'practice')
+        : 'briefing';
     }
     setActiveStudentTab(startTab);
     localStorage.setItem('groovelab_active_tab', startTab);
@@ -5024,10 +5026,25 @@ function App() {
   };
 
   useEffect(() => {
-    if (user && !localStorage.getItem('groovelab_active_tab')) {
-      const startTab = user.role === 'student' ? 'briefing' : (locationMode === 'home' ? (user.is_external_vocalist ? 'repertoire' : 'practice') : 'live');
-      setActiveStudentTab(startTab);
-      localStorage.setItem('groovelab_active_tab', startTab);
+    if (user) {
+      if (!localStorage.getItem('groovelab_active_tab')) {
+        const startTab = user.role === 'student' 
+          ? (locationMode === 'home' ? (user.is_external_vocalist ? 'repertoire' : 'practice') : 'briefing') 
+          : 'live';
+        setActiveStudentTab(startTab);
+        localStorage.setItem('groovelab_active_tab', startTab);
+      } else {
+        // Auto-correct if teacher/admin somehow has a student-only tab active
+        const isTeacherOrAdmin = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
+        if (isTeacherOrAdmin) {
+          const studentTabs = ['briefing', 'practice_board', 'mediathek', 'practice', 'library', 'repertoire', 'matching'];
+          if (studentTabs.includes(activeStudentTab)) {
+            const fallbackTab = 'live';
+            setActiveStudentTab(fallbackTab);
+            localStorage.setItem('groovelab_active_tab', fallbackTab);
+          }
+        }
+      }
     }
     // Realtime subscription for sessions (Active Student Count)
     const sessionsChannel = supabase

@@ -13,6 +13,32 @@ import { TeacherDashboard } from './TeacherDashboard';
 import { StudentDetailModal } from './StudentDetailModal';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import QRCode from 'react-qr-code';
+function generateStarterPin(role: string, isCampus: boolean, isGroovelab: boolean): string {
+  let prefix = 'C';
+  if (role === 'admin' || role === 'secretary') {
+    prefix = 'V';
+  } else if (isCampus && isGroovelab) {
+    prefix = 'CG';
+  } else if (isCampus) {
+    prefix = 'C';
+  } else if (isGroovelab) {
+    prefix = 'G';
+  } else {
+    prefix = 'C';
+  }
+  const randomNum = Math.floor(1000 + Math.random() * 9000).toString();
+  return `${prefix}-${randomNum}`;
+}
+
+function generateSecureQrToken(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let token = 't_';
+  for (let i = 0; i < 24; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return token;
+}
+
 
 interface SystemAlert {
   id: string;
@@ -40,6 +66,7 @@ interface BypassTeacher {
   isGroovelabActive?: boolean;
   isActive?: boolean;
   role?: string;
+  isPinActivated?: boolean;
 }
 
 interface GrooveLabCoach {
@@ -54,6 +81,7 @@ interface GrooveLabCoach {
   isGroovelabActive?: boolean;
   ausweisNummer?: string;
   teacherQrToken?: string;
+  isPinActivated?: boolean;
   studentCount?: number;
   contractEndsAt?: string | null;
 }
@@ -954,7 +982,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     try {
       const { error } = await supabase
         .from('users')
-        .update({ ausweis_nummer: newPin })
+        .update({ 
+          ausweis_nummer: newPin,
+          is_pin_activated: false,
+          personal_pin: null
+        })
         .eq('id', teacherId);
 
       if (error) throw error;
@@ -1376,7 +1408,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       // Fetch all users
       const { data: allUsers, error: usersErr } = await supabase
         .from('users')
-        .select('id, first_name, last_name, role, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token')
+        .select('id, first_name, last_name, role, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token, is_pin_activated')
         .eq('school_id', schoolId);
 
       if (usersErr) throw usersErr;
@@ -1437,7 +1469,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               isCampusActive: u.is_campus_active,
               isGroovelabActive: u.is_groovelab_active,
               isActive: u.is_active ?? false,
-              role: u.role
+              role: u.role,
+              isPinActivated: u.is_pin_activated
             });
           } else {
             if (u.is_groovelab_active) {
@@ -1776,8 +1809,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       }
       
       try {
-        const pin = 'GL-' + Math.floor(1000 + Math.random() * 9000);
-        const qrToken = 't_' + pin;
+        const pin = generateStarterPin(roleText === 'admin' ? 'admin' : 'teacher', true, true);
+        const qrToken = generateSecureQrToken();
         const { error } = await supabase
           .from('users')
           .insert({
@@ -2027,8 +2060,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         const email = parts[2]?.trim();
         const instrument = parts[3]?.trim() || (teacherFilterInstrument !== 'All' ? teacherFilterInstrument : 'Allgemein');
         const maxStudents = parseInt(parts[4]?.trim()) || 10;
-        const pin = 'GL-' + Math.floor(1000 + Math.random() * 9000);
-        const qrToken = 't_' + pin;
+        const pin = generateStarterPin('teacher', false, false);
+        const qrToken = generateSecureQrToken();
 
         const { error } = await supabase
           .from('users')
@@ -2072,8 +2105,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     if (!newTeacherFirstName.trim() || !newTeacherLastName.trim() || !newTeacherEmail.trim()) return;
 
     try {
-      const pin = 'GL-' + Math.floor(1000 + Math.random() * 9000);
-      const qrToken = 't_' + pin;
+      const pin = generateStarterPin('teacher', false, false);
+      const qrToken = generateSecureQrToken();
 
       const { error } = await supabase
         .from('users')
@@ -2114,8 +2147,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     if (!coachFirstName || !coachLastName || !coachEmail) return;
 
     try {
-      const pin = 'GL-' + Math.floor(1000 + Math.random() * 9000);
-      const qrToken = 't_' + pin;
+      const pin = generateStarterPin(coachRole, false, true);
+      const qrToken = generateSecureQrToken();
 
       const { error } = await supabase
         .from('users')
@@ -2152,8 +2185,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     if (!employeeFirstName || !employeeLastName || !employeeEmail) return;
 
     try {
-      const pin = 'GL-' + Math.floor(1000 + Math.random() * 9000);
-      const qrToken = 't_' + pin;
+      const pin = generateStarterPin('admin', false, false);
+      const qrToken = generateSecureQrToken();
 
       const { error } = await supabase
         .from('users')
@@ -11557,15 +11590,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 </div>
                 <button 
                   onClick={async () => {
-                    const newPin = 'GL-' + Math.floor(1000 + Math.random() * 9000);
-                    const newQrToken = 't_' + newPin;
+                    const newPin = generateStarterPin(manageTeacher.role || 'teacher', manageTeacher.isCampusActive ?? false, manageTeacher.isGroovelabActive ?? false);
                     try {
                       const { error } = await supabase
                         .from('users')
-                        .update({ ausweis_nummer: newPin, teacher_qr_token: newQrToken })
+                        .update({ 
+                          ausweis_nummer: newPin, 
+                          is_pin_activated: false,
+                          personal_pin: null
+                        })
                         .eq('id', manageTeacher.id);
                       if (error) throw error;
-                      setManageTeacher({ ...manageTeacher, ausweisNummer: newPin, teacherQrToken: newQrToken });
+                      setManageTeacher({ ...manageTeacher, ausweisNummer: newPin });
                       fetchDashboardData();
                     } catch (err: any) {
                       alert('Fehler beim Zurücksetzen: ' + err.message);
@@ -11582,7 +11618,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               {(() => {
                 const token = manageTeacher.teacherQrToken || '';
                 const isActive = manageTeacher.isActive || manageTeacher.is_active;
-                const link = isActive ? token : (token ? `${window.location.origin}/?qr_token=${token}&email=${encodeURIComponent(manageTeacher.email)}` : '');
+                const link = token;
                 const label = isActive ? 'Login-QR-Code (Ausweis)' : 'Aktivierungs-QR-Code';
                 return link ? (
                   <div style={{
@@ -11605,6 +11641,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       border: '1px solid #e2e8f0'
                     }}>
                       <QRCode id="qr-code-svg" value={link} size={130} />
+                    </div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#334155', marginTop: '-4px', marginBottom: '2px', textAlign: 'center' }}>
+                      {manageTeacher.firstName || ''} {manageTeacher.lastName || ''}
                     </div>
                     <button
                       onClick={downloadQRCode}

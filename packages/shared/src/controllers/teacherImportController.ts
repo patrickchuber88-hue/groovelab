@@ -134,12 +134,17 @@ export async function importTeachersHandler(req: Request, res: Response): Promis
         continue;
       }
 
-      // Generate a unique 'ausweis_nummer' (Zufalls-String als Einmal-PIN)
-      // Generates a 6-digit random numeric string
-      const ausweisNummer = Math.floor(100000 + Math.random() * 900000).toString();
+      // Generate a unique 'ausweis_nummer' (Starter-PIN) following C-XXXX prefix
+      const prefix = 'C';
+      const randomNum = Math.floor(1000 + Math.random() * 9000).toString();
+      const ausweisNummer = `${prefix}-${randomNum}`;
 
-      // Generate a coupled 'teacher_qr_token'
-      const teacherQrToken = 't_' + ausweisNummer;
+      // Generate a secure, random 'teacher_qr_token'
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      let teacherQrToken = 't_';
+      for (let j = 0; j < 24; j++) {
+        teacherQrToken += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
 
       importedTeachers.push({
         school_id: schoolId,

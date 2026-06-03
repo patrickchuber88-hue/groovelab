@@ -249,7 +249,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
         { data: bands },
         { count: sessionCount }
       ] = await Promise.all([
-        supabase.from('users').select('role, school_id, is_campus_active, is_groovelab_active'),
+        supabase.from('users').select('id, first_name, last_name, role, school_id, is_campus_active, is_groovelab_active, ausweis_nummer, teacher_qr_token, is_pin_activated'),
         supabase.from('songs').select('school_id'),
         supabase.from('bands').select('school_id, name'),
         supabase.from('sessions').select('*', { count: 'exact', head: true })
@@ -276,7 +276,8 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
           studentsCampus: schoolUsers.filter(u => u.role === 'student' && u.is_campus_active).length,
           studentsGroovelab: schoolUsers.filter(u => u.role === 'student' && u.is_groovelab_active).length,
           songs: songs?.filter(s => s.school_id === school.id).length || 0,
-          bands: bands?.filter(b => b.school_id === school.id && b.name !== '__SYSTEM_ANNOUNCEMENTS__').length || 0
+          bands: bands?.filter(b => b.school_id === school.id && b.name !== '__SYSTEM_ANNOUNCEMENTS__').length || 0,
+          adminUsers: schoolUsers.filter(u => u.role === 'secretary' || u.role === 'admin')
         };
       });
       setSchoolStats(sStats);
@@ -2199,6 +2200,94 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                    </div>
                  </div>
                </div>
+
+                {/* Verwaltungs-Admin User details card */}
+                <div style={{
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '24px',
+                  padding: '32px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '20px',
+                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)'
+                }}>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    💼 Verwaltungs-Admin (Sekretariat / Schulleitung)
+                  </h3>
+                  {schoolStats[selectedSchool.id]?.adminUsers && schoolStats[selectedSchool.id]?.adminUsers.length > 0 ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+                      {schoolStats[selectedSchool.id].adminUsers.map((admin: any) => (
+                        <div key={admin.id} style={{
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '20px',
+                          padding: '24px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '16px'
+                        }}>
+                          <div style={{ textAlign: 'center' }}>
+                            <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#0f172a' }}>
+                              {admin.first_name || ''} {admin.last_name || ''}
+                            </div>
+                            <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
+                              {admin.role === 'secretary' ? 'Sekretariat / Verwaltung' : 'Schulleitung / Admin'}
+                            </div>
+                          </div>
+
+                          {admin.teacher_qr_token ? (
+                            <div style={{
+                              background: '#ffffff',
+                              padding: '12px',
+                              borderRadius: '16px',
+                              boxShadow: '0 4px 15px rgba(0,0,0,0.02)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              border: '1px solid #e2e8f0'
+                            }}>
+                              <img 
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${admin.teacher_qr_token}`}
+                                alt="Verwaltungs Admin QR Badge"
+                                style={{ width: '150px', height: '150px', display: 'block' }}
+                              />
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                              Kein QR-Token generiert.
+                            </div>
+                          )}
+
+                          <div style={{ width: '100%', background: '#ffffff', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              Starter-PIN Status
+                            </span>
+                            {admin.is_pin_activated ? (
+                              <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#16a34a', background: '#dcfce7', padding: '4px 12px', borderRadius: '100px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                <Check size={14} /> Aktiviert (Persönlicher PIN)
+                              </span>
+                            ) : (
+                              <div style={{ textAlign: 'center' }}>
+                                <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#eab308', fontFamily: 'monospace', letterSpacing: '0.05em' }}>
+                                  {admin.ausweis_nummer || '—'}
+                                </span>
+                                <span style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', marginTop: '4px', fontWeight: 600 }}>
+                                  Ausstehende Aktivierung
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ padding: '24px', background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: '16px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>
+                      Noch kein Verwaltungs-Admin registriert. Verwende den Einladungslink oben, um einen Account zu registrieren.
+                    </div>
+                  )}
+                </div>
 
               </div>
             </div>
