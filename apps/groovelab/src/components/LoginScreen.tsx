@@ -229,7 +229,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Vertreten durch (Schulleitung) *</label>
-                  <input type="text" required value={onboardRepresentedBy} onChange={e => setOnboardRepresentedBy(e.target.value)} placeholder="z.B. Dr. Armin Wagner" style={inputStyle} />
+                  <input type="text" required value={onboardRepresentedBy} onChange={e => setOnboardRepresentedBy(e.target.value)} placeholder="z.B. Dr. Max Mustermann" style={inputStyle} />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>E-Mail-Adresse *</label>
