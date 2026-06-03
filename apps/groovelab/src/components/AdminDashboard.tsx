@@ -5473,12 +5473,12 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Deine Bausteine</span>
             <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', background: '#f1f5f9', padding: '2px 6px', borderRadius: '9999px' }}>
-              {textbausteine.length}
+              {textbausteine.filter((tb: any) => tb.active).length}
             </span>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '8px', overflowY: 'auto', flex: 1, maxHeight: '580px', paddingRight: '2px' }}>
-            {textbausteine.map((tb: any) => {
+            {textbausteine.filter((tb: any) => tb.active).map((tb: any) => {
               const parts = tb.label.split(' ');
               const hasEmoji = parts[0] && /\p{Emoji}/u.test(parts[0]);
               const emoji = hasEmoji ? parts[0] : '🎵';
@@ -9101,7 +9101,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
       {showTextbausteinModal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div className="glass-panel animation-slide-up" style={{ background: 'white', padding: '32px', borderRadius: '32px', maxWidth: '750px', width: '100%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div className="glass-panel animation-slide-up" style={{ background: 'white', padding: '32px', borderRadius: '32px', maxWidth: '950px', width: '95vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column', gap: '24px' }}>
             
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
