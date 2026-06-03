@@ -2075,7 +2075,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         <span style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 800 }}>
                           🎸 {skill.instrument} • {progress}%
                         </span>
-                        <div style={{ width: '100%', height: '6px', background: '#e8e8ed', borderRadius: '3px', marginTop: '6px', overflow: 'hidden' }}>
+                        <div style={{ width: '100%', height: '7px', background: '#e8e8ed', borderRadius: '3.5px', marginTop: '6px', overflow: 'hidden' }}>
                           <div style={{ width: `${progress}%`, height: '100%', background: (status === 'MASTERED' || skill.is_stage_ready) ? '#10b981' : '#000', transition: 'width 0.4s ease' }} />
                         </div>
                       </div>
@@ -2193,8 +2193,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           style={{
                             flex: 1,
                             accentColor: '#000000',
-                            height: '6px',
-                            borderRadius: '3px',
+                            height: '9px',
+                            borderRadius: '4.5px',
                             cursor: 'pointer',
                             background: `linear-gradient(to right, #000000 0%, #000000 ${songProgressPercent}%, #e8e8ed ${songProgressPercent}%, #e8e8ed 100%)`,
                             WebkitAppearance: 'none',
@@ -2256,8 +2256,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 style={{
                                   width: '100%',
                                   accentColor: sub.color,
-                                  height: '4px',
-                                  borderRadius: '2px',
+                                  height: '5px',
+                                  borderRadius: '2.5px',
                                   cursor: 'pointer',
                                   background: `linear-gradient(to right, ${sub.color} 0%, ${sub.color} ${sub.value}%, #e8e8ed ${sub.value}%, #e8e8ed 100%)`,
                                   WebkitAppearance: 'none',
