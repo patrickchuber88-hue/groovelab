@@ -2810,7 +2810,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                     {skill.songs?.title}
                                   </h4>
                                   <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#7d7d82', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    {skill.songs?.artist} • <span style={{ color: '#000', fontWeight: 800 }}>{skill.instrument}</span>
+                                    {skill.songs?.artist} • <span style={{ color: '#000', fontWeight: 800 }}>{progress}%</span>
                                   </p>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -2838,17 +2838,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   >
                                     <X size={14} strokeWidth={2.5} />
                                   </button>
-                                  <span style={{
-                                    background: skill.is_stage_ready ? '#d1fae5' : '#f3f3f6',
-                                    color: skill.is_stage_ready ? '#065f46' : '#000',
-                                    padding: '3px 8px',
-                                    borderRadius: '6px',
-                                    fontSize: '0.65rem',
-                                    fontWeight: 900,
-                                    textTransform: 'uppercase'
-                                  }}>
-                                    {skill.is_stage_ready ? 'Bühnenreif' : `${progress}%`}
-                                  </span>
                                 </div>
                               </div>
 
