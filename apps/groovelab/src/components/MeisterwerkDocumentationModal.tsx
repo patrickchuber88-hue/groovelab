@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronRight, Book } from 'lucide-react';
+import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronRight, Book, Star } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { supabase } from '../lib/supabase';
 
@@ -1220,10 +1220,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         await fetchProgress();
         notifyHomeworkChange();
         if (!keepOpen) {
-          setActiveItem(null);
-          setActiveSubView('hub');
-          setActiveLehrwerkId(null);
-          setActivePageNumber(null);
+          if (activeSubView === 'hub') {
+            onClose();
+          } else {
+            setActiveItem(null);
+            setActiveSubView('hub');
+            setActiveLehrwerkId(null);
+            setActivePageNumber(null);
+          }
         }
         setHasChanges(false);
         return;
@@ -1292,10 +1296,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       await fetchProgress();
       notifyHomeworkChange();
       if (!keepOpen) {
-        setActiveItem(null);
-        setActiveSubView('hub');
-        setActiveLehrwerkId(null);
-        setActivePageNumber(null);
+        if (activeSubView === 'hub') {
+          onClose();
+        } else {
+          setActiveItem(null);
+          setActiveSubView('hub');
+          setActiveLehrwerkId(null);
+          setActivePageNumber(null);
+        }
       }
       setHasChanges(false);
     } catch (err: any) {
@@ -2011,7 +2019,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 const skill = activeSongSkills.find(s => s.id === selectedActiveSongId);
                 if (!skill) return null;
                 const songColor = getLehrwerkColor(skill.songs?.title || 'Song');
-                const progress = status === 'MASTERED' ? 100 : (skill.is_stage_ready ? 100 : (skill.progress_percent || 0));
+                const progress = songProgressPercent;
 
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease' }}>
@@ -2073,7 +2081,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           von {skill.songs?.artist}
                         </p>
                         <span style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 800 }}>
-                          🎸 {skill.instrument} • {progress}%
+                          {progress}%
                         </span>
                         <div style={{ width: '100%', height: '7px', background: '#e8e8ed', borderRadius: '3.5px', marginTop: '6px', overflow: 'hidden' }}>
                           <div style={{ width: `${progress}%`, height: '100%', background: (status === 'MASTERED' || skill.is_stage_ready) ? '#10b981' : '#000', transition: 'width 0.4s ease' }} />
@@ -2100,7 +2108,20 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           {[
                             { mode: 'LOCKED', color: 'hsl(355, 75%, 84%)', label: 'Rot (unbearbeitet)', getActive: () => status === 'IN_PROGRESS' && !isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(false); setSongProgressPercent(25); setHasChanges(true); } },
                             { mode: 'HOMEWORK', color: 'hsl(47, 85%, 84%)', label: 'Gelb (Hausaufgabe)', getActive: () => status === 'IN_PROGRESS' && isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(true); setSongProgressPercent(25); setHasChanges(true); } },
-                            { mode: 'MASTERED', color: 'hsl(130, 65%, 82%)', label: 'Grün (gemeistert - 100%)', getActive: () => status === 'MASTERED', action: () => { setStatus('MASTERED'); setIsCurrentHomework(false); setSongProgressPercent(100); setHasChanges(true); } }
+                            { mode: 'MASTERED', color: 'hsl(130, 65%, 82%)', label: 'Grün (gemeistert - 100%)', getActive: () => status === 'MASTERED', action: () => {
+                               setStatus('MASTERED');
+                               setIsCurrentHomework(false);
+                               setSongProgressPercent(100);
+                               setRhythmVal(100);
+                               setFingerVal(100);
+                               setExpressionVal(100);
+                               setHasChanges(true);
+                               localStorage.setItem(`song_skills_detail_${student.id}_${selectedActiveSongId}`, JSON.stringify({
+                                 rhythm: 100,
+                                 finger: 100,
+                                 expression: 100
+                               }));
+                             } }
                           ].map(b => {
                             const isActive = b.getActive();
                             return (
@@ -2144,30 +2165,49 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       borderRadius: '18px',
                       padding: '16px',
                       border: '1px solid rgba(0, 0, 0, 0.08)',
-                      boxShadow: '0 4px 15px rgba(0,0,0,0.02)'
+                      boxShadow: '0 4px 15px rgba(0,0,0,0.02)',
+                      transition: 'all 0.3s ease'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#0f172a' }}>
+                        <span style={{ fontSize: '0.84rem', fontWeight: 900, color: songProgressPercent === 100 ? '#10b981' : '#0f172a', transition: 'color 0.3s ease' }}>
                           Fortschritt: {songProgressPercent}%
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => setIsSubSlidersExpanded(!isSubSlidersExpanded)}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#4b5563',
-                            fontSize: '0.74rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            padding: '4px 8px',
+                        
+                        {songProgressPercent === 100 ? (
+                          <div style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '4px'
-                          }}
-                        >
-                          {isSubSlidersExpanded ? 'Details ausblenden ▲' : 'Details einblenden ▼'}
-                        </button>
+                            gap: '6px',
+                            color: '#eab308',
+                            fontSize: '0.84rem',
+                            fontWeight: 900,
+                            animation: 'fadeIn 0.3s ease'
+                          }}>
+                            <span>Song gemeistert</span>
+                            <Star size={16} fill="#eab308" color="#eab308" style={{ filter: 'drop-shadow(0 0 3px rgba(234, 179, 8, 0.5))' }} />
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setIsSubSlidersExpanded(!isSubSlidersExpanded)}
+                            style={{
+                              background: '#f1f5f9',
+                              border: 'none',
+                              color: '#4b5563',
+                              fontSize: '0.74rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              padding: '8px 14px',
+                              borderRadius: '20px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            {isSubSlidersExpanded ? 'Details ausblenden ▲' : 'Details einblenden ▼'}
+                          </button>
+                        )}
                       </div>
 
                       {/* Main Average Slider */}
@@ -2183,6 +2223,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             setRhythmVal(val);
                             setFingerVal(val);
                             setExpressionVal(val);
+                            if (val === 100) {
+                              setIsSubSlidersExpanded(false);
+                            } else {
+                              setStatus('IN_PROGRESS');
+                              setIsCurrentHomework(true);
+                            }
                             setHasChanges(true);
                             localStorage.setItem(`song_skills_detail_${student.id}_${selectedActiveSongId}`, JSON.stringify({
                               rhythm: val,
@@ -2192,13 +2238,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           }}
                           style={{
                             flex: 1,
-                            accentColor: '#000000',
+                            accentColor: songProgressPercent === 100 ? '#10b981' : '#000000',
                             height: '9px',
                             borderRadius: '4.5px',
                             cursor: 'pointer',
-                            background: `linear-gradient(to right, #000000 0%, #000000 ${songProgressPercent}%, #e8e8ed ${songProgressPercent}%, #e8e8ed 100%)`,
+                            background: `linear-gradient(to right, ${songProgressPercent === 100 ? '#10b981' : '#000000'} 0%, ${songProgressPercent === 100 ? '#10b981' : '#000000'} ${songProgressPercent}%, #e8e8ed ${songProgressPercent}%, #e8e8ed 100%)`,
                             WebkitAppearance: 'none',
-                            outline: 'none'
+                            outline: 'none',
+                            transition: 'all 0.3s ease'
                           }}
                         />
                       </div>
@@ -2209,18 +2256,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           display: 'flex',
                           flexDirection: 'column',
                           gap: '26px',
-                          borderTop: '1px solid rgba(0, 0, 0, 0.06)',
-                          padding: '16px',
+                          borderTop: '1px solid rgba(0, 0, 0, 0.12)',
+                          padding: '16px 0 0 0',
                           marginTop: '12px',
-                          background: '#f8fafc',
-                          borderRadius: '12px',
-                          border: '1px solid rgba(0, 0, 0, 0.03)',
+                          background: 'transparent',
                           animation: 'fadeIn 0.2s ease'
                         }}>
-                          {[
-                            { label: 'Rhythmus', value: rhythmVal, type: 'rhythm', color: '#ef4444' },
-                            { label: 'Finger', value: fingerVal, type: 'finger', color: '#eab308' },
-                            { label: 'Ausdruck', value: expressionVal, type: 'expression', color: '#10b981' }
+                          {songProgressPercent < 100 && [
+                            { label: 'Rhythmus & Timing', value: rhythmVal, type: 'rhythm', color: '#ef4444' },
+                            { label: 'Finger & Technik', value: fingerVal, type: 'finger', color: '#eab308' },
+                            { label: 'Ausdruck & Performance', value: expressionVal, type: 'expression', color: '#10b981' }
                           ].map(sub => (
                             <div key={sub.type} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', fontWeight: 800, color: '#4b5563' }}>
@@ -2250,6 +2295,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   setHasChanges(true);
                                   const avg = Math.round((r + f + eVal) / 3);
                                   setSongProgressPercent(avg);
+                                  if (avg < 100) {
+                                    setStatus('IN_PROGRESS');
+                                    setIsCurrentHomework(true);
+                                  }
                                   localStorage.setItem(`song_skills_detail_${student.id}_${selectedActiveSongId}`, JSON.stringify({
                                     rhythm: r,
                                     finger: f,
@@ -2270,6 +2319,47 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               />
                             </div>
                           ))}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setStatus('MASTERED');
+                              setIsCurrentHomework(false);
+                              setSongProgressPercent(100);
+                              setRhythmVal(100);
+                              setFingerVal(100);
+                              setExpressionVal(100);
+                              setIsSubSlidersExpanded(false);
+                              setHasChanges(true);
+                              localStorage.setItem(`song_skills_detail_${student.id}_${selectedActiveSongId}`, JSON.stringify({
+                                rhythm: 100,
+                                finger: 100,
+                                expression: 100
+                              }));
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '8px',
+                              background: '#f1f5f9',
+                              border: 'none',
+                              color: '#374151',
+                              fontSize: '0.8rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              padding: '10px 16px',
+                              borderRadius: '20px',
+                              marginTop: '8px',
+                              width: 'fit-content',
+                              alignSelf: 'flex-end',
+                              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                              transition: 'all 0.15s ease'
+                            }}
+                            className="hover-scale"
+                          >
+                            <span>{songProgressPercent === 100 ? 'Song gemeistert' : 'Song als gemeistert markieren'}</span>
+                            <Star size={16} fill="#facc15" color="#eab308" style={{ filter: 'drop-shadow(0 0 3px rgba(250, 204, 21, 0.6))' }} />
+                          </button>
                         </div>
                       )}
                     </div>
@@ -3131,7 +3221,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             flexShrink: 0
                           }} />
                           <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#000' }}>
-                            {skill.songs?.title || 'Song Details'}
+                            {skill.songs?.artist ? `${skill.songs.artist} - ${skill.songs.title}` : (skill.songs?.title || 'Song Details')}
                           </h3>
                         </div>
 
@@ -3319,12 +3409,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             padding: '14px',
                             borderRadius: '14px',
                             border: 'none',
-                            background: '#10b981',
+                            background: '#456355',
                             color: 'white',
                             fontWeight: 800,
                             fontSize: '0.82rem',
                             cursor: 'pointer',
-                            boxShadow: '0 4px 10px rgba(16, 185, 129, 0.2)',
+                            boxShadow: '0 4px 10px rgba(69, 99, 85, 0.2)',
                             transition: 'all 0.15s ease'
                           }}
                           className="hover-scale"
