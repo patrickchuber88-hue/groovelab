@@ -3786,44 +3786,64 @@ export function TeacherDashboard({
                           WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
                           border: '1px solid rgba(255, 255, 255, 0.5)',
                           borderRadius: '24px',
-                          padding: '14px 20px',
                           display: 'flex',
-                          alignItems: 'center',
+                          alignItems: 'stretch',
                           justifyContent: 'space-between',
-                          gap: '20px',
                           boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
                           transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                           width: '100%',
-                          boxSizing: 'border-box'
+                          minHeight: '110px',
+                          boxSizing: 'border-box',
+                          overflow: 'hidden'
                         }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
+                            {/* Full Height Avatar on the left */}
                             <div style={{
-                              width: '64px',
-                              height: '64px',
-                              borderRadius: '50%',
-                              border: '4px solid #ffffff',
-                              boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)',
-                              background: '#ffffff',
+                              width: '110px',
+                              height: '100%',
                               flexShrink: 0,
-                              marginTop: '-18px',
-                              marginBottom: '-18px',
                               position: 'relative',
-                              zIndex: 10,
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               overflow: 'hidden',
-                              transition: 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+                              borderRight: '1px solid rgba(0, 0, 0, 0.05)'
                             }}
                             className="hover-scale"
                             >
-                              <img src={getInstrumentAvatarUrl(teacher?.instrument)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scale(1.15)' }} />
+                              <img 
+                                src={getInstrumentAvatarUrl(teacher?.instrument)} 
+                                alt="" 
+                                style={{ 
+                                  width: '100%', 
+                                  height: '100%', 
+                                  objectFit: 'cover'
+                                }} 
+                              />
                             </div>
-                            <div>
-                              <h3 style={{ margin: 0, fontSize: '28px', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            
+                            <div style={{ 
+                              padding: '16px 20px', 
+                              display: 'flex', 
+                              flexDirection: 'column', 
+                              justifyContent: 'center',
+                              minWidth: 0,
+                              flex: 1 
+                            }}>
+                              <h3 style={{ 
+                                margin: 0, 
+                                fontSize: '30px', 
+                                fontWeight: 950, 
+                                color: '#0f172a', 
+                                fontFamily: "'Plus Jakarta Sans', sans-serif", 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '8px',
+                                lineHeight: 1.15
+                              }}>
                                 {dynamicGreeting.greeting}, <span style={{ 
                                   color: '#007aff', 
-                                  fontSize: '1.15rem',
+                                  fontSize: '1.25rem',
                                   fontWeight: 900,
                                   letterSpacing: '-0.01em',
                                   display: 'inline-flex',
@@ -3833,7 +3853,7 @@ export function TeacherDashboard({
                                   {(new Date().getDay() === 0 || new Date().getDay() === 6) ? '☀️' : '👋'}
                                 </span>
                               </h3>
-                              <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                              <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: 1.25 }}>
                                 {dynamicGreeting.subtitle}
                               </p>
                             </div>
@@ -3841,10 +3861,12 @@ export function TeacherDashboard({
                           
                           {/* Live Clock Badge */}
                           <div style={{
+                            alignSelf: 'center',
+                            marginRight: '20px',
                             background: '#ffffff',
                             border: '1px solid #e2e8f0',
                             borderRadius: '12px',
-                            padding: '5px 10px',
+                            padding: '6px 12px',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '6px',
@@ -3852,55 +3874,14 @@ export function TeacherDashboard({
                             flexShrink: 0
                           }}>
                             <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }} />
-                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', letterSpacing: '0.02em', fontFamily: 'monospace' }}>
+                            <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569', letterSpacing: '0.02em', fontFamily: 'monospace' }}>
                               {currentTimeStr || '13:00'} UHR
                             </span>
                           </div>
                         </div>
                       )}
 
-                      {/* Independent Widget for Rescheduled Appointments / Terminänderungen */}
-                      {!teacher?.sick_until && briefingData?.rescheduledReminders && briefingData.rescheduledReminders.length > 0 && (
-                        <div className="google-card" style={{
-                          width: '100%',
-                          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
-                          backdropFilter: 'blur(24px) saturate(1.8)',
-                          WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
-                          border: '1px solid rgba(255, 255, 255, 0.5)',
-                          borderRadius: '24px',
-                          padding: '16px 20px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '12px',
-                          boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
-                          boxSizing: 'border-box'
-                        }}>
-                          <h3 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            <AlertCircle size={16} color="#007aff" style={{ flexShrink: 0 }} /> Terminänderungen:
-                          </h3>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {briefingData.rescheduledReminders.map((rem: any) => (
-                              <div key={rem.id} style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '10px',
-                                background: 'rgba(0, 122, 255, 0.03)',
-                                border: '1px solid rgba(0, 122, 255, 0.06)',
-                                borderLeft: '3px solid #007aff',
-                                borderRadius: '12px',
-                                padding: '8px 12px',
-                                fontSize: '0.74rem',
-                                color: '#475569',
-                                fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-                              }}>
-                                <span style={{ color: '#334155', fontWeight: 500 }}>
-                                  <strong>{rem.studentName}</strong> wurde auf <strong style={{ color: '#007aff', fontWeight: 700 }}>{rem.weekdayShort}. {rem.dateStr}.{rem.yearShort}, {rem.time} Uhr</strong> verschoben.
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+
 
                       {!teacher?.sick_until && (
                         <div className="google-card" style={{ 
@@ -3943,20 +3924,20 @@ export function TeacherDashboard({
                                   </div>
 
                                   <div style={{
-                                    background: 'linear-gradient(135deg, rgba(251, 188, 5, 0.08) 0%, rgba(251, 188, 5, 0.03) 100%)',
-                                    border: '1.5px solid rgba(251, 188, 5, 0.25)',
+                                    background: 'linear-gradient(135deg, rgba(0, 122, 255, 0.06) 0%, rgba(0, 122, 255, 0.02) 100%)',
+                                    border: '1.5px solid rgba(0, 122, 255, 0.18)',
                                     borderRadius: '16px',
                                     padding: '14px 16px',
-                                    color: '#b45309',
-                                    boxShadow: '0 4px 12px rgba(251, 188, 5, 0.02)',
+                                    color: '#007aff',
+                                    boxShadow: '0 4px 12px rgba(0, 122, 255, 0.02)',
                                     fontSize: '0.88rem',
                                     fontWeight: 700,
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '10px'
                                   }}>
-                                    <Activity size={16} color="#f59e0b" style={{ flexShrink: 0 }} />
-                                    <span>Heute stehen <strong style={{ fontSize: '0.98rem', fontWeight: 900, color: '#78350f' }}>{activeLessonsCount} Termine</strong> auf dem Fahrplan.</span>
+                                    <Activity size={16} color="#007aff" style={{ flexShrink: 0 }} />
+                                    <span>Heute stehen <strong style={{ fontSize: '0.98rem', fontWeight: 900, color: '#0051ba' }}>{activeLessonsCount} Termine</strong> auf dem Fahrplan.</span>
                                   </div>
 
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -3979,6 +3960,9 @@ export function TeacherDashboard({
                                           const badgeTextColor = isCanceled ? '#ef4444' : '#b45309';
                                           const badgeText = isCanceled ? 'Ausfall' : 'Verschoben';
                                           const itemBorderLeft = isCanceled ? '3px solid #ef4444' : '3px solid #fbbc05';
+                                          const matchRem = !isCanceled 
+                                            ? briefingData.rescheduledReminders?.find((r: any) => r.studentName === slot.student?.name)
+                                            : null;
                                           
                                           return (
                                             <div key={idx} style={{
@@ -3992,13 +3976,26 @@ export function TeacherDashboard({
                                               padding: '8px 12px',
                                               fontSize: '0.78rem'
                                             }}>
-                                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
                                                 <span style={{ fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                   {slot.student?.name}
                                                 </span>
                                                 <span style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 500 }}>
                                                   ({slot.timeSlot || slot.start_time?.substring(0, 5)} Uhr)
                                                 </span>
+                                                {!isCanceled && matchRem && (
+                                                  <span style={{ 
+                                                    color: '#b45309', 
+                                                    fontSize: '0.72rem', 
+                                                    fontWeight: 700, 
+                                                    marginLeft: '8px',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '4px'
+                                                  }}>
+                                                    ➔ {matchRem.weekdayShort}. {matchRem.dateStr}., {matchRem.time.replace(':', '.')} Uhr
+                                                  </span>
+                                                )}
                                               </div>
                                               <span style={{
                                                 fontSize: '0.62rem',
@@ -4034,6 +4031,60 @@ export function TeacherDashboard({
                                         <span>Alles läuft nach Plan. Keine heutigen Ausfälle.</span>
                                       </div>
                                     )}
+
+                                    {/* Other weekly rescheduled appointments (excluding today's changes) */}
+                                    {(() => {
+                                      const otherReschedules = briefingData.rescheduledReminders?.filter((rem: any) => 
+                                        !dailyChanges.some((dc: any) => dc.student?.name === rem.studentName)
+                                      ) || [];
+                                      
+                                      if (otherReschedules.length === 0) return null;
+                                      
+                                      return (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '10px' }}>
+                                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                            Weitere Änderungen diese Woche:
+                                          </span>
+                                          <div style={{
+                                            background: 'rgba(0, 122, 255, 0.02)',
+                                            border: '1px solid rgba(0, 122, 255, 0.05)',
+                                            borderRadius: '16px',
+                                            padding: '6px',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '6px'
+                                          }}>
+                                            {otherReschedules.map((rem: any) => (
+                                              <div key={rem.id} style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                background: '#ffffff',
+                                                border: '1px solid rgba(0,0,0,0.03)',
+                                                borderLeft: '3px solid #007aff',
+                                                borderRadius: '10px',
+                                                padding: '8px 12px',
+                                                fontSize: '0.78rem'
+                                              }}>
+                                                <span style={{ fontWeight: 800, color: '#0f172a' }}>
+                                                  {rem.studentName}
+                                                </span>
+                                                <span style={{ 
+                                                  fontSize: '0.72rem', 
+                                                  fontWeight: 700, 
+                                                  color: '#007aff',
+                                                  background: 'rgba(0, 122, 255, 0.06)',
+                                                  padding: '2px 8px',
+                                                  borderRadius: '6px'
+                                                }}>
+                                                  {rem.weekdayShort}. {rem.dateStr}.{rem.yearShort}, {rem.time.replace(':', '.')} Uhr
+                                                </span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      );
+                                    })()}
                                   </div>
 
                                   {firstSlotStartStr && (
