@@ -4627,41 +4627,41 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   border: '1px solid rgba(0, 0, 0, 0.04)',
                   fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif"
                 }}>
-                  {/* Header */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div style={{
-                        width: '32px', height: '32px', borderRadius: '50%',
-                        background: 'rgba(52, 199, 89, 0.08)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        flexShrink: 0
+                   {/* Header */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '22px' }}>
+                    <div style={{
+                      width: '40px', height: '40px', borderRadius: '12px',
+                      background: '#f0fdf4',
+                      border: '1px solid #d1fae5',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0,
+                      boxShadow: '0 2px 8px rgba(16,185,129,0.06)'
+                    }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 3C7.03 3 3 7.03 3 12C3 16.97 7.03 21 12 21C16.97 21 21 16.97 21 12V3H12ZM19 5V12C19 15.86 15.86 19 12 19C8.14 19 5 15.86 5 12C5 8.14 8.14 5 12 5H17.59L13.3 9.29C12.91 9.68 12.91 10.32 13.3 10.71C13.69 11.1 14.33 11.1 14.72 10.71L19 6.42V5Z" fill="#10b981"/>
+                      </svg>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{
+                        fontSize: '0.62rem',
+                        fontWeight: 700,
+                        color: '#10b981',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.08em',
+                        lineHeight: '1.2'
                       }}>
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 0 0 8 20C19 20 22 3 22 3c-1 2-8 2-13 6 4-4 6.25-6 10-7C18.5 2 19 1 17 8z" fill="#34c759"/>
-                        </svg>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{
-                          fontSize: '0.62rem',
-                          fontWeight: 600,
-                          color: '#8e8e93',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.08em',
-                          lineHeight: '1.2'
-                        }}>
-                          Gemeinsam Stärker
-                        </span>
-                        <h3 style={{
-                          fontSize: '0.9rem',
-                          fontWeight: 700,
-                          color: '#1c1c1e',
-                          margin: 0,
-                          letterSpacing: '-0.02em',
-                          lineHeight: '1.2'
-                        }}>
-                          Klassen-Übe-Ziel
-                        </h3>
-                      </div>
+                        Gemeinsam Stärker
+                      </span>
+                      <h3 style={{
+                        fontSize: '0.975rem',
+                        fontWeight: 700,
+                        color: '#1c1c1e',
+                        margin: '2px 0 0 0',
+                        letterSpacing: '-0.02em',
+                        lineHeight: '1.2'
+                      }}>
+                        Klassen-Übe-Ziel
+                      </h3>
                     </div>
                   </div>
 
