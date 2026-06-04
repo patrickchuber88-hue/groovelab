@@ -300,6 +300,8 @@ const renderBandAvatar = (name: string, photoUrl?: string | null, size: string =
 
 
 
+const showMissionsFeature = false;
+
 // --- Band Name Generator Words ---
 const BAND_ADJECTIVES = [
   // English – Energy & Sound
@@ -5918,9 +5920,11 @@ function App() {
                 <button onClick={() => setActiveStudentTab('rooms')} className={`sidebar-item ${activeStudentTab === 'rooms' ? `active ${activePlatform}` : ''}`}>
                   <Box size={20} /> Räume
                 </button>
-                <button onClick={() => setActiveStudentTab('missions')} className={`sidebar-item ${activeStudentTab === 'missions' ? `active ${activePlatform}` : ''}`}>
-                  <Compass size={20} /> Missions
-                </button>
+                {showMissionsFeature && (
+                  <button onClick={() => setActiveStudentTab('missions')} className={`sidebar-item ${activeStudentTab === 'missions' ? `active ${activePlatform}` : ''}`}>
+                    <Compass size={20} /> Missions
+                  </button>
+                )}
                 <button onClick={() => setActiveStudentTab('stats')} className={`sidebar-item ${activeStudentTab === 'stats' ? `active ${activePlatform}` : ''}`}>
                   <Trophy size={20} /> Performance & Cub
                 </button>
@@ -7764,7 +7768,7 @@ function App() {
       )}
 
         {/* Admin/Teacher Section Tabs (Unified) */}
-        {((user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'teacher')) && ['live', 'schedule', 'students', 'team', 'rooms', 'songs', 'stats', 'gallery', 'setup', 'bands', 'missions'].includes(activeStudentTab) && (
+        {((user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'teacher')) && ['live', 'schedule', 'students', 'team', 'rooms', 'songs', 'stats', 'gallery', 'setup', 'bands', showMissionsFeature ? 'missions' : ''].includes(activeStudentTab) && (
           <ErrorBoundary key={`${activePlatform}-${activeStudentTab}`}>
             <AdminDashboard 
               key={activePlatform}
@@ -11013,9 +11017,11 @@ function App() {
                   <button onClick={() => setActiveStudentTab('rooms')} style={getMobileButtonStyle('rooms', 'campus')} className="hover-scale" title="Räume">
                     <Box size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Räume</span>}
                   </button>
-                  <button onClick={() => setActiveStudentTab('missions')} style={getMobileButtonStyle('missions', 'campus')} className="hover-scale" title="Missions">
-                    <Compass size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Missions</span>}
-                  </button>
+                  {showMissionsFeature && (
+                    <button onClick={() => setActiveStudentTab('missions')} style={getMobileButtonStyle('missions', 'campus')} className="hover-scale" title="Missions">
+                      <Compass size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Missions</span>}
+                    </button>
+                  )}
                   <button onClick={() => setActiveStudentTab('stats')} style={getMobileButtonStyle('stats', 'campus')} className="hover-scale" title="Performance & Cub">
                     <Trophy size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Performance & Cub</span>}
                   </button>
