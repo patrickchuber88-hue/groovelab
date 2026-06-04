@@ -181,9 +181,6 @@ interface MobileBriefingViewProps {
   getISOWeek: (date?: string | Date) => string;
   handleTabChangeLocal: (tab: string) => void;
   campusFeedAnnouncements: any[];
-  classWeeklyMins?: number;
-  weeklyTargets?: any[];
-  brandColor?: string;
 }
 
 function MobileBriefingView({
@@ -202,10 +199,7 @@ function MobileBriefingView({
   handleAcknowledgeCancellation,
   getISOWeek,
   handleTabChangeLocal,
-  campusFeedAnnouncements,
-  classWeeklyMins = 0,
-  weeklyTargets = [],
-  brandColor = '#16a34a'
+  campusFeedAnnouncements
 }: MobileBriefingViewProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '4px' }}>
@@ -331,108 +325,6 @@ function MobileBriefingView({
           <span style={{ fontSize: '1.25rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }}>{avatar?.streak_flame || 0} Tage</span>
         </div>
       </div>
-
-      {/* ÜBE-ZIELE DER KLASSE (CROWDFUNDING STYLE) */}
-      {weeklyTargets.length > 0 && (() => {
-        const totalGoals = weeklyTargets.length;
-        const masteredGoals = weeklyTargets.filter((target: any) => {
-          const targetPercent = Math.round((classWeeklyMins / target.minutes) * 100);
-          return targetPercent >= 100;
-        }).length;
-        const highestPercent = weeklyTargets.length > 0 
-          ? Math.max(...weeklyTargets.map((target: any) => Math.round((classWeeklyMins / target.minutes) * 100)))
-          : 0;
-
-        return (
-          <div style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-              <Target size={16} color={brandColor} />
-              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Übe-Ziele der Klasse</h3>
-            </div>
-            
-            {/* KPI Row */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', background: '#f8fafc', padding: '10px', borderRadius: '14px', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Missionen</span>
-                <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1e293b', marginTop: '1px' }}>{totalGoals}</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', borderLeft: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0' }}>
-                <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Geknackt</span>
-                <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#10b981', marginTop: '1px' }}>{masteredGoals}</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Peak</span>
-                <span style={{ fontSize: '0.95rem', fontWeight: 900, color: brandColor, marginTop: '1px' }}>{highestPercent}%</span>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {weeklyTargets.map((target: any) => {
-                const targetPercent = Math.round((classWeeklyMins / target.minutes) * 100);
-                const isDeadlinePassed = target.deadline ? new Date(target.deadline) < new Date() : false;
-                
-                // Crowdfunding scale: 100% goal is marked at 75% width
-                const maxPercentOnBar = 133;
-                const visualWidth = Math.min(100, (targetPercent / maxPercentOnBar) * 100);
-
-                return (
-                  <div key={target.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>{target.title || 'Wochenziel'}</span>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b' }}>
-                        {Math.round(classWeeklyMins)} / {target.minutes} Min.
-                      </span>
-                    </div>
-                    
-                    {/* Progress Track */}
-                    <div style={{ position: 'relative', width: '100%', height: '14px', background: '#f1f5f9', borderRadius: '7px', overflow: 'hidden' }}>
-                      <div 
-                        style={{ 
-                          width: `${visualWidth}%`, 
-                          height: '100%', 
-                          background: targetPercent >= 100 
-                            ? `linear-gradient(90deg, ${brandColor} 0%, #10b981 75%, #059669 100%)`
-                            : `linear-gradient(90deg, ${brandColor} 0%, #10b981 100%)`,
-                          borderRadius: '7px', 
-                          transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)' 
-                        }} 
-                      />
-                      {/* Goal line */}
-                      <div style={{ position: 'absolute', left: '75%', top: 0, bottom: 0, width: '2px', background: '#ffffff', opacity: 0.8, zIndex: 2 }} />
-                    </div>
-                    
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      {target.deadline ? (
-                        <span style={{ fontSize: '0.64rem', fontWeight: 700, color: isDeadlinePassed ? '#ef4444' : '#64748b' }}>
-                          ⏱️ Bis: {new Date(target.deadline).toLocaleDateString('de-DE')}
-                        </span>
-                      ) : (
-                        <span />
-                      )}
-                      <span style={{ 
-                        fontSize: '0.7rem', 
-                        fontWeight: 900, 
-                        color: targetPercent >= 100 ? '#10b981' : brandColor, 
-                        background: targetPercent >= 100 ? '#dcfce7' : `${brandColor}12`, 
-                        padding: '1px 5px', 
-                        borderRadius: '4px' 
-                      }}>
-                        {targetPercent}% {targetPercent >= 100 && '🚀'}
-                      </span>
-                    </div>
-
-                    {targetPercent >= 100 && (
-                      <div style={{ fontSize: '0.65rem', fontWeight: 750, color: '#15803d', display: 'flex', alignItems: 'center', gap: '3px', background: '#f0fdf4', padding: '4px 8px', borderRadius: '6px', border: '1px solid #dcfce7' }}>
-                        <span>🎉 Ziel erreicht & übererfüllt!</span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })()}
 
       {/* HAUSAUFGABEN FITBIT STYLE */}
       <div style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', borderLeft: '6px solid #22c55e' }}>
@@ -910,15 +802,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [isPremiumUser, setIsPremiumUser] = useState(false);
   const [avatar, setAvatar] = useState<Avatar | null>(null);
   const [loading, setLoading] = useState(true);
-  const brandColor = studentUser?.schools?.brand_color || '#16a34a';
   const [error, setError] = useState<string | null>(null);
   
   // Selection Screen State
   const [showSelector, setShowSelector] = useState(false);
   const [submittingSelection, setSubmittingSelection] = useState(false);
-
-  const [classWeeklyMins, setClassWeeklyMins] = useState(0);
-  const [weeklyTargets, setWeeklyTargets] = useState<any[]>([]);
 
   // Daily Briefing State
   const [briefingData, setBriefingData] = useState<any>(null);
@@ -936,6 +824,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [chatTypedMessage, setChatTypedMessage] = useState('');
   const [campusFeedAnnouncements, setCampusFeedAnnouncements] = useState<any[]>([]);
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Übe-Ziel (Class Goal) State
+  const [classGoals, setClassGoals] = useState<any[]>([]);
+  const [classWeeklyMins, setClassWeeklyMins] = useState(0);
 
   const fetchChat = async (teacherId: string, occurrenceId?: string) => {
     if (!studentId || !teacherId) return;
@@ -1938,42 +1830,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         .maybeSingle();
       setMonthlyFocusMinutes(statsData?.monthly_focus_minutes || 0);
 
-      // Fetch classmates focus minutes & targets
-      if (user.teacher_id) {
-        try {
-          const { data: classmates } = await supabase
-            .from('users')
-            .select('id')
-            .eq('teacher_id', user.teacher_id)
-            .eq('role', 'student')
-            .eq('school_id', user.school_id);
-          
-          const classmatesIds = classmates?.map(c => c.id) || [studentId];
-          const oneWeekAgo = new Date();
-          oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-          
-          const { data: classmateLogs } = await supabase
-            .from('fokus_logs')
-            .select('duration_minutes')
-            .in('user_id', classmatesIds)
-            .gte('created_at', oneWeekAgo.toISOString());
-            
-          const weeklyMins = classmateLogs?.reduce((sum: number, log: any) => sum + (log.duration_minutes || 0), 0) || 0;
-          setClassWeeklyMins(weeklyMins);
-          
-          const rawTargets = user.schools?.opening_hours?.weekly_targets?.[user.teacher_id];
-          let weeklyTargetsList: any[] = [];
-          if (Array.isArray(rawTargets)) {
-            weeklyTargetsList = rawTargets;
-          } else if (typeof rawTargets === 'number') {
-            weeklyTargetsList = [{ id: 'default', title: 'Wochenziel', minutes: rawTargets, deadline: '' }];
-          }
-          setWeeklyTargets(weeklyTargetsList);
-        } catch (targetErr) {
-          console.error('Error fetching classmate targets/mins:', targetErr);
-        }
-      }
-
       // Fetch announcements matching student's school_id
       try {
         const { data: annData, error: annErr } = await supabase
@@ -2091,6 +1947,67 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         }
       } finally {
         setBriefingLoading(false);
+      }
+
+      // 4. Fetch Übe-Ziele (class practice goals from teacher's school opening_hours)
+      try {
+        const teacherId = user.teacher_id;
+        const schoolId = user.school_id;
+        if (teacherId && schoolId) {
+          // Load teacher's goals from school opening_hours
+          const { data: schoolData } = await supabase
+            .from('schools')
+            .select('opening_hours')
+            .eq('id', schoolId)
+            .single();
+
+          const rawTargets = schoolData?.opening_hours?.weekly_targets?.[teacherId];
+          let goals: any[] = [];
+          if (Array.isArray(rawTargets)) {
+            goals = rawTargets;
+          } else if (typeof rawTargets === 'number') {
+            goals = [{ id: 'default', title: 'Klassenziel', minutes: rawTargets, deadline: '' }];
+          }
+          setClassGoals(goals);
+
+          // Calculate this student class's weekly practice minutes
+          // Get all students of this teacher for current week
+          if (goals.length > 0) {
+            const now = new Date();
+            const monday = new Date(now);
+            const day = now.getDay();
+            const diff = day === 0 ? -6 : 1 - day;
+            monday.setDate(now.getDate() + diff);
+            monday.setHours(0, 0, 0, 0);
+            const sunday = new Date(monday);
+            sunday.setDate(monday.getDate() + 6);
+            sunday.setHours(23, 59, 59, 999);
+
+            // Get all students of same teacher
+            const { data: classmates } = await supabase
+              .from('users')
+              .select('id')
+              .eq('teacher_id', teacherId)
+              .eq('school_id', schoolId);
+
+            if (classmates && classmates.length > 0) {
+              const classmateIds = classmates.map((c: any) => c.id);
+              const { data: practiceData } = await supabase
+                .from('practice_sessions')
+                .select('duration_minutes')
+                .in('student_id', classmateIds)
+                .gte('created_at', monday.toISOString())
+                .lte('created_at', sunday.toISOString());
+
+              const totalMins = (practiceData || []).reduce(
+                (sum: number, s: any) => sum + (s.duration_minutes || 0), 0
+              );
+              setClassWeeklyMins(totalMins);
+            }
+          }
+        }
+      } catch (goalErr) {
+        console.warn('Could not load class goals:', goalErr);
       }
 
       try {
@@ -3846,9 +3763,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             getISOWeek={getISOWeek}
             handleTabChangeLocal={handleTabChangeLocal}
             campusFeedAnnouncements={campusFeedAnnouncements}
-            classWeeklyMins={classWeeklyMins}
-            weeklyTargets={weeklyTargets}
-            brandColor={brandColor}
           />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -4424,123 +4338,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             {/* RIGHT COLUMN */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               
-              {/* Übe-Ziele der Klasse (Crowdfunding Style) */}
-              {weeklyTargets.length > 0 && (() => {
-                const totalGoals = weeklyTargets.length;
-                const masteredGoals = weeklyTargets.filter((target: any) => {
-                  const targetPercent = Math.round((classWeeklyMins / target.minutes) * 100);
-                  return targetPercent >= 100;
-                }).length;
-                const highestPercent = weeklyTargets.length > 0 
-                  ? Math.max(...weeklyTargets.map((target: any) => Math.round((classWeeklyMins / target.minutes) * 100)))
-                  : 0;
-
-                return (
-                  <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                      <Target size={18} color={brandColor} />
-                      <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        Übe-Ziele der Klasse
-                      </h3>
-                    </div>
-
-                    {/* KPI Row */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '16px', marginBottom: '20px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                        <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Missionen</span>
-                        <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', marginTop: '2px' }}>{totalGoals}</span>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', borderLeft: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0' }}>
-                        <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Geknackt</span>
-                        <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#10b981', marginTop: '2px' }}>{masteredGoals}</span>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                        <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Klassen-Peak</span>
-                        <span style={{ fontSize: '1.05rem', fontWeight: 900, color: brandColor, marginTop: '2px' }}>{highestPercent}%</span>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    {weeklyTargets.map((target: any) => {
-                      const targetPercent = Math.round((classWeeklyMins / target.minutes) * 100);
-                      const isDeadlinePassed = target.deadline ? new Date(target.deadline) < new Date() : false;
-                      
-                      // Crowdfunding scale: 100% goal is marked at 75% width
-                      const maxPercentOnBar = 133;
-                      const visualWidth = Math.min(100, (targetPercent / maxPercentOnBar) * 100);
-
-                      return (
-                        <div key={target.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                            <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>
-                              {target.title || 'Wochenziel'}
-                            </span>
-                            <span style={{ fontSize: '0.72rem', fontWeight: 750, color: '#64748b' }}>
-                              {Math.round(classWeeklyMins)} / {target.minutes} Min.
-                            </span>
-                          </div>
-
-                          {/* Progress Track */}
-                          <div style={{ position: 'relative', width: '100%', height: '16px', background: '#f1f5f9', borderRadius: '8px', overflow: 'hidden' }}>
-                            {/* Visual Progress Bar */}
-                            <div 
-                              style={{ 
-                                width: `${visualWidth}%`, 
-                                height: '100%', 
-                                background: targetPercent >= 100 
-                                  ? `linear-gradient(90deg, ${brandColor} 0%, #10b981 75%, #059669 100%)`
-                                  : `linear-gradient(90deg, ${brandColor} 0%, #10b981 100%)`,
-                                borderRadius: '8px', 
-                                transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)' 
-                              }} 
-                            />
-                            
-                            {/* 100% Goal Marker line (at 75% width) */}
-                            <div style={{ 
-                              position: 'absolute', 
-                              left: '75%', 
-                              top: 0, 
-                              bottom: 0, 
-                              width: '2px', 
-                              background: '#ffffff', 
-                              opacity: 0.8,
-                              zIndex: 2 
-                            }} />
-                          </div>
-
-                          {/* Labels and Deadlines */}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            {target.deadline ? (
-                              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: isDeadlinePassed ? '#ef4444' : '#64748b' }}>
-                                ⏱️ Bis: {new Date(target.deadline).toLocaleDateString('de-DE')}
-                              </span>
-                            ) : (
-                              <span />
-                            )}
-                            <span style={{ 
-                              fontSize: '0.75rem', 
-                              fontWeight: 900, 
-                              color: targetPercent >= 100 ? '#10b981' : brandColor, 
-                              background: targetPercent >= 100 ? '#dcfce7' : `${brandColor}12`, 
-                              padding: '2px 6px', 
-                              borderRadius: '4px' 
-                            }}>
-                              {targetPercent}% {targetPercent >= 100 && '🚀'}
-                            </span>
-                          </div>
-
-                          {targetPercent >= 100 && (
-                            <div style={{ fontSize: '0.7rem', fontWeight: 750, color: '#15803d', display: 'flex', alignItems: 'center', gap: '4px', background: '#f0fdf4', padding: '6px 10px', borderRadius: '8px', border: '1px solid #dcfce7' }}>
-                              <span>🎉 Ziel erreicht & übererfüllt!</span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );})()}
-              
               {/* Nächste Termine */}
               <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -4817,6 +4614,123 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   )}
                 </div>
               </div>
+
+              {/* ÜBE-ZIEL WIDGET (Crowdfunding-Stil) */}
+              {classGoals.length > 0 && (
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: '24px',
+                  padding: '24px',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+                  border: '1px solid #e2e8f0'
+                }}>
+                  {/* Header */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                    <div style={{
+                      width: '32px', height: '32px', borderRadius: '10px',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0, boxShadow: '0 4px 10px rgba(16,185,129,0.25)'
+                    }}>
+                      <span style={{ fontSize: '1rem' }}>🌱</span>
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1e293b', margin: 0, letterSpacing: '-0.01em' }}>
+                        Klassen-Übe-Ziel
+                      </h3>
+                      <p style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '2px 0 0 0' }}>
+                        Gemeinsam stärker
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Goals */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {classGoals.map((goal: any) => {
+                      const pct = goal.minutes > 0 ? Math.round((classWeeklyMins / goal.minutes) * 100) : 0;
+                      const isDeadlinePassed = goal.deadline ? new Date(goal.deadline) < new Date() : false;
+                      // Crowdfunding: 100% goal sits at 75% of bar width
+                      const maxPercentOnBar = 133;
+                      const visualWidth = Math.min(100, (pct / maxPercentOnBar) * 100);
+                      const isAchieved = pct >= 100;
+
+                      return (
+                        <div key={goal.id} style={{
+                          background: isAchieved ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' : '#f8fafc',
+                          borderRadius: '16px',
+                          padding: '16px',
+                          border: isAchieved ? '1.5px solid #86efac' : '1px solid #e2e8f0'
+                        }}>
+                          {/* Goal Title & deadline */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                            <div>
+                              <div style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a' }}>
+                                {goal.title || 'Wochenziel'}
+                              </div>
+                              {goal.deadline && (
+                                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: isDeadlinePassed ? '#ef4444' : '#64748b', marginTop: '2px' }}>
+                                  ⏱️ bis {new Date(goal.deadline).toLocaleDateString('de-DE')}{isDeadlinePassed ? ' (Abgelaufen)' : ''}
+                                </div>
+                              )}
+                            </div>
+                            <span style={{
+                              fontSize: '0.78rem',
+                              fontWeight: 900,
+                              color: isAchieved ? '#059669' : '#0b57d0',
+                              background: isAchieved ? '#dcfce7' : 'rgba(11,87,208,0.08)',
+                              padding: '2px 8px',
+                              borderRadius: '6px'
+                            }}>
+                              {pct}%
+                            </span>
+                          </div>
+
+                          {/* Minutes label */}
+                          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '8px' }}>
+                            {classWeeklyMins} Min. von {goal.minutes} Min. geübt
+                          </div>
+
+                          {/* Crowdfunding progress bar */}
+                          <div style={{ position: 'relative', height: '10px', background: '#e2e8f0', borderRadius: '99px', overflow: 'hidden' }}>
+                            <div style={{
+                              width: `${visualWidth}%`,
+                              height: '100%',
+                              background: isAchieved
+                                ? 'linear-gradient(90deg, #10b981 0%, #059669 75%, #047857 100%)'
+                                : 'linear-gradient(90deg, #0b57d0 0%, #10b981 100%)',
+                              borderRadius: '99px',
+                              transition: 'width 1s cubic-bezier(0.4, 0, 0.2, 1)'
+                            }} />
+                            {/* 100% marker line at 75% of bar */}
+                            <div style={{
+                              position: 'absolute', left: '75%', top: 0, bottom: 0,
+                              width: '2px', background: 'rgba(255,255,255,0.9)',
+                              zIndex: 2
+                            }} />
+                          </div>
+
+                          {/* Achievement banner */}
+                          {isAchieved && (
+                            <div style={{
+                              display: 'flex', alignItems: 'center', gap: '6px',
+                              marginTop: '10px',
+                              background: 'rgba(16,185,129,0.1)',
+                              padding: '7px 10px',
+                              borderRadius: '10px',
+                              border: '1px solid rgba(16,185,129,0.2)'
+                            }}>
+                              <span style={{ fontSize: '0.9rem' }}>🎉</span>
+                              <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#065f46' }}>
+                                Ziel geknackt! Weiter so!
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
             </div>
 

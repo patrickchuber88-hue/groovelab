@@ -8894,71 +8894,121 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   </div>
                 )}
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  {(stats?.weeklyTargets || []).length === 0 ? (
-                    <p style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', margin: '20px 0', fontWeight: 600 }}>
-                      Keine aktiven Ziele angelegt.
-                    </p>
-                  ) : (
-                    (stats.weeklyTargets || []).map((target: any) => {
-                      const targetPercent = Math.min(100, Math.round((classWeeklyMins / target.minutes) * 100));
-                      const isDeadlinePassed = target.deadline ? new Date(target.deadline) < new Date() : false;
+                {(() => {
+                  const targets = stats?.weeklyTargets || [];
+                  const totalGoals = targets.length;
+                  const masteredGoals = targets.filter((target: any) => {
+                    const targetPercent = Math.round((classWeeklyMins / target.minutes) * 100);
+                    return targetPercent >= 100;
+                  }).length;
+                  const highestPercent = targets.length > 0 
+                    ? Math.max(...targets.map((target: any) => Math.round((classWeeklyMins / target.minutes) * 100)))
+                    : 0;
 
-                      return (
-                        <div key={target.id} style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: '#f8fafc', padding: '20px', borderRadius: '20px', border: '1px solid #e2e8f0', position: 'relative' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                            <div>
-                              <h4 style={{ fontSize: '0.88rem', fontWeight: 900, color: '#0f172a', margin: 0 }}>{target.title || 'Wochenziel'}</h4>
-                              {target.deadline && (
-                                <span style={{ fontSize: '0.7rem', fontWeight: 750, color: isDeadlinePassed ? '#ef4444' : '#64748b', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-                                  ⏱️ Bis: {new Date(target.deadline).toLocaleDateString('de-DE')} {isDeadlinePassed && '(Abgelaufen)'}
-                                </span>
-                              )}
-                            </div>
-                            <button 
-                              onClick={() => handleDeleteGoal(target.id)}
-                              style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                              className="hover-scale"
-                              title="Ziel löschen"
-                            >
-                              <X size={16} />
-                            </button>
+                  return (
+                    <>
+                      {totalGoals > 0 && (
+                        /* KPI Row */
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '16px', marginBottom: '20px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                            <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Missionen</span>
+                            <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', marginTop: '2px' }}>{totalGoals}</span>
                           </div>
-
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '4px' }}>
-                            <span style={{ fontSize: '0.78rem', fontWeight: 850, color: '#334155' }}>
-                              {formatMins(classWeeklyMins)} von {target.minutes} Min.
-                            </span>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 900, color: brandColor, background: `${brandColor}12`, padding: '2px 6px', borderRadius: '4px' }}>
-                              {targetPercent}%
-                            </span>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', borderLeft: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0' }}>
+                            <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Geknackt</span>
+                            <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#10b981', marginTop: '2px' }}>{masteredGoals}</span>
                           </div>
-
-                          <div style={{ width: '100%', height: '10px', background: '#e2e8f0', borderRadius: '5px', overflow: 'hidden' }}>
-                            <div 
-                              style={{ 
-                                width: `${targetPercent}%`, 
-                                height: '100%', 
-                                background: `linear-gradient(90deg, ${brandColor} 0%, #10b981 100%)`, 
-                                borderRadius: '5px', 
-                                transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)' 
-                              }} 
-                            />
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                            <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Peak</span>
+                            <span style={{ fontSize: '1.05rem', fontWeight: 900, color: brandColor, marginTop: '2px' }}>{highestPercent}%</span>
                           </div>
-
-                          {targetPercent >= 100 && (
-                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', background: '#f0fdf4', padding: '8px 12px', borderRadius: '12px', border: '1px solid #dcfce7', marginTop: '2px' }}>
-                              <span style={{ fontSize: '1rem' }}>🎉</span>
-                              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#14532d' }}>
-                                Ziel erreicht! Richtig stark!
-                              </span>
-                            </div>
-                          )}
                         </div>
-                      );
-                    })
-                  )}
-                </div>
+                      )}
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        {totalGoals === 0 ? (
+                          <p style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', margin: '20px 0', fontWeight: 600 }}>
+                            Keine aktiven Ziele angelegt.
+                          </p>
+                        ) : (
+                          targets.map((target: any) => {
+                            const targetPercent = Math.round((classWeeklyMins / target.minutes) * 100);
+                            const isDeadlinePassed = target.deadline ? new Date(target.deadline) < new Date() : false;
+                            
+                            // Crowdfunding scale: 100% goal is marked at 75% width
+                            const maxPercentOnBar = 133;
+                            const visualWidth = Math.min(100, (targetPercent / maxPercentOnBar) * 100);
+
+                            return (
+                              <div key={target.id} style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: '#f8fafc', padding: '20px', borderRadius: '20px', border: '1px solid #e2e8f0', position: 'relative' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                  <div>
+                                    <h4 style={{ fontSize: '0.88rem', fontWeight: 900, color: '#0f172a', margin: 0 }}>{target.title || 'Wochenziel'}</h4>
+                                    {target.deadline && (
+                                      <span style={{ fontSize: '0.7rem', fontWeight: 750, color: isDeadlinePassed ? '#ef4444' : '#64748b', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                                        ⏱️ Bis: {new Date(target.deadline).toLocaleDateString('de-DE')} {isDeadlinePassed && '(Abgelaufen)'}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <button 
+                                    onClick={() => handleDeleteGoal(target.id)}
+                                    style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                    className="hover-scale"
+                                    title="Ziel löschen"
+                                  >
+                                    <X size={16} />
+                                  </button>
+                                </div>
+
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '4px' }}>
+                                  <span style={{ fontSize: '0.78rem', fontWeight: 850, color: '#334155' }}>
+                                    {formatMins(classWeeklyMins)} von {target.minutes} Min.
+                                  </span>
+                                  <span style={{ 
+                                    fontSize: '0.75rem', 
+                                    fontWeight: 900, 
+                                    color: targetPercent >= 100 ? '#10b981' : brandColor, 
+                                    background: targetPercent >= 100 ? '#dcfce7' : `${brandColor}12`, 
+                                    padding: '2px 6px', 
+                                    borderRadius: '4px' 
+                                  }}>
+                                    {targetPercent}%
+                                  </span>
+                                </div>
+
+                                {/* Progress Track */}
+                                <div style={{ position: 'relative', width: '100%', height: '12px', background: '#e2e8f0', borderRadius: '6px', overflow: 'hidden' }}>
+                                  <div 
+                                    style={{ 
+                                      width: `${visualWidth}%`, 
+                                      height: '100%', 
+                                      background: targetPercent >= 100 
+                                        ? `linear-gradient(90deg, ${brandColor} 0%, #10b981 75%, #059669 100%)`
+                                        : `linear-gradient(90deg, ${brandColor} 0%, #10b981 100%)`, 
+                                      borderRadius: '6px', 
+                                      transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)' 
+                                    }} 
+                                  />
+                                  {/* Goal line */}
+                                  <div style={{ position: 'absolute', left: '75%', top: 0, bottom: 0, width: '2px', background: '#ffffff', opacity: 0.8, zIndex: 2 }} />
+                                </div>
+
+                                {targetPercent >= 100 && (
+                                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', background: '#f0fdf4', padding: '8px 12px', borderRadius: '12px', border: '1px solid #dcfce7', marginTop: '2px' }}>
+                                    <span style={{ fontSize: '1rem' }}>🎉</span>
+                                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#14532d' }}>
+                                      Ziel erreicht & übererfüllt!
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
             </div>
