@@ -4023,7 +4023,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 boxSizing: 'border-box',
                 overflow: 'hidden',
                 position: 'relative',
-                padding: '24px 32px'
+                padding: '24px 190px 24px 32px'
               }}>
                 {/* Background decorative music note */}
                 <Music size={140} style={{ position: 'absolute', left: '40%', bottom: '-30px', opacity: 0.02, color: '#007aff', pointerEvents: 'none' }} />
@@ -4061,7 +4061,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     Hi, <span style={{ color: '#007aff', fontWeight: 900 }}>{studentUser?.first_name || 'Student'}</span>! 👋
                   </h3>
                   
-                  <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#475569', fontWeight: 600, lineHeight: 1.45, maxWidth: '85%' }}>
+                  <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#475569', fontWeight: 600, lineHeight: 1.45, maxWidth: '95%' }}>
                     Ein neuer Moment für Musik. Nimm dir heute ein paar Minuten für deine Übungsziele und sichere dir deine tägliche Serie!
                   </p>
 
@@ -4140,21 +4140,20 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   )}
                 </div>
 
-                {/* Right Instrument Avatar Sticker Container */}
+                {/* Right Instrument Avatar Sticker Container - Full Height */}
                 <div style={{
-                  width: '110px',
-                  height: '110px',
-                  borderRadius: '24px',
-                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.15) 100%)',
+                  position: 'absolute',
+                  top: 0,
+                  bottom: 0,
+                  right: 0,
+                  width: '160px',
+                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.1) 100%)',
                   backdropFilter: 'blur(10px)',
-                  boxShadow: '0 12px 32px rgba(31, 38, 135, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
-                  border: '1.5px solid rgba(255, 255, 255, 0.7)',
+                  borderLeft: '1px solid rgba(255, 255, 255, 0.6)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  flexShrink: 0,
-                  zIndex: 2,
-                  marginLeft: '20px'
+                  zIndex: 2
                 }}>
                   <img 
                     src={
@@ -4176,8 +4175,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     } 
                     alt="" 
                     style={{ 
-                      width: '80%', 
-                      height: '80%', 
+                      width: '85%', 
+                      height: '85%', 
                       objectFit: 'contain'
                     }} 
                   />
