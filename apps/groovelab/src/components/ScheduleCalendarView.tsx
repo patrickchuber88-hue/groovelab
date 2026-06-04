@@ -1172,16 +1172,9 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                   );
  
                   if (isRescheduled) {
-                    const isConfirmed = occ.status === 'rescheduled_confirmed' || occ.student_acknowledged;
-                    if (isConfirmed) {
-                      cardBackground = 'rgba(254, 243, 199, 0.45)';
-                      finalColors.border = '#10b981';
-                      finalColors.text = '#713f12';
-                    } else {
-                      cardBackground = 'rgba(254, 243, 199, 0.45)';
-                      finalColors.border = '#f59e0b';
-                      finalColors.text = '#92400e';
-                    }
+                    cardBackground = 'rgba(253, 224, 71, 0.35)';
+                    finalColors.border = '#facc15';
+                    finalColors.text = '#713f12';
                   }
  
                   return (
