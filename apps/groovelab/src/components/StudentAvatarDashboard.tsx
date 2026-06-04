@@ -4100,27 +4100,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     className="hover-zoom"
                   />
                   
-                  {/* Premium evolution indicator */}
-                  <div style={{
-                    position: 'absolute',
-                    bottom: '12px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    background: 'rgba(255, 255, 255, 0.15)',
-                    backdropFilter: 'blur(8px)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '100px',
-                    padding: '3px 10px',
-                    fontSize: '0.62rem',
-                    fontWeight: 900,
-                    color: '#ffffff',
-                    letterSpacing: '0.05em',
-                    textTransform: 'uppercase',
-                    whiteSpace: 'nowrap',
-                    zIndex: 3
-                  }}>
-                    Lvl {avatar?.evolution_level || 1} • {LEVEL_NAMES[avatar?.instrument_type || 'guitarist']?.[avatar?.evolution_level || 1]?.split(' (')[0] || 'Musiker'}
-                  </div>
+
                 </div>
 
                 {/* Right Text & Info Column */}
