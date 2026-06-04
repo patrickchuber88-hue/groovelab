@@ -320,6 +320,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [bookingStartTime, setBookingStartTime] = useState<string>('08:00');
   const [bookingEndTime, setBookingEndTime] = useState<string>('09:00');
   const [bookingPurpose, setBookingPurpose] = useState<string>('');
+  const [isRecurring, setIsRecurring] = useState<boolean>(false);
+  const [showPreviewField, setShowPreviewField] = useState<boolean>(false);
+  const [recurringInterval, setRecurringInterval] = useState<number>(1);
   const [bookingType, setBookingType] = useState<'solo' | 'lesson'>('solo');
   const [bookingStudentId, setBookingStudentId] = useState<string>('');
   const [studentSearchTerm, setStudentSearchTerm] = useState<string>('');
@@ -4758,7 +4761,10 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     const getBookingsForSlot = (dayIdx: number, hourStr: string) => {
       if (!selectedRoom) return [];
       
-      const currentSelectedDate = new Date(bookingDate);
+      const dateParts = bookingDate.split('-');
+      const currentSelectedDate = dateParts.length === 3
+        ? new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]))
+        : new Date(bookingDate);
       const dayOfWeek = currentSelectedDate.getDay();
       const diffToMon = currentSelectedDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
       const mondayOfSelectedWeek = new Date(currentSelectedDate.setDate(diffToMon));
@@ -4798,6 +4804,28 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                            s.day_of_week === targetDayInt || 
                            String(s.day_of_week) === String(targetDayInt);
         if (!matchesDay) return false;
+
+        if (s.start_date && s.interval_weeks && s.interval_weeks > 1) {
+          const sDateParts = s.start_date.split('-');
+          const sDate = sDateParts.length === 3 
+            ? new Date(parseInt(sDateParts[0]), parseInt(sDateParts[1]) - 1, parseInt(sDateParts[2]))
+            : new Date(s.start_date);
+          sDate.setHours(0, 0, 0, 0);
+          
+          const sDayOfWeek = sDate.getDay();
+          const sDiffToMon = sDate.getDate() - (sDayOfWeek === 0 ? 6 : sDayOfWeek - 1);
+          const sMonday = new Date(sDate.setDate(sDiffToMon));
+          sMonday.setHours(0, 0, 0, 0);
+
+          const cMonday = new Date(mondayOfSelectedWeek);
+          cMonday.setHours(0, 0, 0, 0);
+
+          const msDiff = cMonday.getTime() - sMonday.getTime();
+          if (msDiff < 0) return false;
+
+          const weekDiff = Math.round(msDiff / (7 * 24 * 60 * 60 * 1000));
+          if (weekDiff % s.interval_weeks !== 0) return false;
+        }
 
         const durationMin = s.duration || s.duration_minutes || 45;
         
@@ -4930,7 +4958,39 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         };
       });
 
-      return [...manualForSlot, ...mappedSchedules, ...mappedDynamics];
+      // 4. Draft/Preview booking during input
+      const draftPreviewBooking: any[] = [];
+      if (showPreviewField && !selectedBooking && bookingDate && bookingStartTime && bookingEndTime && selectedRoom) {
+        const previewParts = bookingDate.split('-');
+        const previewDate = previewParts.length === 3
+          ? new Date(parseInt(previewParts[0]), parseInt(previewParts[1]) - 1, parseInt(previewParts[2]))
+          : new Date(bookingDate);
+        previewDate.setHours(0, 0, 0, 0);
+        if (previewDate >= mondayOfSelectedWeek && previewDate <= sundayOfSelectedWeek) {
+          const previewDayIdx = getWeekdayIndex(bookingDate);
+          if (previewDayIdx === dayIdx) {
+            const slotHour = parseInt(hourStr.split(':')[0]);
+            const startHour = parseInt(bookingStartTime.split(':')[0]);
+            const endHour = parseInt(bookingEndTime.split(':')[0]);
+            if (slotHour >= startHour && slotHour < endHour) {
+              draftPreviewBooking.push({
+                id: 'preview_draft_booking',
+                roomId: selectedRoom.id,
+                roomName: selectedRoom.name,
+                date: bookingDate,
+                startTime: bookingStartTime,
+                endTime: bookingEndTime,
+                purpose: bookingPurpose || 'Eigennutzung',
+                teacherId: userId,
+                teacherName: admin ? `${admin.first_name} ${admin.last_name}` : 'Lehrer',
+                isPreview: true
+              });
+            }
+          }
+        }
+      }
+
+      return [...manualForSlot, ...mappedSchedules, ...mappedDynamics, ...draftPreviewBooking];
     };
 
     // Check if room is occupied during selected time slot
@@ -5086,8 +5146,6 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     // Filter rooms by floor AND availability (if date filter is active)
     const roomsToRender = (rooms.filter(room => {
       if (selectedFloor !== 'Alle' && room.floor !== selectedFloor) return false;
-      // If date/time filter is active and the room is occupied, hide it
-      if (isDateFilterActive && isRoomOccupied(room.id)) return false;
       return true;
     })).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
@@ -5100,19 +5158,50 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       const studentName = studentObj ? `Unterricht: ${studentObj.first_name} ${studentObj.last_name}` : 'Unterricht';
       const finalPurpose = bookingType === 'lesson' ? studentName : (bookingPurpose || 'Eigennutzung');
 
-      const newBooking = {
-        id: 'cb_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-        roomId,
-        roomName,
-        date: bookingDate,
-        startTime: bookingStartTime,
-        endTime: bookingEndTime,
-        purpose: finalPurpose,
-        teacherId: userId,
-        teacherName: admin ? `${admin.first_name} ${admin.last_name}` : 'Lehrer'
-      };
+      if (isRecurring) {
+        // Build the recurring schedule
+        const DAYS_MAP = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const parts = bookingDate.split('-');
+        const d = parts.length === 3 ? new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])) : new Date(bookingDate);
+        const targetDayName = DAYS_MAP[d.getDay()];
 
-      setCampusBookings(prev => [...prev, newBooking]);
+        const [shStr, smStr] = bookingStartTime.split(':');
+        const [ehStr, emStr] = bookingEndTime.split(':');
+        const startMin = (parseInt(shStr) || 0) * 60 + (parseInt(smStr) || 0);
+        const endMin = (parseInt(ehStr) || 0) * 60 + (parseInt(emStr) || 0);
+        const durationMin = Math.max(15, endMin - startMin);
+
+        const newSchedule = {
+          id: 'sched_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+          room_id: roomId,
+          day_of_week: targetDayName,
+          time_slot: bookingStartTime,
+          duration: durationMin,
+          purpose: finalPurpose,
+          teacher_id: userId,
+          teacher: admin ? { first_name: admin.first_name, last_name: admin.last_name } : { first_name: 'Lehrer', last_name: '' },
+          status: 'approved',
+          start_date: bookingDate,
+          interval_weeks: recurringInterval
+        };
+
+        setSchedules(prev => [...prev, newSchedule]);
+      } else {
+        const newBooking = {
+          id: 'cb_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+          roomId,
+          roomName,
+          date: bookingDate,
+          startTime: bookingStartTime,
+          endTime: bookingEndTime,
+          purpose: finalPurpose,
+          teacherId: userId,
+          teacherName: admin ? `${admin.first_name} ${admin.last_name}` : 'Lehrer'
+        };
+
+        setCampusBookings(prev => [...prev, newBooking]);
+      }
+
       setIsDateFilterActive(false);
       setSuccessAnimationRoomId(roomId);
       setTimeout(() => setSuccessAnimationRoomId(null), 1000);
@@ -5121,6 +5210,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       setBookingPurpose('');
       setBookingStudentId('');
       setStudentSearchTerm('');
+      setIsRecurring(false);
+      setShowPreviewField(false);
+      setRecurringInterval(1);
     };
 
     const handleUpdateBooking = () => {
@@ -5165,6 +5257,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       setBookingStudentId('');
       setStudentSearchTerm('');
       setIsDateFilterActive(false);
+      setShowPreviewField(false);
+      setRecurringInterval(1);
     };
 
 
@@ -5441,6 +5535,12 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     });
 
     const getWeekdayIndex = (dateStr: string) => {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        const day = d.getDay();
+        return day === 0 ? 6 : day - 1;
+      }
       const d = new Date(dateStr);
       const day = d.getDay();
       return day === 0 ? 6 : day - 1;
@@ -5972,7 +6072,11 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                   let textColor = '#48484a';
                                   let leftAccentColor = '#8e8e93';
 
-                                  if (b.status === 'pending_reschedule') {
+                                  if (b.isPreview) {
+                                    bg = 'rgba(0, 122, 255, 0.04)';
+                                    textColor = '#007aff';
+                                    leftAccentColor = '#007aff';
+                                  } else if (b.status === 'pending_reschedule') {
                                     bg = 'rgba(255, 204, 0, 0.15)';
                                     textColor = '#946600';
                                     leftAccentColor = '#ffcc00';
@@ -6008,6 +6112,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                     <div
                                       key={b.id}
                                       onClick={(e) => {
+                                        if (b.isPreview) return;
                                         e.stopPropagation();
                                         setSelectedBooking(b);
                                         if (!b.isSchedule) {
@@ -6028,20 +6133,20 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                         }
                                       }}
 
-                                      draggable={isOwnBooking && !isSchedule}
+                                      draggable={isOwnBooking && !isSchedule && !b.isPreview}
                                       onDragStart={(e) => {
-                                        if (isOwnBooking && !isSchedule) {
+                                        if (isOwnBooking && !isSchedule && !b.isPreview) {
                                           handleDragStart(e, b.id);
                                         }
                                       }}
                                       onDragEnd={() => {
                                         setDragOverCell(null);
                                       }}
-                                      title={`${b.purpose} (${b.startTime} - ${b.endTime}) - ${b.teacherName}`}
+                                      title={b.isPreview ? `Vorschau: ${b.purpose} (${b.startTime} - ${b.endTime})` : `${b.purpose} (${b.startTime} - ${b.endTime}) - ${b.teacherName}`}
                                       style={{
                                         background: bg,
-                                        border: `1px solid ${leftAccentColor}25`,
-                                        borderLeft: `3px solid ${leftAccentColor}`,
+                                        border: b.isPreview ? `2.2px dashed ${leftAccentColor}` : `1px solid ${leftAccentColor}25`,
+                                        borderLeft: b.isPreview ? `2.2px dashed ${leftAccentColor}` : `3px solid ${leftAccentColor}`,
                                         borderRadius: '8px',
                                         padding: '6px 8px',
                                         fontSize: '0.64rem',
@@ -6056,14 +6161,14 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                         display: 'flex',
                                         flexDirection: 'column',
                                         justifyContent: 'flex-start',
-                                        boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                                        boxShadow: b.isPreview ? 'none' : '0 1px 3px rgba(0,0,0,0.02)',
                                         overflow: 'hidden',
-                                        cursor: isOwnBooking ? 'grab' : 'pointer'
+                                        cursor: b.isPreview ? 'default' : (isOwnBooking ? 'grab' : 'pointer')
                                       }}
                                     >
                                       
                                       {/* Resize Handles */}
-                                      {isOwnBooking && !isSchedule && (
+                                      {isOwnBooking && !isSchedule && !b.isPreview && (
                                         <>
                                           <div
                                             onPointerDown={(e) => handleResizeStart(e, b, 'top')}
@@ -6135,15 +6240,19 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.58rem', opacity: 0.8, marginBottom: '2px', fontWeight: 800 }}>
                                         <span style={{ display: 'flex', alignItems: 'center' }}>
                                           {isSchedule && <GraduationCap size={10} style={{ marginRight: '3px' }} />}
-                                          {b.startTime} - {b.endTime}
+                                          {b.startTime} - {b.endTime}{b.isPreview && ' (Vorschau)'}
                                         </span>
                                       </div>
-                                      <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
-                                        {isSchedule ? b.teacherName : b.purpose}
-                                      </div>
-                                      <div style={{ fontSize: '0.58rem', opacity: 0.8, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {isSchedule ? b.purpose : (isOwnBooking ? 'Meine Buchung' : b.teacherName)}
-                                      </div>
+                                      {durationHrs >= 0.75 && (
+                                        <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                                          {isSchedule ? b.teacherName : b.purpose}
+                                        </div>
+                                      )}
+                                      {durationHrs >= 1.0 && (
+                                        <div style={{ fontSize: '0.58rem', opacity: 0.8, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                          {b.isPreview ? 'Vorschau' : (isSchedule ? b.purpose : (isOwnBooking ? 'Meine Buchung' : b.teacherName))}
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })}
@@ -6311,75 +6420,55 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               /* Booking Form (Shown when showMyBookingsOnly is false) */
               <div 
                 className="glass-panel" 
+                onClickCapture={() => setShowPreviewField(true)}
+                onFocusCapture={() => setShowPreviewField(true)}
                 style={{ 
                   background: isEditing ? '#f6f0ff' : 'white', 
-                  borderRadius: '24px', 
+                  borderRadius: '18px', 
                   border: isEditing ? '1.5px solid #af52de40' : '1px solid rgba(0, 0, 0, 0.04)', 
-                  padding: '20px', 
+                  padding: '14px 16px', 
                   boxShadow: isEditing 
                     ? '0 8px 32px rgba(175, 82, 222, 0.08), 0 2px 12px rgba(175, 82, 222, 0.04)' 
                     : '0 4px 24px -4px rgba(0, 0, 0, 0.02), 0 2px 12px -2px rgba(0, 0, 0, 0.01)',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '14px',
+                  gap: '10px',
                   transition: 'all 0.3s ease'
                 }}
               >
 
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1c1c1e', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ color: brandColor }}>⚡</span> Raum buchen
-                </h3>
-
-                {/* Segmented Control for Eigennutzung vs Unterricht */}
-                <div style={{ display: 'flex', background: '#f2f2f7', borderRadius: '12px', padding: '2px', marginTop: '2px' }}>
-                  <button
-                    onClick={() => setBookingType('solo')}
-                    style={{
-                      flex: 1,
-                      background: bookingType === 'solo' ? 'white' : 'transparent',
-                      border: 'none',
-                      borderRadius: '10px',
-                      padding: '8px 12px',
-                      fontSize: '0.75rem',
-                      fontWeight: bookingType === 'solo' ? 800 : 600,
-                      color: bookingType === 'solo' ? '#1c1c1e' : '#8e8e93',
-                      cursor: 'pointer',
-                      boxShadow: bookingType === 'solo' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    Eigennutzung
-                  </button>
-                  <button
-                    onClick={() => setBookingType('lesson')}
-                    style={{
-                      flex: 1,
-                      background: bookingType === 'lesson' ? 'white' : 'transparent',
-                      border: 'none',
-                      borderRadius: '10px',
-                      padding: '8px 12px',
-                      fontSize: '0.75rem',
-                      fontWeight: bookingType === 'lesson' ? 800 : 600,
-                      color: bookingType === 'lesson' ? '#1c1c1e' : '#8e8e93',
-                      cursor: 'pointer',
-                      boxShadow: bookingType === 'lesson' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    Unterricht
-                  </button>
-                </div>
-
-                {/* Smart Room Selector */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Raum</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: 0, gap: '10px' }}>
+                  <h3 style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1c1c1e', margin: 0, display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
+                    <span style={{ color: brandColor }}>⚡</span> Raum buchen
+                  </h3>
                   <select
                     value={selectedCampusRoomId || ''}
                     onChange={(e) => {
                       setSelectedCampusRoomId(e.target.value);
                     }}
                     className="premium-input"
-                    style={{ background: '#ffffff', color: '#1c1c1e' }}
+                    style={{ 
+                      appearance: 'none',
+                      WebkitAppearance: 'none',
+                      background: '#f2f2f7', 
+                      color: '#1c1c1e', 
+                      height: '28px', 
+                      padding: '2px 24px 2px 10px', 
+                      fontSize: '0.74rem', 
+                      fontWeight: 700,
+                      width: 'auto', 
+                      minWidth: '100px', 
+                      flexShrink: 1,
+                      border: '1px solid rgba(0, 0, 0, 0.04)',
+                      borderRadius: '8px',
+                      backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'right 8px center',
+                      backgroundSize: '10px',
+                      cursor: 'pointer',
+                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                      transition: 'all 0.15s ease'
+                    }}
                   >
                     {rooms.map((r: any) => (
                       <option key={r.id} value={r.id}>{r.name}</option>
@@ -6387,138 +6476,62 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   </select>
                 </div>
 
-                {/* Student Autocomplete Search */}
-                {bookingType === 'lesson' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', position: 'relative' }}>
-                    <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Schüler</label>
-                    {bookingStudentId ? (
-                      <div style={{
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Datum</label>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <input
+                      type="date"
+                      value={bookingDate}
+                      onChange={(e) => {
+                        setBookingDate(e.target.value);
+                        setIsDateFilterActive(true);
+                      }}
+                      onClick={() => setIsDateFilterActive(true)}
+                      onFocus={() => setIsDateFilterActive(true)}
+                      className="premium-input"
+                      style={{
+                        borderColor: isDateFilterActive ? '#ffe699' : '#e5e5ea',
+                        background: isDateFilterActive ? '#ffffff' : '#f2f2f7',
+                        color: isDateFilterActive ? '#1c1c1e' : '#8e8e93',
+                        boxShadow: isDateFilterActive ? '0 0 0 3px rgba(255, 230, 153, 0.25)' : 'none',
+                        height: '36px',
+                        padding: '6px 10px',
+                        fontSize: '0.78rem',
+                        flex: 1
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowPreviewField(prev => !prev);
+                      }}
+                      style={{
+                        height: '36px',
+                        padding: '0 12px',
+                        borderRadius: '10px',
+                        border: '1px solid',
+                        borderColor: showPreviewField ? brandColor : '#e5e5ea',
+                        background: showPreviewField ? 'rgba(0, 122, 255, 0.08)' : '#ffffff',
+                        color: showPreviewField ? brandColor : '#8e8e93',
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'space-between',
-                        background: '#f2f2f7',
-                        padding: '8px 12px',
-                        borderRadius: '10px',
-                        fontSize: '0.8rem',
-                        fontWeight: 700,
-                        color: '#1c1c1e'
-                      }}>
-                        <span>
-                          {(() => {
-                            const s = students.find(x => x.id === bookingStudentId);
-                            return s ? `${s.first_name} ${s.last_name}` : 'Unbekannter Schüler';
-                          })()}
-                        </span>
-                        <button
-                          onClick={() => {
-                            setBookingStudentId('');
-                            setStudentSearchTerm('');
-                          }}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#ff3b30',
-                            cursor: 'pointer',
-                            fontSize: '0.9rem',
-                            fontWeight: 800,
-                            padding: '0 4px'
-                          }}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        <input
-                          placeholder="Schüler suchen..."
-                          value={studentSearchTerm}
-                          onChange={(e) => setStudentSearchTerm(e.target.value)}
-                          className="premium-input"
-                          style={{ background: '#ffffff', color: '#1c1c1e' }}
-                        />
-                        {studentSearchTerm && (
-                          <div style={{
-                            position: 'absolute',
-                            top: '100%',
-                            left: 0,
-                            right: 0,
-                            background: 'white',
-                            border: '1px solid #e5e5ea',
-                            borderRadius: '12px',
-                            boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
-                            zIndex: 100,
-                            maxHeight: '150px',
-                            overflowY: 'auto',
-                            marginTop: '4px'
-                          }}>
-                            {students
-                              .filter((s: any) =>
-                                `${s.first_name} ${s.last_name}`
-                                  .toLowerCase()
-                                  .includes(studentSearchTerm.toLowerCase())
-                              )
-                              .slice(0, 5)
-                              .map((s: any) => (
-                                <div
-                                  key={s.id}
-                                  onClick={() => {
-                                    setBookingStudentId(s.id);
-                                    setStudentSearchTerm('');
-                                  }}
-                                  style={{
-                                    padding: '8px 12px',
-                                    fontSize: '0.78rem',
-                                    fontWeight: 700,
-                                    color: '#1c1c1e',
-                                    cursor: 'pointer',
-                                    borderBottom: '1px solid #f2f2f7'
-                                  }}
-                                  onMouseEnter={(e) => { e.currentTarget.style.background = '#f2f2f7'; }}
-                                  onMouseLeave={(e) => { e.currentTarget.style.background = 'white'; }}
-                                >
-                                  {s.first_name} {s.last_name}
-                                </div>
-                              ))}
-                            {students.filter((s: any) =>
-                              `${s.first_name} ${s.last_name}`
-                                .toLowerCase()
-                                .includes(studentSearchTerm.toLowerCase())
-                            ).length === 0 && (
-                              <div style={{ padding: '8px 12px', fontSize: '0.75rem', color: '#8e8e93', fontStyle: 'italic' }}>
-                                Keine Schüler gefunden
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </>
-                    )}
+                        gap: '4px',
+                        transition: 'all 0.15s',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      👁️ Vorschau
+                    </button>
                   </div>
-                )}
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Datum</label>
-                  <input
-                    type="date"
-                    value={bookingDate}
-                    onChange={(e) => {
-                      setBookingDate(e.target.value);
-                      setIsDateFilterActive(true);
-                    }}
-                    onClick={() => setIsDateFilterActive(true)}
-                    onFocus={() => setIsDateFilterActive(true)}
-                    className="premium-input"
-                    style={{
-                      borderColor: isDateFilterActive ? '#ffe699' : '#e5e5ea',
-                      background: isDateFilterActive ? '#ffffff' : '#f2f2f7',
-                      color: isDateFilterActive ? '#1c1c1e' : '#8e8e93',
-                      boxShadow: isDateFilterActive ? '0 0 0 3px rgba(255, 230, 153, 0.25)' : 'none'
-                    }}
-                  />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Von</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Von</label>
                     <select
                       value={bookingStartTime}
                       onChange={(e) => {
@@ -6528,10 +6541,23 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                       onFocus={() => setIsDateFilterActive(true)}
                       className="premium-input"
                       style={{
-                        borderColor: isDateFilterActive ? '#ffe699' : '#e5e5ea',
+                        appearance: 'none',
+                        WebkitAppearance: 'none',
+                        borderColor: isDateFilterActive ? '#ffe699' : 'rgba(0, 0, 0, 0.06)',
                         background: isDateFilterActive ? '#ffffff' : '#f2f2f7',
-                        color: isDateFilterActive ? '#1c1c1e' : '#8e8e93',
-                        boxShadow: isDateFilterActive ? '0 0 0 3px rgba(255, 230, 153, 0.25)' : 'none'
+                        color: '#1c1c1e',
+                        boxShadow: isDateFilterActive ? '0 0 0 3px rgba(255, 230, 153, 0.25)' : 'none',
+                        height: '36px',
+                        padding: '6px 28px 6px 10px',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        borderRadius: '10px',
+                        backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'right 10px center',
+                        backgroundSize: '11px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
                       }}
                     >
                       {Array.from({ length: 27 }, (_, i) => {
@@ -6543,8 +6569,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     </select>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Bis</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Bis</label>
                     <select
                       value={bookingEndTime}
                       onChange={(e) => {
@@ -6554,10 +6580,23 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                       onFocus={() => setIsDateFilterActive(true)}
                       className="premium-input"
                       style={{
-                        borderColor: isDateFilterActive ? '#ffe699' : '#e5e5ea',
+                        appearance: 'none',
+                        WebkitAppearance: 'none',
+                        borderColor: isDateFilterActive ? '#ffe699' : 'rgba(0, 0, 0, 0.06)',
                         background: isDateFilterActive ? '#ffffff' : '#f2f2f7',
-                        color: isDateFilterActive ? '#1c1c1e' : '#8e8e93',
-                        boxShadow: isDateFilterActive ? '0 0 0 3px rgba(255, 230, 153, 0.25)' : 'none'
+                        color: '#1c1c1e',
+                        boxShadow: isDateFilterActive ? '0 0 0 3px rgba(255, 230, 153, 0.25)' : 'none',
+                        height: '36px',
+                        padding: '6px 28px 6px 10px',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        borderRadius: '10px',
+                        backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'right 10px center',
+                        backgroundSize: '11px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
                       }}
                     >
                       {Array.from({ length: 27 }, (_, i) => {
@@ -6571,16 +6610,17 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 </div>
 
                 {/* Duration Quick Buttons */}
-                <div style={{ display: 'flex', gap: '8px', marginTop: '-6px' }}>
+                <div style={{ display: 'flex', gap: '6px', marginTop: '-2px' }}>
                   <button
+                    type="button"
                     onClick={() => handleQuickDuration(30)}
                     style={{
                       flex: 1,
                       background: 'transparent',
                       border: '1px solid #e5e5ea',
                       borderRadius: '8px',
-                      padding: '6px 8px',
-                      fontSize: '0.7rem',
+                      padding: '4px 6px',
+                      fontSize: '0.66rem',
                       fontWeight: 700,
                       color: '#8e8e93',
                       cursor: 'pointer',
@@ -6592,14 +6632,15 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     30 Min.
                   </button>
                   <button
+                    type="button"
                     onClick={() => handleQuickDuration(45)}
                     style={{
                       flex: 1,
                       background: 'transparent',
                       border: '1px solid #e5e5ea',
                       borderRadius: '8px',
-                      padding: '6px 8px',
-                      fontSize: '0.7rem',
+                      padding: '4px 6px',
+                      fontSize: '0.66rem',
                       fontWeight: 700,
                       color: '#8e8e93',
                       cursor: 'pointer',
@@ -6610,17 +6651,100 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   >
                     45 Min.
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickDuration(60)}
+                    style={{
+                      flex: 1,
+                      background: 'transparent',
+                      border: '1px solid #e5e5ea',
+                      borderRadius: '8px',
+                      padding: '4px 6px',
+                      fontSize: '0.66rem',
+                      fontWeight: 700,
+                      color: '#8e8e93',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = brandColor; e.currentTarget.style.color = brandColor; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e5e5ea'; e.currentTarget.style.color = '#8e8e93'; }}
+                  >
+                    60 Min.
+                  </button>
                 </div>
 
-                {bookingType === 'solo' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Verwendungszweck</label>
-                    <input
-                      placeholder="z.B. Klavierübung"
-                      value={bookingPurpose}
-                      onChange={(e) => setBookingPurpose(e.target.value)}
-                      className="premium-input"
-                    />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Notiz (nur für dich sichtbar)</label>
+                  <input
+                    placeholder="z.B. Klavierübung, Setup vorbereiten..."
+                    value={bookingPurpose}
+                    onChange={(e) => setBookingPurpose(e.target.value)}
+                    className="premium-input"
+                    style={{ height: '36px', padding: '6px 10px', fontSize: '0.78rem' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Buchungs-Typ</label>
+                  <div style={{ display: 'flex', background: '#f2f2f7', borderRadius: '8px', padding: '2px', gap: '2px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setIsRecurring(false)}
+                      style={{
+                        flex: 1,
+                        background: !isRecurring ? '#ffffff' : 'transparent',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '6px 0',
+                        fontSize: '0.74rem',
+                        fontWeight: !isRecurring ? 800 : 600,
+                        color: !isRecurring ? '#1c1c1e' : '#8e8e93',
+                        boxShadow: !isRecurring ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      Einzeltermin
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsRecurring(true)}
+                      style={{
+                        flex: 1,
+                        background: isRecurring ? '#ffffff' : 'transparent',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '6px 0',
+                        fontSize: '0.74rem',
+                        fontWeight: isRecurring ? 800 : 600,
+                        color: isRecurring ? '#1c1c1e' : '#8e8e93',
+                        boxShadow: isRecurring ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      Serientermin (wöchentlich)
+                    </button>
+                  </div>
+                </div>
+
+                {isRecurring && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Wochenrhythmus</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input
+                        type="number"
+                        min="1"
+                        max="12"
+                        value={recurringInterval}
+                        onChange={(e) => setRecurringInterval(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="premium-input"
+                        style={{ height: '36px', padding: '6px 10px', fontSize: '0.78rem', width: '80px', textAlign: 'center' }}
+                      />
+                      <span style={{ fontSize: '0.74rem', color: '#8e8e93', fontWeight: 600 }}>
+                        {recurringInterval === 1 ? 'jede Woche (Standard)' : `alle ${recurringInterval} Wochen`}
+                      </span>
+                    </div>
                   </div>
                 )}
 
@@ -6629,17 +6753,17 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   <div style={{
                     background: '#fff9e6',
                     border: '1px solid #ffeeba',
-                    borderRadius: '12px',
-                    padding: '8px 12px',
-                    fontSize: '0.72rem',
+                    borderRadius: '10px',
+                    padding: '6px 10px',
+                    fontSize: '0.68rem',
                     fontWeight: 700,
                     color: '#b45309',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    lineHeight: '1.25'
+                    gap: '4px',
+                    lineHeight: '1.2'
                   }}>
-                    <span>⚠️ Raum im Zeitraum bereits belegt. Parallele Buchung wird erlaubt.</span>
+                    <span>⚠️ Raum im Zeitraum belegt. Buchung wird parallel angezeigt.</span>
                   </div>
                 )}
 
@@ -6650,19 +6774,19 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     background: brandColor,
                     color: 'white',
                     border: 'none',
-                    borderRadius: '12px',
-                    padding: '12px 14px',
-                    fontSize: '0.85rem',
+                    borderRadius: '10px',
+                    padding: '10px 12px',
+                    fontSize: '0.8rem',
                     fontWeight: 800,
                     cursor: (!selectedRoom) ? 'not-allowed' : 'pointer',
                     opacity: (!selectedRoom) ? 0.45 : 1,
                     transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                    marginTop: '6px',
+                    marginTop: '2px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '8px',
-                    height: '44px',
+                    gap: '6px',
+                    height: '38px',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
                   }}
                   onMouseEnter={(e) => {
