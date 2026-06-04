@@ -830,12 +830,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
       
       if (!isMaster) {
-        // Enforce GrooveLab activation check
-        if (!user.is_groovelab_active) {
-          alert("Dein GrooveLab-Zugang ist nicht aktiv. Bitte wende dich an deine Musikschule.");
+        // Enforce activation check (must have at least one active module)
+        if (!user.is_campus_active && !user.is_groovelab_active) {
+          alert("Dein Zugang ist nicht aktiv. Bitte wende dich an deine Musikschule.");
           await supabase.auth.signOut();
           setLoading(false);
           return;
+        }
+
+        // Set default platform: prioritize campus by default, fallback to groovelab
+        if (user.is_campus_active) {
+          localStorage.setItem('groovelab_active_platform', 'campus');
+        } else if (user.is_groovelab_active) {
+          localStorage.setItem('groovelab_active_platform', 'groovelab');
         }
 
         // Enforce school matching check for students using component-level schoolData state or userSchool fallback
