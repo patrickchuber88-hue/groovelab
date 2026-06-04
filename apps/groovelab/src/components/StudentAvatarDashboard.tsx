@@ -4527,19 +4527,18 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               <div style={{ 
                 background: '#ffffff', 
                 borderRadius: '30px', 
-                padding: '32px', 
                 boxShadow: '0 15px 40px rgba(15, 23, 42, 0.03)',
                 border: '1px solid rgba(0, 0, 0, 0.04)',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '28px'
+                overflow: 'hidden'
               }}>
                 
                 {/* PRACTICE GOAL HERO BLOCK */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'stretch', flexWrap: 'wrap', gap: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'stretch', flexWrap: 'wrap' }}>
                   
                   {/* Left: Practice action */}
-                  <div style={{ flex: '1 1 320px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '16px' }}>
+                  <div style={{ flex: '1 1 320px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '24px', padding: '32px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <div style={{ background: 'rgba(251, 188, 5, 0.12)', color: '#d97706', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -4622,21 +4621,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         flex: '1 1 300px', 
                         display: 'flex', 
                         flexDirection: 'column', 
-                        gap: '16px', 
+                        gap: '20px', 
                         background: '#f8fafc', 
-                        padding: '24px', 
-                        borderRadius: '24px', 
-                        border: '1px solid rgba(0,0,0,0.02)',
+                        padding: '32px', 
                         position: 'relative'
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                             🔥 Flammen-Pfad
                           </span>
                           <span style={{ 
                             background: 'linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%)', 
                             color: '#ea580c', 
-                            fontSize: '0.75rem', 
+                            fontSize: '0.85rem', 
                             fontWeight: 900, 
                             padding: '4px 12px', 
                             borderRadius: '100px',
@@ -4647,14 +4644,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         </div>
 
                         {/* Visual Path Stepper */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', position: 'relative', marginTop: '4px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative', marginTop: '4px' }}>
                           
                           {/* Stepper vertical line connector */}
                           <div style={{
                             position: 'absolute',
-                            left: '20px',
-                            top: '24px',
-                            bottom: '24px',
+                            left: '21px',
+                            top: '28px',
+                            bottom: '28px',
                             width: '3px',
                             background: '#e2e8f0',
                             zIndex: 1
@@ -4663,8 +4660,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           {/* Dynamic connector overlay based on streak */}
                           <div style={{
                             position: 'absolute',
-                            left: '20px',
-                            top: '24px',
+                            left: '21px',
+                            top: '28px',
                             height: streak >= 9 ? '100%' : streak >= 6 ? '50%' : streak >= 3 ? '0%' : '0%',
                             width: '3px',
                             background: 'linear-gradient(to bottom, #f97316 0%, #ef4444 100%)',
@@ -4678,7 +4675,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             alignItems: 'center', 
                             gap: '16px', 
                             background: '#ffffff', 
-                            padding: '12px 16px', 
+                            padding: '14px 18px', 
                             borderRadius: '16px', 
                             border: '1px solid rgba(0,0,0,0.03)',
                             zIndex: 2,
@@ -4687,26 +4684,26 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             transition: 'all 0.3s'
                           }}>
                             <div style={{ 
-                              width: '10px', 
-                              height: '10px', 
+                              width: '12px', 
+                              height: '12px', 
                               borderRadius: '50%', 
                               background: isTier1Unlocked ? '#eab308' : '#cbd5e1', 
                               boxShadow: isTier1Unlocked ? '0 0 10px #eab308' : 'none',
                               zIndex: 3
                             }} />
                             <div style={{ color: isTier1Unlocked ? '#eab308' : '#94a3b8' }}>
-                              <Flame size={20} fill={isTier1Unlocked ? 'currentColor' : 'none'} />
+                              <Flame size={22} fill={isTier1Unlocked ? 'currentColor' : 'none'} />
                             </div>
                             <div style={{ flex: 1 }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '0.8rem', fontWeight: 900, color: isTier1Unlocked ? '#854d0e' : '#475569' }}>
+                                <span style={{ fontSize: '0.95rem', fontWeight: 900, color: isTier1Unlocked ? '#854d0e' : '#475569' }}>
                                   Kleine Flamme
                                 </span>
-                                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: isTier1Unlocked ? '#854d0e' : '#94a3b8' }}>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: isTier1Unlocked ? '#854d0e' : '#94a3b8' }}>
                                   3+ Tage • 3 Min.
                                 </span>
                               </div>
-                              <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '2px' }}>
+                              <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>
                                 {isTier1Unlocked ? '🎉 Freigeschaltet!' : `Noch ${Math.max(1, 3 - streak)} ${Math.max(1, 3 - streak) === 1 ? 'Tag' : 'Tage'} bis Freischaltung`}
                               </div>
                             </div>
@@ -4718,7 +4715,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             alignItems: 'center', 
                             gap: '16px', 
                             background: '#ffffff', 
-                            padding: '12px 16px', 
+                            padding: '14px 18px', 
                             borderRadius: '16px', 
                             border: '1px solid rgba(0,0,0,0.03)',
                             zIndex: 2,
@@ -4727,26 +4724,26 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             transition: 'all 0.3s'
                           }}>
                             <div style={{ 
-                              width: '10px', 
-                              height: '10px', 
+                              width: '12px', 
+                              height: '12px', 
                               borderRadius: '50%', 
                               background: isTier2Unlocked ? '#f97316' : '#cbd5e1', 
                               boxShadow: isTier2Unlocked ? '0 0 10px #f97316' : 'none',
                               zIndex: 3
                             }} />
                             <div style={{ color: isTier2Unlocked ? '#f97316' : '#94a3b8' }}>
-                              <Flame size={20} fill={isTier2Unlocked ? 'currentColor' : 'none'} />
+                              <Flame size={22} fill={isTier2Unlocked ? 'currentColor' : 'none'} />
                             </div>
                             <div style={{ flex: 1 }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '0.8rem', fontWeight: 900, color: isTier2Unlocked ? '#9a3412' : '#475569' }}>
+                                <span style={{ fontSize: '0.95rem', fontWeight: 900, color: isTier2Unlocked ? '#9a3412' : '#475569' }}>
                                   Mittlere Flamme
                                 </span>
-                                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: isTier2Unlocked ? '#9a3412' : '#94a3b8' }}>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: isTier2Unlocked ? '#9a3412' : '#94a3b8' }}>
                                   6+ Tage • 5 Min.
                                 </span>
                               </div>
-                              <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '2px' }}>
+                              <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>
                                 {isTier2Unlocked ? '🎉 Freigeschaltet!' : `Noch ${Math.max(1, 6 - streak)} ${Math.max(1, 6 - streak) === 1 ? 'Tag' : 'Tage'} bis Freischaltung`}
                               </div>
                             </div>
@@ -4758,7 +4755,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             alignItems: 'center', 
                             gap: '16px', 
                             background: '#ffffff', 
-                            padding: '12px 16px', 
+                            padding: '14px 18px', 
                             borderRadius: '16px', 
                             border: '1px solid rgba(0,0,0,0.03)',
                             zIndex: 2,
@@ -4767,26 +4764,26 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             transition: 'all 0.3s'
                           }}>
                             <div style={{ 
-                              width: '10px', 
-                              height: '10px', 
+                              width: '12px', 
+                              height: '12px', 
                               borderRadius: '50%', 
                               background: isTier3Unlocked ? '#ef4444' : '#cbd5e1', 
                               boxShadow: isTier3Unlocked ? '0 0 10px #ef4444' : 'none',
                               zIndex: 3
                             }} />
                             <div style={{ color: isTier3Unlocked ? '#ef4444' : '#94a3b8' }}>
-                              <Flame size={20} fill={isTier3Unlocked ? 'currentColor' : 'none'} />
+                              <Flame size={22} fill={isTier3Unlocked ? 'currentColor' : 'none'} />
                             </div>
                             <div style={{ flex: 1 }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '0.8rem', fontWeight: 900, color: isTier3Unlocked ? '#991b1b' : '#475569' }}>
+                                <span style={{ fontSize: '0.95rem', fontWeight: 900, color: isTier3Unlocked ? '#991b1b' : '#475569' }}>
                                   Helden-Feuer
                                 </span>
-                                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: isTier3Unlocked ? '#991b1b' : '#94a3b8' }}>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: isTier3Unlocked ? '#991b1b' : '#94a3b8' }}>
                                   9+ Tage • 10 Min.
                                 </span>
                               </div>
-                              <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '2px' }}>
+                              <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>
                                 {isTier3Unlocked ? '🔥 Helden-Feuer aktiv!' : `Noch ${Math.max(1, 9 - streak)} ${Math.max(1, 9 - streak) === 1 ? 'Tag' : 'Tage'} bis Freischaltung`}
                               </div>
                             </div>
@@ -4797,33 +4794,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     );
                   })()}
 
-                </div>
-
-                {/* Footer inputs (Test Controls) Styled nicely as a developer console */}
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center', 
-                  fontSize: '0.68rem', 
-                  color: '#64748b', 
-                  borderTop: '1px solid #f1f5f9', 
-                  paddingTop: '16px',
-                  background: '#f8fafc',
-                  margin: '0 -32px -32px -32px',
-                  padding: '16px 32px',
-                  borderBottomLeftRadius: '30px',
-                  borderBottomRightRadius: '30px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} />
-                    <span style={{ fontWeight: 800, color: '#475569' }}>Joker bereit</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.62rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Console:</span>
-                    <select style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '3px 6px', fontSize: '0.65rem', background: '#ffffff', fontWeight: 700, color: '#475569' }}><option>Tag 0</option></select>
-                    <select style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '3px 6px', fontSize: '0.65rem', background: '#ffffff', fontWeight: 700, color: '#475569' }}><option>0 Fehl</option></select>
-                    <button style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '3px 10px', fontSize: '0.65rem', fontWeight: 800, color: '#475569', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>Real Geübt</button>
-                  </div>
                 </div>
               </div>
 
