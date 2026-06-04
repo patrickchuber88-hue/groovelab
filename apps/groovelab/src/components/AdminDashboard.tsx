@@ -6565,14 +6565,14 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                             {b.teacherName}
                                           </div>
                                         )}
-
-                                        {/* Purpose */}
-                                        {durationHrs >= 1.0 && b.purpose && b.purpose.trim().toLowerCase() !== 'eigennutzung' && (
-                                          <div style={{ fontSize: '0.64rem', opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                            {b.isPreview ? 'Vorschau' : b.purpose}
-                                          </div>
-                                        )}
                                       </div>
+
+                                      {/* Purpose */}
+                                      {durationHrs >= 1.0 && b.purpose && b.purpose.trim().toLowerCase() !== 'eigennutzung' && (
+                                        <div style={{ fontSize: '0.64rem', opacity: 0.8, marginTop: '5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                          {b.isPreview ? 'Vorschau' : b.purpose}
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })}
