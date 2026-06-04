@@ -4557,21 +4557,27 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     </div>
                     
                     {/* Modern circular or highlighted quest status */}
-                    <div style={{ 
-                      background: 'rgba(251, 188, 5, 0.05)', 
-                      borderRadius: '16px', 
-                      padding: '12px 16px', 
-                      border: '1px dashed rgba(251, 188, 5, 0.3)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      alignSelf: 'flex-start'
-                    }}>
-                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#f59e0b', animation: 'pulse 1.5s infinite' }} />
-                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#854d0e' }}>
-                        Ziel für heute: Mindestens 10 Min. üben
-                      </span>
-                    </div>
+                    {(() => {
+                      const streak = avatar?.streak_flame || 0;
+                      const requiredMins = streak >= 6 ? 10 : streak >= 3 ? 5 : 3;
+                      return (
+                        <div style={{ 
+                          background: 'rgba(251, 188, 5, 0.05)', 
+                          borderRadius: '16px', 
+                          padding: '12px 16px', 
+                          border: '1px dashed rgba(251, 188, 5, 0.3)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          alignSelf: 'flex-start'
+                        }}>
+                          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#f59e0b', animation: 'pulse 1.5s infinite' }} />
+                          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#854d0e' }}>
+                            Ziel für heute: Mindestens {requiredMins} Min. üben
+                          </span>
+                        </div>
+                      );
+                    })()}
 
                     <button 
                       onClick={() => setActiveTab('practice_board')}
