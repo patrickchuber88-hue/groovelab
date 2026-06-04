@@ -589,8 +589,9 @@ function MobileBriefingView({
                       
                       <div style={{ 
                         flex: 1, 
-                        background: 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)',
-                        boxShadow: '0 4px 10px rgba(239, 68, 68, 0.1)',
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
                         borderRadius: '12px',
                         padding: '10px 14px',
                         display: 'flex',
@@ -598,12 +599,12 @@ function MobileBriefingView({
                         gap: '12px'
                       }}>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
-                            <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#fee2e2', color: '#991b1b', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Ausfall</span>
+                            <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#000000', color: '#ffffff', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Ausfall</span>
                           </div>
-                          <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600, marginTop: '2px' }}>
-                            {occ.start_time?.substring(0,5)} <span style={{ color: '#fee2e2' }}>Groovelab</span>
+                          <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
+                            {occ.start_time?.substring(0,5)} <span style={{ color: '#22c55e' }}>Groovelab</span>
                           </div>
                         </div>
 
@@ -627,8 +628,8 @@ function MobileBriefingView({
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            background: 'rgba(255, 255, 255, 0.2)',
-                            color: '#ffffff',
+                            background: '#f1f5f9',
+                            color: '#475569',
                             width: '32px',
                             height: '32px',
                             borderRadius: '50%',
@@ -637,8 +638,14 @@ function MobileBriefingView({
                             transition: 'all 0.2s',
                             flexShrink: 0
                           }}
-                          onMouseOver={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'; }}
-                          onMouseOut={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'; }}
+                          onMouseOver={e => {
+                            e.currentTarget.style.background = '#e2e8f0';
+                            e.currentTarget.style.color = '#0b57d0';
+                          }}
+                          onMouseOut={e => {
+                            e.currentTarget.style.background = '#f1f5f9';
+                            e.currentTarget.style.color = '#475569';
+                          }}
                         >
                           <MessageSquare size={14} />
                         </button>
@@ -658,8 +665,9 @@ function MobileBriefingView({
                       
                       <div style={{ 
                         flex: 1, 
-                        background: 'linear-gradient(135deg, #fef08a 0%, #eab308 100%)',
-                        boxShadow: '0 4px 10px rgba(234, 179, 8, 0.1)',
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
                         borderRadius: '12px',
                         padding: '10px 14px',
                         display: 'flex',
@@ -667,12 +675,12 @@ function MobileBriefingView({
                         gap: '12px'
                       }}>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#78350f', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
-                            <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#78350f', color: '#ffffff', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Verschoben</span>
+                            <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#000000', color: '#ffffff', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Verschoben</span>
                           </div>
-                          <div style={{ fontSize: '0.75rem', color: 'rgba(120, 53, 15, 0.95)', fontWeight: 600, marginTop: '2px' }}>
-                            {occ.start_time?.substring(0,5)} <span style={{ color: '#b45309' }}>Groovelab</span>
+                          <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
+                            {occ.start_time?.substring(0,5)} <span style={{ color: '#22c55e' }}>Groovelab</span>
                           </div>
                         </div>
 
@@ -696,8 +704,8 @@ function MobileBriefingView({
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            background: 'rgba(120, 53, 15, 0.12)',
-                            color: '#78350f',
+                            background: '#f1f5f9',
+                            color: '#475569',
                             width: '32px',
                             height: '32px',
                             borderRadius: '50%',
@@ -706,8 +714,14 @@ function MobileBriefingView({
                             transition: 'all 0.2s',
                             flexShrink: 0
                           }}
-                          onMouseOver={e => { e.currentTarget.style.background = 'rgba(120, 53, 15, 0.22)'; }}
-                          onMouseOut={e => { e.currentTarget.style.background = 'rgba(120, 53, 15, 0.12)'; }}
+                          onMouseOver={e => {
+                            e.currentTarget.style.background = '#e2e8f0';
+                            e.currentTarget.style.color = '#0b57d0';
+                          }}
+                          onMouseOut={e => {
+                            e.currentTarget.style.background = '#f1f5f9';
+                            e.currentTarget.style.color = '#475569';
+                          }}
                         >
                           <MessageSquare size={14} />
                         </button>
@@ -4523,8 +4537,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               
                               <div style={{ 
                                 flex: 1, 
-                                background: 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)',
-                                boxShadow: '0 4px 10px rgba(239, 68, 68, 0.1)',
+                                background: '#ffffff',
+                                border: '1px solid #e2e8f0',
+                                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
                                 borderRadius: '14px',
                                 padding: '10px 14px',
                                 display: 'flex',
@@ -4532,12 +4547,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 gap: '12px'
                               }}>
                                 <div style={{ flex: 1 }}>
-                                  <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
-                                    <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#fee2e2', color: '#991b1b', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Ausfall</span>
+                                    <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#000000', color: '#ffffff', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Ausfall</span>
                                   </div>
-                                  <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600, marginTop: '2px' }}>
-                                    {occ.start_time?.substring(0,5)} Uhr <span style={{ color: '#fee2e2' }}>Groovelab</span>
+                                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
+                                    {occ.start_time?.substring(0,5)} Uhr <span style={{ color: '#22c55e' }}>Groovelab</span>
                                   </div>
                                 </div>
 
@@ -4561,8 +4576,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    background: 'rgba(255, 255, 255, 0.2)',
-                                    color: '#ffffff',
+                                    background: '#f1f5f9',
+                                    color: '#475569',
                                     width: '32px',
                                     height: '32px',
                                     borderRadius: '50%',
@@ -4571,8 +4586,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     transition: 'all 0.2s',
                                     flexShrink: 0
                                   }}
-                                  onMouseOver={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'; }}
-                                  onMouseOut={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'; }}
+                                  onMouseOver={e => {
+                                    e.currentTarget.style.background = '#e2e8f0';
+                                    e.currentTarget.style.color = '#0b57d0';
+                                  }}
+                                  onMouseOut={e => {
+                                    e.currentTarget.style.background = '#f1f5f9';
+                                    e.currentTarget.style.color = '#475569';
+                                  }}
                                 >
                                   <MessageSquare size={14} />
                                 </button>
@@ -4592,8 +4613,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               
                               <div style={{ 
                                 flex: 1, 
-                                background: 'linear-gradient(135deg, #fef08a 0%, #eab308 100%)',
-                                boxShadow: '0 4px 10px rgba(234, 179, 8, 0.1)',
+                                background: '#ffffff',
+                                border: '1px solid #e2e8f0',
+                                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
                                 borderRadius: '14px',
                                 padding: '10px 14px',
                                 display: 'flex',
@@ -4601,12 +4623,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 gap: '12px'
                               }}>
                                 <div style={{ flex: 1 }}>
-                                  <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#78350f', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
-                                    <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#78350f', color: '#ffffff', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Verschoben</span>
+                                    <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#000000', color: '#ffffff', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Verschoben</span>
                                   </div>
-                                  <div style={{ fontSize: '0.75rem', color: 'rgba(120, 53, 15, 0.95)', fontWeight: 600, marginTop: '2px' }}>
-                                    {occ.start_time?.substring(0,5)} Uhr <span style={{ color: '#b45309' }}>Groovelab</span>
+                                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
+                                    {occ.start_time?.substring(0,5)} Uhr <span style={{ color: '#22c55e' }}>Groovelab</span>
                                   </div>
                                 </div>
 
@@ -4630,8 +4652,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    background: 'rgba(120, 53, 15, 0.12)',
-                                    color: '#78350f',
+                                    background: '#f1f5f9',
+                                    color: '#475569',
                                     width: '32px',
                                     height: '32px',
                                     borderRadius: '50%',
@@ -4640,8 +4662,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     transition: 'all 0.2s',
                                     flexShrink: 0
                                   }}
-                                  onMouseOver={e => { e.currentTarget.style.background = 'rgba(120, 53, 15, 0.22)'; }}
-                                  onMouseOut={e => { e.currentTarget.style.background = 'rgba(120, 53, 15, 0.12)'; }}
+                                  onMouseOver={e => {
+                                    e.currentTarget.style.background = '#e2e8f0';
+                                    e.currentTarget.style.color = '#0b57d0';
+                                  }}
+                                  onMouseOut={e => {
+                                    e.currentTarget.style.background = '#f1f5f9';
+                                    e.currentTarget.style.color = '#475569';
+                                  }}
                                 >
                                   <MessageSquare size={14} />
                                 </button>
