@@ -4592,7 +4592,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   );
 
   const renderCampusRoomsTab = () => {
-    const isEditing = !!(selectedBooking && selectedBooking.teacherId === userId);
+    const isEditing = !!(selectedBooking && (!selectedBooking.isSchedule || selectedBooking.teacherId === userId));
     // Helper to extract unique floors for this school's rooms
     const uniqueFloors = Array.from(new Set(rooms.map(r => r.floor || 'Allgemein'))).sort((a, b) => {
       const order = ['ug', 'eg', 'og', 'allgemein'];
@@ -5785,7 +5785,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
 
                                 {slotBookings.map((b: any) => {
-                                  const isOwnBooking = b.teacherId === userId;
+                                  const isOwnBooking = !b.isSchedule || b.teacherId === userId;
                                   const isSchedule = b.isSchedule;
                                   
                                   // Apple Calendar Color Schemes
@@ -5827,10 +5827,16 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setSelectedBooking(b);
-                                        if (b.teacherId === userId) {
-                                          // For schedule blocks, default to today's date; for manual bookings use their stored date
-                                          const dateToUse = b.isSchedule ? bookingDate : b.date;
-                                          setBookingDate(dateToUse);
+                                        if (!b.isSchedule) {
+                                          // Always populate form for own manual bookings
+                                          setBookingDate(b.date);
+                                          setBookingStartTime(b.startTime);
+                                          setBookingEndTime(b.endTime);
+                                          setBookingPurpose(b.purpose || '');
+                                          setIsDateFilterActive(true);
+                                          setShowMyBookingsOnly(false);
+                                        } else if (b.teacherId === userId) {
+                                          // Schedule block: use current bookingDate as base
                                           setBookingStartTime(b.startTime);
                                           setBookingEndTime(b.endTime);
                                           setBookingPurpose(b.purpose || '');
