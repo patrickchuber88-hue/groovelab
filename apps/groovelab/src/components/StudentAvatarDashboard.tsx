@@ -4175,9 +4175,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     } 
                     alt="" 
                     style={{ 
-                      width: '85%', 
-                      height: '85%', 
-                      objectFit: 'contain'
+                      width: '100%', 
+                      height: '100%', 
+                      objectFit: 'cover'
                     }} 
                   />
                 </div>
