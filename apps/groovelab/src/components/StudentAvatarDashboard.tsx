@@ -581,68 +581,137 @@ function MobileBriefingView({
                 
                 if (isCancelled) {
                   return (
-                    <div key={occ.id} style={{ 
-                      position: 'relative',
-                      background: 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)',
-                      boxShadow: '0 4px 15px rgba(239, 68, 68, 0.12)',
-                      borderRadius: '16px',
-                      padding: '12px 14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px'
-                    }}>
-                      <div style={{ width: '40px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center', flexShrink: 0 }}>
-                        <div style={{ background: '#ef4444', color: 'white', fontSize: '0.55rem', fontWeight: 800, padding: '2px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
-                        <div style={{ background: 'white', color: '#1e293b', fontSize: '1rem', fontWeight: 900, padding: '4px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
+                    <div key={occ.id} style={{ display: 'flex', gap: '16px', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
+                      <div style={{ width: '48px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center', flexShrink: 0 }}>
+                        <div style={{ background: '#ef4444', color: 'white', fontSize: '0.6rem', fontWeight: 800, padding: '4px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
+                        <div style={{ background: 'white', color: '#1e293b', fontSize: '1.2rem', fontWeight: 900, padding: '6px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
                       </div>
                       
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.85)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          Unterricht fällt aus
-                        </span>
-                        <span style={{ fontSize: '0.88rem', fontWeight: 850, color: '#ffffff', letterSpacing: '-0.01em' }}>
-                          {d.toLocaleDateString('de-DE', {weekday: 'long', day: '2-digit', month: '2-digit'})}
-                        </span>
-                        <span style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600 }}>
-                          {occ.start_time?.substring(0,5)} Uhr <span style={{ color: 'rgba(255, 255, 255, 0.75)', marginLeft: '4px' }}>• Groovelab</span>
-                        </span>
-                      </div>
+                      <div style={{ 
+                        flex: 1, 
+                        background: 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)',
+                        boxShadow: '0 4px 10px rgba(239, 68, 68, 0.1)',
+                        borderRadius: '12px',
+                        padding: '10px 14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px'
+                      }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
+                            <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#fee2e2', color: '#991b1b', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Ausfall</span>
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600, marginTop: '2px' }}>
+                            {occ.start_time?.substring(0,5)} <span style={{ color: '#fee2e2' }}>Groovelab</span>
+                          </div>
+                        </div>
 
-                      <button
-                        onClick={() => {
-                          const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-                          const dayLabel = DAYS_DE[new Date(occ.date).getDay()];
-                          const formattedDate = new Date(occ.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
-                          const label = `${dayLabel} (${formattedDate}), ${occ.start_time?.substring(0, 5)} Uhr (Ausfall)`;
-                          setAppointmentChatData({
-                            teacherId: occ.teacher_id,
-                            date: occ.date,
-                            start_time: occ.start_time?.substring(0, 5),
-                            label,
-                            occurrenceId: occ.id
-                          });
-                          setShowAppointmentChat(true);
-                        }}
-                        title="Shoutbox öffnen"
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: 'rgba(255, 255, 255, 0.2)',
-                          color: '#ffffff',
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '50%',
-                          border: 'none',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s',
-                          flexShrink: 0
-                        }}
-                        onMouseOver={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'; }}
-                        onMouseOut={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'; }}
-                      >
-                        <MessageSquare size={14} />
-                      </button>
+                        <button
+                          onClick={() => {
+                            const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+                            const dayLabel = DAYS_DE[new Date(occ.date).getDay()];
+                            const formattedDate = new Date(occ.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+                            const label = `${dayLabel} (${formattedDate}), ${occ.start_time?.substring(0, 5)} Uhr (Ausfall)`;
+                            setAppointmentChatData({
+                              teacherId: occ.teacher_id,
+                              date: occ.date,
+                              start_time: occ.start_time?.substring(0, 5),
+                              label,
+                              occurrenceId: occ.id
+                            });
+                            setShowAppointmentChat(true);
+                          }}
+                          title="Shoutbox öffnen"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: 'rgba(255, 255, 255, 0.2)',
+                            color: '#ffffff',
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '50%',
+                            border: 'none',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            flexShrink: 0
+                          }}
+                          onMouseOver={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'; }}
+                          onMouseOut={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'; }}
+                        >
+                          <MessageSquare size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                const isRescheduled = occ.status === 'rescheduled_confirmed';
+                if (isRescheduled) {
+                  return (
+                    <div key={occ.id} style={{ display: 'flex', gap: '16px', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
+                      <div style={{ width: '48px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center', flexShrink: 0 }}>
+                        <div style={{ background: '#eab308', color: 'white', fontSize: '0.6rem', fontWeight: 800, padding: '4px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
+                        <div style={{ background: 'white', color: '#1e293b', fontSize: '1.2rem', fontWeight: 900, padding: '6px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
+                      </div>
+                      
+                      <div style={{ 
+                        flex: 1, 
+                        background: 'linear-gradient(135deg, #fef08a 0%, #eab308 100%)',
+                        boxShadow: '0 4px 10px rgba(234, 179, 8, 0.1)',
+                        borderRadius: '12px',
+                        padding: '10px 14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px'
+                      }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#78350f', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
+                            <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#78350f', color: '#ffffff', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Verschoben</span>
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'rgba(120, 53, 15, 0.95)', fontWeight: 600, marginTop: '2px' }}>
+                            {occ.start_time?.substring(0,5)} <span style={{ color: '#b45309' }}>Groovelab</span>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+                            const dayLabel = DAYS_DE[new Date(occ.date).getDay()];
+                            const formattedDate = new Date(occ.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+                            const label = `${dayLabel} (${formattedDate}), ${occ.start_time?.substring(0, 5)} Uhr (Verschoben)`;
+                            setAppointmentChatData({
+                              teacherId: occ.teacher_id,
+                              date: occ.date,
+                              start_time: occ.start_time?.substring(0, 5),
+                              label,
+                              occurrenceId: occ.id
+                            });
+                            setShowAppointmentChat(true);
+                          }}
+                          title="Shoutbox öffnen"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: 'rgba(120, 53, 15, 0.12)',
+                            color: '#78350f',
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '50%',
+                            border: 'none',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            flexShrink: 0
+                          }}
+                          onMouseOver={e => { e.currentTarget.style.background = 'rgba(120, 53, 15, 0.22)'; }}
+                          onMouseOut={e => { e.currentTarget.style.background = 'rgba(120, 53, 15, 0.12)'; }}
+                        >
+                          <MessageSquare size={14} />
+                        </button>
+                      </div>
                     </div>
                   );
                 }
@@ -650,15 +719,12 @@ function MobileBriefingView({
                 return (
                   <div key={occ.id} style={{ display: 'flex', gap: '16px', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
                     <div style={{ width: '48px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
-                      <div style={{ background: occ.status === 'rescheduled_confirmed' ? '#eab308' : '#10b981', color: 'white', fontSize: '0.6rem', fontWeight: 800, padding: '4px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
+                      <div style={{ background: '#10b981', color: 'white', fontSize: '0.6rem', fontWeight: 800, padding: '4px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
                       <div style={{ background: 'white', color: '#1e293b', fontSize: '1.2rem', fontWeight: 900, padding: '6px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: '0.9rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
-                        {occ.status === 'rescheduled_confirmed' && (
-                          <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#fef08a', color: '#854d0e', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Verschoben</span>
-                        )}
                       </div>
                       <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>{occ.start_time?.substring(0,5)} <span style={{ color: '#22c55e' }}>Groovelab</span></div>
                     </div>
@@ -4449,68 +4515,137 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         
                         if (isCancelled) {
                           return (
-                            <div key={occ.id} style={{ 
-                              position: 'relative',
-                              background: 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)',
-                              boxShadow: '0 4px 15px rgba(239, 68, 68, 0.12)',
-                              borderRadius: '16px',
-                              padding: '12px 14px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '12px'
-                            }}>
+                            <div key={occ.id} style={{ display: 'flex', gap: '16px', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
                               <div style={{ width: '48px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center', flexShrink: 0 }}>
                                  <div style={{ background: '#ef4444', color: 'white', fontSize: '0.6rem', fontWeight: 800, padding: '4px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
                                  <div style={{ background: 'white', color: '#1e293b', fontSize: '1.2rem', fontWeight: 900, padding: '6px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
                               </div>
                               
-                              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.85)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                  Unterricht fällt aus
-                                </span>
-                                <span style={{ fontSize: '0.88rem', fontWeight: 850, color: '#ffffff', letterSpacing: '-0.01em' }}>
-                                  {d.toLocaleDateString('de-DE', {weekday: 'long', day: '2-digit', month: '2-digit'})}
-                                </span>
-                                <span style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600 }}>
-                                  {occ.start_time?.substring(0,5)} Uhr <span style={{ color: 'rgba(255, 255, 255, 0.75)', marginLeft: '4px' }}>• Groovelab</span>
-                                </span>
-                              </div>
+                              <div style={{ 
+                                flex: 1, 
+                                background: 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)',
+                                boxShadow: '0 4px 10px rgba(239, 68, 68, 0.1)',
+                                borderRadius: '14px',
+                                padding: '10px 14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px'
+                              }}>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
+                                    <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#fee2e2', color: '#991b1b', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Ausfall</span>
+                                  </div>
+                                  <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600, marginTop: '2px' }}>
+                                    {occ.start_time?.substring(0,5)} Uhr <span style={{ color: '#fee2e2' }}>Groovelab</span>
+                                  </div>
+                                </div>
 
-                              <button
-                                onClick={() => {
-                                  const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-                                  const dayLabel = DAYS_DE[new Date(occ.date).getDay()];
-                                  const formattedDate = new Date(occ.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
-                                  const label = `${dayLabel} (${formattedDate}), ${occ.start_time?.substring(0, 5)} Uhr (Ausfall)`;
-                                  setAppointmentChatData({
-                                    teacherId: occ.teacher_id,
-                                    date: occ.date,
-                                    start_time: occ.start_time?.substring(0, 5),
-                                    label,
-                                    occurrenceId: occ.id
-                                  });
-                                  setShowAppointmentChat(true);
-                                }}
-                                title="Shoutbox öffnen"
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  background: 'rgba(255, 255, 255, 0.2)',
-                                  color: '#ffffff',
-                                  width: '32px',
-                                  height: '32px',
-                                  borderRadius: '50%',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  transition: 'all 0.2s',
-                                  flexShrink: 0
-                                }}
-                                onMouseOver={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'; }}
-                                onMouseOut={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'; }}
-                              >
-                                <MessageSquare size={14} />
-                              </button>
+                                <button
+                                  onClick={() => {
+                                    const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+                                    const dayLabel = DAYS_DE[new Date(occ.date).getDay()];
+                                    const formattedDate = new Date(occ.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+                                    const label = `${dayLabel} (${formattedDate}), ${occ.start_time?.substring(0, 5)} Uhr (Ausfall)`;
+                                    setAppointmentChatData({
+                                      teacherId: occ.teacher_id,
+                                      date: occ.date,
+                                      start_time: occ.start_time?.substring(0, 5),
+                                      label,
+                                      occurrenceId: occ.id
+                                    });
+                                    setShowAppointmentChat(true);
+                                  }}
+                                  title="Shoutbox öffnen"
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    background: 'rgba(255, 255, 255, 0.2)',
+                                    color: '#ffffff',
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '50%',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    flexShrink: 0
+                                  }}
+                                  onMouseOver={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'; }}
+                                  onMouseOut={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'; }}
+                                >
+                                  <MessageSquare size={14} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        const isRescheduled = occ.status === 'rescheduled_confirmed';
+                        if (isRescheduled) {
+                          return (
+                            <div key={occ.id} style={{ display: 'flex', gap: '16px', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
+                              <div style={{ width: '48px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center', flexShrink: 0 }}>
+                                 <div style={{ background: '#eab308', color: 'white', fontSize: '0.6rem', fontWeight: 800, padding: '4px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
+                                 <div style={{ background: 'white', color: '#1e293b', fontSize: '1.2rem', fontWeight: 900, padding: '6px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
+                              </div>
+                              
+                              <div style={{ 
+                                flex: 1, 
+                                background: 'linear-gradient(135deg, #fef08a 0%, #eab308 100%)',
+                                boxShadow: '0 4px 10px rgba(234, 179, 8, 0.1)',
+                                borderRadius: '14px',
+                                padding: '10px 14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px'
+                              }}>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#78350f', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
+                                    <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#78350f', color: '#ffffff', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Verschoben</span>
+                                  </div>
+                                  <div style={{ fontSize: '0.75rem', color: 'rgba(120, 53, 15, 0.95)', fontWeight: 600, marginTop: '2px' }}>
+                                    {occ.start_time?.substring(0,5)} Uhr <span style={{ color: '#b45309' }}>Groovelab</span>
+                                  </div>
+                                </div>
+
+                                <button
+                                  onClick={() => {
+                                    const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+                                    const dayLabel = DAYS_DE[new Date(occ.date).getDay()];
+                                    const formattedDate = new Date(occ.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+                                    const label = `${dayLabel} (${formattedDate}), ${occ.start_time?.substring(0, 5)} Uhr (Verschoben)`;
+                                    setAppointmentChatData({
+                                      teacherId: occ.teacher_id,
+                                      date: occ.date,
+                                      start_time: occ.start_time?.substring(0, 5),
+                                      label,
+                                      occurrenceId: occ.id
+                                    });
+                                    setShowAppointmentChat(true);
+                                  }}
+                                  title="Shoutbox öffnen"
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    background: 'rgba(120, 53, 15, 0.12)',
+                                    color: '#78350f',
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '50%',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    flexShrink: 0
+                                  }}
+                                  onMouseOver={e => { e.currentTarget.style.background = 'rgba(120, 53, 15, 0.22)'; }}
+                                  onMouseOut={e => { e.currentTarget.style.background = 'rgba(120, 53, 15, 0.12)'; }}
+                                >
+                                  <MessageSquare size={14} />
+                                </button>
+                              </div>
                             </div>
                           );
                         }
@@ -4518,15 +4653,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         return (
                           <div key={occ.id} style={{ display: 'flex', gap: '16px', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
                             <div style={{ width: '48px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
-                              <div style={{ background: occ.status === 'rescheduled_confirmed' ? '#eab308' : '#10b981', color: 'white', fontSize: '0.6rem', fontWeight: 800, padding: '4px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
+                              <div style={{ background: '#10b981', color: 'white', fontSize: '0.6rem', fontWeight: 800, padding: '4px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
                               <div style={{ background: 'white', color: '#1e293b', fontSize: '1.2rem', fontWeight: 900, padding: '6px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
                             </div>
                             <div style={{ flex: 1 }}>
                               <div style={{ fontSize: '0.9rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
-                                {occ.status === 'rescheduled_confirmed' && (
-                                  <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#fef08a', color: '#854d0e', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Verschoben</span>
-                                )}
                               </div>
                               <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>{occ.start_time?.substring(0,5)} <span style={{ color: '#22c55e' }}>Groovelab</span></div>
                             </div>
