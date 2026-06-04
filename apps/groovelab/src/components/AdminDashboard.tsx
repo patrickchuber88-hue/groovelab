@@ -41,6 +41,17 @@ const INSTRUMENT_COLORS: Record<string, string> = {
   "Vocals": "#22c55e", 
   "Piano": "#a855f7", "E-Piano": "#a855f7", "Keys": "#a855f7" 
 };
+
+const normalizeInstrument = (name: string) => {
+  const n = (name || '').toLowerCase().trim();
+  if (n.includes('gitarre') || n.includes('guitar')) return 'Guitar';
+  if (n.includes('bass')) return 'Bass';
+  if (n.includes('drums') || n.includes('schlagzeug')) return 'Drums';
+  if (n.includes('piano') || n.includes('keys') || n.includes('klavier')) return 'Keys';
+  if (n.includes('vocals') || n.includes('gesang')) return 'Vocals';
+  return name;
+};
+
 const ADMIN_INSTRUMENT_ICONS: Record<string, any> = { 
   "Gitarre": renderInstrumentIcon("Gitarre"), 
   "Guitar": renderInstrumentIcon("Guitar"), 
@@ -193,6 +204,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [setupRooms, setSetupRooms] = useState<any[]>([]);
   const [setupStations, setSetupStations] = useState<any[]>([]);
   const [kiosks, setKiosks] = useState<any[] | null>(null);
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [missionSearch, setMissionSearch] = useState('');
+  const [missionFilter, setMissionFilter] = useState<'pending' | 'approved' | 'all'>('pending');
   const tabStorageKey = activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab';
   const [activeTab, setActiveTab] = useState<string>(() => localStorage.getItem(activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab') || forceTab || 'live');
   const [mediathekTab, setMediathekTab] = useState<'songs' | 'lehrwerke'>('songs');
@@ -1628,7 +1642,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
   useEffect(() => {
     fetchData();
-  }, [activeTab, activePlatform, bookingDate]);
+  }, [activeTab, activePlatform, bookingDate, missionFilter]);
 
   useEffect(() => {
     if (activeTab === 'rooms') {
@@ -1994,6 +2008,35 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         else ssq = ssq.eq('is_groovelab_active', true);
         const { data: studentsData } = await ssq.order('first_name');
         if (studentsData) setStudents(studentsData);
+      } else if (activeTab === 'missions') {
+        let query = supabase.from('user_song_skills').select('*, users!user_id(*), songs(*)');
+        if (missionFilter === 'pending') {
+          query = query.eq('is_pending_approval', true);
+        } else if (missionFilter === 'approved') {
+          query = query.eq('is_stage_ready', true).eq('is_pending_approval', false);
+        }
+        const { data: subData } = await query;
+        
+        const filteredSubs = (subData || []).filter((s: any) => {
+          const u = Array.isArray(s.users) ? s.users[0] : s.users;
+          return u?.school_id === adminData.school_id;
+        });
+
+        const mappedSubs = filteredSubs.map((s: any) => ({
+          ...s,
+          users: Array.isArray(s.users) ? s.users[0] : s.users,
+          songs: Array.isArray(s.songs) ? s.songs[0] : s.songs
+        }));
+        
+        setSubmissions(mappedSubs);
+
+        // Also fetch active sessions to check who is currently in the lab
+        const { data: activeSessionsData } = await supabase
+          .from('sessions')
+          .select('*, profiles:users!inner(*), stations(*)')
+          .eq('profiles.school_id', adminData.school_id)
+          .is('check_out_time', null);
+        setActiveSessions(activeSessionsData || []);
       }
     }
   };
@@ -8577,6 +8620,336 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     </div>
   );
 
+  const handleApproveSubmission = async (subId: string) => {
+    setSubmissions(prev => prev.filter(s => s.id !== subId));
+    try {
+      const { data: sub } = await supabase.from('user_song_skills').select('user_id, song_id, instrument, difficulty_level').eq('id', subId).single();
+      
+      await supabase.from('user_song_skills').update({ is_pending_approval: false, is_stage_ready: true, verified_by_id: userId }).eq('id', subId);
+      
+      if (sub) {
+        const { data: memberships } = await supabase.from('band_members').select('band_id').eq('user_id', sub.user_id);
+        
+        if (memberships && memberships.length > 0) {
+          const bandIds = memberships.map(m => m.band_id);
+          
+          const { data: existingBandSongs } = await supabase
+            .from('band_songs')
+            .select('band_id')
+            .in('band_id', bandIds)
+            .eq('song_id', sub.song_id);
+            
+          const bandsWithSong = new Set(existingBandSongs?.map(bs => bs.band_id) || []);
+          
+          const { data: assignedSlots } = await supabase
+            .from('band_song_slots')
+            .select('band_songs(band_id)')
+            .eq('user_id', sub.user_id)
+            .eq('band_songs.song_id', sub.song_id);
+          
+          const bandsWhereAlreadyAssigned = new Set((assignedSlots || []).map((s: any) => 
+            Array.isArray(s.band_songs) ? s.band_songs[0]?.band_id : s.band_songs?.band_id
+          ).filter(Boolean));
+
+          const hasEligibleBands = bandIds.some(id => !bandsWithSong.has(id) && !bandsWhereAlreadyAssigned.has(id));
+          
+          if (hasEligibleBands) {
+            await supabase.from('users').update({ 
+              pending_repertoire_proposal: {
+                song_id: sub.song_id,
+                difficulty_level: sub.difficulty_level,
+                instrument: sub.instrument
+              }
+            }).eq('id', sub.user_id);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error approving submission:', err);
+    }
+    fetchData();
+  };
+
+  const handleRejectSubmission = async (subId: string) => {
+    setSubmissions(prev => prev.filter(s => s.id !== subId));
+    try {
+      await supabase.from('user_song_skills').update({ is_pending_approval: false, progress_percent: 85 }).eq('id', subId);
+    } catch (err) {
+      console.error('Error rejecting submission:', err);
+    }
+    fetchData();
+  };
+
+  const renderMissionsTab = () => {
+    const brandColor = '#16a34a';
+    
+    const filteredSubmissions = submissions.filter(sub => {
+      const studentName = `${sub.users?.first_name || ''} ${sub.users?.last_name || ''}`.toLowerCase();
+      const songTitle = `${sub.songs?.title || ''} ${sub.songs?.artist || ''} ${sub.topic_name || ''}`.toLowerCase();
+      return studentName.includes(missionSearch.toLowerCase()) || songTitle.includes(missionSearch.toLowerCase());
+    });
+
+    return (
+      <div style={{ marginTop: '0px' }}>
+        <div 
+          className="glass-panel" 
+          style={{ 
+            background: 'white', 
+            borderRadius: '20px', 
+            border: '1px solid rgba(0, 0, 0, 0.05)', 
+            padding: '16px 20px', 
+            boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '16px' 
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', flexWrap: 'wrap', gap: '12px' }}>
+            <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+              <div style={{ background: `${brandColor}15`, color: brandColor, padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
+                <Award size={18} />
+              </div>
+              Missions-Board ({submissions.filter(s => s.is_pending_approval).length} ausstehend)
+            </h2>
+
+            <div style={{
+              display: 'flex',
+              background: 'rgba(241, 245, 249, 0.8)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              padding: '4px',
+              borderRadius: '16px',
+              border: '1px solid rgba(226, 232, 240, 0.8)',
+              position: 'relative'
+            }}>
+              {[
+                { id: 'pending', label: 'Ausstehend' },
+                { id: 'approved', label: 'Verifiziert' },
+                { id: 'all', label: 'Alle' }
+              ].map(opt => (
+                <button
+                  key={opt.id}
+                  onClick={() => setMissionFilter(opt.id as any)}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: missionFilter === opt.id ? 'white' : 'transparent',
+                    color: missionFilter === opt.id ? '#0f172a' : '#64748b',
+                    fontWeight: 800,
+                    fontSize: '0.75rem',
+                    cursor: 'pointer',
+                    boxShadow: missionFilter === opt.id ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                    transition: 'all 0.2s',
+                    position: 'relative',
+                    zIndex: 2
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ position: 'relative', width: '100%' }}>
+            <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              type="text"
+              placeholder="Schüler oder Song suchen..."
+              value={missionSearch}
+              onChange={e => setMissionSearch(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '12px 16px 12px 42px',
+                borderRadius: '16px',
+                border: '1.5px solid #e2e8f0',
+                background: '#f8fafc',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                color: '#1e293b',
+                outline: 'none',
+                transition: 'border-color 0.2s'
+              }}
+            />
+          </div>
+
+          {filteredSubmissions.length === 0 ? (
+            <div style={{ 
+              background: '#f8fafc', 
+              borderRadius: '20px', 
+              padding: '48px 24px', 
+              textAlign: 'center', 
+              border: '1px dashed #e2e8f0',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px'
+            }}>
+              <div style={{ background: '#ecfdf5', color: '#16a34a', padding: '12px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Award size={24} />
+              </div>
+              <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#1e293b' }}>
+                {missionFilter === 'pending' ? 'Keine ausstehenden Missionen!' : 'Keine Missionen gefunden!'}
+              </div>
+              <div style={{ fontSize: '0.78rem', color: '#64748b', maxWidth: '320px', lineHeight: 1.4 }}>
+                {missionFilter === 'pending' 
+                  ? 'Alle Schüler-Abnahmen sind verifiziert und auf dem neuesten Stand. Großartige Arbeit!' 
+                  : 'Passe deine Suche oder deine Filter-Einstellungen an.'}
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+              {filteredSubmissions.map(sub => {
+                const isInLab = activeSessions.some(sess => sess.user_id === sub.user_id);
+                const norm = normalizeInstrument(sub.instrument);
+                return (
+                  <div 
+                    key={sub.id} 
+                    className="hover-scale"
+                    style={{ 
+                      background: 'white', 
+                      padding: '20px', 
+                      borderRadius: '24px', 
+                      border: '1.5px solid #f1f5f9',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.01)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '16px',
+                      position: 'relative',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <div style={{
+                      position: 'absolute',
+                      top: '16px',
+                      right: '16px',
+                      background: isInLab ? '#d1fae5' : '#f1f5f9',
+                      color: isInLab ? '#065f46' : '#64748b',
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      fontSize: '0.65rem',
+                      fontWeight: 900,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      {isInLab ? 'IM LAB' : 'HOME'}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ width: '48px', height: '48px', borderRadius: '14px', overflow: 'hidden', border: '1.5px solid #f1f5f9' }}>
+                        <img 
+                          src={activePlatform === 'campus' ? resolveCampusAvatar(sub.users) : (sub.users?.photo_url || '/avatar_ghost.jpg')} 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                          alt="" 
+                        />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#0f172a' }}>
+                            {sub.users?.first_name} {sub.users?.last_name}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                          Schüler
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <div style={{ 
+                          width: '24px', height: '24px', borderRadius: '8px', 
+                          background: INSTRUMENT_COLORS[norm] || '#cbd5e1', 
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                          fontSize: '0.8rem', flexShrink: 0
+                        }}>
+                          {ADMIN_INSTRUMENT_ICONS[sub.instrument] || '🎸'}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {sub.songs?.title || sub.topic_name || 'Unbekanntes Thema'}
+                          </div>
+                          <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b' }}>
+                            {sub.songs?.artist || 'Matrix-Mission'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', paddingTop: '8px', borderTop: '1px solid #f1f5f9' }}>
+                        <span style={{ background: '#f1f5f9', padding: '3px 8px', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#475569' }}>
+                          {sub.difficulty_level === 'original' ? '⚡ PRO' : '🚀 STARTER'}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#16a34a' }}>
+                          {sub.progress_percent || 100}% bereit
+                        </span>
+                      </div>
+                    </div>
+
+                    {sub.is_pending_approval ? (
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                        <button
+                          onClick={() => handleRejectSubmission(sub.id)}
+                          style={{
+                            flex: 1,
+                            padding: '10px',
+                            borderRadius: '12px',
+                            border: '1.5px solid #fca5a5',
+                            background: '#fef2f2',
+                            color: '#ef4444',
+                            fontWeight: 800,
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s'
+                          }}
+                        >
+                          Ablehnen
+                        </button>
+                        <button
+                          onClick={() => handleApproveSubmission(sub.id)}
+                          style={{
+                            flex: 1.5,
+                            padding: '10px',
+                            borderRadius: '12px',
+                            border: 'none',
+                            background: brandColor,
+                            color: 'white',
+                            fontWeight: 900,
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s',
+                            boxShadow: `0 4px 12px ${brandColor}20`
+                          }}
+                        >
+                          Freigeben
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        gap: '6px', 
+                        padding: '8px', 
+                        background: '#f0fdf4', 
+                        color: '#16a34a', 
+                        borderRadius: '12px', 
+                        fontSize: '0.75rem', 
+                        fontWeight: 850 
+                      }}>
+                        <Check size={14} /> Verifiziert
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const renderBatchiPadModal = () => {
     if (!showBatchiPadModal) return null;
     return (
@@ -9543,6 +9916,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       {activeTab === 'stats' && renderStatsTab()}
       {activeTab === 'gallery' && renderIDGalleryTab()}
       {activeTab === 'setup' && renderSetupTab()}
+      {activeTab === 'missions' && renderMissionsTab()}
 
       {renderStudentDetailModal()}
       {renderQRModal()}
