@@ -600,7 +600,7 @@ function MobileBriefingView({
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
-                            <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#fee2e2', color: '#991b1b', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Ausfall</span>
+                            <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#000000', color: '#ffffff', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Ausfall</span>
                           </div>
                           <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600, marginTop: '2px' }}>
                             {occ.start_time?.substring(0,5)} <span style={{ color: '#fee2e2' }}>Groovelab</span>
@@ -669,7 +669,7 @@ function MobileBriefingView({
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#78350f', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
-                            <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#78350f', color: '#ffffff', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Verschoben</span>
+                            <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#000000', color: '#ffffff', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Verschoben</span>
                           </div>
                           <div style={{ fontSize: '0.75rem', color: 'rgba(120, 53, 15, 0.95)', fontWeight: 600, marginTop: '2px' }}>
                             {occ.start_time?.substring(0,5)} <span style={{ color: '#b45309' }}>Groovelab</span>
@@ -4534,7 +4534,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 <div style={{ flex: 1 }}>
                                   <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
-                                    <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#fee2e2', color: '#991b1b', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Ausfall</span>
+                                    <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#000000', color: '#ffffff', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Ausfall</span>
                                   </div>
                                   <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600, marginTop: '2px' }}>
                                     {occ.start_time?.substring(0,5)} Uhr <span style={{ color: '#fee2e2' }}>Groovelab</span>
@@ -4603,7 +4603,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 <div style={{ flex: 1 }}>
                                   <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#78350f', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
-                                    <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#78350f', color: '#ffffff', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Verschoben</span>
+                                    <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#000000', color: '#ffffff', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Verschoben</span>
                                   </div>
                                   <div style={{ fontSize: '0.75rem', color: 'rgba(120, 53, 15, 0.95)', fontWeight: 600, marginTop: '2px' }}>
                                     {occ.start_time?.substring(0,5)} Uhr <span style={{ color: '#b45309' }}>Groovelab</span>
