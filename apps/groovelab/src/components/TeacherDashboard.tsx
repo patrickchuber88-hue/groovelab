@@ -4484,7 +4484,7 @@ export function TeacherDashboard({
                                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
                                                     {isBook ? <BookOpen size={14} color="#64748b" /> : <Music size={14} color="#64748b" />}
                                                     <span style={{ fontWeight: 800, color: '#475569', fontSize: '0.8rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                                      {item.title}
+                                                      {item.title.replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme)\)/i, '')}
                                                     </span>
                                                   </div>
                                                   {(item.status === 'MASTERED' || item.status === 'THEORY_DONE') && (
@@ -4565,7 +4565,7 @@ export function TeacherDashboard({
                                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
                                                     {isBook ? <BookOpen size={14} color="#64748b" /> : <Music size={14} color="#64748b" />}
                                                     <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.8rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                                      {item.title}
+                                                      {item.title.replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme)\)/i, '')}
                                                     </span>
                                                   </div>
                                                   {(item.status === 'MASTERED' || item.status === 'THEORY_DONE') && (
