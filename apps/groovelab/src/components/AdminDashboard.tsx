@@ -7508,7 +7508,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   };
 
   const renderSongsTab = () => {
-    const brandColor = '#fbbc05';
+    const brandColor = '#16a34a';
     const filteredLehrwerke = lehrwerke.filter(item => 
       item.title.toLowerCase().includes(songSearch.toLowerCase()) || 
       (item.author || '').toLowerCase().includes(songSearch.toLowerCase())
