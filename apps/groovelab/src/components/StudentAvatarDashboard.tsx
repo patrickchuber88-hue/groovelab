@@ -288,8 +288,8 @@ function MobileBriefingView({
         )}
       </div>
 
-      {/* 2x2 GRID FOR FITBIT STYLE KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+      {/* RESPONSIVE GRID FOR KPIs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
         {/* XP Kachel */}
         <div style={{ background: 'linear-gradient(135deg, #0b57d0 0%, #3b82f6 100%)', borderRadius: '20px', color: 'white', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 4px 12px rgba(11, 87, 208, 0.08)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -4547,7 +4547,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               {/* PEDAGOGISCHER DREISPALTIER-ÜBEBEREICH */}
               <div style={{ 
                 display: 'grid', 
-                gridTemplateColumns: 'repeat(3, 1fr)', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
                 gap: '24px', 
                 alignItems: 'stretch' 
               }}>
