@@ -4924,11 +4924,16 @@ function App() {
     const schoolId = currentUser?.school_id || (currentUser?.schools ? (Array.isArray(currentUser.schools) ? currentUser.schools[0]?.id : currentUser.schools?.id) : null);
     if (!roomId && schoolId) {
       try {
-        const { data: roomData } = await supabase
+        let roomsQuery = supabase
           .from('rooms')
           .select('id')
-          .eq('school_id', schoolId)
-          .eq('is_groovelab_active', true)
+          .eq('school_id', schoolId);
+        if (activePlatform === 'campus') {
+          roomsQuery = roomsQuery.eq('is_campus_active', true);
+        } else {
+          roomsQuery = roomsQuery.eq('is_groovelab_active', true);
+        }
+        const { data: roomData } = await roomsQuery
           .order('sort_order', { ascending: true })
           .limit(1);
         if (roomData && roomData.length > 0) {
@@ -6371,7 +6376,8 @@ function App() {
         display: 'flex', 
         flexDirection: 'column', 
         height: activeStudentTab === 'live' ? '100%' : 'auto',
-        paddingRight: activePlatform === 'campus' ? '0px' : undefined
+        paddingRight: activePlatform === 'campus' ? '0px' : undefined,
+        minWidth: 0
       }}>
         {/* Live Lab Tab for Students */}
         {user.role?.toLowerCase() === 'student' && activeStudentTab === 'live' && (
@@ -6617,79 +6623,84 @@ function App() {
                       Unterrichtstage & Startzeiten
                     </h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {(user.planned_boards || []).length > 0 ? (
-                        (user.planned_boards as any[]).map((board) => {
-                          const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-                          return (
-                            <div key={board.id} style={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              justifyContent: 'space-between', 
-                              padding: '16px 20px', 
-                              background: '#f8fafc', 
-                              borderRadius: '16px', 
-                              border: '1px solid #f1f5f9' 
-                            }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <div style={{ height: '36px', width: '36px', borderRadius: '10px', background: '#ffffff', border: '1px solid rgba(0,0,0,0.04)', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', fontWeight: 900 }}>
-                                  🗓️
+                      {(() => {
+                        const boardsToDisplay = activePlatform === 'campus' 
+                          ? (user.campus_räume || []) 
+                          : (user.groovelab_räume || []);
+                        return boardsToDisplay.length > 0 ? (
+                          (boardsToDisplay as any[]).map((board) => {
+                            const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+                            return (
+                              <div key={board.id} style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'space-between', 
+                                padding: '16px 20px', 
+                                background: '#f8fafc', 
+                                borderRadius: '16px', 
+                                border: '1px solid #f1f5f9' 
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                  <div style={{ height: '36px', width: '36px', borderRadius: '10px', background: '#ffffff', border: '1px solid rgba(0,0,0,0.04)', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', fontWeight: 900 }}>
+                                    🗓️
+                                  </div>
+                                  <div>
+                                    <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem' }}>
+                                      {DAYS_DE[board.dayOfWeek]}s
+                                    </div>
+                                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>
+                                      {(() => {
+                                      const timeToMinutes = (timeStr: string) => {
+                                        const [h, m] = timeStr.split(':').map(Number);
+                                        return h * 60 + m;
+                                      };
+                                      const minutesToTime = (mins: number) => {
+                                        const h = Math.floor(mins / 60);
+                                        const m = mins % 60;
+                                        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                                      };
+                                      
+                                      const daySchedules = (campusTeacherStats?.schedules || []).filter(s => s.day_of_week === board.dayOfWeek);
+                                      let startStr = board.startAnchor || '14:00';
+                                      let endStr = '';
+
+                                      if (daySchedules.length > 0) {
+                                        let minStart = Infinity;
+                                        let maxEnd = -Infinity;
+                                        daySchedules.forEach(s => {
+                                          if (s.time_slot) {
+                                            const startMins = timeToMinutes(s.time_slot);
+                                            const endMins = startMins + (s.duration || 30);
+                                            if (startMins < minStart) minStart = startMins;
+                                            if (endMins > maxEnd) maxEnd = endMins;
+                                          }
+                                        });
+                                        if (minStart !== Infinity) startStr = minutesToTime(minStart);
+                                        if (maxEnd !== -Infinity) endStr = minutesToTime(maxEnd);
+                                      } else {
+                                        const startMins = timeToMinutes(startStr);
+                                        endStr = minutesToTime(startMins + 180);
+                                      }
+
+                                      return <>Geplanter Unterricht: {startStr} bis {endStr} Uhr</>;
+                                    })()}
+                                    </div>
+                                  </div>
                                 </div>
-                                <div>
-                                  <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem' }}>
-                                    {DAYS_DE[board.dayOfWeek]}s
-                                  </div>
-                                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>
-                                    {(() => {
-                                    const timeToMinutes = (timeStr: string) => {
-                                      const [h, m] = timeStr.split(':').map(Number);
-                                      return h * 60 + m;
-                                    };
-                                    const minutesToTime = (mins: number) => {
-                                      const h = Math.floor(mins / 60);
-                                      const m = mins % 60;
-                                      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-                                    };
-                                    
-                                    const daySchedules = (campusTeacherStats?.schedules || []).filter(s => s.day_of_week === board.dayOfWeek);
-                                    let startStr = board.startAnchor || '14:00';
-                                    let endStr = '';
-
-                                    if (daySchedules.length > 0) {
-                                      let minStart = Infinity;
-                                      let maxEnd = -Infinity;
-                                      daySchedules.forEach(s => {
-                                        if (s.time_slot) {
-                                          const startMins = timeToMinutes(s.time_slot);
-                                          const endMins = startMins + (s.duration || 30);
-                                          if (startMins < minStart) minStart = startMins;
-                                          if (endMins > maxEnd) maxEnd = endMins;
-                                        }
-                                      });
-                                      if (minStart !== Infinity) startStr = minutesToTime(minStart);
-                                      if (maxEnd !== -Infinity) endStr = minutesToTime(maxEnd);
-                                    } else {
-                                      const startMins = timeToMinutes(startStr);
-                                      endStr = minutesToTime(startMins + 180);
-                                    }
-
-                                    return <>Geplanter Unterricht: {startStr} bis {endStr} Uhr</>;
-                                  })()}
-                                  </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ background: 'rgba(0, 122, 255, 0.08)', color: '#007aff', padding: '4px 10px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800 }}>
+                                    Aktiv
+                                  </span>
                                 </div>
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ background: 'rgba(0, 122, 255, 0.08)', color: '#007aff', padding: '4px 10px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800 }}>
-                                  Aktiv
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', border: '2.5px dashed #cbd5e1', borderRadius: '20px' }}>
-                          Bisher keine Unterrichtstage im Stundenplaner angelegt.
-                        </div>
-                      )}
+                            );
+                          })
+                        ) : (
+                          <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', border: '2.5px dashed #cbd5e1', borderRadius: '20px' }}>
+                            Bisher keine Unterrichtstage im Stundenplaner angelegt.
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
 

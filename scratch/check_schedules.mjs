@@ -1,24 +1,31 @@
-import { createClient } from '@supabase/supabase-js'
-import fs from 'fs'
+import { createClient } from '@supabase/supabase-js';
 
-const env = fs.readFileSync('/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/.env.local', 'utf-8');
-const url = env.match(/VITE_SUPABASE_URL=(.*)/)[1].trim();
-const key = env.match(/VITE_SUPABASE_ANON_KEY=(.*)/)[1].trim();
+const url = "https://supabase.campus-groovelab.de";
+const key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzgwNDE3ODE1LCJleHAiOjQ5MzQwMTc4MTV9.zOsuxweIlQBi7doeBoUqg9aTR6-qzOr0sjsa0Oee5cc";
 const supabase = createClient(url, key);
 
-async function checkSchedules() {
-  const { data: schedules, error } = await supabase.from('schedules').select('*');
+async function run() {
+  const { data: schedules, error } = await supabase
+    .from('schedules')
+    .select('*, teacher:users!schedules_teacher_id_fkey(first_name, last_name, is_campus_active, is_groovelab_active), student:users!schedules_student_id_fkey(first_name, last_name, is_campus_active, is_groovelab_active)');
+
   if (error) {
-    console.error("Error fetching schedules:", error);
+    console.error("Error querying schedules:", error);
     return;
   }
+
+  console.log(`Found ${schedules.length} schedules.`);
   
-  console.log(`Total schedules: ${schedules.length}`);
-  const nullTimeSlots = schedules.filter(s => !s.time_slot);
-  console.log(`Schedules with null time_slot: ${nullTimeSlots.length}`);
-  if (nullTimeSlots.length > 0) {
-    console.log("Null time_slot schedules:", nullTimeSlots.map(s => ({ id: s.id, teacher_id: s.teacher_id, student_id: s.student_id })));
+  let count = 0;
+  for (const item of schedules) {
+    const student = item.student;
+    const teacher = item.teacher;
+    if (student && student.is_campus_active && student.is_groovelab_active) {
+      count++;
+      console.log(`Schedule ID: ${item.id} | Student: ${student.first_name} ${student.last_name} (BOTH) | Teacher: ${teacher?.first_name} ${teacher?.last_name}`);
+    }
   }
+  console.log(`Found ${count} schedule entries linked with dual-active students.`);
 }
 
-checkSchedules();
+run();

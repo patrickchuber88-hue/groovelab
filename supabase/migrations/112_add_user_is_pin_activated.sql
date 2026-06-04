@@ -1,0 +1,1 @@
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_pin_activated BOOLEAN DEFAULT FALSE;

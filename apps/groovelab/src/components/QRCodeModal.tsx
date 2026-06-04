@@ -9,6 +9,7 @@ interface QRCodeModalProps {
     last_name: string;
     role: string;
     qr_token: string;
+    teacher_qr_token?: string;
     photo_url?: string;
     instrument?: string;
     school_id?: string;
@@ -364,7 +365,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                 justifyContent: 'center',
                 border: '1.5px solid rgba(251, 191, 36, 0.3)'
               }}>
-                <QRCode value={user.qr_token || ''} size={135} />
+                <QRCode value={user.teacher_qr_token || user.qr_token || ''} size={135} />
               </div>
             </div>
           </div>
@@ -444,7 +445,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                 alignItems: 'center',
                 justifyContent: 'center'
               }}>
-                <QRCode value={user.qr_token || ''} size={150} />
+                <QRCode value={user.teacher_qr_token || user.qr_token || ''} size={150} />
               </div>
 
               <p style={{ 

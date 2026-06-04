@@ -1,0 +1,18 @@
+import { createClient } from '@supabase/supabase-js'
+
+const url = "https://supabase.campus-groovelab.de";
+const key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzgwNDE3ODE1LCJleHAiOjQ5MzQwMTc4MTV9.zOsuxweIlQBi7doeBoUqg9aTR6-qzOr0sjsa0Oee5cc";
+const supabase = createClient(url, key);
+
+// Let's test with a student's ID or qr_token
+const uuidToken = "0769ac49-0493-478f-aa2a-7aeed7706665"; // A valid UUID
+
+console.log("Querying with OR on id, qr_token, and teacher_qr_token...");
+const { data, error } = await supabase
+  .from('users')
+  .select('*, schools(*)')
+  .or(`id.eq.${uuidToken},qr_token.eq.${uuidToken},teacher_qr_token.eq.${uuidToken}`)
+  .maybeSingle();
+
+console.log("Error:", error);
+console.log("Data:", data ? { id: data.id, role: data.role, first_name: data.first_name } : null);

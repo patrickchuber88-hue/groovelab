@@ -97,6 +97,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   useEffect(() => {
     if (!isInitialLoadDone) return;
     if (userId) {
+      const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+      const columnName = activePlatform === 'campus' ? 'campus_räume' : 'groovelab_räume';
+
       const boardDefinitions = boards.map(b => ({
         id: b.id,
         dayOfWeek: b.dayOfWeek,
@@ -116,19 +119,19 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       }));
 
       if (boards.length > 0) {
-        localStorage.setItem(`groovelab_teacher_boards_${userId}`, JSON.stringify(boardDefinitions));
+        localStorage.setItem(`groovelab_teacher_boards_${activePlatform}_${userId}`, JSON.stringify(boardDefinitions));
       } else {
-        localStorage.removeItem(`groovelab_teacher_boards_${userId}`);
+        localStorage.removeItem(`groovelab_teacher_boards_${activePlatform}_${userId}`);
       }
 
-      // Save to Supabase planned_boards in real-time as well!
+      // Save to Supabase planned_boards column dynamically in real-time
       supabase
         .from('users')
-        .update({ planned_boards: boardDefinitions })
+        .update({ [columnName]: boardDefinitions })
         .eq('id', userId)
         .then(({ error }) => {
           if (error) {
-            console.error('Error auto-saving planned_boards to DB:', error);
+            console.error(`Error auto-saving ${columnName} to DB:`, error);
           }
         });
     }
@@ -137,13 +140,16 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const loadInitialData = async () => {
     try {
       setLoading(true);
+      const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+      const isCampus = activePlatform === 'campus';
+      const columnName = isCampus ? 'campus_räume' : 'groovelab_räume';
       
       // 1. Fetch all rooms
       const { data: rData } = await supabase
         .from('rooms')
         .select('id, name')
         .eq('school_id', schoolId)
-        .eq('is_campus_active', true)
+        .eq(isCampus ? 'is_campus_active' : 'is_groovelab_active', true)
         .order('name');
       const loadedRooms = rData || [];
       setRooms(loadedRooms);
@@ -151,14 +157,14 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         setNewBoardRoom(loadedRooms[0].id);
       }
 
-      // 2. Fetch all students for this teacher who are active in Campus
+      // 2. Fetch all students for this teacher who are active in the platform
       const { data: sData } = await supabase
         .from('users')
         .select('id, first_name, last_name, instrument, lesson_duration')
         .eq('school_id', schoolId)
         .eq('role', 'student')
         .eq('teacher_id', userId)
-        .eq('is_campus_active', true);
+        .eq(isCampus ? 'is_campus_active' : 'is_groovelab_active', true);
       
       const loadedStudents: Student[] = (sData || []).map(s => ({
         id: s.id,
@@ -168,14 +174,14 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         duration: s.lesson_duration || 45 // Load lesson_duration from DB
       }));
 
-      // 3. Fetch teacher profile for planned boards
+      // 3. Fetch teacher profile for planned boards (checking new platform-specific column and fallback planned_boards)
       const { data: teacherProfile } = await supabase
         .from('users')
-        .select('planned_boards')
+        .select('*')
         .eq('id', userId)
         .maybeSingle();
 
-      const dbPlannedBoards = teacherProfile?.planned_boards as { id: string; dayOfWeek: number; startAnchor: string; roomId: string; students?: Student[] }[] || [];
+      const dbPlannedBoards = ((teacherProfile as any)?.[columnName] || teacherProfile?.planned_boards) as { id: string; dayOfWeek: number; startAnchor: string; roomId: string; students?: Student[] }[] || [];
 
       // 4. Fetch existing schedules to pre-populate boards
       const { data: schedData } = await supabase
@@ -209,7 +215,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       let reconstructedBoards: DayBoard[] = [];
       const usedStudentIds = new Set<string>();
 
-      const storedBoards = localStorage.getItem(`groovelab_teacher_boards_${userId}`);
+      const storedBoards = localStorage.getItem(`groovelab_teacher_boards_${activePlatform}_${userId}`) || localStorage.getItem(`groovelab_teacher_boards_${userId}`);
       let parsedStored: typeof dbPlannedBoards = [];
       if (storedBoards) {
         try {
@@ -756,7 +762,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             roomId: b.roomId,
             students: b.students
           }));
-          localStorage.setItem(`groovelab_teacher_boards_${userId}`, JSON.stringify(boardDefinitions));
+          const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+          localStorage.setItem(`groovelab_teacher_boards_${activePlatform}_${userId}`, JSON.stringify(boardDefinitions));
           alert('Stundenplan erfolgreich aus dem Backup wiederhergestellt!');
         } else {
           alert('Ungültiges Backup-Format.');
@@ -798,6 +805,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         .eq('teacher_id', userId);
 
       // Save the planned boards definitions to the teacher's profile in users table
+      const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+      const columnName = activePlatform === 'campus' ? 'campus_räume' : 'groovelab_räume';
+
       const boardDefinitions = validBoards.map(b => ({
         id: b.id,
         dayOfWeek: b.dayOfWeek,
@@ -807,7 +817,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
       await supabase
         .from('users')
-        .update({ planned_boards: boardDefinitions })
+        .update({ [columnName]: boardDefinitions })
         .eq('id', userId);
 
       // 2. Insert all new schedule slots from the day boards

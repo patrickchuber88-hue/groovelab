@@ -1665,7 +1665,7 @@ export function TeacherDashboard({
       try {
         setBriefingLoading(true);
         const resp = await fetch(`/api/briefing/teacher?userId=${userId}`);
-        if (resp.ok) {
+        if (resp.ok && resp.headers.get('content-type')?.includes('application/json')) {
           const data = await resp.json();
           if (data && data.success) {
             setBriefingData(data);

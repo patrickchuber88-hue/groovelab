@@ -1323,7 +1323,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: studentId })
       });
-      if (resp.ok) {
+      if (resp.ok && resp.headers.get('content-type')?.includes('application/json')) {
         const data = await resp.json();
         if (data.checkoutUrl) {
           window.location.href = data.checkoutUrl;
@@ -1382,11 +1382,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     setRankingError(null);
     try {
       const resp = await fetch(`/api/ranking/global?userId=${studentId}`);
-      if (resp.ok) {
+      if (resp.ok && resp.headers.get('content-type')?.includes('application/json')) {
         const data = await resp.json();
         setRankingData(data.ranking || []);
       } else {
-        const errData = await resp.json().catch(() => ({ error: 'Ranking konnte nicht geladen werden.' }));
+        let errData: any = { error: 'Ranking konnte nicht geladen werden.' };
+        if (resp.headers.get('content-type')?.includes('application/json')) {
+          errData = await resp.json().catch(() => ({ error: 'Ranking konnte nicht geladen werden.' }));
+        }
         setRankingError(errData.error || 'Fehler beim Laden des Rankings.');
       }
     } catch (err: any) {
@@ -1511,7 +1514,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         })
       });
 
-      if (response.ok) {
+      if (response.ok && response.headers.get('content-type')?.includes('application/json')) {
         const data = await response.json();
         alert(`Klasse geübt! Du hast +${data.stats.xpAdded} XP erhalten und dein Streak ist bei ${data.stats.streakFlame} Flammen! 🔥`);
         fetchStudentAndAvatar();
@@ -1926,7 +1929,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     setWrappedLoading(true);
     try {
       const resp = await fetch(`/api/wrapped?userId=${studentId}`);
-      if (resp.ok) {
+      if (resp.ok && resp.headers.get('content-type')?.includes('application/json')) {
         const data = await resp.json();
         setWrappedData(data);
       } else {
@@ -2017,7 +2020,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         body: JSON.stringify({ heroClassId })
       });
 
-      if (response.ok) {
+      if (response.ok && response.headers.get('content-type')?.includes('application/json')) {
         const result = await response.json();
         setAvatar(result.avatar);
         setShowSelector(false);

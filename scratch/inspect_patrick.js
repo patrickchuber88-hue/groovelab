@@ -1,21 +1,25 @@
-const { createClient } = require('@supabase/supabase-js');
-require('dotenv').config({ path: 'apps/groovelab/.env.local' });
+const { Client } = require('ssh2');
+const fs = require('fs');
+const conn = new Client();
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://supabase.178.105.10.2.sslip.io';
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseKey);
+const config = {
+  host: '178.105.10.2',
+  port: 22,
+  username: 'root',
+  privateKey: fs.readFileSync('/Users/patrickhuber/.ssh/id_ed25519'),
+  readyTimeout: 10000
+};
 
-async function run() {
-  const { data, error } = await supabase
-    .from('users')
-    .select('id, first_name, last_name, role, is_active, is_campus_active, is_groovelab_active, school_id')
-    .eq('id', '03564b1c-e2bb-4ccb-be95-b9fd1ef34829')
-    .single();
-  
-  if (error) {
-    console.error(error);
-  } else {
-    console.log("Teacher Patrick Huber details:", data);
-  }
-}
-run();
+conn.on('ready', () => {
+  const sql = `
+    SELECT id, first_name, last_name, role, is_master_admin, teacher_qr_token, qr_token, ausweis_nummer 
+    FROM public.users 
+    WHERE first_name = 'Patrick' AND last_name = 'Huber';
+  `;
+
+  conn.exec(`docker exec -i supabase-db psql -U postgres -d postgres -c "${sql}"`, (err, stream) => {
+    if (err) throw err;
+    stream.on('close', () => conn.end())
+          .on('data', (data) => console.log(String(data)));
+  });
+}).connect(config);

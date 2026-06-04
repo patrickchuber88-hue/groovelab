@@ -1,0 +1,884 @@
+commit 350a9e5c13c9ef22800a9d918b4908d44fd09501
+Author: patrickchuber88-hue <patrick.c.huber88@gmail.com>
+Date:   Wed Jun 3 16:15:42 2026 +0200
+
+    Fix: reload database data on platform change to avoid showing campus songs in groovelab dashboard
+
+diff --git a/apps/groovelab/src/components/AdminDashboard.tsx b/apps/groovelab/src/components/AdminDashboard.tsx
+index bc651bc..53d2783 100644
+--- a/apps/groovelab/src/components/AdminDashboard.tsx
++++ b/apps/groovelab/src/components/AdminDashboard.tsx
+@@ -224,6 +224,15 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
+   const [songStatus, setSongStatus] = useState<'unbearbeitet' | 'in_progress' | 'mastered'>('unbearbeitet');
+   const [showSongProgressDetails, setShowSongProgressDetails] = useState<boolean>(true);
+ 
++  // Campus Bookings states
++  const [selectedCampusRoomId, setSelectedCampusRoomId] = useState<string>(() => rooms[0]?.id || '');
++  const [campusBookings, setCampusBookings] = useState<any[]>([]);
++  const [bookingDate, setBookingDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
++  const [bookingStartTime, setBookingStartTime] = useState<string>('08:00');
++  const [bookingEndTime, setBookingEndTime] = useState<string>('09:00');
++  const [bookingPurpose, setBookingPurpose] = useState<string>('');
++  const [successAnimationRoomId, setSuccessAnimationRoomId] = useState<string | null>(null);
++
+   // Textbausteine states
+   const [textbausteine, setTextbausteine] = useState<any[]>(() => {
+     const stored = localStorage.getItem('groovelab_textbausteine');
+@@ -1414,7 +1423,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
+ 
+   useEffect(() => {
+     fetchData();
+-  }, [activeTab]);
++  }, [activeTab, activePlatform]);
+ 
+   useEffect(() => {
+     if (forceTab) {
+@@ -4419,416 +4428,470 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
+     </div>
+   );
+ 
+-  const renderRoomsTab = () => (
+-    <div style={{ marginTop: '0px' }}>
+-      <div 
+-        className="glass-panel" 
+-        style={{ 
+-          background: 'white', 
+-          borderRadius: '20px', 
+-          border: '1px solid rgba(0, 0, 0, 0.05)', 
+-          padding: '16px 20px', 
+-          boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
+-          display: 'flex', 
+-          flexDirection: 'column', 
+-          gap: '16px' 
+-        }}
+-      >
+-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+-          <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+-            <div style={{ background: `${brandColor}15`, color: brandColor, padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
+-              <Box size={16} />
+-            </div>
+-            Räume & Übungsplätze
+-          </h2>
+-        </div>
++  const renderRoomsTab = () => {
++    const selectedRoom = rooms.find(r => r.id === selectedCampusRoomId) || rooms[0];
++    
++    // Calculate available rooms for selected booking search criteria
++    const dateBookings = campusBookings.filter((b: any) => b.date === bookingDate);
++    const availableRooms = rooms.filter(room => {
++      return !dateBookings.some((b: any) => {
++        if (b.roomId !== room.id) return false;
++        return !(b.endTime <= bookingStartTime || b.startTime >= bookingEndTime);
++      });
++    });
+ 
+-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px' }}>
+-          {rooms.map((room, idx) => {
+-            const isSelected = draggedRoomId === room.id;
+-            const isDragOver = dragOverRoomId === room.id;
+-            return (
+-              <div 
+-                key={room.id} 
+-                className="glass-panel" 
+-                onDragOver={handleRoomDragOver}
+-                onDragEnter={(e) => handleRoomDragEnter(e, room.id)}
+-                onDragLeave={handleRoomDragLeave}
+-                onDrop={(e) => handleRoomDrop(e, room.id)}
+-                style={{ 
+-                  padding: '14px 18px', 
+-                  background: isDragOver ? 'rgba(99, 102, 241, 0.03)' : 'white', 
+-                  borderRadius: '16px', 
+-                  border: isDragOver ? `2px dashed ${brandColor}` : (isSelected ? '2px dashed #94a3b8' : '1px solid #e8e8ed'),
+-                  opacity: isSelected ? 0.5 : 1,
+-                  cursor: 'default',
+-                  transition: 'all 0.2s ease',
+-                  boxShadow: isDragOver ? `0 10px 20px -8px ${brandColor}30` : 'none',
+-                  position: 'relative',
+-                  display: 'flex',
+-                  flexDirection: 'column',
+-                  gap: '10px'
+-                }}
+-              >
+-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+-                    {/* Drag Handle */}
+-                    <div 
+-                      draggable="true"
+-                      onDragStart={(e) => handleRoomDragStart(e, room.id)}
+-                      onDragEnd={handleRoomDragEnd}
+-                      style={{ 
+-                        cursor: 'grab', 
+-                        padding: '4px', 
+-                        borderRadius: '8px',
++    const myBookings = campusBookings.filter((b: any) => b.teacherId === userId);
++
++    const DAYS_OF_WEEK = [
++      { label: 'Montag', value: 'Monday', short: 'Mo' },
++      { label: 'Dienstag', value: 'Tuesday', short: 'Di' },
++      { label: 'Mittwoch', value: 'Wednesday', short: 'Mi' },
++      { label: 'Donnerstag', value: 'Thursday', short: 'Do' },
++      { label: 'Freitag', value: 'Friday', short: 'Fr' },
++      { label: 'Samstag', value: 'Saturday', short: 'Sa' },
++      { label: 'Sonntag', value: 'Sunday', short: 'So' }
++    ];
++
++    const TIME_SLOTS = Array.from({ length: 14 }, (_, i) => {
++      const hour = 8 + i;
++      return `${String(hour).padStart(2, '0')}:00`;
++    });
++
++    const getWeekdayIndex = (dateStr: string) => {
++      const d = new Date(dateStr);
++      const day = d.getDay();
++      return day === 0 ? 6 : day - 1;
++    };
++
++    const roomBookings = selectedRoom ? campusBookings.filter((b: any) => b.roomId === selectedRoom.id) : [];
++
++    const handleAddBooking = (roomId: string) => {
++      const roomName = rooms.find(r => r.id === roomId)?.name || 'Raum';
++      const newBooking = {
++        id: 'cb_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
++        roomId,
++        roomName,
++        date: bookingDate,
++        startTime: bookingStartTime,
++        endTime: bookingEndTime,
++        purpose: bookingPurpose || 'Unterricht',
++        teacherId: userId,
++        teacherName: admin ? `${admin.first_name} ${admin.last_name}` : 'Lehrer'
++      };
++
++      setCampusBookings(prev => [...prev, newBooking]);
++      setSuccessAnimationRoomId(roomId);
++      setTimeout(() => setSuccessAnimationRoomId(null), 1000);
++    };
++
++    const handleCancelBooking = (bookingId: string) => {
++      setCampusBookings(prev => prev.filter(b => b.id !== bookingId));
++    };
++
++    const getBookingsForSlot = (dayIndex: number, hourStr: string) => {
++      const currentSelectedDate = new Date(bookingDate);
++      const dayOfWeek = currentSelectedDate.getDay();
++      const diffToMon = currentSelectedDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
++      const mondayOfSelectedWeek = new Date(currentSelectedDate.setDate(diffToMon));
++      mondayOfSelectedWeek.setHours(0,0,0,0);
++
++      const sundayOfSelectedWeek = new Date(mondayOfSelectedWeek);
++      sundayOfSelectedWeek.setDate(mondayOfSelectedWeek.getDate() + 6);
++      sundayOfSelectedWeek.setHours(23,59,59,999);
++
++      return roomBookings.filter((b: any) => {
++        const bDate = new Date(b.date);
++        if (bDate < mondayOfSelectedWeek || bDate > sundayOfSelectedWeek) return false;
++        
++        const bDayIndex = getWeekdayIndex(b.date);
++        if (bDayIndex !== dayIndex) return false;
++
++        const slotHour = parseInt(hourStr.split(':')[0]);
++        const startHour = parseInt(b.startTime.split(':')[0]);
++        const endHour = parseInt(b.endTime.split(':')[0]);
++        
++        return slotHour >= startHour && slotHour < endHour;
++      });
++    };
++
++    return (
++      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '0px' }}>
++        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px', alignItems: 'start' }}>
++          {/* Left Column: Room catalog and weekly calendar */}
++          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
++            
++            {/* Room Horizontal Picker */}
++            <div 
++              className="glass-panel" 
++              style={{ 
++                background: 'white', 
++                borderRadius: '20px', 
++                border: '1px solid rgba(0, 0, 0, 0.05)', 
++                padding: '16px 20px', 
++                boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)'
++              }}
++            >
++              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
++                <h2 style={{ fontSize: '1.4rem', fontWeight: 900, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
++                  <div style={{ background: `${brandColor}15`, color: brandColor, padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
++                    <Box size={16} />
++                  </div>
++                  Campus Räumlichkeiten
++                </h2>
++              </div>
++
++              <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px' }}>
++                {rooms.map((room) => {
++                  const isSelected = selectedCampusRoomId === room.id;
++                  return (
++                    <div
++                      key={room.id}
++                      onClick={() => setSelectedCampusRoomId(room.id)}
++                      style={{
++                        minWidth: '180px',
++                        padding: '12px 14px',
++                        background: isSelected ? `${brandColor}08` : 'white',
++                        border: isSelected ? `2px solid ${brandColor}` : '1.5px solid #e2e8f0',
++                        borderRadius: '14px',
++                        cursor: 'pointer',
++                        transition: 'all 0.2s ease',
++                        boxShadow: isSelected ? `0 4px 12px ${brandColor}15` : 'none',
+                         display: 'flex',
+-                        alignItems: 'center',
+-                        justifyContent: 'center',
+-                        color: '#94a3b8',
+-                        background: '#f4f4f5',
+-                        border: 'none',
+-                        transition: 'all 0.15s ease',
+-                        flexShrink: 0,
+-                        width: '30px',
+-                        height: '30px'
++                        flexDirection: 'column',
++                        gap: '6px'
+                       }}
+-                      className="hover-scale-mini"
+-                      title="Raum verschieben"
+                     >
+-                      <GripVertical size={14} />
++                      <div style={{ fontWeight: 800, fontSize: '0.85rem', color: isSelected ? brandColor : '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
++                        {room.name}
++                      </div>
++                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
++                        <span style={{ padding: '2px 6px', background: '#f1f5f9', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 700, color: '#475569' }}>
++                          Kapazität: {room.capacity || 4}
++                        </span>
++                      </div>
+                     </div>
++                  );
++                })}
++              </div>
++            </div>
+ 
+-                    {/* Numeric Index Badge */}
+-                    <div style={{ 
+-                      width: '30px', 
+-                      height: '30px', 
+-                      borderRadius: '50%', 
+-                      background: '#f4f4f5', 
+-                      display: 'flex', 
+-                      alignItems: 'center', 
+-                      justifyContent: 'center', 
+-                      fontSize: '0.85rem', 
+-                      fontWeight: 800, 
+-                      color: '#18181b',
+-                      flexShrink: 0
+-                    }}>
+-                      {idx + 1}
++            {/* Weekly Availability Calendar Grid */}
++            <div 
++              className="glass-panel" 
++              style={{ 
++                background: 'white', 
++                borderRadius: '20px', 
++                border: '1px solid rgba(0, 0, 0, 0.05)', 
++                padding: '18px 20px', 
++                boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)'
++              }}
++            >
++              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
++                <div>
++                  <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>
++                    Wochenübersicht: {selectedRoom?.name || 'Wähle einen Raum'}
++                  </h3>
++                  <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '2px 0 0 0', fontWeight: 600 }}>
++                    Angezeigt für die Woche der Buchungsauswahl ({new Date(bookingDate).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })})
++                  </p>
++                </div>
++              </div>
++
++              {/* Calendar Grid Container */}
++              <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
++                {/* Header Row */}
++                <div style={{ display: 'grid', gridTemplateColumns: '80px repeat(7, 1fr)', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
++                  <div style={{ padding: '10px', fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textAlign: 'center', borderRight: '1px solid #e2e8f0' }}>Zeit</div>
++                  {DAYS_OF_WEEK.map((day, i) => (
++                    <div key={day.value} style={{ padding: '10px 4px', fontSize: '0.72rem', fontWeight: 800, color: '#1e293b', textAlign: 'center', borderRight: i < 6 ? '1px solid #e2e8f0' : 'none' }}>
++                      {day.label}
+                     </div>
++                  ))}
++                </div>
+ 
+-                    <div style={{ minWidth: 0 }}>
+-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '1px' }}>
+-                        <span style={{ 
+-                          fontSize: '0.68rem', 
+-                          fontWeight: 900, 
+-                          color: idx === 0 ? '#d97706' : '#64748b', 
+-                          background: idx === 0 ? '#fef3c7' : '#f1f5f9', 
+-                          padding: '2px 6px', 
+-                          borderRadius: '5px',
+-                          textTransform: 'uppercase',
+-                          letterSpacing: '0.05em'
+-                        }}>
+-                          {idx === 0 ? '👑 Hauptraum' : 'Nebenraum'}
+-                        </span>
+-                      </div>
+-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+-                        <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{cleanRoomName(room.name)}</h3>
++                {/* Hourly Rows */}
++                <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '420px', overflowY: 'auto' }}>
++                  {TIME_SLOTS.map((hour) => (
++                    <div key={hour} style={{ display: 'grid', gridTemplateColumns: '80px repeat(7, 1fr)', borderBottom: '1px solid #f1f5f9', minHeight: '44px' }}>
++                      {/* Time cell */}
++                      <div style={{ padding: '10px 4px', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textAlign: 'center', background: '#f8fafc', borderRight: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
++                        {hour}
+                       </div>
++                      {/* Day cells */}
++                      {DAYS_OF_WEEK.map((day, dayIdx) => {
++                        const slotBookings = getBookingsForSlot(dayIdx, hour);
++                        return (
++                          <div
++                            key={day.value}
++                            style={{
++                              padding: '3px',
++                              borderRight: dayIdx < 6 ? '1px solid #f1f5f9' : 'none',
++                              position: 'relative',
++                              background: 'white',
++                              display: 'flex',
++                              flexDirection: 'column',
++                              gap: '2px',
++                              justifyContent: 'center'
++                            }}
++                          >
++                            {slotBookings.map((b: any) => (
++                              <div
++                                key={b.id}
++                                title={`${b.purpose} (${b.startTime} - ${b.endTime}) - ${b.teacherName}`}
++                                style={{
++                                  background: b.teacherId === userId ? `${brandColor}15` : '#f1f5f9',
++                                  borderLeft: `3px solid ${b.teacherId === userId ? brandColor : '#94a3b8'}`,
++                                  padding: '2px 4px',
++                                  borderRadius: '4px',
++                                  fontSize: '0.58rem',
++                                  fontWeight: 700,
++                                  color: b.teacherId === userId ? brandColor : '#475569',
++                                  overflow: 'hidden',
++                                  textOverflow: 'ellipsis',
++                                  whiteSpace: 'nowrap',
++                                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
++                                }}
++                              >
++                                {b.teacherName.split(' ')[0]}
++                              </div>
++                            ))}
++                          </div>
++                        );
++                      })}
+                     </div>
+-                  </div>
++                  ))}
+                 </div>
++              </div>
++            </div>
++          </div>
+ 
+-                {/* Geofence coordinate badges */}
+-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '1px' }}>
+-                  {(room.geofence_points || []).map((pt: any, gidx: number) => (
+-                    <div key={gidx} style={{ 
+-                      background: '#f0fdf4', 
+-                      border: '1px solid #bbf7d0', 
+-                      borderRadius: '9999px', 
+-                      padding: '3px 8px', 
+-                      display: 'flex', 
+-                      alignItems: 'center', 
+-                      gap: '4px',
+-                      fontSize: '0.72rem',
+-                      color: '#166534',
++          {/* Right Sidebar: Booking Form & Available Rooms */}
++          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
++            
++            {/* Booking Form */}
++            <div 
++              className="glass-panel" 
++              style={{ 
++                background: 'white', 
++                borderRadius: '20px', 
++                border: '1px solid rgba(0, 0, 0, 0.05)', 
++                padding: '18px', 
++                boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
++                display: 'flex',
++                flexDirection: 'column',
++                gap: '12px'
++              }}
++            >
++              <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
++                <span style={{ color: brandColor }}>⚡</span> Raum buchen
++              </h3>
++
++              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
++                <label style={{ fontSize: '0.7rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase' }}>Datum</label>
++                <input
++                  type="date"
++                  value={bookingDate}
++                  onChange={(e) => setBookingDate(e.target.value)}
++                  style={{
++                    padding: '8px 12px',
++                    borderRadius: '10px',
++                    border: '1px solid #cbd5e1',
++                    fontSize: '0.8rem',
++                    fontWeight: 700,
++                    outline: 'none',
++                    color: '#1e293b',
++                    height: '40px'
++                  }}
++                />
++              </div>
++
++              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
++                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
++                  <label style={{ fontSize: '0.7rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase' }}>Von</label>
++                  <select
++                    value={bookingStartTime}
++                    onChange={(e) => setBookingStartTime(e.target.value)}
++                    style={{
++                      padding: '8px 10px',
++                      borderRadius: '10px',
++                      border: '1px solid #cbd5e1',
++                      fontSize: '0.8rem',
+                       fontWeight: 700,
+-                      height: '24px'
+-                    }}>
+-                      <MapPin size={10} /> Punkt {gidx + 1}
+-                      <button 
+-                        onClick={() => handleDeleteGeofencePoint(room.id, gidx)}
+-                        style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
+-                        title="Punkt löschen"
+-                      >
+-                        <X size={10} />
+-                      </button>
+-                    </div>
+-                  ))}
+-                  
+-                  <button 
+-                    onClick={() => handleAddGeofencePoint(room.id)}
+-                    style={{ 
+-                      background: '#fffbeb', 
+-                      border: 'none', 
+-                      borderRadius: '9999px', 
+-                      padding: '3px 10px', 
+-                      color: '#92400e', 
+-                      fontSize: '0.72rem', 
+-                      fontWeight: 800, 
+-                      cursor: 'pointer',
+-                      display: 'flex',
+-                      alignItems: 'center',
+-                      gap: '3px',
+-                      height: '30px'
++                      outline: 'none',
++                      color: '#1e293b',
++                      height: '40px'
+                     }}
+-                    title="Aktuellen Standort scannen"
+                   >
+-                    <MapPin size={10} /> Scan
+-                  </button>
++                    {Array.from({ length: 27 }, (_, i) => {
++                      const min = i * 30 + 480;
++                      const hh = String(Math.floor(min / 60)).padStart(2, '0');
++                      const mm = String(min % 60).padStart(2, '0');
++                      return `${hh}:${mm}`;
++                    }).map(t => <option key={t} value={t}>{t}</option>)}
++                  </select>
++                </div>
+ 
+-                  <button 
+-                    onClick={() => setShowManualInput(showManualInput === room.id ? null : room.id)}
+-                    style={{ 
+-                      background: '#f4f4f5', 
+-                      border: 'none', 
+-                      borderRadius: '9999px', 
+-                      padding: '3px 10px', 
+-                      color: '#52525b', 
+-                      fontSize: '0.72rem', 
+-                      fontWeight: 800, 
+-                      cursor: 'pointer',
+-                      display: 'flex',
+-                      alignItems: 'center',
+-                      gap: '3px',
+-                      height: '30px'
++                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
++                  <label style={{ fontSize: '0.7rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase' }}>Bis</label>
++                  <select
++                    value={bookingEndTime}
++                    onChange={(e) => setBookingEndTime(e.target.value)}
++                    style={{
++                      padding: '8px 10px',
++                      borderRadius: '10px',
++                      border: '1px solid #cbd5e1',
++                      fontSize: '0.8rem',
++                      fontWeight: 700,
++                      outline: 'none',
++                      color: '#1e293b',
++                      height: '40px'
+                     }}
+                   >
+-                    <Plus size={10} /> Manuell
+-                  </button>
++                    {Array.from({ length: 27 }, (_, i) => {
++                      const min = (i + 1) * 30 + 480;
++                      const hh = String(Math.floor(min / 60)).padStart(2, '0');
++                      const mm = String(min % 60).padStart(2, '0');
++                      return `${hh}:${mm}`;
++                    }).filter(t => t > bookingStartTime).map(t => <option key={t} value={t}>{t}</option>)}
++                  </select>
++                </div>
++              </div>
+ 
+-                  {showManualInput === room.id && (
+-                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center', animation: 'fadeIn 0.2s' }}>
+-                      <input 
+-                        placeholder="Lat, Lng" 
+-                        value={manualCoords[room.id] || ''} 
+-                        onChange={e => setManualCoords({...manualCoords, [room.id]: e.target.value})}
+-                        style={{ padding: '4px 8px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.72rem', width: '100px', height: '30px' }} 
+-                      />
+-                      <button 
+-                        onClick={() => {
+-                          const parts = manualCoords[room.id]?.split(',').map(s => s.trim());
+-                          if (parts?.length === 2 && !isNaN(Number(parts[0])) && !isNaN(Number(parts[1]))) {
+-                            handleAddGeofencePoint(room.id, Number(parts[0]), Number(parts[1]));
+-                            setManualCoords({...manualCoords, [room.id]: ''});
+-                            setShowManualInput(null);
+-                          } else {
+-                            alert('Format: 47.123, 7.456');
+-                          }
+-                        }}
+-                        style={{ background: brandColor, color: 'white', border: 'none', borderRadius: '8px', padding: '4px 10px', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', height: '30px' }}
+-                      >
+-                        Set
+-                      </button>
+-                    </div>
+-                  )}
++              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
++                <label style={{ fontSize: '0.7rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase' }}>Verwendungszweck</label>
++                <input
++                  placeholder="z.B. Klavierunterricht"
++                  value={bookingPurpose}
++                  onChange={(e) => setBookingPurpose(e.target.value)}
++                  style={{
++                    padding: '8px 12px',
++                    borderRadius: '10px',
++                    border: '1px solid #cbd5e1',
++                    fontSize: '0.8rem',
++                    fontWeight: 700,
++                    outline: 'none',
++                    color: '#1e293b',
++                    height: '40px'
++                  }}
++                />
++              </div>
+ 
+-                  {(room.geofence_points?.length > 0 || room.latitude) && (
+-                    <button 
+-                      onClick={() => handleClearGeofencePoints(room.id)}
+-                      style={{ background: 'transparent', border: 'none', color: '#cbd5e1', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', padding: '4px', height: '30px', display: 'flex', alignItems: 'center' }}
+-                    >
+-                      Alle löschen
+-                    </button>
+-                  )}
+-                </div>
++              <hr style={{ border: 'none', borderTop: '1px solid #f1f5f9', margin: '4px 0' }} />
+ 
+-                {/* Primary Card action buttons (+ iPads, Layout) */}
+-                <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
+-                  <button 
+-                    onClick={() => triggerBatchAddStations(room.id)} 
+-                    style={{ flex: 1, padding: '6px 10px', borderRadius: '9999px', background: '#f4f4f5', border: 'none', color: brandColor, cursor: 'pointer', fontWeight: 800, fontSize: '0.78rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', height: '32px' }}
+-                  >
+-                    <Plus size={12} /> iPads
+-                  </button>
+-                  <button 
+-                    onClick={() => setCustomizingRoom(room)} 
+-                    style={{ flex: 1, padding: '6px 10px', borderRadius: '9999px', background: '#f4f4f5', border: 'none', color: '#475569', cursor: 'pointer', fontWeight: 800, fontSize: '0.78rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', height: '32px' }}
+-                  >
+-                    <MapPin size={12} /> Layout
+-                  </button>
++              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
++                <div style={{ fontSize: '0.72rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase' }}>
++                  Verfügbare Räume
+                 </div>
++                {availableRooms.length === 0 ? (
++                  <div style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 700, padding: '8px', background: '#fef2f2', borderRadius: '8px', textAlign: 'center' }}>
++                    Keine freien Räume gefunden
++                  </div>
++                ) : (
++                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
++                    {availableRooms.map((room) => {
++                      const isSuccess = successAnimationRoomId === room.id;
++                      return (
++                        <div
++                          key={room.id}
++                          onClick={() => handleAddBooking(room.id)}
++                          style={{
++                            display: 'flex',
++                            justifyContent: 'space-between',
++                            alignItems: 'center',
++                            padding: '8px 12px',
++                            background: isSuccess ? '#ecfdf5' : '#f8fafc',
++                            border: isSuccess ? '1.5px solid #10b981' : '1px solid #e2e8f0',
++                            borderRadius: '10px',
++                            cursor: 'pointer',
++                            transition: 'all 0.2s ease',
++                            height: '42px'
++                          }}
++                        >
++                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: isSuccess ? '#047857' : '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
++                            {room.name}
++                          </span>
++                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: isSuccess ? '#10b981' : brandColor }}>
++                            {isSuccess ? 'Gebucht! ✓' : 'Buchen +'}
++                          </span>
++                        </div>
++                      );
++                    })}
++                  </div>
++                )}
++              </div>
++            </div>
+ 
++            {/* Meine Buchungen */}
++            <div 
++              className="glass-panel" 
++              style={{ 
++                background: 'white', 
++                borderRadius: '20px', 
++                border: '1px solid rgba(0, 0, 0, 0.05)', 
++                padding: '18px', 
++                boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)'
++              }}
++            >
++              <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
++                Meine Buchungen
++              </h3>
+ 
+-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
+-                  {stations.filter(s => s.room_id === room.id).map(station => {
+-                    const activeColor = station.color && station.color !== '#e5e7eb' && station.color !== '#e2e8f0' ? station.color : getStationColor(station.name);
+-                    return (
+-                      <div
+-                        key={station.id}
+-                        draggable
+-                        onDragStart={(e) => handleStationDragStart(e, station.id)}
+-                        onDragOver={(e) => handleStationDragOver(e, station.id)}
+-                        onDragEnd={() => {
+-                          setDraggedStationId(null);
+-                          setDragOverStationId(null);
+-                        }}
+-                        onDrop={(e) => handleStationDrop(e, room.id)}
++              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '180px', overflowY: 'auto' }}>
++                {myBookings.length === 0 ? (
++                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, textAlign: 'center', padding: '12px', border: '1.5px dashed #cbd5e1', borderRadius: '10px', background: '#f9f9fb' }}>
++                    Du hast noch keine Buchungen vorgenommen.
++                  </div>
++                ) : (
++                  myBookings.map((b: any) => (
++                    <div
++                      key={b.id}
++                      style={{
++                        padding: '10px 12px',
++                        background: '#f8fafc',
++                        border: '1px solid #cbd5e1',
++                        borderRadius: '12px',
++                        display: 'flex',
++                        justifyContent: 'space-between',
++                        alignItems: 'center'
++                      }}
++                    >
++                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
++                        <span style={{ fontSize: '0.78rem', fontWeight: 850, color: '#1e293b', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
++                          {b.roomName}
++                        </span>
++                        <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700 }}>
++                          {new Date(b.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} • {b.startTime} - {b.endTime}
++                        </span>
++                      </div>
++                      <button
++                        onClick={() => handleCancelBooking(b.id)}
+                         style={{
++                          background: '#fff1f2',
++                          color: '#ef4444',
++                          border: 'none',
++                          borderRadius: '8px',
++                          width: '28px',
++                          height: '28px',
+                           display: 'flex',
+-                          justifyContent: 'space-between',
+                           alignItems: 'center',
+-                          padding: '6px 10px',
+-                          background: draggedStationId === station.id 
+-                            ? '#f4f4f5' 
+-                            : dragOverStationId === station.id 
+-                            ? '#e4e4e7' 
+-                            : '#f9f9fb',
+-                          borderRadius: '10px',
+-                          border: dragOverStationId === station.id ? `2px dashed ${brandColor}` : '1px solid rgba(0, 0, 0, 0.04)',
+-                          transition: 'all 0.2s',
+-                          position: 'relative',
+-                          cursor: 'grab',
+-                          opacity: draggedStationId === station.id ? 0.5 : 1
++                          justifyContent: 'center',
++                          cursor: 'pointer',
++                          transition: 'background 0.2s'
+                         }}
++                        title="Buchung stornieren"
+                       >
+-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, color: '#475569', fontSize: '0.8rem' }}>
+-                          <GripVertical size={14} style={{ color: '#a1a1aa', cursor: 'grab' }} />
+-                          <Tablet size={14} color={activeColor} /> {station.name}
+-                        </div>
+-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+-                          <div style={{ position: 'relative' }}>
+-                            <button
+-                              type="button"
+-                              onClick={(e) => {
+-                                e.stopPropagation();
+-                                setActiveColorMenuStationId(activeColorMenuStationId === station.id ? null : station.id);
+-                              }}
+-                              style={{
+-                                display: 'flex',
+-                                alignItems: 'center',
+-                                gap: '4px',
+-                                padding: '4px 8px',
+-                                borderRadius: '16px',
+-                                border: '1px solid #cbd5e1',
+-                                background: '#ffffff',
+-                                cursor: 'pointer',
+-                                fontSize: '0.75rem',
+-                                fontWeight: 800,
+-                                color: '#475569',
+-                                boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+-                                transition: 'all 0.15s ease',
+-                                outline: 'none',
+-                                height: '30px'
+-                              }}
+-                            >
+-                              <span style={{
+-                                width: '8px',
+-                                height: '8px',
+-                                borderRadius: '50%',
+-                                background: activeColor,
+-                                display: 'inline-block',
+-                                boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.1)'
+-                              }} />
+-                              <span>Farbe</span>
+-                            </button>
+-
+-                            {activeColorMenuStationId === station.id && (
+-                              <>
+-                                <div 
+-                                  onClick={() => setActiveColorMenuStationId(null)}
+-                                  style={{
+-                                    position: 'fixed',
+-                                    inset: 0,
+-                                    zIndex: 999,
+-                                    background: 'transparent'
+-                                  }}
+-                                />
+-                                <div style={{
+-                                  position: 'absolute',
+-                                  right: 0,
+-                                  top: '32px',
+-                                  background: '#ffffff',
+-                                  borderRadius: '12px',
+-                                  border: '1px solid #cbd5e1',
+-                                  boxShadow: '0 8px 20px -4px rgba(0, 0, 0, 0.1)',
+-                                  padding: '4px',
+-                                  display: 'flex',
+-                                  flexDirection: 'column',
+-                                  gap: '3px',
+-                                  zIndex: 1000,
+-                                  minWidth: '110px',
+-                                  animation: 'fadeIn 0.15s ease'
+-                                }}>
+-                                  {[
+-                                    { hex: '#3b82f6', label: 'Blau' },
+-                                    { hex: '#eab308', label: 'Gelb' },
+-                                    { hex: '#64748b', label: 'Grau' },
+-                                    { hex: '#22c55e', label: 'Grün' },
+-                                    { hex: '#a855f7', label: 'Lila' },
+-                                    { hex: '#ef4444', label: 'Rot' }
+-                                  ].map(c => {
+-                                    const isSelected = activeColor === c.hex;
+-                                    return (
+-                                      <button
+-                                        type="button"
+-                                        key={c.hex}
+-                                        onClick={async (e) => {
+-                                          e.stopPropagation();
+-                                          setStations(prev => prev.map(s => s.id === station.id ? { ...s, color: c.hex } : s));
+-                                          setActiveColorMenuStationId(null);
+-                                          const { error } = await supabase.from('stations').update({ color: c.hex }).eq('id', station.id);
+-                                          if (error) alert('Fehler: ' + error.message);
+-                                        }}
+-                                        style={{
+-                                          display: 'flex',
+-                                          alignItems: 'center',
+-                                          gap: '4px',
+-                                          width: '100%',
+-                                          padding: '6px 8px',
+-                                          border: 'none',
+-                                          borderRadius: '6px',
+-                                          background: isSelected ? '#f1f5f9' : 'transparent',
+-                                          cursor: 'pointer',
+-                                          textAlign: 'left',
+-                                          fontSize: '0.75rem',
+-                                          fontWeight: isSelected ? 800 : 600,
+-                                          color: isSelected ? '#1e293b' : '#475569',
+-                                          transition: 'all 0.15s',
+-                                          outline: 'none'
+-                                        }}
+-                                      >
+-                                        <span style={{
+-                                          width: '8px',
+-                                          height: '8px',
+-                                          borderRadius: '50%',
+-                                          background: c.hex,
+-                                          boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.1)'
+-                                        }} />
+-                                        <span>{c.label}</span>
+-                                        {isSelected && <span style={{ marginLeft: 'auto', color: brandColor, fontSize: '0.7rem' }}>✓</span>}
+-                                      </button>
+-                                    );
+-                                  })}
+-                                </div>
+-                              </>
+-                            )}
+-                          </div>
+-                          <button onClick={() => handleDeleteStation(station.id)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', height: '30px', width: '30px', justifyContent: 'center' }}  >
+-                            <Trash2 size={13} />
+-                          </button>
+-                        </div>
+-                      </div>
+-                    );
+-                  })}
+-                  {stations.filter(s => s.room_id === room.id).length === 0 && (
+-                    <div style={{ textAlign: 'center', padding: '10px', color: '#94a3b8', fontSize: '0.78rem', border: '1px dashed #cbd5e1', borderRadius: '10px', background: '#f9f9fb' }}>Keine Übeplätze definiert.</div>
+-                  )}
+-                </div>
++                        <Trash2 size={13} />
++                      </button>
++                    </div>
++                  ))
++                )}
+               </div>
+-            )})}
++            </div>
++          </div>
+         </div>
+       </div>
+-    </div>
+-  );
++    );
++  }
+ 
+   const renderSongsTab = () => {
+     const filteredLehrwerke = lehrwerke.filter(item => 
