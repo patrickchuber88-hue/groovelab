@@ -3954,7 +3954,7 @@ export function TeacherDashboard({
                   )}
 
                   {/* SCHEDULE & PREP-MIRROR ROW (Two Columns: Left has greeting banner and Schüler Notizen, Right has Tagesplan) */}
-                  <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '24px', alignItems: 'start', width: '100%' }}>
+                  <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '24px', alignItems: 'stretch', width: '100%' }}>
                     
                     {/* LEFT COLUMN: Greeting Banner & Schüler Notizen */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: '1 1 350px', minWidth: '300px' }}>
@@ -4065,6 +4065,9 @@ export function TeacherDashboard({
                       {!teacher?.sick_until && (
                         <div className="google-card" style={{ 
                           width: '100%', 
+                          flex: 1,
+                          display: 'flex',
+                          flexDirection: 'column',
                           borderLeft: widgetState === 'VORBEREITUNG' 
                             ? '4px solid #fbbc05' 
                             : widgetState === 'ACTIVE' 
