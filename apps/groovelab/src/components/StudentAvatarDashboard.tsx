@@ -3922,89 +3922,81 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
           {/* TOP 4 KPIs ROW */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
             
             {/* KPI 1: XP */}
             <div style={{ 
-              background: '#ffffff', color: '#1e293b',
-              borderRadius: '16px', border: '1px solid rgba(0, 0, 0, 0.04)',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '12px 16px', minHeight: '60px',
-              transition: 'all 0.25s ease',
-              boxSizing: 'border-box'
+              position: 'relative', overflow: 'hidden',
+              background: 'linear-gradient(135deg, #007aff 0%, #0051b3 100%)', color: 'white',
+              borderRadius: '12px', boxShadow: '0 4px 12px rgba(0, 122, 255, 0.1)',
+              display: 'flex', alignItems: 'center', minHeight: '40px',
+              transition: 'all 0.25s ease'
             }} className="hover-scale">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>XP</span>
-                <span style={{ fontSize: '1.3rem', fontWeight: 900, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#007aff' }}>
-                  {currentXp || 0}
-                </span>
-              </div>
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(0, 122, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Star size={16} color="#007aff" fill="#007aff" />
+              <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                    {currentXp || 0}
+                  </span>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.04em' }}>XP</span>
+                </div>
+                <Star size={13} color="white" fill="white" style={{ opacity: 0.9 }} />
               </div>
             </div>
 
             {/* KPI 2: Songs */}
             <div style={{ 
-              background: '#ffffff', color: '#1e293b',
-              borderRadius: '16px', border: '1px solid rgba(0, 0, 0, 0.04)',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '12px 16px', minHeight: '60px',
-              transition: 'all 0.25s ease',
-              boxSizing: 'border-box'
+              position: 'relative', overflow: 'hidden',
+              background: 'linear-gradient(135deg, #34c759 0%, #20993f 100%)', color: 'white',
+              borderRadius: '12px', boxShadow: '0 4px 12px rgba(52, 199, 89, 0.1)',
+              display: 'flex', alignItems: 'center', minHeight: '40px',
+              transition: 'all 0.25s ease'
             }} className="hover-scale">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Songs</span>
-                <span style={{ fontSize: '1.3rem', fontWeight: 900, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#34c759' }}>
-                  {wrappedData?.monthlyFlashback?.masteredSongsCount || 0} <span style={{ fontSize: '0.9rem', color: '#94a3b8', fontWeight: 600 }}>/ 3</span>
-                </span>
-              </div>
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(52, 199, 89, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Award size={16} color="#34c759" />
+              <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                    {wrappedData?.monthlyFlashback?.masteredSongsCount || 0}/3
+                  </span>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Songs</span>
+                </div>
+                <Award size={13} color="white" style={{ opacity: 0.9 }} />
               </div>
             </div>
 
             {/* KPI 3: Fokus */}
             <div style={{ 
-              background: '#ffffff', color: '#1e293b',
-              borderRadius: '16px', border: '1px solid rgba(0, 0, 0, 0.04)',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '12px 16px', minHeight: '60px',
-              transition: 'all 0.25s ease',
-              boxSizing: 'border-box'
+              position: 'relative', overflow: 'hidden',
+              background: 'linear-gradient(135deg, #ffcc00 0%, #d4a000 100%)', color: '#1c1c1e',
+              borderRadius: '12px', boxShadow: '0 4px 12px rgba(255, 204, 0, 0.1)',
+              display: 'flex', alignItems: 'center', minHeight: '40px',
+              transition: 'all 0.25s ease'
             }} className="hover-scale">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Fokus</span>
-                <span style={{ fontSize: '1.3rem', fontWeight: 900, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#eab308' }}>
-                  {wrappedData?.monthlyFlashback?.focusMinutes || 0} <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600 }}>Min</span>
-                </span>
-              </div>
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(255, 204, 0, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Clock size={16} color="#eab308" />
+              <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                    {wrappedData?.monthlyFlashback?.focusMinutes || 0}
+                  </span>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Min</span>
+                </div>
+                <Clock size={13} color="#1c1c1e" style={{ opacity: 0.9 }} />
               </div>
             </div>
 
             {/* KPI 4: Streak */}
             <div style={{ 
-              background: '#ffffff', color: '#1e293b',
-              borderRadius: '16px', border: '1px solid rgba(0, 0, 0, 0.04)',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '12px 16px', minHeight: '60px',
-              transition: 'all 0.25s ease',
-              boxSizing: 'border-box'
+              position: 'relative', overflow: 'hidden',
+              background: 'linear-gradient(135deg, #ff3b30 0%, #c92018 100%)', color: 'white',
+              borderRadius: '12px', boxShadow: '0 4px 12px rgba(255, 59, 48, 0.1)',
+              display: 'flex', alignItems: 'center', minHeight: '40px',
+              transition: 'all 0.25s ease'
             }} className="hover-scale">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Streak</span>
-                <span style={{ fontSize: '1.3rem', fontWeight: 900, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#ff3b30' }}>
-                  {avatar?.streak_flame || 0} <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600 }}>Tage</span>
-                </span>
-              </div>
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(255, 59, 48, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Flame size={16} color="#ff3b30" />
+              <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                    {avatar?.streak_flame || 0}
+                  </span>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Tage</span>
+                </div>
+                <Flame size={13} color="white" style={{ opacity: 0.9 }} />
               </div>
             </div>
 
