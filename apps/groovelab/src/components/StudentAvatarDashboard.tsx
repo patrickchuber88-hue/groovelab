@@ -591,13 +591,9 @@ function MobileBriefingView({
                       alignItems: 'center',
                       gap: '12px'
                     }}>
-                      <div style={{
-                        width: '36px', height: '36px', borderRadius: '50%',
-                        background: '#ffffff',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        flexShrink: 0
-                      }}>
-                        <Calendar size={18} color="#ef4444" />
+                      <div style={{ width: '40px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center', flexShrink: 0 }}>
+                        <div style={{ background: '#ef4444', color: 'white', fontSize: '0.55rem', fontWeight: 800, padding: '2px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
+                        <div style={{ background: 'white', color: '#1e293b', fontSize: '1rem', fontWeight: 900, padding: '4px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
                       </div>
                       
                       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1px' }}>
@@ -4463,13 +4459,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               alignItems: 'center',
                               gap: '12px'
                             }}>
-                              <div style={{
-                                width: '36px', height: '36px', borderRadius: '50%',
-                                background: '#ffffff',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                flexShrink: 0
-                              }}>
-                                <Calendar size={18} color="#ef4444" />
+                              <div style={{ width: '48px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center', flexShrink: 0 }}>
+                                 <div style={{ background: '#ef4444', color: 'white', fontSize: '0.6rem', fontWeight: 800, padding: '4px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
+                                 <div style={{ background: 'white', color: '#1e293b', fontSize: '1.2rem', fontWeight: 900, padding: '6px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
                               </div>
                               
                               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1px' }}>
