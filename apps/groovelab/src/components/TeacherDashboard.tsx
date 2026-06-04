@@ -37,6 +37,44 @@ const normalizeInstrument = (name: string) => {
   return name;
 };
 
+const getISOWeekRaw = (dateInput?: string | Date, lessonDay: number = 1): string => {
+  let date: Date;
+  if (!dateInput) {
+    date = new Date();
+  } else if (dateInput instanceof Date) {
+    date = dateInput;
+  } else {
+    const match = String(dateInput).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      const year = parseInt(match[1], 10);
+      const month = parseInt(match[2], 10) - 1; // 0-indexed
+      const day = parseInt(match[3], 10);
+      date = new Date(year, month, day);
+    } else {
+      date = new Date(dateInput);
+    }
+  }
+  if (isNaN(date.getTime())) {
+    date = new Date();
+  }
+
+  // Adjust the date back to the most recent lesson day
+  const currentDay = date.getDay(); // 0 (Sun) to 6 (Sat)
+  let diff = currentDay - lessonDay;
+  if (diff < 0) {
+    diff += 7;
+  }
+  const lessonStart = new Date(date);
+  lessonStart.setDate(date.getDate() - diff);
+
+  const d = new Date(Date.UTC(lessonStart.getFullYear(), lessonStart.getMonth(), lessonStart.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+};
+
 const getNormalizedRequiredInsts = (insts: Record<string, number> | null | undefined) => {
   const normalized: Record<string, number> = {};
   if (!insts) return normalized;
@@ -1666,7 +1704,7 @@ export function TeacherDashboard({
         setLoadingPrepMirror(true);
         const studentId = activeStudent.id;
         
-        const [avatarRes, progressRes] = await Promise.all([
+        const [avatarRes, progressRes, matrixRes] = await Promise.all([
           supabase
             .from('avatars')
             .select('evolution_level, xp, avatar_style')
@@ -1682,11 +1720,17 @@ export function TeacherDashboard({
             `)
             .eq('user_id', studentId)
             .order('last_updated', { ascending: false })
-            .limit(3)
+            .limit(3),
+          supabase
+            .from('progress_matrix')
+            .select('*')
+            .eq('student_id', studentId)
+            .order('updated_at', { ascending: false })
         ]);
 
         const studentAvatar = avatarRes.data;
         const recentProgress = progressRes.data;
+        const matrixItems = matrixRes.data || [];
 
         const verifiedSongs = (recentProgress || []).map((p: any) => ({
           title: p.exercises?.title || 'Übungssong',
@@ -1695,13 +1739,72 @@ export function TeacherDashboard({
           note: p.exercises?.description || ''
         }));
 
+        const currentWeekStr = getISOWeekRaw(new Date(), 1);
+        const prevWeekDate = new Date();
+        prevWeekDate.setDate(prevWeekDate.getDate() - 7);
+        const prevWeekStr = getISOWeekRaw(prevWeekDate, 1);
+
+        const parseHomeworkNotes = (rawNotes: string): string[] => {
+          if (!rawNotes || rawNotes.trim() === '') return [];
+          try {
+            if (rawNotes.startsWith('[') && rawNotes.endsWith(']')) {
+              return JSON.parse(rawNotes);
+            }
+            return rawNotes.split('\n\n').filter(Boolean);
+          } catch (e) {
+            return [rawNotes];
+          }
+        };
+
+        const currentWeekItems = matrixItems.filter(item => 
+          !item.topic_name.startsWith('Hausaufgabe KW ') && 
+          (item.is_current_homework || (item.updated_at && getISOWeekRaw(item.updated_at, 1) === currentWeekStr))
+        );
+
+        const currentWeekNotesItem = matrixItems.find(item => 
+          item.topic_name.startsWith('Hausaufgabe KW ') && 
+          (item.is_current_homework || (item.updated_at && getISOWeekRaw(item.updated_at, 1) === currentWeekStr))
+        ) || matrixItems.find(item => 
+          item.is_current_homework && 
+          item.homework_notes && 
+          item.homework_notes.trim() !== ''
+        );
+
+        const currentWeekNotes = currentWeekNotesItem ? parseHomeworkNotes(currentWeekNotesItem.homework_notes) : [];
+
+        const prevWeekItems = matrixItems.filter(item => 
+          !item.topic_name.startsWith('Hausaufgabe KW ') && 
+          item.updated_at && 
+          getISOWeekRaw(item.updated_at, 1) === prevWeekStr
+        );
+
+        const prevWeekNotesItem = matrixItems.find(item => 
+          item.topic_name.startsWith('Hausaufgabe KW ') && 
+          item.updated_at && 
+          getISOWeekRaw(item.updated_at, 1) === prevWeekStr
+        );
+
+        const prevWeekNotes = prevWeekNotesItem ? parseHomeworkNotes(prevWeekNotesItem.homework_notes) : [];
+
         setDynamicPrepMirror({
           studentId,
           studentName: activeStudent.name,
           timeSlot: briefingData.timeline.find((s: any) => s.student?.id === studentId)?.timeSlot || '',
           streakCount: studentAvatar?.avatar_style === 'Premium_Hero' ? 6 : 0,
           evolutionLevel: studentAvatar?.evolution_level || 1,
-          verifiedSongs
+          verifiedSongs,
+          currentWeekNum: currentWeekStr.split('-W')[1] || '',
+          currentWeekItems: currentWeekItems.map(item => ({
+            title: item.topic_name,
+            status: item.status
+          })),
+          currentWeekNotes,
+          prevWeekNum: prevWeekStr.split('-W')[1] || '',
+          prevWeekItems: prevWeekItems.map(item => ({
+            title: item.topic_name,
+            status: item.status
+          })),
+          prevWeekNotes
         });
       } catch (e) {
         console.error('Error loading dynamic prep:', e);
@@ -1871,7 +1974,7 @@ export function TeacherDashboard({
           if (nextSlot && nextSlot.student) {
             const studentId = nextSlot.student.id;
             
-            const [avatarRes, progressRes] = await Promise.all([
+            const [avatarRes, progressRes, matrixRes] = await Promise.all([
               supabase
                 .from('avatars')
                 .select('evolution_level, xp, avatar_style')
@@ -1887,11 +1990,17 @@ export function TeacherDashboard({
                 `)
                 .eq('user_id', studentId)
                 .order('last_updated', { ascending: false })
-                .limit(3)
+                .limit(3),
+              supabase
+                .from('progress_matrix')
+                .select('*')
+                .eq('student_id', studentId)
+                .order('updated_at', { ascending: false })
             ]);
 
             const studentAvatar = avatarRes.data;
             const recentProgress = progressRes.data;
+            const matrixItems = matrixRes.data || [];
 
             const verifiedSongs = (recentProgress || []).map((p: any) => ({
               title: p.exercises?.title || 'Übungssong',
@@ -1900,13 +2009,72 @@ export function TeacherDashboard({
               note: allowMessages ? (p.exercises?.description || '') : '[SYSTEM: Nachrichten global stummgeschaltet]'
             }));
 
+            const currentWeekStr = getISOWeekRaw(new Date(), 1);
+            const prevWeekDate = new Date();
+            prevWeekDate.setDate(prevWeekDate.getDate() - 7);
+            const prevWeekStr = getISOWeekRaw(prevWeekDate, 1);
+
+            const parseHomeworkNotes = (rawNotes: string): string[] => {
+              if (!rawNotes || rawNotes.trim() === '') return [];
+              try {
+                if (rawNotes.startsWith('[') && rawNotes.endsWith(']')) {
+                  return JSON.parse(rawNotes);
+                }
+                return rawNotes.split('\n\n').filter(Boolean);
+              } catch (e) {
+                return [rawNotes];
+              }
+            };
+
+            const currentWeekItems = matrixItems.filter(item => 
+              !item.topic_name.startsWith('Hausaufgabe KW ') && 
+              (item.is_current_homework || (item.updated_at && getISOWeekRaw(item.updated_at, 1) === currentWeekStr))
+            );
+
+            const currentWeekNotesItem = matrixItems.find(item => 
+              item.topic_name.startsWith('Hausaufgabe KW ') && 
+              (item.is_current_homework || (item.updated_at && getISOWeekRaw(item.updated_at, 1) === currentWeekStr))
+            ) || matrixItems.find(item => 
+              item.is_current_homework && 
+              item.homework_notes && 
+              item.homework_notes.trim() !== ''
+            );
+
+            const currentWeekNotes = currentWeekNotesItem ? parseHomeworkNotes(currentWeekNotesItem.homework_notes) : [];
+
+            const prevWeekItems = matrixItems.filter(item => 
+              !item.topic_name.startsWith('Hausaufgabe KW ') && 
+              item.updated_at && 
+              getISOWeekRaw(item.updated_at, 1) === prevWeekStr
+            );
+
+            const prevWeekNotesItem = matrixItems.find(item => 
+              item.topic_name.startsWith('Hausaufgabe KW ') && 
+              item.updated_at && 
+              getISOWeekRaw(item.updated_at, 1) === prevWeekStr
+            );
+
+            const prevWeekNotes = prevWeekNotesItem ? parseHomeworkNotes(prevWeekNotesItem.homework_notes) : [];
+
             prepMirror = {
               studentId,
               studentName: nextSlot.student.name,
               timeSlot: nextSlot.timeSlot,
               streakCount: studentAvatar?.avatar_style === 'Premium_Hero' ? 6 : 0,
               evolutionLevel: studentAvatar?.evolution_level || 1,
-              verifiedSongs
+              verifiedSongs,
+              currentWeekNum: currentWeekStr.split('-W')[1] || '',
+              currentWeekItems: currentWeekItems.map(item => ({
+                title: item.topic_name,
+                status: item.status
+              })),
+              currentWeekNotes,
+              prevWeekNum: prevWeekStr.split('-W')[1] || '',
+              prevWeekItems: prevWeekItems.map(item => ({
+                title: item.topic_name,
+                status: item.status
+              })),
+              prevWeekNotes
             };
           }
 
@@ -4135,7 +4303,7 @@ export function TeacherDashboard({
                                       <Award size={18} />
                                     </div>
                                     <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                      {activeStudent?.id === prep.studentId ? 'Schüler Notizen' : 'Schüler Notizen (Nächste)'}
+                                      {activeStudent?.id === prep.studentId ? 'Notizen' : 'Notizen (Nächste)'}
                                     </h4>
                                   </div>
 
@@ -4168,9 +4336,6 @@ export function TeacherDashboard({
                                       </div>
                                       <div>
                                         <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.92rem' }}>{prep.studentName}</div>
-                                        <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
-                                          Slot: {prep.timeSlot} Uhr • Level {prep.evolutionLevel}
-                                        </div>
                                       </div>
                                     </div>
 
@@ -4193,70 +4358,163 @@ export function TeacherDashboard({
                                       </div>
                                     )}
 
+                                    {/* Hausaufgaben der Vorwoche */}
                                     <div>
                                       <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
-                                        Aktuelle Songs / Hausaufgaben
+                                        Hausaufgaben der Vorwoche (KW {prep.prevWeekNum || '?'})
                                       </div>
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                        {prep.verifiedSongs && prep.verifiedSongs.length > 0 ? (
-                                          prep.verifiedSongs.map((song: any, idx: number) => (
-                                            <div key={idx} style={{
-                                              background: '#f8fafc',
-                                              padding: '12px 14px',
-                                              borderRadius: '14px',
-                                              border: '1px solid rgba(0, 0, 0, 0.04)',
-                                              display: 'flex',
-                                              flexDirection: 'column',
-                                              gap: '4px'
-                                            }}>
-                                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                                                <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.82rem' }}>{song.title}</span>
-                                                <span style={{
-                                                  background: song.status === 'verifiziert' ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 158, 11, 0.08)',
-                                                  color: song.status === 'verifiziert' ? '#10b981' : '#f59e0b',
-                                                  fontSize: '0.68rem',
-                                                  fontWeight: 800,
-                                                  borderRadius: '100px',
-                                                  padding: '2px 8px',
-                                                  textTransform: 'uppercase',
-                                                  letterSpacing: '0.02em',
-                                                  flexShrink: 0
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        {((prep.prevWeekItems && prep.prevWeekItems.length > 0) || (prep.prevWeekNotes && prep.prevWeekNotes.length > 0)) ? (
+                                          <>
+                                            {prep.prevWeekItems && prep.prevWeekItems.map((item: any, idx: number) => {
+                                              const isBook = item.title.includes('Seite');
+                                              return (
+                                                <div key={`prev-item-${idx}`} style={{
+                                                  background: '#f8fafc',
+                                                  padding: '10px 12px',
+                                                  borderRadius: '12px',
+                                                  border: '1px solid rgba(0, 0, 0, 0.03)',
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'space-between',
+                                                  gap: '8px',
+                                                  opacity: 0.85
                                                 }}>
-                                                  {song.status === 'verifiziert' ? 'Verifiziert' : 'Übt gerade'}
-                                                </span>
-                                              </div>
-                                              {song.note && (
-                                                <div style={{ 
-                                                  fontSize: '0.75rem', 
-                                                  color: '#475569', 
-                                                  fontWeight: 500, 
-                                                  fontStyle: 'italic', 
-                                                  borderLeft: '2.5px solid #10b981', 
-                                                  paddingLeft: '8px', 
-                                                  marginTop: '4px',
-                                                  lineHeight: 1.3
-                                                }}>
-                                                  {song.note}
+                                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                                                    {isBook ? <BookOpen size={14} color="#64748b" /> : <Music size={14} color="#64748b" />}
+                                                    <span style={{ fontWeight: 800, color: '#475569', fontSize: '0.8rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                                      {item.title}
+                                                    </span>
+                                                  </div>
+                                                  {(item.status === 'MASTERED' || item.status === 'THEORY_DONE') && (
+                                                    <span style={{
+                                                      background: 'rgba(16, 185, 129, 0.08)',
+                                                      color: '#10b981',
+                                                      fontSize: '0.64rem',
+                                                      fontWeight: 800,
+                                                      borderRadius: '100px',
+                                                      padding: '2px 8px',
+                                                      textTransform: 'uppercase',
+                                                      flexShrink: 0
+                                                    }}>
+                                                      Erledigt
+                                                    </span>
+                                                  )}
                                                 </div>
-                                              )}
-                                            </div>
-                                          ))
+                                              );
+                                            })}
+                                            {prep.prevWeekNotes && prep.prevWeekNotes.map((note: string, idx: number) => (
+                                              <div key={`prev-note-${idx}`} style={{ 
+                                                fontSize: '0.75rem', 
+                                                color: '#64748b', 
+                                                fontWeight: 500, 
+                                                fontStyle: 'italic', 
+                                                borderLeft: '2.5px solid #cbd5e1', 
+                                                paddingLeft: '8px', 
+                                                margin: '2px 4px',
+                                                lineHeight: 1.3,
+                                                opacity: 0.85
+                                              }}>
+                                                {note}
+                                              </div>
+                                            ))}
+                                          </>
                                         ) : (
                                           <div style={{ 
                                             display: 'flex', 
-                                            flexDirection: 'column', 
                                             alignItems: 'center', 
-                                            gap: '8px', 
-                                            padding: '24px 0', 
-                                            textAlign: 'center', 
+                                            justifyContent: 'center',
+                                            gap: '6px', 
+                                            padding: '14px 0', 
                                             background: '#f8fafc',
-                                            borderRadius: '14px',
-                                            border: '1px dashed #e2e8f0'
+                                            borderRadius: '12px',
+                                            border: '1px dashed #e2e8f0',
+                                            fontSize: '0.74rem',
+                                            color: '#94a3b8',
+                                            fontWeight: 555
                                           }}>
-                                            <BookOpen size={20} color="#94a3b8" style={{ strokeWidth: 1.5 }} />
-                                            <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
-                                              Keine aktiven Songs dokumentiert.
-                                            </span>
+                                            <BookOpen size={14} />
+                                            <span>Keine Hausaufgaben erfasst.</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Hausaufgaben dieser Woche */}
+                                    <div>
+                                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
+                                        Hausaufgaben dieser Woche (KW {prep.currentWeekNum || '?'})
+                                      </div>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        {((prep.currentWeekItems && prep.currentWeekItems.length > 0) || (prep.currentWeekNotes && prep.currentWeekNotes.length > 0)) ? (
+                                          <>
+                                            {prep.currentWeekItems && prep.currentWeekItems.map((item: any, idx: number) => {
+                                              const isBook = item.title.includes('Seite');
+                                              return (
+                                                <div key={`curr-item-${idx}`} style={{
+                                                  background: '#f8fafc',
+                                                  padding: '10px 12px',
+                                                  borderRadius: '12px',
+                                                  border: '1px solid rgba(0, 0, 0, 0.03)',
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'space-between',
+                                                  gap: '8px'
+                                                }}>
+                                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                                                    {isBook ? <BookOpen size={14} color="#64748b" /> : <Music size={14} color="#64748b" />}
+                                                    <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.8rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                                      {item.title}
+                                                    </span>
+                                                  </div>
+                                                  {(item.status === 'MASTERED' || item.status === 'THEORY_DONE') && (
+                                                    <span style={{
+                                                      background: 'rgba(16, 185, 129, 0.08)',
+                                                      color: '#10b981',
+                                                      fontSize: '0.64rem',
+                                                      fontWeight: 800,
+                                                      borderRadius: '100px',
+                                                      padding: '2px 8px',
+                                                      textTransform: 'uppercase',
+                                                      flexShrink: 0
+                                                    }}>
+                                                      Erledigt
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              );
+                                            })}
+                                            {prep.currentWeekNotes && prep.currentWeekNotes.map((note: string, idx: number) => (
+                                              <div key={`curr-note-${idx}`} style={{ 
+                                                fontSize: '0.75rem', 
+                                                color: '#475569', 
+                                                fontWeight: 500, 
+                                                fontStyle: 'italic', 
+                                                borderLeft: '2.5px solid #10b981', 
+                                                paddingLeft: '8px', 
+                                                margin: '2px 4px',
+                                                lineHeight: 1.3
+                                              }}>
+                                                {note}
+                                              </div>
+                                            ))}
+                                          </>
+                                        ) : (
+                                          <div style={{ 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            justifyContent: 'center',
+                                            gap: '6px', 
+                                            padding: '14px 0', 
+                                            background: '#f8fafc',
+                                            borderRadius: '12px',
+                                            border: '1px dashed #e2e8f0',
+                                            fontSize: '0.74rem',
+                                            color: '#94a3b8',
+                                            fontWeight: 550
+                                          }}>
+                                            <BookOpen size={14} />
+                                            <span>Keine Hausaufgaben erfasst.</span>
                                           </div>
                                         )}
                                       </div>
@@ -4281,7 +4539,7 @@ export function TeacherDashboard({
                                         }}
                                         style={{
                                           flex: 1,
-                                          background: '#007aff',
+                                          background: '#10b981',
                                           color: 'white',
                                           border: 'none',
                                           padding: '10px 14px',
@@ -4293,7 +4551,7 @@ export function TeacherDashboard({
                                           alignItems: 'center',
                                           justifyContent: 'center',
                                           gap: '6px',
-                                          boxShadow: '0 4px 12px rgba(0, 122, 255, 0.15)',
+                                          boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)',
                                           transition: 'all 0.2s'
                                         }}
                                         className="hover-scale"
@@ -4311,9 +4569,9 @@ export function TeacherDashboard({
                                           });
                                         }}
                                         style={{
-                                          background: 'rgba(0, 122, 255, 0.08)',
-                                          color: '#007aff',
-                                          border: 'none',
+                                          background: '#fdf6e2',
+                                          color: '#b45309',
+                                          border: '1px solid rgba(180, 83, 9, 0.1)',
                                           padding: '10px 14px',
                                           borderRadius: '12px',
                                           fontSize: '0.8rem',
