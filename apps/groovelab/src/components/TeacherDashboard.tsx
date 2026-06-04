@@ -5839,6 +5839,90 @@ export function TeacherDashboard({
                 )}
               </div>
 
+              {myBookings.length > 0 && (
+                <div style={{ 
+                  background: '#ffffff', 
+                  borderRadius: '24px', 
+                  padding: '24px', 
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                    <Calendar size={18} color="#8b5cf6" />
+                    <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Meine Buchungen</h3>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {myBookings.map((b: any) => {
+                      const dateObj = new Date(b.date);
+                      const dateFormatted = dateObj.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+                      const isPendingReschedule = b.status === 'pending_reschedule' || b.status === 'pending';
+                      
+                      const isRescheduled = b.status === 'pending_reschedule';
+                      const bg = 'rgba(139, 92, 246, 0.06)';
+                      const border = isRescheduled || isPendingReschedule ? '1px dashed rgba(139, 92, 246, 0.25)' : '1px solid rgba(139, 92, 246, 0.18)';
+                      const borderLeft = '4px solid #8b5cf6';
+                      const badgeBg = 'rgba(139, 92, 246, 0.12)';
+                      const badgeText = '#7c3aed';
+                      const roomColor = '#7c3aed';
+
+                      return (
+                        <div 
+                          key={b.id} 
+                          onClick={() => handleBookingClick(b)}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px',
+                            padding: '12px 14px',
+                            background: bg,
+                            border: border,
+                            borderLeft: borderLeft,
+                            borderRadius: '16px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.01)'
+                          }}
+                          className="hover-scale"
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.04)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.01)';
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#0f172a' }}>
+                              {dateFormatted} • {b.startTime} - {b.endTime}
+                            </span>
+                            <span style={{ 
+                              fontSize: '0.62rem', 
+                              fontWeight: 800, 
+                              color: badgeText,
+                              background: badgeBg,
+                              padding: '2px 6px',
+                              borderRadius: '6px',
+                              textTransform: 'uppercase'
+                            }}>
+                              {b.status === 'pending_reschedule' ? 'Verschoben' : (isPendingReschedule ? 'Reserviert' : 'Gebucht')}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 550, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ color: roomColor, fontWeight: 700 }}>
+                              {b.roomName || b.rooms?.name || 'Raum'}
+                            </span>
+                            {b.purpose && b.purpose.toLowerCase() !== 'unterricht' && (
+                              <span style={{ fontWeight: 500, opacity: 0.85 }}>
+                                {` (${b.purpose.replace(/^Unterricht:\s*/i, '')})`}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {!teacher?.sick_until && (
                 <>
                   {/* INFOS DER VERWALTUNG */}
@@ -6084,94 +6168,7 @@ export function TeacherDashboard({
                 </div>
               </div>
 
-              {/* MEINE BUCHUNGEN WIDGET */}
-              <div style={{ 
-                background: '#ffffff', 
-                borderRadius: '24px', 
-                padding: '24px', 
-                boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
-                  <Calendar size={18} color="#8b5cf6" />
-                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Meine Buchungen</h3>
-                </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {myBookings.length === 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px 0', textAlign: 'center', opacity: 0.6 }}>
-                      <Calendar size={24} color="#94a3b8" style={{ strokeWidth: 1.5 }} />
-                      <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
-                        Keine Buchungen in den nächsten 2 Wochen.
-                      </span>
-                    </div>
-                  ) : (
-                    myBookings.map((b: any) => {
-                      const dateObj = new Date(b.date);
-                      const dateFormatted = dateObj.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
-                      const isPendingReschedule = b.status === 'pending_reschedule' || b.status === 'pending';
-                      
-                      const isRescheduled = b.status === 'pending_reschedule';
-                      const bg = 'rgba(139, 92, 246, 0.06)';
-                      const border = isRescheduled || isPendingReschedule ? '1px dashed rgba(139, 92, 246, 0.25)' : '1px solid rgba(139, 92, 246, 0.18)';
-                      const borderLeft = '4px solid #8b5cf6';
-                      const badgeBg = 'rgba(139, 92, 246, 0.12)';
-                      const badgeText = '#7c3aed';
-                      const roomColor = '#7c3aed';
-
-                      return (
-                        <div 
-                          key={b.id} 
-                          onClick={() => handleBookingClick(b)}
-                          style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '4px',
-                            padding: '12px 14px',
-                            background: bg,
-                            border: border,
-                            borderLeft: borderLeft,
-                            borderRadius: '16px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.01)'
-                          }}
-                          className="hover-scale"
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.04)';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.01)';
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#0f172a' }}>
-                              {dateFormatted} • {b.startTime} - {b.endTime}
-                            </span>
-                            <span style={{ 
-                              fontSize: '0.62rem', 
-                              fontWeight: 800, 
-                              color: badgeText,
-                              background: badgeBg,
-                              padding: '2px 6px',
-                              borderRadius: '6px',
-                              textTransform: 'uppercase'
-                            }}>
-                              {b.status === 'pending_reschedule' ? 'Verschoben' : (isPendingReschedule ? 'Reserviert' : 'Gebucht')}
-                            </span>
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem', color: '#475569', fontWeight: 550 }}>
-                            <span>{b.isSchedule ? 'Unterricht' : 'Raumbuchung'}</span>
-                            <span style={{ color: roomColor, fontWeight: 700 }}>
-                              {b.roomName || b.rooms?.name || 'Raum'}
-                              {b.purpose && ` (${b.purpose})`}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
                 </>
               )}
             </aside>

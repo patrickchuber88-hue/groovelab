@@ -6623,14 +6623,20 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                           e.currentTarget.style.transform = 'none';
                         }}
                       >
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0 }}>
-                          <span style={{ fontSize: '0.8rem', fontWeight: 850, color: '#6d28d9', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                            {b.roomName}
-                            {b.purpose && <span style={{ fontWeight: 500, opacity: 0.85 }}>{` (${b.purpose})`}</span>}
-                          </span>
-                          <span style={{ fontSize: '0.7rem', color: '#af52de', fontWeight: 700 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
+                          <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#0f172a' }}>
                             {new Date(b.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} • {b.startTime} - {b.endTime}
                           </span>
+                          <div style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 550, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ color: '#6d28d9', fontWeight: 700 }}>
+                              {b.roomName}
+                            </span>
+                            {b.purpose && b.purpose.toLowerCase() !== 'unterricht' && (
+                              <span style={{ fontWeight: 500, opacity: 0.85 }}>
+                                {` (${b.purpose.replace(/^Unterricht:\s*/i, '')})`}
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         <button
