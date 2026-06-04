@@ -1395,6 +1395,7 @@ export function TeacherDashboard({
 
   const [briefingData, setBriefingData] = useState<any>(null);
   const [briefingLoading, setBriefingLoading] = useState(true);
+  const [kpiCollapsed, setKpiCollapsed] = useState(false);
   const [myBookings, setMyBookings] = useState<any[]>([]);
 
   // Helper to check if today is student's birthday
@@ -4028,14 +4029,34 @@ export function TeacherDashboard({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                   {/* Gamified KPI Cards row */}
                   {!teacher?.sick_until && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                    <div>
+                      {/* Collapse toggle */}
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '6px' }}>
+                        <button
+                          onClick={() => setKpiCollapsed(c => !c)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '5px',
+                            background: 'transparent', border: '1px solid rgba(0,0,0,0.08)',
+                            borderRadius: '100px', padding: '3px 10px',
+                            fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8',
+                            cursor: 'pointer', transition: 'all 0.2s', letterSpacing: '0.04em',
+                            textTransform: 'uppercase'
+                          }}
+                        >
+                          <svg width="10" height="10" viewBox="0 0 10 10" style={{ transition: 'transform 0.25s', transform: kpiCollapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                            <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                          </svg>
+                          {kpiCollapsed ? 'KPIs aufklappen' : 'KPIs einklappen'}
+                        </button>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
 
                       {/* Card 1: Heutige Schüler (Blue) */}
                       <div style={{
                         position: 'relative', overflow: 'hidden',
                         background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', color: 'white',
                         borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.35)',
-                        display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
+                        display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: kpiCollapsed ? '36px' : '70px',
                         padding: '14px 16px', boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                         border: '1px solid rgba(255, 255, 255, 0.12)'
@@ -4046,10 +4067,12 @@ export function TeacherDashboard({
                             <Users size={13} color="white" />
                           </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
-                          <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{activeLessonsCount}</span>
-                          <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Std.</span>
-                        </div>
+                        {!kpiCollapsed && (
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+                            <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{activeLessonsCount}</span>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Std.</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Card 2: Geburtstage Heute (Green) */}
@@ -4057,7 +4080,7 @@ export function TeacherDashboard({
                         position: 'relative', overflow: 'hidden',
                         background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white',
                         borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.35)',
-                        display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
+                        display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: kpiCollapsed ? '36px' : '70px',
                         padding: '14px 16px', boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                         border: '1px solid rgba(255, 255, 255, 0.12)'
@@ -4066,10 +4089,12 @@ export function TeacherDashboard({
                           <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Geburtstage</span>
                           <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', fontSize: '0.8rem' }}>🎂</div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
-                          <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{birthdaysCount}</span>
-                          <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Heute</span>
-                        </div>
+                        {!kpiCollapsed && (
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+                            <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{birthdaysCount}</span>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Heute</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Card 3: Tages-Pensum (Yellow) */}
@@ -4077,7 +4102,7 @@ export function TeacherDashboard({
                         position: 'relative', overflow: 'hidden',
                         background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: 'white',
                         borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(234, 179, 8, 0.4)',
-                        display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
+                        display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: kpiCollapsed ? '36px' : '70px',
                         padding: '14px 16px', boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                         border: '1px solid rgba(255, 255, 255, 0.12)'
@@ -4088,9 +4113,11 @@ export function TeacherDashboard({
                             <Clock size={13} color="white" />
                           </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
-                          <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{workloadHoursStr}</span>
-                        </div>
+                        {!kpiCollapsed && (
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+                            <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{workloadHoursStr}</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Card 4: Ausfälle Heute (Red) */}
@@ -4098,7 +4125,7 @@ export function TeacherDashboard({
                         position: 'relative', overflow: 'hidden',
                         background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: 'white',
                         borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.35)',
-                        display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
+                        display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: kpiCollapsed ? '36px' : '70px',
                         padding: '14px 16px', boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                         border: '1px solid rgba(255, 255, 255, 0.12)'
@@ -4109,13 +4136,16 @@ export function TeacherDashboard({
                             <AlertCircle size={13} color="white" />
                           </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
-                          <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{cancellationsCount}</span>
-                          <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Heute</span>
-                        </div>
+                        {!kpiCollapsed && (
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+                            <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{cancellationsCount}</span>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Heute</span>
+                          </div>
+                        )}
                       </div>
 
                     </div>
+                  </div>
                   )}
 
                   {/* SCHEDULE & PREP-MIRROR ROW (Two Columns: Left has greeting banner and Schüler Notizen, Right has Tagesplan) */}

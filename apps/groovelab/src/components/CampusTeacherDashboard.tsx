@@ -29,6 +29,7 @@ interface CampusTeacherDashboardProps {
 export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashboardProps) {
   // Navigation State
   const [activeBoard, setActiveBoard] = useState<'compass' | 'classes' | 'schedule' | 'bypass' | 'setup' | 'rooms'>('compass');
+  const [kpiCollapsed, setKpiCollapsed] = useState(false);
 
   // Teacher Profile Data
   const [teacher, setTeacher] = useState<any>(null);
@@ -1368,88 +1369,117 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
             </div>
 
             {/* Gamified KPI Cards row */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
-
-              {/* Card 1: Heutige Stunden (Blue) */}
-              <div style={{
-                position: 'relative', overflow: 'hidden',
-                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', color: 'white',
-                borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.4)',
-                display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
-                padding: '14px 16px', boxSizing: 'border-box',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                border: '1px solid rgba(255, 255, 255, 0.12)'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Heutige Stunden</span>
-                  <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', fontSize: '0.8rem' }}>📅</div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
-                  <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{sortedTodaySchedules.length}</span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Std.</span>
-                </div>
+            <div>
+              {/* Collapse toggle */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '6px' }}>
+                <button
+                  onClick={() => setKpiCollapsed(c => !c)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '5px',
+                    background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '100px', padding: '3px 10px',
+                    fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8',
+                    cursor: 'pointer', transition: 'all 0.2s', letterSpacing: '0.04em',
+                    textTransform: 'uppercase'
+                  }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" style={{ transition: 'transform 0.25s', transform: kpiCollapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                    <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                  </svg>
+                  {kpiCollapsed ? 'KPIs aufklappen' : 'KPIs einklappen'}
+                </button>
               </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
 
-              {/* Card 2: Cockpit Auslastung (Green) */}
-              <div style={{
-                position: 'relative', overflow: 'hidden',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white',
-                borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.4)',
-                display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
-                padding: '14px 16px', boxSizing: 'border-box',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                border: '1px solid rgba(255, 255, 255, 0.12)'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Auslastung</span>
-                  <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', fontSize: '0.8rem' }}>📈</div>
+                {/* Card 1: Heutige Stunden (Blue) */}
+                <div style={{
+                  position: 'relative', overflow: 'hidden',
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', color: 'white',
+                  borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.4)',
+                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: kpiCollapsed ? '36px' : '70px',
+                  padding: '14px 16px', boxSizing: 'border-box',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Heutige Stunden</span>
+                    <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', fontSize: '0.8rem' }}>📅</div>
+                  </div>
+                  {!kpiCollapsed && (
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+                      <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{sortedTodaySchedules.length}</span>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Std.</span>
+                    </div>
+                  )}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
-                  <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{rooms.length ? Math.min(100, Math.round((sortedTodaySchedules.length / 9) * 100)) : 75}</span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>%</span>
+
+                {/* Card 2: Cockpit Auslastung (Green) */}
+                <div style={{
+                  position: 'relative', overflow: 'hidden',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white',
+                  borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.4)',
+                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: kpiCollapsed ? '36px' : '70px',
+                  padding: '14px 16px', boxSizing: 'border-box',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Auslastung</span>
+                    <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', fontSize: '0.8rem' }}>📈</div>
+                  </div>
+                  {!kpiCollapsed && (
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+                      <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{rooms.length ? Math.min(100, Math.round((sortedTodaySchedules.length / 9) * 100)) : 75}</span>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>%</span>
+                    </div>
+                  )}
                 </div>
+
+                {/* Card 3: Ausstehende Alerts (Yellow) */}
+                <div style={{
+                  position: 'relative', overflow: 'hidden',
+                  background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: 'white',
+                  borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(234, 179, 8, 0.4)',
+                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: kpiCollapsed ? '36px' : '70px',
+                  padding: '14px 16px', boxSizing: 'border-box',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Offene Alerts</span>
+                    <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', fontSize: '0.8rem' }}>🔔</div>
+                  </div>
+                  {!kpiCollapsed && (
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+                      <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{notifications.filter(n => !n.resolved).length}</span>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Offen</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Card 4: Abgesagte Termine (Red) */}
+                <div style={{
+                  position: 'relative', overflow: 'hidden',
+                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: 'white',
+                  borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.4)',
+                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: kpiCollapsed ? '36px' : '70px',
+                  padding: '14px 16px', boxSizing: 'border-box',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Abgesagt</span>
+                    <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', fontSize: '0.8rem' }}>✕</div>
+                  </div>
+                  {!kpiCollapsed && (
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+                      <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{sortedTodaySchedules.filter(s => s.status === 'canceled_by_student').length}</span>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Heute</span>
+                    </div>
+                  )}
+                </div>
+
               </div>
-
-              {/* Card 3: Ausstehende Alerts (Yellow) */}
-              <div style={{
-                position: 'relative', overflow: 'hidden',
-                background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: 'white',
-                borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(234, 179, 8, 0.4)',
-                display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
-                padding: '14px 16px', boxSizing: 'border-box',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                border: '1px solid rgba(255, 255, 255, 0.12)'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Offene Alerts</span>
-                  <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', fontSize: '0.8rem' }}>🔔</div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
-                  <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{notifications.filter(n => !n.resolved).length}</span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Offen</span>
-                </div>
-              </div>
-
-              {/* Card 4: Abgesagte Termine (Red) */}
-              <div style={{
-                position: 'relative', overflow: 'hidden',
-                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: 'white',
-                borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.4)',
-                display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
-                padding: '14px 16px', boxSizing: 'border-box',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                border: '1px solid rgba(255, 255, 255, 0.12)'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Abgesagt</span>
-                  <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', fontSize: '0.8rem' }}>✕</div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
-                  <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{sortedTodaySchedules.filter(s => s.status === 'canceled_by_student').length}</span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Heute</span>
-                </div>
-              </div>
-
             </div>
 
             {/* Terminänderungen & Alerts Widget */}
