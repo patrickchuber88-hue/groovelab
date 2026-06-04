@@ -6524,18 +6524,20 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                         </div>
                                       )}
 
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                                        <span style={{ 
-                                          display: 'inline-flex', 
-                                          alignItems: 'center',
-                                          background: isOwnBooking && !b.isPreview ? '#ffffff' : 'rgba(0, 0, 0, 0.05)',
-                                          color: isOwnBooking && !b.isPreview ? '#000000' : textColor,
-                                          padding: '1.5px 5px',
-                                          borderRadius: '4px',
-                                          fontSize: '0.58rem',
-                                          fontWeight: 900
-                                        }}>
-                                          {isSchedule && <GraduationCap size={9} style={{ marginRight: '3px' }} />}
+                                      <div style={{ 
+                                        display: 'flex', 
+                                        justifyContent: 'space-between', 
+                                        alignItems: 'center', 
+                                        fontSize: '0.64rem', 
+                                        fontWeight: 800,
+                                        background: isOwnBooking && !b.isPreview ? '#ffffff' : 'rgba(0, 0, 0, 0.04)',
+                                        color: isOwnBooking && !b.isPreview ? '#000000' : textColor,
+                                        padding: '4px 8px',
+                                        margin: '-6px -8px 6px -8px',
+                                        borderBottom: isOwnBooking && !b.isPreview ? 'none' : `1px solid ${leftAccentColor}15`
+                                      }}>
+                                        <span style={{ display: 'flex', alignItems: 'center' }}>
+                                          {isSchedule && <GraduationCap size={10} style={{ marginRight: '3px' }} />}
                                           {b.startTime} - {b.endTime}{b.isPreview && ' (Vorschau)'}
                                         </span>
                                       </div>
