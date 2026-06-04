@@ -234,6 +234,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [editSongTitle, setEditSongTitle] = useState('');
   const [editSongArtist, setEditSongArtist] = useState('');
   const [copiedPraiseId, setCopiedPraiseId] = useState<string | null>(null);
+  const [isEditingTarget, setIsEditingTarget] = useState(false);
+  const [tempTarget, setTempTarget] = useState('300');
   const [editSongInstrumentation, setEditSongInstrumentation] = useState<Record<string, number>>({});
   const [assignSongStudentInstrument, setAssignSongStudentInstrument] = useState<string>('E-Gitarre');
   const [selectedSongSkill, setSelectedSongSkill] = useState<any | null>(null);
@@ -2447,6 +2449,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       }
     });
 
+    const customWeeklyTarget = openingHours?.weekly_targets?.[userId] || 300;
+
     setStats({
       studentCount,
       songCount,
@@ -2463,9 +2467,41 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       otherClassMins,
       myClassCount: myStudents.length,
       classWeeklyMins,
+      weeklyTarget: customWeeklyTarget,
       highlights
     });
-  };;
+  };
+
+  const handleSaveTarget = async (minutesVal: number) => {
+    if (!admin?.school_id) return;
+    const currentHours = admin?.schools?.opening_hours || {};
+    const updatedHours = {
+      ...currentHours,
+      weekly_targets: {
+        ...(currentHours.weekly_targets || {}),
+        [userId]: minutesVal
+      }
+    };
+
+    const { error } = await supabase
+      .from('schools')
+      .update({ opening_hours: updatedHours })
+      .eq('id', admin.school_id);
+
+    if (error) {
+      alert("Fehler beim Speichern: " + error.message);
+    } else {
+      setAdmin({
+        ...admin,
+        schools: {
+          ...admin.schools,
+          opening_hours: updatedHours
+        }
+      });
+      setIsEditingTarget(false);
+      fetchStats(admin.school_id);
+    }
+  };
 
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -8584,7 +8620,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       const totalSchoolMins = myClassMins + otherClassMins;
 
       const classWeeklyMins = stats.classWeeklyMins || 0;
-      const weeklyTarget = 300; // 5 hours target
+      const weeklyTarget = stats.weeklyTarget || 300;
       const targetPercent = Math.min(100, Math.round((classWeeklyMins / weeklyTarget) * 100));
 
       // Pie chart data
@@ -8698,12 +8734,57 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
               {/* Weekly Class Target Card */}
               <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0' }}>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>🌱</span> Klassen-Wochenziel
-                </h3>
-                <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0 0 24px 0', fontWeight: 600 }}>
-                  Gemeinsam schaffen wir mehr! Euer kollektives Ziel von {weeklyTarget} Minuten pro Woche.
-                </p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                    <span>🌱</span> Klassen-Wochenziel
+                  </h3>
+                  {!isEditingTarget && (
+                    <button 
+                      onClick={() => {
+                        setTempTarget(weeklyTarget.toString());
+                        setIsEditingTarget(true);
+                      }}
+                      style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', padding: '4px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      title="Ziel bearbeiten"
+                      className="hover-scale"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                  )}
+                </div>
+                
+                {isEditingTarget ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', margin: '16px 0' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <input
+                        type="number"
+                        min="1"
+                        value={tempTarget}
+                        onChange={(e) => setTempTarget(e.target.value)}
+                        style={{ padding: '8px 12px', borderRadius: '8px', border: `1px solid ${brandColor}`, width: '100px', fontSize: '0.9rem', fontWeight: 700 }}
+                      />
+                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>Minuten pro Woche</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => handleSaveTarget(parseInt(tempTarget, 10) || 300)}
+                        style={{ background: brandColor, color: 'white', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
+                      >
+                        Speichern
+                      </button>
+                      <button
+                        onClick={() => setIsEditingTarget(false)}
+                        style={{ background: '#f1f5f9', color: '#475569', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
+                      >
+                        Abbrechen
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0 0 24px 0', fontWeight: 600 }}>
+                    Gemeinsam schaffen wir mehr! Euer kollektives Ziel von {weeklyTarget} Minuten pro Woche.
+                  </p>
+                )}
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '8px' }}>
                   <span style={{ fontSize: '0.85rem', fontWeight: 850, color: '#0f172a' }}>
