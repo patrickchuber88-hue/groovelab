@@ -300,7 +300,7 @@ export default function CampusDirectMessages({
                     width: '100%',
                     padding: '14px 16px',
                     borderRadius: '16px',
-                    background: isSelected ? 'linear-gradient(135deg, #eff6ff, #dbeafe)' : 'transparent',
+                    background: isSelected ? 'linear-gradient(135deg, #f0fdf4, #dcfce7)' : 'transparent',
                     border: '1px solid transparent',
                     cursor: 'pointer',
                     marginBottom: '6px',
@@ -342,7 +342,7 @@ export default function CampusDirectMessages({
 
                   <div style={{ flex: 1, overflow: 'hidden' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                      <span style={{ fontWeight: 800, fontSize: '0.9rem', color: isSelected ? '#1e3a8a' : '#1e293b' }}>
+                      <span style={{ fontWeight: 800, fontSize: '0.9rem', color: isSelected ? '#14532d' : '#1e293b' }}>
                         {partner.first_name} {partner.last_name || ''}
                       </span>
                       {partner.lastMessage && (
@@ -400,8 +400,8 @@ export default function CampusDirectMessages({
                   fontWeight: 900,
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
-                  background: selectedRecipient.role === 'student' ? '#eff6ff' : '#fee2e2',
-                  color: selectedRecipient.role === 'student' ? '#3b82f6' : '#ef4444',
+                  background: selectedRecipient.role === 'student' ? '#f0fdf4' : '#fee2e2',
+                  color: selectedRecipient.role === 'student' ? '#16a34a' : '#ef4444',
                   padding: '2px 8px',
                   borderRadius: '6px',
                   display: 'inline-block',
@@ -420,8 +420,8 @@ export default function CampusDirectMessages({
                   padding: '10px 16px',
                   border: 'none',
                   background: 'transparent',
-                  borderBottom: chatChannel === 'personal' ? '3px solid #4f46e5' : '3px solid transparent',
-                  color: chatChannel === 'personal' ? '#4f46e5' : '#64748b',
+                  borderBottom: chatChannel === 'personal' ? '3px solid #16a34a' : '3px solid transparent',
+                  color: chatChannel === 'personal' ? '#16a34a' : '#64748b',
                   fontWeight: 800,
                   fontSize: '0.85rem',
                   cursor: 'pointer',
@@ -440,8 +440,8 @@ export default function CampusDirectMessages({
                   padding: '10px 16px',
                   border: 'none',
                   background: 'transparent',
-                  borderBottom: chatChannel === 'system' ? '3px solid #4f46e5' : '3px solid transparent',
-                  color: chatChannel === 'system' ? '#4f46e5' : '#64748b',
+                  borderBottom: chatChannel === 'system' ? '3px solid #16a34a' : '3px solid transparent',
+                  color: chatChannel === 'system' ? '#16a34a' : '#64748b',
                   fontWeight: 800,
                   fontSize: '0.85rem',
                   cursor: 'pointer',
@@ -495,7 +495,7 @@ export default function CampusDirectMessages({
                         style={{
                           padding: '12px 18px',
                           borderRadius: isSelf ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
-                          background: isSelf ? 'linear-gradient(135deg, #4f46e5, #4338ca)' : 'white',
+                          background: isSelf ? 'linear-gradient(135deg, #16a34a, #15803d)' : 'white',
                           color: isSelf ? 'white' : '#1e293b',
                           boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
                           border: isSelf ? 'none' : '1px solid #f1f5f9',
@@ -531,9 +531,9 @@ export default function CampusDirectMessages({
                 <button 
                   type="button"
                   onClick={() => setChatChannel('personal')}
-                  style={{ background: '#e0e7ff', border: 'none', color: '#4f46e5', padding: '8px 16px', borderRadius: '12px', fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer', transition: 'all 0.2s' }}
-                  onMouseOver={e => e.currentTarget.style.background = '#c7d2fe'}
-                  onMouseOut={e => e.currentTarget.style.background = '#e0e7ff'}
+                  style={{ background: '#dcfce7', border: 'none', color: '#16a34a', padding: '8px 16px', borderRadius: '12px', fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer', transition: 'all 0.2s' }}
+                  onMouseOver={e => e.currentTarget.style.background = '#bbf7d0'}
+                  onMouseOut={e => e.currentTarget.style.background = '#dcfce7'}
                 >
                   Zum persönlichen Chat
                 </button>
@@ -560,7 +560,7 @@ export default function CampusDirectMessages({
                 <button
                   type="submit"
                   style={{
-                    background: 'linear-gradient(135deg, #4f46e5, #4338ca)',
+                    background: 'linear-gradient(135deg, #16a34a, #15803d)',
                     color: 'white',
                     border: 'none',
                     width: '48px',
@@ -570,7 +570,7 @@ export default function CampusDirectMessages({
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)',
+                    boxShadow: '0 4px 12px rgba(22, 163, 74, 0.3)',
                     transition: 'all 0.2s'
                   }}
                   className="hover-scale"
@@ -593,7 +593,7 @@ export default function CampusDirectMessages({
               boxShadow: '0 10px 25px rgba(0,0,0,0.03)',
               marginBottom: '24px'
             }}>
-              <Inbox size={36} style={{ strokeWidth: 1.5, color: '#4f46e5' }} />
+              <Inbox size={36} style={{ strokeWidth: 1.5, color: '#16a34a' }} />
             </div>
             <h3 style={{ fontSize: '1.3rem', fontWeight: 900, color: '#1e293b', marginBottom: '8px' }}>Willkommen im Chat</h3>
             <p style={{ fontSize: '0.95rem', color: '#64748b', maxWidth: '360px', lineHeight: 1.6, margin: '0' }}>
