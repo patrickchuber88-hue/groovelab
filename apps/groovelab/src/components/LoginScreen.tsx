@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, RotateCw } from 'lucide-react';
-import { Scanner } from '@yudiel/react-qr-scanner';
 import { getDistanceFromLatLonInM } from '../utils/geo';
 import jsQR from 'jsqr';
 
@@ -10,7 +9,130 @@ interface LoginScreenProps {
   kioskStationId?: string | null;
 }
 
+interface CustomQRScannerProps {
+  onScan: (value: string) => void;
+  onError: (error: any) => void;
+  paused?: boolean;
+  facingMode: 'user' | 'environment';
+}
 
+function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQRScannerProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const requestRef = useRef<number | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function startCamera() {
+      try {
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+        }
+
+        const constraints: MediaStreamConstraints = {
+          video: {
+            facingMode: facingMode,
+            width: { ideal: 640 },
+            height: { ideal: 640 }
+          },
+          audio: false
+        };
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (!active) {
+          stream.getTracks().forEach(track => track.stop());
+          return;
+        }
+
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.setAttribute('playsinline', 'true');
+          videoRef.current.play().catch(err => {
+            console.warn('[Scanner] Play failed:', err);
+          });
+        }
+      } catch (err: any) {
+        console.error('[Scanner] getUserMedia error:', err);
+        onError(err);
+      }
+    }
+
+    if (!paused) {
+      startCamera();
+    } else {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+    }
+
+    return () => {
+      active = false;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+      if (requestRef.current) {
+        cancelAnimationFrame(requestRef.current);
+        requestRef.current = null;
+      }
+    };
+  }, [facingMode, paused]);
+
+  useEffect(() => {
+    if (paused) {
+      if (requestRef.current) {
+        cancelAnimationFrame(requestRef.current);
+        requestRef.current = null;
+      }
+      return;
+    }
+
+    canvasRef.current = document.createElement('canvas');
+
+    const scanFrame = () => {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      if (video && canvas && video.readyState === video.HAVE_ENOUGH_DATA) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: 'dontInvert'
+          });
+          if (code && code.data) {
+            onScan(code.data);
+          }
+        }
+      }
+      requestRef.current = requestAnimationFrame(scanFrame);
+    };
+
+    requestRef.current = requestAnimationFrame(scanFrame);
+
+    return () => {
+      if (requestRef.current) {
+        cancelAnimationFrame(requestRef.current);
+        requestRef.current = null;
+      }
+    };
+  }, [paused, onScan]);
+
+  return (
+    <video
+      ref={videoRef}
+      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+      playsInline
+      muted
+    />
+  );
+}
 
 const isWithinOpeningHours = (openingHours: any) => {
   if (!openingHours) return true;
@@ -708,15 +830,16 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
       
       if (!isMaster) {
-        // Enforce school matching check for students using component-level schoolData state
+        // Enforce school matching check for students using component-level schoolData state or userSchool fallback
         if (user.role === 'student') {
-          if (!schoolData?.id) {
+          const effectiveSchool = schoolData || userSchool;
+          if (!effectiveSchool?.id) {
             alert("Login verweigert. Für den Schüler-Login wird ein zugehöriger Schul-Link benötigt.");
             await supabase.auth.signOut();
             setLoading(false);
             return;
           }
-          if (user.school_id !== schoolData.id) {
+          if (user.school_id !== effectiveSchool.id) {
             alert("Login verweigert. Dieser Login-Link gehört nicht zu deiner Schule.");
             await supabase.auth.signOut();
             setLoading(false);
@@ -897,7 +1020,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         
         const schoolId = (stationData?.rooms as any)?.school_id;
         if (schoolId) {
-          const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', schoolId).eq('is_groovelab_active', true).order('sort_order', { ascending: true });
+          const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+          let roomsQuery = supabase.from('rooms').select('*').eq('school_id', schoolId);
+          if (activePlatform === 'campus') {
+            roomsQuery = roomsQuery.eq('is_campus_active', true);
+          } else {
+            roomsQuery = roomsQuery.eq('is_groovelab_active', true);
+          }
+          const { data: rooms } = await roomsQuery.order('sort_order', { ascending: true });
           setPrefetchedRooms(rooms);
           console.log(`[Login] Pre-fetched ${rooms?.length} rooms for school: ${schoolId}`);
         }
@@ -914,8 +1044,15 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     async function fetchKioskData() {
       try {
         setLoadingKioskData(true);
+        const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+        let roomsQuery = supabase.from('rooms').select('*').eq('school_id', schoolData.id);
+        if (activePlatform === 'campus') {
+          roomsQuery = roomsQuery.eq('is_campus_active', true);
+        } else {
+          roomsQuery = roomsQuery.eq('is_groovelab_active', true);
+        }
         const [roomsRes, stationsRes, sessionsRes] = await Promise.all([
-          supabase.from('rooms').select('*').eq('school_id', schoolData.id).eq('is_groovelab_active', true).order('sort_order', { ascending: true }),
+          roomsQuery.order('sort_order', { ascending: true }),
           supabase.from('stations').select('*').order('name'),
           supabase.from('sessions').select('station_id').is('check_out_time', null)
         ]);
@@ -1012,11 +1149,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     setError(null);
     try {
       console.log('[Login] Attempting manual PIN login for:', pin);
+      const cleanPin = pin.trim();
+      sessionStorage.setItem('groovelab_qr_token', cleanPin);
+
       let query = supabase
         .from('users')
         .select('*, schools(*)');
       
-      const cleanPin = pin.trim();
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanPin);
       const isTokenLogin = cleanPin.startsWith('t_') || isUuid;
 
@@ -1031,6 +1170,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       }
 
       const { data: user, error: userErr } = await query.maybeSingle();
+      sessionStorage.removeItem('groovelab_qr_token');
 
       if (userErr || !user) {
         throw new Error('Ungültiger Ausweis-PIN oder QR-Token.');
@@ -1046,17 +1186,25 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         user.school_id = userSchool.id;
       }
 
+      // Automatically resolve schoolData from the database if not present in the URL parameter
+      if (!schoolData && userSchool) {
+        setSchoolData(userSchool);
+        setSchoolName(userSchool.name);
+      }
+
       if (user.role === 'student') {
-        if (!schoolData?.id) {
+        const effectiveSchool = schoolData || userSchool;
+        if (!effectiveSchool?.id) {
           throw new Error('Für den Schüler-Login wird ein zugehöriger Schul-Link benötigt.');
         }
-        if (user.school_id !== schoolData.id) {
+        if (user.school_id !== effectiveSchool.id) {
           throw new Error('Login verweigert. Dieser Login-Link gehört nicht zu deiner Schule.');
         }
       }
 
+      const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
       let isWithinAnyRoom = true;
-      const isBypass = userSchool?.opening_hours?.geofence_bypass === true || !!effectiveStationId;
+      const isBypass = true; // Bypassed: Geofence deactivated, user is always let in if credentials match
 
       if (!isBypass) {
         isWithinAnyRoom = false;
@@ -1077,7 +1225,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         }
 
         if (currentPos) {
-          const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', user.school_id).eq('is_groovelab_active', true).order('sort_order', { ascending: true });
+          const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+          let roomsQuery = supabase.from('rooms').select('*').eq('school_id', user.school_id);
+          if (activePlatform === 'campus') {
+            roomsQuery = roomsQuery.eq('is_campus_active', true);
+          } else {
+            roomsQuery = roomsQuery.eq('is_groovelab_active', true);
+          }
+          const { data: rooms } = await roomsQuery.order('sort_order', { ascending: true });
           if (rooms) {
             for (const room of rooms) {
               const points = Array.isArray(room.geofence_points) ? room.geofence_points : [];
@@ -1124,7 +1279,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         }
       }
 
-      const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
+
       if (isTeacher) {
         if (user.is_observer) {
           await finalizeLogin(user, effectiveStationId, false, true);
@@ -1193,37 +1348,26 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     setLoading(true);
     setError(null);
 
-    let qrToken = scannedValue;
+    let qrToken = scannedValue.trim();
     try {
-      if (scannedValue.includes('?')) {
-        const urlParams = new URLSearchParams(scannedValue.split('?')[1]);
-        const parsedToken = urlParams.get('qr_token') || urlParams.get('teacher_qr_token');
+      if (scannedValue.includes('?') || scannedValue.startsWith('http://') || scannedValue.startsWith('https://')) {
+        // Handle case where it might be a query string or a full URL
+        const urlString = scannedValue.includes('?') ? scannedValue : `http://dummy.com/?${scannedValue}`;
+        const urlObj = new URL(urlString);
+        const parsedToken = urlObj.searchParams.get('qr_token') || 
+                            urlObj.searchParams.get('teacher_qr_token') || 
+                            urlObj.searchParams.get('token') || 
+                            urlObj.searchParams.get('campus_pass');
         if (parsedToken) {
-          qrToken = parsedToken;
+          qrToken = parsedToken.trim();
         }
       }
     } catch (e) {
       console.warn("Failed to parse scanned URL", e);
     }
+    console.log('[Login] handleScan scannedValue:', scannedValue, '-> parsed qrToken:', qrToken);
 
-    // 0. Force kill camera immediately upon scan
-    try {
-      document.querySelectorAll('video').forEach(video => {
-        const stream = video.srcObject as MediaStream;
-        if (stream) {
-          stream.getTracks().forEach(track => track.stop());
-          video.srcObject = null;
-        }
-      });
-      
-      // Secondary fallback to kill any global media streams
-      navigator.mediaDevices.getUserMedia({ video: true })
-        .then(stream => {
-           stream.getTracks().forEach(t => t.stop());
-        }).catch(e => { /* Ignore */ });
-    } catch (e) {
-      console.warn("Could not kill camera", e);
-    }
+    // Camera stream will be naturally released on page reload, avoiding browser locks.
 
     try {
       console.log('[Login] Starting scan for token:', qrToken);
@@ -1258,18 +1402,26 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         user.school_id = userSchool.id;
       }
 
+      // Automatically resolve schoolData from the database if not present in the URL parameter
+      if (!schoolData && userSchool) {
+        setSchoolData(userSchool);
+        setSchoolName(userSchool.name);
+      }
+
       if (user.role === 'student') {
-        if (!schoolData?.id) {
+        const effectiveSchool = schoolData || userSchool;
+        if (!effectiveSchool?.id) {
           throw new Error('Für den Schüler-Login wird ein zugehöriger Schul-Link benötigt.');
         }
-        if (user.school_id !== schoolData.id) {
+        if (user.school_id !== effectiveSchool.id) {
           throw new Error('Login verweigert. Dieser Login-Link gehört nicht zu deiner Schule.');
         }
       }
 
       // 2. Geofence Check (Simpel & Stabil)
+      const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
       let isWithinAnyRoom = true;
-      const isBypass = schoolData?.opening_hours?.geofence_bypass === true || !!effectiveStationId;
+      const isBypass = true; // Bypassed: Geofence deactivated, user is always let in if credentials match
 
       if (!isBypass) {
         isWithinAnyRoom = false;
@@ -1293,7 +1445,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
         if (currentPos) {
           // 1. Check Rooms (Multi-Point)
-          const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', user.school_id).eq('is_groovelab_active', true).order('sort_order', { ascending: true });
+          const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+          let roomsQuery = supabase.from('rooms').select('*').eq('school_id', user.school_id);
+          if (activePlatform === 'campus') {
+            roomsQuery = roomsQuery.eq('is_campus_active', true);
+          } else {
+            roomsQuery = roomsQuery.eq('is_groovelab_active', true);
+          }
+          const { data: rooms } = await roomsQuery.order('sort_order', { ascending: true });
           if (rooms) {
             for (const room of rooms) {
               const points = Array.isArray(room.geofence_points) ? room.geofence_points : [];
@@ -1359,7 +1518,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         return;
       }
 
-      const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
+
       if (isTeacher) {
         if (user.is_observer) {
           // Hospitanten are always sent to home mode without prompt
@@ -1766,19 +1925,20 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           position: 'relative',
           boxShadow: '0 0 0 4px rgba(0,0,0,0.02)'
         }}>
-          <Scanner
-            key={`groovelab-scanner-${facingMode}`}
-            onScan={(result) => {
-              const val = result?.[0]?.rawValue;
-              if (val) handleScan(val);
+          <CustomQRScanner
+            onScan={(val) => {
+              console.log('[Scanner] Extracted QR value:', val);
+              handleScan(val);
+            }}
+            onError={(err: any) => {
+              console.error('[Scanner] Camera error:', err);
+              const errMsg = err?.message || String(err || '');
+              if (!errMsg.toLowerCase().includes('abort') && !errMsg.toLowerCase().includes('aborted')) {
+                setError(`Kamera-Fehler: ${errMsg}`);
+              }
             }}
             paused={loading}
-            components={{ finder: true }}
-            styles={{
-              container: { width: '100%', height: '100%' },
-              video: { width: '100%', height: '100%', objectFit: 'cover' }
-            }}
-            constraints={{ facingMode }}
+            facingMode={facingMode}
           />
 
           {/* Switch Camera Button */}
@@ -2093,11 +2253,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.8 }}>
               <span>Deine Position:</span>
-              <span style={{ fontWeight: 700 }}>{geoDebug.userPos ? `${geoDebug.userPos.lat.toFixed(4)}, ${geoDebug.userPos.lng.toFixed(4)}` : 'Wird gesucht...'}</span>
+              <span style={{ fontWeight: 700 }}>{geoDebug.userPos && typeof geoDebug.userPos.lat === 'number' && typeof geoDebug.userPos.lng === 'number' ? `${geoDebug.userPos.lat.toFixed(4)}, ${geoDebug.userPos.lng.toFixed(4)}` : 'Wird gesucht...'}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.8 }}>
               <span>Ziel (Akademie):</span>
-              <span style={{ fontWeight: 700 }}>{geoDebug.schoolCoords ? `${geoDebug.schoolCoords.lat.toFixed(4)}, ${geoDebug.schoolCoords.lng.toFixed(4)}` : 'Nicht gesetzt'}</span>
+              <span style={{ fontWeight: 700 }}>{geoDebug.schoolCoords && typeof geoDebug.schoolCoords.lat === 'number' && typeof geoDebug.schoolCoords.lng === 'number' ? `${geoDebug.schoolCoords.lat.toFixed(4)}, ${geoDebug.schoolCoords.lng.toFixed(4)}` : 'Nicht gesetzt'}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '8px' }}>
               <span>Berechnete Distanz:</span>
@@ -2852,6 +3012,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 if (pinSetupInput.length !== 4) return;
                 setLoading(true);
                 try {
+                  if (pinSetupUser?.ausweis_nummer) {
+                    sessionStorage.setItem('groovelab_qr_token', pinSetupUser.ausweis_nummer);
+                  }
                   const { error } = await supabase
                     .from('users')
                     .update({
@@ -2859,6 +3022,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                       is_pin_activated: true
                     })
                     .eq('id', pinSetupUser.id);
+
+                  sessionStorage.removeItem('groovelab_qr_token');
 
                   if (error) throw error;
                   

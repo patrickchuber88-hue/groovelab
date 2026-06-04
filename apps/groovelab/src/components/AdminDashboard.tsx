@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, ChevronLeft, ChevronRight, GripVertical, BookOpen } from 'lucide-react';
+import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, ChevronLeft, ChevronRight, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap } from 'lucide-react';
 import { 
   ResponsiveContainer,
   BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell,
@@ -184,6 +184,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [students, setStudents] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
+  const [schedules, setSchedules] = useState<any[]>([]);
   const [stations, setStations] = useState<any[]>([]);
   const [songs, setSongs] = useState<any[]>([]);
   const [allBands, setAllBands] = useState<any[]>([]);
@@ -226,12 +227,19 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
   // Campus Bookings states
   const [selectedCampusRoomId, setSelectedCampusRoomId] = useState<string>(() => rooms[0]?.id || '');
-  const [campusBookings, setCampusBookings] = useState<any[]>([]);
+  const [campusBookings, setCampusBookings] = useState<any[]>(() => {
+    const stored = localStorage.getItem('groovelab_campus_bookings');
+    return stored ? JSON.parse(stored) : [];
+  });
   const [bookingDate, setBookingDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [bookingStartTime, setBookingStartTime] = useState<string>('08:00');
   const [bookingEndTime, setBookingEndTime] = useState<string>('09:00');
   const [bookingPurpose, setBookingPurpose] = useState<string>('');
   const [successAnimationRoomId, setSuccessAnimationRoomId] = useState<string | null>(null);
+  const [selectedFloor, setSelectedFloor] = useState<string>('Alle');
+  const [showMyBookingsOnly, setShowMyBookingsOnly] = useState<boolean>(false);
+  const [isDateFilterActive, setIsDateFilterActive] = useState<boolean>(false);
+  const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
 
   // Textbausteine states
   const [textbausteine, setTextbausteine] = useState<any[]>(() => {
@@ -322,6 +330,46 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       setTbCategory('rhythm');
     }
   }, [editingTextbaustein, textbausteine]);
+
+  useEffect(() => {
+    const [sh, sm] = bookingStartTime.split(':').map(Number);
+    const [eh, em] = bookingEndTime.split(':').map(Number);
+    const startMins = sh * 60 + sm;
+    const endMins = eh * 60 + em;
+    if (endMins <= startMins) {
+      const targetEndMins = startMins + 30;
+      const th = String(Math.floor(targetEndMins / 60)).padStart(2, '0');
+      const tm = String(targetEndMins % 60).padStart(2, '0');
+      setBookingEndTime(`${th}:${tm}`);
+    }
+  }, [bookingStartTime, bookingEndTime]);
+
+  useEffect(() => {
+    if (isDateFilterActive && rooms.length > 0) {
+      const dateBookings = campusBookings.filter((b: any) => b.date === bookingDate);
+      const available = rooms.filter(room => {
+        return !dateBookings.some((b: any) => {
+          if (b.roomId !== room.id) return false;
+          const [sh, sm] = b.startTime.split(':').map(Number);
+          const [eh, em] = b.endTime.split(':').map(Number);
+          const bStart = sh * 60 + sm;
+          const bEnd = eh * 60 + em;
+          const [fsh, fsm] = bookingStartTime.split(':').map(Number);
+          const [feh, fem] = bookingEndTime.split(':').map(Number);
+          const fStart = fsh * 60 + fsm;
+          const fEnd = feh * 60 + fem;
+          return !(bEnd <= fStart || bStart >= fEnd);
+        });
+      });
+      if (available.length > 0 && !available.some(r => r.id === selectedCampusRoomId)) {
+        setSelectedCampusRoomId(available[0].id);
+      }
+    }
+  }, [isDateFilterActive, bookingDate, bookingStartTime, bookingEndTime, campusBookings, rooms, selectedCampusRoomId]);
+
+  useEffect(() => {
+    localStorage.setItem('groovelab_campus_bookings', JSON.stringify(campusBookings));
+  }, [campusBookings]);
 
   const handleDeleteTextbaustein = (id: string) => {
     setTextbausteine(prev => prev.filter(tb => tb.id !== id));
@@ -1556,13 +1604,25 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         const { data: teachersData } = await tsq.order('first_name');
         if (teachersData) setTeachers(teachersData);
       } else if (activeTab === 'rooms') {
-        const { data: roomsData } = await supabase
+        let roomsQuery = supabase
           .from('rooms')
           .select('*')
-          .eq('school_id', adminData.school_id)
-          .eq('is_groovelab_active', true)
-          .order('sort_order', { ascending: true });
+          .eq('school_id', adminData.school_id);
+        
+        if (activePlatform === 'campus') {
+          roomsQuery = roomsQuery.eq('is_campus_active', true);
+        } else {
+          roomsQuery = roomsQuery.eq('is_groovelab_active', true);
+        }
+        
+        const { data: roomsData } = await roomsQuery.order('sort_order', { ascending: true });
         if (roomsData) setRooms(roomsData);
+
+        const { data: schedulesData } = await supabase
+          .from('schedules')
+          .select('*, teacher:users!schedules_teacher_id_fkey(first_name, last_name)')
+          .eq('school_id', adminData.school_id);
+        setSchedules(schedulesData || []);
 
         let { data: stationsData } = await supabase
           .from('stations')
@@ -4459,17 +4519,396 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
   const renderCampusRoomsTab = () => {
     const selectedRoom = rooms.find(r => r.id === selectedCampusRoomId) || rooms[0];
-    
-    // Calculate available rooms for selected booking search criteria
-    const dateBookings = campusBookings.filter((b: any) => b.date === bookingDate);
-    const availableRooms = rooms.filter(room => {
-      return !dateBookings.some((b: any) => {
-        if (b.roomId !== room.id) return false;
-        return !(b.endTime <= bookingStartTime || b.startTime >= bookingEndTime);
-      });
+
+    // Helper to extract unique floors for this school's rooms
+    const uniqueFloors = Array.from(new Set(rooms.map(r => r.floor || 'Allgemein'))).sort((a, b) => {
+      const order = ['ug', 'eg', 'og', 'allgemein'];
+      const getIndex = (f: string) => {
+        const lf = f.toLowerCase();
+        if (lf.includes('ug')) return 0;
+        if (lf.includes('eg')) return 1;
+        if (lf.includes('og')) {
+          const num = parseInt(lf.replace(/[^0-9]/g, '')) || 1;
+          return 2 + num / 10;
+        }
+        return 10;
+      };
+      return getIndex(a) - getIndex(b);
     });
 
-    const myBookings = campusBookings.filter((b: any) => b.teacherId === userId);
+    const changeWeek = (weeks: number) => {
+      const d = new Date(bookingDate);
+      d.setDate(d.getDate() + weeks * 7);
+      setBookingDate(d.toISOString().split('T')[0]);
+    };
+
+    const getCalendarWeek = (dateStr: string) => {
+      const date = new Date(dateStr);
+      const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+      const dayNum = d.getUTCDay() || 7;
+      d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+    };
+
+    const getWeekRange = (dateStr: string) => {
+      const d = new Date(dateStr);
+      const day = d.getDay();
+      const diff = d.getDate() - (day === 0 ? 6 : day - 1);
+      const mon = new Date(d.setDate(diff));
+      const sun = new Date(mon);
+      sun.setDate(mon.getDate() + 6);
+      const format = (dt: Date) => dt.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+      return `${format(mon)} - ${format(sun)}.${d.getFullYear() !== mon.getFullYear() ? ' ' + sun.getFullYear() : ''}`;
+    };
+
+    const getWeekdayDate = (dayIdx: number, baseDateStr: string) => {
+      const d = new Date(baseDateStr);
+      const day = d.getDay();
+      const diff = d.getDate() - (day === 0 ? 6 : day - 1) + dayIdx;
+      const targetDate = new Date(d.setDate(diff));
+      return targetDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+    };
+
+    const isTodayInWeek = (baseDateStr: string) => {
+      const today = new Date();
+      const d = new Date(baseDateStr);
+      const day = d.getDay();
+      const diff = d.getDate() - (day === 0 ? 6 : day - 1);
+      const mon = new Date(d.setDate(diff));
+      mon.setHours(0,0,0,0);
+      const sun = new Date(mon);
+      sun.setDate(mon.getDate() + 6);
+      sun.setHours(23,59,59,999);
+      return today >= mon && today <= sun;
+    };
+
+    const isDayToday = (dayIdx: number, baseDateStr: string) => {
+      const today = new Date();
+      const d = new Date(baseDateStr);
+      const day = d.getDay();
+      const diff = d.getDate() - (day === 0 ? 6 : day - 1) + dayIdx;
+      const targetDate = new Date(d.setDate(diff));
+      return today.toDateString() === targetDate.toDateString();
+    };
+
+    const handleCancelBooking = (bookingId: string | string[]) => {
+      const ids = Array.isArray(bookingId) ? bookingId : [bookingId];
+      setCampusBookings(prev => prev.filter(b => !ids.includes(b.id)));
+    };
+
+    // Filter rooms by floor
+    const roomsToRender = (rooms.filter(room => {
+      if (selectedFloor === 'Alle') return true;
+      return room.floor === selectedFloor;
+    })).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+    // Map bookings and weekly schedules
+        // Merge consecutive schedules for this campus view
+    const mergedSchedules = (() => {
+      if (!schedules || schedules.length === 0) return [];
+      
+      const groups: { [key: string]: any[] } = {};
+      schedules.forEach((s: any) => {
+        const key = `${s.room_id}_${s.day_of_week}_${s.teacher_id}`;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(s);
+      });
+
+      const merged: any[] = [];
+      Object.values(groups).forEach((groupList: any) => {
+        const parsed = groupList.map((s: any) => {
+          const startTimeStr = s.time_slot || s.start_time || '';
+          const durationMin = s.duration || s.duration_minutes || 45;
+          const [shStr, smStr] = startTimeStr.split(':');
+          const sh = parseInt(shStr) || 0;
+          const sm = parseInt(smStr) || 0;
+          const startMin = sh * 60 + sm;
+          const endMin = startMin + durationMin;
+          return { ...s, startMin, endMin };
+        });
+
+        parsed.sort((a: any, b: any) => a.startMin - b.startMin);
+
+        const mergedGroup: any[] = [];
+        parsed.forEach((item: any) => {
+          if (mergedGroup.length === 0) {
+            mergedGroup.push({ ...item });
+          } else {
+            const last = mergedGroup[mergedGroup.length - 1];
+            if (item.startMin <= last.endMin + 5) {
+              last.endMin = Math.max(last.endMin, item.endMin);
+            } else {
+              mergedGroup.push({ ...item });
+            }
+          }
+        });
+
+        mergedGroup.forEach((item: any) => {
+          const sh = Math.floor(item.startMin / 60);
+          const sm = item.startMin % 60;
+          item.time_slot = `${String(sh).padStart(2, '0')}:${String(sm).padStart(2, '0')}`;
+          item.duration = item.endMin - item.startMin;
+          merged.push(item);
+        });
+      });
+      return merged;
+    })();
+
+    const getBookingsForSlot = (dayIdx: number, hourStr: string) => {
+      if (!selectedRoom) return [];
+      
+      const currentSelectedDate = new Date(bookingDate);
+      const dayOfWeek = currentSelectedDate.getDay();
+      const diffToMon = currentSelectedDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
+      const mondayOfSelectedWeek = new Date(currentSelectedDate.setDate(diffToMon));
+      mondayOfSelectedWeek.setHours(0,0,0,0);
+
+      const sundayOfSelectedWeek = new Date(mondayOfSelectedWeek);
+      sundayOfSelectedWeek.setDate(mondayOfSelectedWeek.getDate() + 6);
+      sundayOfSelectedWeek.setHours(23,59,59,999);
+
+      // 1. Manual bookings
+      const manualForSlot = campusBookings.filter((b: any) => {
+        if (b.roomId !== selectedRoom.id) return false;
+        const bDate = new Date(b.date);
+        if (bDate < mondayOfSelectedWeek || bDate > sundayOfSelectedWeek) return false;
+        
+        const bDayIndex = getWeekdayIndex(b.date);
+        if (bDayIndex !== dayIdx) return false;
+
+        const slotHour = parseInt(hourStr.split(':')[0]);
+        const startHour = parseInt(b.startTime.split(':')[0]);
+        const endHour = parseInt(b.endTime.split(':')[0]);
+        
+        return slotHour >= startHour && slotHour < endHour;
+      });
+
+      // 2. Weekly recurring schedules
+      const DAYS_MAP = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      const targetDay = DAYS_MAP[dayIdx];
+      const targetDayInt = dayIdx + 1; // 1 = Monday, 7 = Sunday
+      const schedulesForSlot = mergedSchedules.filter((s: any) => {
+        if (s.room_id !== selectedRoom.id) return false;
+        
+        const startTimeStr = s.time_slot || s.start_time;
+        if (!startTimeStr) return false;
+        
+        const matchesDay = s.day_of_week === targetDay || 
+                           s.day_of_week === targetDayInt || 
+                           String(s.day_of_week) === String(targetDayInt);
+        if (!matchesDay) return false;
+
+        const durationMin = s.duration || s.duration_minutes || 45;
+        
+        const slotHour = parseInt(hourStr.split(':')[0]);
+        const slotStartMin = slotHour * 60;
+        const slotEndMin = (slotHour + 1) * 60;
+
+        const [shStr, smStr] = startTimeStr.split(':');
+        const sh = parseInt(shStr) || 0;
+        const sm = parseInt(smStr) || 0;
+        const schedStartMin = sh * 60 + sm;
+        const schedEndMin = schedStartMin + durationMin;
+        
+        return schedStartMin < slotEndMin && schedEndMin > slotStartMin;
+      });
+
+      // Convert schedules to booking format
+      const mappedSchedules = schedulesForSlot.map((s: any) => {
+        const isApproved = s.status === 'approved' || s.is_approved === true;
+        const startTimeStr = s.time_slot || s.start_time || '';
+        const durationMin = s.duration || s.duration_minutes || 45;
+        
+        // Calculate end_time string
+        let endTimeStr = s.end_time || '';
+        if (startTimeStr && !endTimeStr) {
+          const [shStr, smStr] = startTimeStr.split(':');
+          const sh = parseInt(shStr) || 0;
+          const sm = parseInt(smStr) || 0;
+          const totalMin = sh * 60 + sm + durationMin;
+          const eh = Math.floor(totalMin / 60) % 24;
+          const em = totalMin % 60;
+          endTimeStr = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
+        }
+
+        const teacherName = s.teacher 
+          ? `${s.teacher.first_name} ${s.teacher.last_name}` 
+          : (s.teacher_name || 'Lehrer');
+
+        return {
+          id: s.id,
+          roomId: s.room_id,
+          roomName: selectedRoom.name,
+          date: '', // Weekly recurring
+          startTime: startTimeStr,
+          endTime: endTimeStr,
+          purpose: s.purpose || (s.subject_name ? `Unterricht: ${s.subject_name}` : 'Regulärer Unterricht'),
+          teacherId: s.teacher_id,
+          teacherName: teacherName,
+          isSchedule: true,
+          isApproved
+        };
+      });
+
+      return [...manualForSlot, ...mappedSchedules];
+    };
+
+    // Check if room is occupied during selected time slot
+    const isRoomOccupied = (roomId: string) => {
+      const dateBookings = campusBookings.filter((b: any) => b.date === bookingDate);
+      const DAYS_MAP = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dayVal = new Date(bookingDate).getDay();
+      const targetDay = DAYS_MAP[dayVal];
+      const targetDayInt = dayVal === 0 ? 7 : dayVal; // 1 = Monday, 7 = Sunday
+
+      const hasBooking = dateBookings.some((b: any) => {
+        if (b.roomId !== roomId) return false;
+        return !(b.endTime <= bookingStartTime || b.startTime >= bookingEndTime);
+      });
+
+      const hasSchedule = mergedSchedules.some((s: any) => {
+        if (s.room_id !== roomId) return false;
+        
+        const startTimeStr = s.time_slot || s.start_time;
+        if (!startTimeStr) return false;
+        
+        const matchesDay = s.day_of_week === targetDay || 
+                           s.day_of_week === targetDayInt || 
+                           String(s.day_of_week) === String(targetDayInt);
+        if (!matchesDay) return false;
+
+        const durationMin = s.duration || s.duration_minutes || 45;
+
+        // User booking range in minutes
+        const [uShStr, uSmStr] = bookingStartTime.split(':');
+        const uSh = parseInt(uShStr) || 0;
+        const uSm = parseInt(uSmStr) || 0;
+        const userStartMin = uSh * 60 + uSm;
+
+        const [uEhStr, uEmStr] = bookingEndTime.split(':');
+        const uEh = parseInt(uEhStr) || 0;
+        const uEm = parseInt(uEmStr) || 0;
+        const userEndMin = uEh * 60 + uEm;
+
+        // Schedule range in minutes
+        const [shStr, smStr] = startTimeStr.split(':');
+        const sh = parseInt(shStr) || 0;
+        const sm = parseInt(smStr) || 0;
+        const schedStartMin = sh * 60 + sm;
+        const schedEndMin = schedStartMin + durationMin;
+
+        return schedStartMin < userEndMin && schedEndMin > userStartMin;
+      });
+
+      return hasBooking || hasSchedule;
+    };
+
+    const handleAddBooking = (roomId: string) => {
+      const roomName = rooms.find(r => r.id === roomId)?.name || 'Raum';
+      const newBooking = {
+        id: 'cb_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+        roomId,
+        roomName,
+        date: bookingDate,
+        startTime: bookingStartTime,
+        endTime: bookingEndTime,
+        purpose: bookingPurpose || 'Unterricht',
+        teacherId: userId,
+        teacherName: admin ? `${admin.first_name} ${admin.last_name}` : 'Lehrer'
+      };
+
+      setCampusBookings(prev => [...prev, newBooking]);
+      setIsDateFilterActive(false);
+      setSuccessAnimationRoomId(roomId);
+      setTimeout(() => setSuccessAnimationRoomId(null), 1000);
+    };
+
+    const handleCellClick = (dayIdx: number, hourStr: string) => {
+      const currentSelectedDate = new Date(bookingDate);
+      const dayOfWeek = currentSelectedDate.getDay();
+      const diffToMon = currentSelectedDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
+      const targetDate = new Date(currentSelectedDate.setDate(diffToMon + dayIdx));
+      const targetDateStr = targetDate.toISOString().split('T')[0];
+
+      const startH = parseInt(hourStr.split(':')[0]);
+      const startStr = `${String(startH).padStart(2, '0')}:00`;
+      const endStr = `${String(startH + 1).padStart(2, '0')}:00`;
+
+      setBookingDate(targetDateStr);
+      setBookingStartTime(startStr);
+      setBookingEndTime(endStr);
+      setIsDateFilterActive(true);
+    };
+
+    // Merge overlapping/consecutive bookings for "Meine Buchungen" sidebar
+    const groupedMyBookings: { [key: string]: any[] } = {};
+    campusBookings.filter((b: any) => b.teacherId === userId).forEach((b: any) => {
+      const key = `${b.roomId}_${b.date}`;
+      if (!groupedMyBookings[key]) {
+        groupedMyBookings[key] = [];
+      }
+      groupedMyBookings[key].push(b);
+    });
+
+    const myBookings: any[] = [];
+    Object.values(groupedMyBookings).forEach((list: any[]) => {
+      const parsed = list.map((b: any) => {
+        const [shStr, smStr] = b.startTime.split(':');
+        const sh = parseInt(shStr) || 0;
+        const sm = parseInt(smStr) || 0;
+        const [ehStr, emStr] = b.endTime.split(':');
+        const eh = parseInt(ehStr) || 0;
+        const em = parseInt(emStr) || 0;
+        const startMin = sh * 60 + sm;
+        let endMin = eh * 60 + em;
+        if (endMin <= startMin) {
+          endMin = startMin + 30;
+        }
+        return { ...b, startMin, endMin };
+      });
+
+      parsed.sort((a, b) => a.startMin - b.startMin);
+
+      const mergedList: any[] = [];
+      parsed.forEach((item) => {
+        if (mergedList.length === 0) {
+          mergedList.push({
+            ...item,
+            ids: [item.id]
+          });
+        } else {
+          const last = mergedList[mergedList.length - 1];
+          if (item.startMin <= last.endMin) {
+            last.endMin = Math.max(last.endMin, item.endMin);
+            last.ids.push(item.id);
+            if (last.purpose && item.purpose && last.purpose !== item.purpose) {
+              const cleanedPurpose = item.purpose.replace(/^Unterricht:\s*/i, '');
+              if (!last.purpose.includes(cleanedPurpose)) {
+                last.purpose = `${last.purpose} & ${cleanedPurpose}`;
+              }
+            }
+          } else {
+            mergedList.push({
+              ...item,
+              ids: [item.id]
+            });
+          }
+        }
+      });
+
+      mergedList.forEach((m: any) => {
+        const sh = String(Math.floor(m.startMin / 60)).padStart(2, '0');
+        const sm = String(m.startMin % 60).padStart(2, '0');
+        const eh = String(Math.floor(m.endMin / 60)).padStart(2, '0');
+        const em = String(m.endMin % 60).padStart(2, '0');
+        myBookings.push({
+          ...m,
+          startTime: `${sh}:${sm}`,
+          endTime: `${eh}:${em}`
+        });
+      });
+    });
 
     const DAYS_OF_WEEK = [
       { label: 'Montag', value: 'Monday', short: 'Mo' },
@@ -4492,62 +4931,68 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       return day === 0 ? 6 : day - 1;
     };
 
-    const roomBookings = selectedRoom ? campusBookings.filter((b: any) => b.roomId === selectedRoom.id) : [];
-
-    const handleAddBooking = (roomId: string) => {
-      const roomName = rooms.find(r => r.id === roomId)?.name || 'Raum';
-      const newBooking = {
-        id: 'cb_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-        roomId,
-        roomName,
-        date: bookingDate,
-        startTime: bookingStartTime,
-        endTime: bookingEndTime,
-        purpose: bookingPurpose || 'Unterricht',
-        teacherId: userId,
-        teacherName: admin ? `${admin.first_name} ${admin.last_name}` : 'Lehrer'
-      };
-
-      setCampusBookings(prev => [...prev, newBooking]);
-      setSuccessAnimationRoomId(roomId);
-      setTimeout(() => setSuccessAnimationRoomId(null), 1000);
-    };
-
-    const handleCancelBooking = (bookingId: string) => {
-      setCampusBookings(prev => prev.filter(b => b.id !== bookingId));
-    };
-
-    const getBookingsForSlot = (dayIndex: number, hourStr: string) => {
-      const currentSelectedDate = new Date(bookingDate);
-      const dayOfWeek = currentSelectedDate.getDay();
-      const diffToMon = currentSelectedDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
-      const mondayOfSelectedWeek = new Date(currentSelectedDate.setDate(diffToMon));
-      mondayOfSelectedWeek.setHours(0,0,0,0);
-
-      const sundayOfSelectedWeek = new Date(mondayOfSelectedWeek);
-      sundayOfSelectedWeek.setDate(mondayOfSelectedWeek.getDate() + 6);
-      sundayOfSelectedWeek.setHours(23,59,59,999);
-
-      return roomBookings.filter((b: any) => {
-        const bDate = new Date(b.date);
-        if (bDate < mondayOfSelectedWeek || bDate > sundayOfSelectedWeek) return false;
-        
-        const bDayIndex = getWeekdayIndex(b.date);
-        if (bDayIndex !== dayIndex) return false;
-
-        const slotHour = parseInt(hourStr.split(':')[0]);
-        const startHour = parseInt(b.startTime.split(':')[0]);
-        const endHour = parseInt(b.endTime.split(':')[0]);
-        
-        return slotHour >= startHour && slotHour < endHour;
-      });
-    };
-
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '0px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px', alignItems: 'start' }}>
+        <style>{`
+          .custom-calendar-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+          }
+          .custom-calendar-scrollbar::-webkit-scrollbar-track {
+            background: #f8fafc;
+            border-radius: 4px;
+          }
+          .custom-calendar-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+          }
+          .custom-calendar-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+          }
+          @media (max-width: 1024px) {
+            .calendar-header-flex {
+              flex-direction: column !important;
+              align-items: stretch !important;
+              gap: 12px !important;
+            }
+            .calendar-controls-wrapper {
+              width: 100% !important;
+              justify-content: space-between !important;
+              gap: 12px !important;
+            }
+            .calendar-today-btn {
+              padding: 8px 16px !important;
+              font-size: 0.8rem !important;
+              height: 40px !important;
+              border-radius: 12px !important;
+              min-width: 80px !important;
+            }
+            .calendar-week-pagination {
+              padding: 6px 12px !important;
+              border-radius: 14px !important;
+              height: 40px !important;
+              flex-grow: 1 !important;
+              justify-content: space-between !important;
+            }
+            .calendar-week-chevron-btn {
+              padding: 8px 12px !important;
+              border-radius: 10px !important;
+              min-width: 36px !important;
+            }
+          }
+          .rooms-board-grid {
+            grid-template-columns: 1fr 340px;
+          }
+          @media (max-width: 1400px) {
+            .rooms-board-grid {
+              grid-template-columns: 1fr !important;
+            }
+          }
+        `}</style>
+
+        <div className="rooms-board-grid" style={{ display: 'grid', gap: '20px', alignItems: 'stretch', minWidth: 0 }}>
           {/* Left Column: Room catalog and weekly calendar */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
             
             {/* Room Horizontal Picker */}
             <div 
@@ -4560,18 +5005,93 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)'
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
                 <h2 style={{ fontSize: '1.4rem', fontWeight: 900, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                   <div style={{ background: `${brandColor}15`, color: brandColor, padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
                     <Box size={16} />
                   </div>
                   Campus Räumlichkeiten
                 </h2>
+
+                <div style={{ 
+                  background: '#f1f5f9', 
+                  borderRadius: '12px', 
+                  padding: '3px', 
+                  display: 'flex', 
+                  gap: '2px', 
+                  border: '1px solid rgba(0,0,0,0.02)',
+                  alignItems: 'center',
+                  flexWrap: 'wrap'
+                }}>
+                  {['Alle', ...uniqueFloors].map((floor) => {
+                    const isSelected = selectedFloor === floor;
+                    return (
+                      <button
+                        key={floor}
+                        onClick={() => setSelectedFloor(floor)}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: '9px',
+                          border: 'none',
+                          background: isSelected ? '#ffffff' : 'transparent',
+                          color: isSelected ? brandColor : '#64748b',
+                          fontWeight: isSelected ? 800 : 600,
+                          fontSize: '0.75rem',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                        }}
+                      >
+                        {floor === 'Allgemein' ? 'Standard' : floor}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px' }}>
-                {rooms.map((room) => {
+              {/* Active Filter Info Banner */}
+              {isDateFilterActive && (
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  background: '#fffbeb', 
+                  border: '1px solid #fef3c7', 
+                  borderRadius: '12px', 
+                  padding: '10px 14px', 
+                  marginBottom: '14px',
+                  animation: 'fadeIn 0.2s ease'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: '#b45309', fontWeight: 700 }}>
+                    <span>📅</span>
+                    <span>Anzeige gefiltert für: {new Date(bookingDate).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit' })}, {bookingStartTime} - {bookingEndTime} Uhr</span>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setIsDateFilterActive(false);
+                      setBookingDate(new Date().toISOString().split('T')[0]);
+                    }}
+                    style={{ 
+                      background: 'transparent', 
+                      border: 'none', 
+                      color: '#b45309', 
+                      fontWeight: 800, 
+                      fontSize: '0.75rem', 
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    Filter zurücksetzen ✕
+                  </button>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px', width: '100%', minWidth: 0 }}>
+                {roomsToRender.map((room) => {
                   const isSelected = selectedCampusRoomId === room.id;
+                  const occupied = isRoomOccupied(room.id);
                   return (
                     <div
                       key={room.id}
@@ -4587,16 +5107,32 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                         boxShadow: isSelected ? `0 4px 12px ${brandColor}15` : 'none',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '6px'
+                        gap: '6px',
+                        opacity: (isDateFilterActive && occupied) ? 0.4 : 1
                       }}
                     >
-                      <div style={{ fontWeight: 800, fontSize: '0.85rem', color: isSelected ? brandColor : '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {room.name}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ fontWeight: 800, fontSize: '0.85rem', color: isSelected ? brandColor : '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '120px' }}>
+                          {room.name}
+                        </div>
+                        <span style={{ 
+                          width: '8px', 
+                          height: '8px', 
+                          borderRadius: '50%', 
+                          background: occupied ? '#ef4444' : '#22c55e',
+                          display: 'inline-block',
+                          boxShadow: '0 0 4px rgba(0,0,0,0.05)'
+                        }} title={occupied ? 'Belegt' : 'Verfügbar'} />
                       </div>
-                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
                         <span style={{ padding: '2px 6px', background: '#f1f5f9', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 700, color: '#475569' }}>
                           Kapazität: {room.capacity || 4}
                         </span>
+                        {occupied && (
+                          <span style={{ padding: '2px 6px', background: '#fee2e2', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#ef4444' }}>
+                            Belegt
+                          </span>
+                        )}
                       </div>
                     </div>
                   );
@@ -4615,7 +5151,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)'
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div className="calendar-header-flex" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <div>
                   <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>
                     Wochenübersicht: {selectedRoom?.name || 'Wähle einen Raum'}
@@ -4624,80 +5160,268 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     Angezeigt für die Woche der Buchungsauswahl ({new Date(bookingDate).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })})
                   </p>
                 </div>
+
+                {/* Week Pagination and Today Button */}
+                <div className="calendar-controls-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    onClick={() => {
+                      const today = new Date();
+                      const dateStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+                      setBookingDate(dateStr);
+                    }}
+                    className="calendar-today-btn"
+                    style={{
+                      border: '1px solid #e2e8f0',
+                      background: 'white',
+                      cursor: 'pointer',
+                      padding: '6px 12px',
+                      borderRadius: '10px',
+                      color: '#475569',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                      height: '32px'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = brandColor; e.currentTarget.style.color = brandColor; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'white'; e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.color = '#475569'; }}
+                  >
+                    Heute
+                  </button>
+
+                  <div className="calendar-week-pagination" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '4px 8px', borderRadius: '12px', border: '1px solid #e2e8f0', height: '32px' }}>
+                    <button
+                      onClick={() => changeWeek(-1)}
+                      className="calendar-week-chevron-btn"
+                      style={{
+                        border: 'none',
+                        background: 'none',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        color: '#64748b'
+                      }}
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <span className="calendar-week-label" style={{ fontSize: '0.74rem', fontWeight: 800, color: '#334155', minWidth: '150px', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                      <span style={{ color: brandColor, fontWeight: 800 }}>KW {getCalendarWeek(bookingDate)}</span>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b' }}>({getWeekRange(bookingDate)})</span>
+                    </span>
+                    <button
+                      onClick={() => changeWeek(1)}
+                      className="calendar-week-chevron-btn"
+                      style={{
+                        border: 'none',
+                        background: 'none',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        color: '#64748b'
+                      }}
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Calendar Grid Container */}
-              <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+              <div style={{ overflowX: 'auto', width: '100%' }} className="custom-calendar-scrollbar">
+                <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', minWidth: '950px' }}>
                 {/* Header Row */}
                 <div style={{ display: 'grid', gridTemplateColumns: '80px repeat(7, 1fr)', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                   <div style={{ padding: '10px', fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textAlign: 'center', borderRight: '1px solid #e2e8f0' }}>Zeit</div>
-                  {DAYS_OF_WEEK.map((day, i) => (
-                    <div key={day.value} style={{ padding: '10px 4px', fontSize: '0.72rem', fontWeight: 800, color: '#1e293b', textAlign: 'center', borderRight: i < 6 ? '1px solid #e2e8f0' : 'none' }}>
-                      {day.label}
-                    </div>
-                  ))}
+                  {DAYS_OF_WEEK.map((day, dayIdx) => {
+                    const isToday = isTodayInWeek(bookingDate) && isDayToday(dayIdx, bookingDate);
+                    return (
+                      <div 
+                        key={day.value} 
+                        style={{ 
+                          padding: '10px 4px', 
+                          fontSize: '0.72rem', 
+                          fontWeight: 800, 
+                          color: '#1e293b', 
+                          textAlign: 'center', 
+                          borderRight: dayIdx < 6 ? '1px solid #e2e8f0' : 'none',
+                          position: 'relative',
+                          background: isToday ? `${brandColor}06` : '#f8fafc'
+                        }}
+                      >
+                        {isToday && (
+                          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: brandColor }} />
+                        )}
+                        <div>{day.label}</div>
+                        <div style={{ fontSize: '0.62rem', color: '#64748b', marginTop: '2px', fontWeight: 700 }}>
+                          {getWeekdayDate(dayIdx, bookingDate)}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* Hourly Rows */}
-                <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '420px', overflowY: 'auto' }}>
-                  {TIME_SLOTS.map((hour) => (
-                    <div key={hour} style={{ display: 'grid', gridTemplateColumns: '80px repeat(7, 1fr)', borderBottom: '1px solid #f1f5f9', minHeight: '44px' }}>
-                      {/* Time cell */}
-                      <div style={{ padding: '10px 4px', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textAlign: 'center', background: '#f8fafc', borderRight: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {hour}
+                <div className="custom-calendar-scrollbar" style={{ display: 'flex', flexDirection: 'column', maxHeight: '420px', overflowY: 'auto', position: 'relative' }}>
+                  {TIME_SLOTS.map((hour) => {
+                    const slotHourInt = parseInt(hour.split(':')[0]);
+                    
+                    return (
+                      <div key={hour} style={{ display: 'grid', gridTemplateColumns: '80px repeat(7, 1fr)', borderBottom: '1px solid #f1f5f9', minHeight: '52px', position: 'relative' }}>
+                        {/* Time cell */}
+                        <div style={{ padding: '10px 4px', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textAlign: 'center', background: '#f8fafc', borderRight: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {hour}
+                        </div>
+                        {/* Day cells */}
+                        {DAYS_OF_WEEK.map((day, dayIdx) => {
+                          const slotBookings = getBookingsForSlot(dayIdx, hour);
+                          const isToday = isTodayInWeek(bookingDate) && isDayToday(dayIdx, bookingDate);
+                          const currentHour = new Date().getHours();
+                          const currentMin = new Date().getMinutes();
+                          const showTimeIndicator = isToday && currentHour === slotHourInt;
+
+                          return (
+                            <div
+                              key={day.value}
+                              onClick={() => handleCellClick(dayIdx, hour)}
+                              style={{
+                                padding: '4px',
+                                borderRight: dayIdx < 6 ? '1px solid #f1f5f9' : 'none',
+                                position: 'relative',
+                                background: isToday ? `${brandColor}02` : 'white',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '3px',
+                                justifyContent: 'stretch',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              {/* Real-time indicator line */}
+                              {showTimeIndicator && (
+                                <div style={{ 
+                                  position: 'absolute', 
+                                  top: `${(currentMin / 60) * 100}%`, 
+                                  left: 0, 
+                                  right: 0, 
+                                  height: '2px', 
+                                  background: '#ef4444', 
+                                  zIndex: 10,
+                                  pointerEvents: 'none',
+                                  display: 'flex',
+                                  alignItems: 'center'
+                                }}>
+                                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444', marginLeft: '-3px' }} />
+                                </div>
+                              )}
+
+                              {slotBookings.map((b: any) => {
+                                const isOwnBooking = b.teacherId === userId;
+                                const isSchedule = b.isSchedule;
+                                
+                                // Color Scheme
+                                let bg = '#f1f5f9';
+                                let borderStyle = '1px solid #cbd5e1';
+                                let textColor = '#475569';
+                                let leftAccentColor = '#94a3b8';
+
+                                if (isSchedule) {
+                                  if (b.isApproved) {
+                                    bg = '#e6f4ea';
+                                    borderStyle = '1px solid #a7f3d0';
+                                    textColor = '#137333';
+                                    leftAccentColor = '#34a853';
+                                  } else {
+                                    bg = '#fef3c7';
+                                    borderStyle = '1px dashed #fde68a';
+                                    textColor = '#b45309';
+                                    leftAccentColor = '#d97706';
+                                  }
+                                } else if (isOwnBooking) {
+                                  // Meine Buchung (lila/purple)
+                                  bg = '#f3e8ff';
+                                  borderStyle = '1px solid #e9d5ff';
+                                  textColor = '#6b21a8';
+                                  leftAccentColor = '#8b5cf6';
+                                }
+
+                                const [shStr, smStr] = b.startTime.split(':');
+                                const sh = parseInt(shStr) || 0;
+                                const sm = parseInt(smStr) || 0;
+                                const [ehStr, emStr] = b.endTime.split(':');
+                                const eh = parseInt(ehStr) || 0;
+                                const em = parseInt(emStr) || 0;
+                                const durationHrs = (eh * 60 + em - (sh * 60 + sm)) / 60;
+                                const slotH = parseInt(hour.split(':')[0]);
+                                
+                                // Only draw on starting hour slot
+                                if (slotH !== sh) return null;
+
+                                return (
+                                  <div
+                                    key={b.id}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedBooking(b);
+                                    }}
+                                    title={`${b.purpose} (${b.startTime} - ${b.endTime}) - ${b.teacherName}`}
+                                    style={{
+                                      background: bg,
+                                      border: borderStyle,
+                                      borderRadius: '0 8px 8px 0',
+                                      padding: '4px 6px 4px 8px',
+                                      fontSize: '0.62rem',
+                                      fontWeight: 800,
+                                      color: textColor,
+                                      position: 'absolute',
+                                      top: `calc(${(sm / 60) * 100}% + 4px)`,
+                                      left: '4px',
+                                      right: '4px',
+                                      height: `calc(${durationHrs * 100}% - 8px)`,
+                                      zIndex: 5,
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      justifyContent: 'flex-start',
+                                      boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis'
+                                    }}
+                                  >
+                                    <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '4px', background: leftAccentColor, borderRadius: '0' }} />
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.55rem', opacity: 0.8, marginBottom: '2px', fontWeight: 700 }}>
+                                      <span style={{ display: 'flex', alignItems: 'center' }}>
+                                        {isSchedule && <GraduationCap size={10} style={{ marginRight: '3px' }} />}
+                                        {b.startTime} - {b.endTime}
+                                      </span>
+                                    </div>
+                                    <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                                      {isSchedule ? b.teacherName : b.purpose}
+                                    </div>
+                                    <div style={{ fontSize: '0.55rem', opacity: 0.8, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {isSchedule ? b.purpose : (isOwnBooking ? 'Meine Buchung' : b.teacherName)}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })}
                       </div>
-                      {/* Day cells */}
-                      {DAYS_OF_WEEK.map((day, dayIdx) => {
-                        const slotBookings = getBookingsForSlot(dayIdx, hour);
-                        return (
-                          <div
-                            key={day.value}
-                            style={{
-                              padding: '3px',
-                              borderRight: dayIdx < 6 ? '1px solid #f1f5f9' : 'none',
-                              position: 'relative',
-                              background: 'white',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '2px',
-                              justifyContent: 'center'
-                            }}
-                          >
-                            {slotBookings.map((b: any) => (
-                              <div
-                                key={b.id}
-                                title={`${b.purpose} (${b.startTime} - ${b.endTime}) - ${b.teacherName}`}
-                                style={{
-                                  background: b.teacherId === userId ? `${brandColor}15` : '#f1f5f9',
-                                  borderLeft: `3px solid ${b.teacherId === userId ? brandColor : '#94a3b8'}`,
-                                  padding: '2px 4px',
-                                  borderRadius: '4px',
-                                  fontSize: '0.58rem',
-                                  fontWeight: 700,
-                                  color: b.teacherId === userId ? brandColor : '#475569',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                                }}
-                              >
-                                {b.teacherName.split(' ')[0]}
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
+            </div>
           </div>
 
-          {/* Right Sidebar: Booking Form & Available Rooms */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Right Sidebar: Booking Form & Meine Buchungen */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: '100%', alignSelf: 'stretch' }}>
             
-            {/* Booking Form */}
+            {/* Meine Buchungen (Promoted to the top) */}
             <div 
               className="glass-panel" 
               style={{ 
@@ -4708,164 +5432,67 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '12px'
+                flexGrow: showMyBookingsOnly ? 1 : 0,
+                transition: 'all 0.3s ease',
+                height: showMyBookingsOnly ? '100%' : 'auto'
               }}
             >
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ color: brandColor }}>⚡</span> Raum buchen
-              </h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  Meine Buchungen
+                  <span style={{ fontSize: '0.72rem', background: '#f3e8ff', color: '#8b5cf6', padding: '2px 6px', borderRadius: '6px', fontWeight: 800 }}>
+                    {myBookings.length}
+                  </span>
+                </h3>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '0.7rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase' }}>Datum</label>
-                <input
-                  type="date"
-                  value={bookingDate}
-                  onChange={(e) => setBookingDate(e.target.value)}
+                <button
+                  onClick={() => setShowMyBookingsOnly(!showMyBookingsOnly)}
                   style={{
-                    padding: '8px 12px',
-                    borderRadius: '10px',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    outline: 'none',
-                    color: '#1e293b',
-                    height: '40px'
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#94a3b8',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '4px',
+                    transition: 'color 0.2s'
                   }}
-                />
+                  onMouseEnter={(e) => e.currentTarget.style.color = brandColor}
+                  onMouseLeave={(e) => e.currentTarget.style.color = '#94a3b8'}
+                >
+                  {showMyBookingsOnly ? <ArrowLeft size={16} /> : <Maximize2 size={16} />}
+                </button>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '0.7rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase' }}>Von</label>
-                  <select
-                    value={bookingStartTime}
-                    onChange={(e) => setBookingStartTime(e.target.value)}
-                    style={{
-                      padding: '8px 10px',
-                      borderRadius: '10px',
-                      border: '1px solid #cbd5e1',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      outline: 'none',
-                      color: '#1e293b',
-                      height: '40px'
-                    }}
-                  >
-                    {Array.from({ length: 27 }, (_, i) => {
-                      const min = i * 30 + 480;
-                      const hh = String(Math.floor(min / 60)).padStart(2, '0');
-                      const mm = String(min % 60).padStart(2, '0');
-                      return `${hh}:${mm}`;
-                    }).map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '0.7rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase' }}>Bis</label>
-                  <select
-                    value={bookingEndTime}
-                    onChange={(e) => setBookingEndTime(e.target.value)}
-                    style={{
-                      padding: '8px 10px',
-                      borderRadius: '10px',
-                      border: '1px solid #cbd5e1',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      outline: 'none',
-                      color: '#1e293b',
-                      height: '40px'
-                    }}
-                  >
-                    {Array.from({ length: 27 }, (_, i) => {
-                      const min = (i + 1) * 30 + 480;
-                      const hh = String(Math.floor(min / 60)).padStart(2, '0');
-                      const mm = String(min % 60).padStart(2, '0');
-                      return `${hh}:${mm}`;
-                    }).filter(t => t > bookingStartTime).map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '0.7rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase' }}>Verwendungszweck</label>
-                <input
-                  placeholder="z.B. Klavierunterricht"
-                  value={bookingPurpose}
-                  onChange={(e) => setBookingPurpose(e.target.value)}
+              {/* Cancel All Button */}
+              {myBookings.length >= 2 && (
+                <button
+                  onClick={() => {
+                    const allIds = myBookings.flatMap(b => b.ids || [b.id]);
+                    handleCancelBooking(allIds);
+                  }}
                   style={{
-                    padding: '8px 12px',
+                    background: '#fff1f2',
+                    color: '#ef4444',
+                    border: '1px solid #fecaca',
+                    padding: '6px 12px',
                     borderRadius: '10px',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    outline: 'none',
-                    color: '#1e293b',
-                    height: '40px'
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    marginBottom: '10px',
+                    width: '100%',
+                    textAlign: 'center',
+                    transition: 'all 0.2s'
                   }}
-                />
-              </div>
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#ffe4e6'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = '#fff1f2'}
+                >
+                  Alle stornieren
+                </button>
+              )}
 
-              <hr style={{ border: 'none', borderTop: '1px solid #f1f5f9', margin: '4px 0' }} />
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ fontSize: '0.72rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase' }}>
-                  Verfügbare Räume
-                </div>
-                {availableRooms.length === 0 ? (
-                  <div style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 700, padding: '8px', background: '#fef2f2', borderRadius: '8px', textAlign: 'center' }}>
-                    Keine freien Räume gefunden
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
-                    {availableRooms.map((room) => {
-                      const isSuccess = successAnimationRoomId === room.id;
-                      return (
-                        <div
-                          key={room.id}
-                          onClick={() => handleAddBooking(room.id)}
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            padding: '8px 12px',
-                            background: isSuccess ? '#ecfdf5' : '#f8fafc',
-                            border: isSuccess ? '1.5px solid #10b981' : '1px solid #e2e8f0',
-                            borderRadius: '10px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            height: '42px'
-                          }}
-                        >
-                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: isSuccess ? '#047857' : '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {room.name}
-                          </span>
-                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: isSuccess ? '#10b981' : brandColor }}>
-                            {isSuccess ? 'Gebucht! ✓' : 'Buchen +'}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Meine Buchungen */}
-            <div 
-              className="glass-panel" 
-              style={{ 
-                background: 'white', 
-                borderRadius: '20px', 
-                border: '1px solid rgba(0, 0, 0, 0.05)', 
-                padding: '18px', 
-                boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)'
-              }}
-            >
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                Meine Buchungen
-              </h3>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '180px', overflowY: 'auto' }}>
+              <div className="custom-calendar-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: showMyBookingsOnly ? 'calc(100vh - 300px)' : '180px', overflowY: 'auto' }}>
                 {myBookings.length === 0 ? (
                   <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, textAlign: 'center', padding: '12px', border: '1.5px dashed #cbd5e1', borderRadius: '10px', background: '#f9f9fb' }}>
                     Du hast noch keine Buchungen vorgenommen.
@@ -4893,7 +5520,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                         </span>
                       </div>
                       <button
-                        onClick={() => handleCancelBooking(b.id)}
+                        onClick={() => handleCancelBooking(b.ids || b.id)}
                         style={{
                           background: '#fff1f2',
                           color: '#ef4444',
@@ -4916,13 +5543,170 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 )}
               </div>
             </div>
+
+            {/* Booking Form (Hidden when Maximized) */}
+            {!showMyBookingsOnly && (
+              <div 
+                className="glass-panel" 
+                style={{ 
+                  background: 'white', 
+                  borderRadius: '20px', 
+                  border: '1px solid rgba(0, 0, 0, 0.05)', 
+                  padding: '18px', 
+                  boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}
+              >
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ color: brandColor }}>⚡</span> Raum buchen
+                </h3>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.7rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase' }}>Datum</label>
+                  <input
+                    type="date"
+                    value={bookingDate}
+                    onChange={(e) => {
+                      setBookingDate(e.target.value);
+                      setIsDateFilterActive(true);
+                    }}
+                    onFocus={() => setIsDateFilterActive(true)}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '10px',
+                      border: `1.5px solid ${isDateFilterActive ? brandColor : '#cbd5e1'}`,
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      outline: 'none',
+                      color: isDateFilterActive ? '#000000' : '#cbd5e1',
+                      background: isDateFilterActive ? '#ffffff' : '#f8fafc',
+                      height: '40px',
+                      transition: 'all 0.2s ease'
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase' }}>Von</label>
+                    <select
+                      value={bookingStartTime}
+                      onChange={(e) => {
+                        setBookingStartTime(e.target.value);
+                        setIsDateFilterActive(true);
+                      }}
+                      onFocus={() => setIsDateFilterActive(true)}
+                      style={{
+                        padding: '8px 10px',
+                        borderRadius: '10px',
+                        border: `1.5px solid ${isDateFilterActive ? brandColor : '#cbd5e1'}`,
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        outline: 'none',
+                        color: isDateFilterActive ? '#000000' : '#cbd5e1',
+                        background: isDateFilterActive ? '#ffffff' : '#f8fafc',
+                        height: '40px',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      {Array.from({ length: 27 }, (_, i) => {
+                        const min = i * 30 + 480;
+                        const hh = String(Math.floor(min / 60)).padStart(2, '0');
+                        const mm = String(min % 60).padStart(2, '0');
+                        return `${hh}:${mm}`;
+                      }).map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase' }}>Bis</label>
+                    <select
+                      value={bookingEndTime}
+                      onChange={(e) => {
+                        setBookingEndTime(e.target.value);
+                        setIsDateFilterActive(true);
+                      }}
+                      onFocus={() => setIsDateFilterActive(true)}
+                      style={{
+                        padding: '8px 10px',
+                        borderRadius: '10px',
+                        border: `1.5px solid ${isDateFilterActive ? brandColor : '#cbd5e1'}`,
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        outline: 'none',
+                        color: isDateFilterActive ? '#000000' : '#cbd5e1',
+                        background: isDateFilterActive ? '#ffffff' : '#f8fafc',
+                        height: '40px',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      {Array.from({ length: 27 }, (_, i) => {
+                        const min = (i + 1) * 30 + 480;
+                        const hh = String(Math.floor(min / 60)).padStart(2, '0');
+                        const mm = String(min % 60).padStart(2, '0');
+                        return `${hh}:${mm}`;
+                      }).filter(t => t > bookingStartTime).map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.7rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase' }}>Verwendungszweck</label>
+                  <input
+                    placeholder="z.B. Klavierunterricht"
+                    value={bookingPurpose}
+                    onChange={(e) => setBookingPurpose(e.target.value)}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '10px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      outline: 'none',
+                      color: '#1e293b',
+                      height: '40px'
+                    }}
+                  />
+                </div>
+
+                <button
+                  onClick={() => selectedRoom && handleAddBooking(selectedRoom.id)}
+                  disabled={!selectedRoom || isRoomOccupied(selectedRoom.id)}
+                  style={{
+                    background: brandColor,
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '10px 14px',
+                    fontSize: '0.8rem',
+                    fontWeight: 800,
+                    cursor: (!selectedRoom || isRoomOccupied(selectedRoom.id)) ? 'not-allowed' : 'pointer',
+                    opacity: (!selectedRoom || isRoomOccupied(selectedRoom.id)) ? 0.5 : 1,
+                    transition: 'all 0.2s ease',
+                    marginTop: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    height: '40px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                  }}
+                >
+                  {!selectedRoom 
+                    ? 'Wähle einen Raum' 
+                    : isRoomOccupied(selectedRoom.id) 
+                      ? 'Raum belegt' 
+                      : `${selectedRoom.name} buchen`}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
     );
-  };
-
-  const renderGroovelabRoomsTab = () => {
+  };  const renderGroovelabRoomsTab = () => {
     const groovelabBrandColor = '#eab308';
     
     return (
@@ -6983,7 +7767,10 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       overflowY: activeTab === 'live' ? 'hidden' : 'auto',
       height: activeTab === 'live' ? '100%' : 'auto',
       display: 'flex',
-      flexDirection: 'column'
+      flexDirection: 'column',
+      minWidth: 0,
+      width: '100%',
+      overflowX: 'hidden'
     }}>
       {activeTab !== 'live' && activeTab !== 'schedule' && (admin as any)?.schools?.limits_enabled && (
         <header style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', marginBottom: '24px', marginTop: '16px', gap: '20px', flexWrap: 'wrap' }}>
