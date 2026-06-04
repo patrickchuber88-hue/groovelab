@@ -5926,7 +5926,7 @@ function App() {
                   </button>
                 )}
                 <button onClick={() => setActiveStudentTab('stats')} className={`sidebar-item ${activeStudentTab === 'stats' ? `active ${activePlatform}` : ''}`}>
-                  <Trophy size={20} /> Performance & Cub
+                  <Trophy size={20} /> Performance & Highlights
                 </button>
                 <button onClick={() => setActiveStudentTab('setup')} className={`sidebar-item ${activeStudentTab === 'setup' ? `active ${activePlatform}` : ''}`}>
                   <Settings size={20} /> Setup
@@ -11022,8 +11022,8 @@ function App() {
                       <Compass size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Missions</span>}
                     </button>
                   )}
-                  <button onClick={() => setActiveStudentTab('stats')} style={getMobileButtonStyle('stats', 'campus')} className="hover-scale" title="Performance & Cub">
-                    <Trophy size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Performance & Cub</span>}
+                  <button onClick={() => setActiveStudentTab('stats')} style={getMobileButtonStyle('stats', 'campus')} className="hover-scale" title="Performance & Highlights">
+                    <Trophy size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Performance & Highlights</span>}
                   </button>
                   <button onClick={() => setActiveStudentTab('setup')} style={getMobileButtonStyle('setup', 'campus')} className="hover-scale" title="Setup">
                     <Settings size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Setup</span>}

@@ -233,6 +233,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [isEditingSongHeader, setIsEditingSongHeader] = useState(false);
   const [editSongTitle, setEditSongTitle] = useState('');
   const [editSongArtist, setEditSongArtist] = useState('');
+  const [copiedPraiseId, setCopiedPraiseId] = useState<string | null>(null);
   const [editSongInstrumentation, setEditSongInstrumentation] = useState<Record<string, number>>({});
   const [assignSongStudentInstrument, setAssignSongStudentInstrument] = useState<string>('E-Gitarre');
   const [selectedSongSkill, setSelectedSongSkill] = useState<any | null>(null);
@@ -2163,6 +2164,11 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     else studentSq = studentSq.eq('is_groovelab_active', true);
     const { count: studentCount } = await studentSq;
 
+    let studentListSq = supabase.from('users').select('*').eq('school_id', schoolId).eq('role', 'student');
+    if (activePlatform === 'campus') studentListSq = studentListSq.eq('is_campus_active', true);
+    else studentListSq = studentListSq.eq('is_groovelab_active', true);
+    const { data: schoolStudents } = await studentListSq;
+
     let songSq = supabase.from('songs').select('*', { count: 'exact', head: true }).eq('school_id', schoolId);
     if (activePlatform === 'campus') songSq = songSq.eq('is_campus_active', true);
     else songSq = songSq.eq('is_groovelab_active', true);
@@ -2171,7 +2177,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     // Fetch sessions filtered by active students
     let sessionsSq = supabase
       .from('sessions')
-      .select('check_in_time, check_out_time, station_id, users!inner(school_id, is_campus_active, is_groovelab_active)')
+      .select('check_in_time, check_out_time, station_id, user_id, users!inner(school_id, is_campus_active, is_groovelab_active)')
       .eq('users.school_id', schoolId)
       .not('check_out_time', 'is', null);
     if (activePlatform === 'campus') sessionsSq = sessionsSq.eq('users.is_campus_active', true);
@@ -2323,6 +2329,124 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       return { day, mins: Math.round(mins / 60) };
     });
 
+    // Cooperative and Highlights calculations for Campus platform
+    let myClassMins = 0;
+    let otherClassMins = 0;
+    const myStudents = (schoolStudents || []).filter((s: any) => s.teacher_id === userId);
+    const myStudentIds = new Set(myStudents.map((s: any) => s.id));
+
+    filteredSessions.forEach((s: any) => {
+      if (s.check_in_time && s.check_out_time) {
+        const start = new Date(s.check_in_time);
+        const end = new Date(s.check_out_time);
+        const mins = Math.max(0, Math.floor((end.getTime() - start.getTime()) / 60000));
+        if (myStudentIds.has(s.user_id)) {
+          myClassMins += mins;
+        } else {
+          otherClassMins += mins;
+        }
+      }
+    });
+
+    // Map sessions & skills for highlights
+    const studentSessionsMap: Record<string, any[]> = {};
+    (sessions || []).forEach((s: any) => {
+      const uId = s.user_id;
+      if (uId) {
+        if (!studentSessionsMap[uId]) studentSessionsMap[uId] = [];
+        studentSessionsMap[uId].push(s);
+      }
+    });
+
+    const studentSkillsMap: Record<string, any[]> = {};
+    (skills || []).forEach((sk: any) => {
+      const uId = sk.user_id;
+      if (uId) {
+        if (!studentSkillsMap[uId]) studentSkillsMap[uId] = [];
+        studentSkillsMap[uId].push(sk);
+      }
+    });
+
+    // Calculate highlights (Helden-Momente)
+    let classWeeklyMins = 0;
+    const highlights: any[] = [];
+    myStudents.forEach((student: any) => {
+      const studentSessions = studentSessionsMap[student.id] || [];
+      const studentSkills = studentSkillsMap[student.id] || [];
+
+      // Calculate recent focus minutes (last 7 days)
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      const recentMins = studentSessions
+        .filter((s: any) => new Date(s.check_in_time) >= oneWeekAgo)
+        .reduce((sum: number, s: any) => {
+          if (s.check_in_time && s.check_out_time) {
+            const start = new Date(s.check_in_time);
+            const end = new Date(s.check_out_time);
+            return sum + Math.max(0, Math.floor((end.getTime() - start.getTime()) / 60000));
+          }
+          return sum;
+        }, 0);
+      classWeeklyMins += recentMins;
+
+      // Streak
+      const weeks = new Set();
+      studentSessions.forEach((s: any) => {
+        const d = new Date(s.check_in_time);
+        const year = d.getFullYear();
+        const firstDayOfYear = new Date(year, 0, 1);
+        const pastDaysOfYear = (d.getTime() - firstDayOfYear.getTime()) / 86400000;
+        const week = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+        weeks.add(`${year}-${week}`);
+      });
+      const streakCount = weeks.size;
+
+      // Mastered songs count
+      const masteredSongs = studentSkills.filter((sk: any) => sk.progress_percent === 100 || sk.is_stage_ready);
+      const masteredCount = masteredSongs.length;
+
+      // Add highlights
+      if (streakCount >= 3) {
+        highlights.push({
+          studentId: student.id,
+          studentName: `${student.first_name} ${student.last_name}`,
+          type: 'streak',
+          value: `${streakCount} Wochen`,
+          emoji: '🔥',
+          title: 'Konstanz-Meister',
+          text: `Hat in ${streakCount} verschiedenen Wochen im Groove Lab geübt!`,
+          praiseTemplate: `Hey ${student.first_name}, super Leistung! Du hast eine Übesträhne von ${streakCount} Wochen. Mach weiter so! 🎸`
+        });
+      }
+      if (recentMins >= 45) {
+        highlights.push({
+          studentId: student.id,
+          studentName: `${student.first_name} ${student.last_name}`,
+          type: 'focus',
+          value: `${recentMins} Min.`,
+          emoji: '⚡',
+          title: 'Power-Übende(r)',
+          text: `Hat in den letzten 7 Tagen unglaubliche ${recentMins} Minuten trainiert!`,
+          praiseTemplate: `Hi ${student.first_name}, ich habe deine Übezeiten gesehen: ${recentMins} Minuten Fokus diese Woche! Richtig stark! 🎹`
+        });
+      }
+      if (masteredCount > 0) {
+        const lastMastered = masteredSongs[masteredSongs.length - 1];
+        if (lastMastered) {
+          highlights.push({
+            studentId: student.id,
+            studentName: `${student.first_name} ${student.last_name}`,
+            type: 'song',
+            value: lastMastered.songs?.title || 'Song',
+            emoji: '🏆',
+            title: 'Bühnenreif',
+            text: `Hat den Song "${lastMastered.songs?.title || 'Song'}" komplett gemeistert!`,
+            praiseTemplate: `Hallo ${student.first_name}, herzlichen Glückwunsch! Du hast "${lastMastered.songs?.title || 'Song'}" bühnenreif gemeistert. Ich freue mich schon auf das nächste Vorspielen! 🎤`
+          });
+        }
+      }
+    });
+
     setStats({
       studentCount,
       songCount,
@@ -2334,7 +2458,12 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       stageReadyPerInst,
       topSongs,
       leaderboard,
-      resetDateStr
+      resetDateStr,
+      myClassMins,
+      otherClassMins,
+      myClassCount: myStudents.length,
+      classWeeklyMins,
+      highlights
     });
   };;
 
@@ -8448,6 +8577,266 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     const resetFormatted = stats.resetDateStr 
       ? new Date(stats.resetDateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
       : null;
+
+    if (activePlatform === 'campus') {
+      const myClassMins = stats.myClassMins || 0;
+      const otherClassMins = stats.otherClassMins || 0;
+      const totalSchoolMins = myClassMins + otherClassMins;
+
+      const classWeeklyMins = stats.classWeeklyMins || 0;
+      const weeklyTarget = 300; // 5 hours target
+      const targetPercent = Math.min(100, Math.round((classWeeklyMins / weeklyTarget) * 100));
+
+      // Pie chart data
+      const pieData = myClassMins === 0 && otherClassMins === 0 
+        ? [
+            { name: 'Unsere Klasse', value: 0.1, color: brandColor },
+            { name: 'Restliche Schule', value: 0.9, color: '#e2e8f0' }
+          ]
+        : [
+            { name: 'Unsere Klasse', value: myClassMins, color: brandColor },
+            { name: 'Restliche Schule', value: otherClassMins, color: '#cbd5e1' }
+          ];
+
+      const contributionPercent = totalSchoolMins > 0 
+        ? Math.round((myClassMins / totalSchoolMins) * 100) 
+        : 0;
+
+      return (
+        <div style={{ marginTop: '0px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+          {/* Top Header Card */}
+          <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: `${brandColor}15`, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Award size={24} />
+              </div>
+              <div>
+                <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Performance & Highlights</h2>
+                <p style={{ color: '#64748b', margin: 0, fontWeight: 600, fontSize: '0.9rem' }}>Feiere die Lernfortschritte deiner Klasse und stärke die Motivation durch positives Feedback.</p>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
+              {[
+                { label: 'Deine Schüler', value: stats.myClassCount || 0, icon: Users, color: brandColor, bg: `${brandColor}08` },
+                { label: 'Klassen-Übezeit (Gesamt)', value: formatMins(myClassMins), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
+                { label: 'Klassen-Übezeit (Woche)', value: formatMins(classWeeklyMins), icon: TrendingUp, color: '#10b981', bg: '#f0fdf4' },
+                { label: 'Beitrag zur Schule', value: `${contributionPercent}%`, icon: Shield, color: '#6366f1', bg: '#f5f3ff' }
+              ].map((stat, idx) => (
+                <div key={idx} style={{ padding: '24px', background: stat.bg, borderRadius: '24px', border: `1px solid ${stat.color}15`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '130px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{stat.label}</span>
+                    <div style={{ padding: '8px', borderRadius: '10px', background: 'white', color: stat.color, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.02)' }}>
+                      <stat.icon size={18} />
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', marginTop: '12px' }}>{stat.value}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Grid Layout: Left (Contribution & Goal) | Right (Highlights Feed) */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '32px', alignItems: 'start' }}>
+            {/* Left Column */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+              
+              {/* Contribution Pie Chart */}
+              <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', width: '100%', marginBottom: '8px', textAlign: 'left' }}>
+                  Gemeinsamer Schul-Beitrag
+                </h3>
+                <p style={{ fontSize: '0.8rem', color: '#64748b', width: '100%', margin: '0 0 24px 0', textAlign: 'left', fontWeight: 600 }}>
+                  Wie viel trägt deine Klasse zum gesamten Übe-Erfolg der Musikschule bei?
+                </p>
+
+                <div style={{ width: '100%', height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RechartsPieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={65}
+                        outerRadius={90}
+                        paddingAngle={3}
+                        dataKey="value"
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value) => formatMins(Number(value))} />
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
+                  
+                  {/* Center Text inside Donut */}
+                  <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: '1.75rem', fontWeight: 950, color: '#0f172a', lineHeight: 1 }}>
+                      {contributionPercent}%
+                    </span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '4px' }}>
+                      Klassen-Anteil
+                    </span>
+                  </div>
+                </div>
+
+                {/* Legend */}
+                <div style={{ display: 'flex', gap: '24px', marginTop: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '4px', background: brandColor }} />
+                    <span style={{ fontSize: '0.78rem', fontWeight: 750, color: '#334155' }}>Unsere Klasse ({formatMins(myClassMins)})</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '4px', background: '#cbd5e1' }} />
+                    <span style={{ fontSize: '0.78rem', fontWeight: 750, color: '#64748b' }}>Restliche Schule ({formatMins(otherClassMins)})</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Weekly Class Target Card */}
+              <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0' }}>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>🌱</span> Klassen-Wochenziel
+                </h3>
+                <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0 0 24px 0', fontWeight: 600 }}>
+                  Gemeinsam schaffen wir mehr! Euer kollektives Ziel von {weeklyTarget} Minuten pro Woche.
+                </p>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 850, color: '#0f172a' }}>
+                    {formatMins(classWeeklyMins)} von {weeklyTarget} Min.
+                  </span>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 900, color: brandColor, background: `${brandColor}12`, padding: '2px 8px', borderRadius: '6px' }}>
+                    {targetPercent}%
+                  </span>
+                </div>
+
+                <div style={{ width: '100%', height: '14px', background: '#f1f5f9', borderRadius: '7px', overflow: 'hidden', marginBottom: '16px' }}>
+                  <div 
+                    style={{ 
+                      width: `${targetPercent}%`, 
+                      height: '100%', 
+                      background: `linear-gradient(90deg, ${brandColor} 0%, #10b981 100%)`, 
+                      borderRadius: '7px', 
+                      transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)' 
+                    }} 
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', background: '#f0fdf4', padding: '12px 16px', borderRadius: '16px', border: '1px solid #dcfce7' }}>
+                  <span style={{ fontSize: '1.2rem' }}>🎉</span>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#14532d', lineHeight: 1.4 }}>
+                    {targetPercent >= 100 
+                      ? "Ziel erreicht! Eure Klasse rockt diese Woche!" 
+                      : `Noch ${weeklyTarget - classWeeklyMins} Minuten, um das Wochenziel als Klasse zu knacken!`}
+                  </span>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Right Column: Helden-Momente Feed */}
+            <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', minHeight: '500px' }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>✨</span> Helden-Momente
+              </h3>
+              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0 0 28px 0', fontWeight: 600 }}>
+                Besondere Meilensteine und Fleiß-Highlights deiner Schüler aus dieser Woche.
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {(stats.highlights || []).length === 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: '24px', border: '1px dashed #cbd5e1' }}>
+                    <span style={{ fontSize: '2.5rem', marginBottom: '16px' }}>🤫</span>
+                    <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#475569', margin: '0 0 6px 0' }}>Ruhe vor dem Sturm</h4>
+                    <p style={{ fontSize: '0.78rem', color: '#64748b', maxWidth: '300px', margin: 0, lineHeight: 1.4 }}>
+                      Sobald deine Schüler diese Woche fleißig üben oder Challenges meistern, erscheinen ihre Erfolge hier!
+                    </p>
+                  </div>
+                ) : (
+                  (stats.highlights || []).map((hl: any, idx: number) => {
+                    const uniqueId = `${hl.studentId}-${hl.type}`;
+                    const isCopied = copiedPraiseId === uniqueId;
+
+                    return (
+                      <div 
+                        key={idx} 
+                        style={{ 
+                          padding: '20px', 
+                          background: 'white', 
+                          borderRadius: '20px', 
+                          border: '1px solid #e2e8f0', 
+                          boxShadow: '0 4px 12px rgba(15, 23, 42, 0.02)',
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          gap: '14px',
+                          transition: 'transform 0.2s, box-shadow 0.2s',
+                          cursor: 'default'
+                        }}
+                        className="hover-scale"
+                      >
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                          <div style={{ fontSize: '1.75rem', width: '44px', height: '44px', borderRadius: '12px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            {hl.emoji}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0f172a' }}>{hl.studentName}</span>
+                              <span style={{ fontSize: '0.7rem', fontWeight: 900, color: brandColor, background: `${brandColor}10`, padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
+                                {hl.title}
+                              </span>
+                            </div>
+                            <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '4px 0 0 0', lineHeight: 1.4, fontWeight: 550 }}>
+                              {hl.text}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Direct Praise Panel */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifySelf: 'stretch', gap: '12px', background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+                          <span style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            "{hl.praiseTemplate}"
+                          </span>
+                          
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(hl.praiseTemplate);
+                              setCopiedPraiseId(uniqueId);
+                              setTimeout(() => setCopiedPraiseId(null), 1500);
+                            }}
+                            style={{
+                              background: isCopied ? '#10b981' : '#ffffff',
+                              border: `1px solid ${isCopied ? '#10b981' : '#cbd5e1'}`,
+                              color: isCopied ? 'white' : '#0f172a',
+                              padding: '6px 12px',
+                              borderRadius: '8px',
+                              fontSize: '0.75rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              transition: 'all 0.2s',
+                              boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+                            }}
+                          >
+                            {isCopied ? <Check size={14} /> : null}
+                            <span>{isCopied ? 'Kopiert!' : 'Lob kopieren'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div style={{ marginTop: '0px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
