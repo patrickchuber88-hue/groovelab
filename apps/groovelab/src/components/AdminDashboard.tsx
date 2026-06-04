@@ -4962,7 +4962,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           date: '', // Weekly recurring
           startTime: startTimeStr,
           endTime: endTimeStr,
-          purpose: s.purpose || (s.subject_name ? `Unterricht: ${s.subject_name}` : 'Regulärer Unterricht'),
+          purpose: s.purpose || (s.subject_name ? `Unterricht: ${s.subject_name}` : 'Unterricht'),
           teacherId: s.teacher_id,
           teacherName: teacherName,
           isSchedule: true,
