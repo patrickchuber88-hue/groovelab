@@ -6345,6 +6345,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                   const colWidth = 100 / slotBookings.length;
                                   const colLeft = bIdx * colWidth;
                                   const isSchedule = b.isSchedule;
+                                  const isOwnSchedule = isSchedule && isOwnBooking;
                                   const isRescheduled = b.status === 'pending_reschedule' || b.status === 'rescheduled_confirmed';
                                   const hasConflict = isRescheduled && slotBookings.length > 1;
                                   
@@ -6431,14 +6432,14 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                       }}
                                       title={b.isPreview ? `Vorschau: ${b.purpose} (${b.startTime} - ${b.endTime})` : `${b.purpose} (${b.startTime} - ${b.endTime}) - ${b.teacherName}`}
                                       style={{
-                                        background: isOwnBooking && !b.isPreview ? leftAccentColor : bg,
-                                        border: b.isPreview ? `2.2px dashed ${leftAccentColor}` : `1px solid ${hasConflict ? '#ff9500' : (isOwnBooking ? 'rgba(255, 255, 255, 0.15)' : leftAccentColor + '25')}`,
-                                        borderLeft: b.isPreview ? `2.2px dashed ${leftAccentColor}` : `3px solid ${hasConflict ? '#ff9500' : (isOwnBooking ? brandColor : leftAccentColor)}`,
+                                        background: isOwnSchedule && !b.isPreview ? leftAccentColor : bg,
+                                        border: b.isPreview ? `2.2px dashed ${leftAccentColor}` : `1px solid ${hasConflict ? '#ff9500' : (isOwnSchedule ? 'rgba(255, 255, 255, 0.15)' : leftAccentColor + '25')}`,
+                                        borderLeft: b.isPreview ? `2.2px dashed ${leftAccentColor}` : `3px solid ${hasConflict ? '#ff9500' : (isOwnSchedule ? brandColor : leftAccentColor)}`,
                                         borderRadius: '8px',
                                         padding: '6px 8px',
                                         fontSize: '0.70rem',
                                         fontWeight: 800,
-                                        color: isOwnBooking && !b.isPreview ? '#ffffff' : textColor,
+                                        color: isOwnSchedule && !b.isPreview ? '#ffffff' : textColor,
                                         position: 'absolute',
                                         top: `calc(${(sm / 60) * 100}% + 4px)`,
                                         left: `calc(${colLeft}% + 4px)`,
@@ -6524,54 +6525,79 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                         </div>
                                       )}
 
-                                      <div style={{
-                                        background: isOwnBooking && !b.isPreview ? '#ffffff' : 'rgba(0, 0, 0, 0.04)',
-                                        color: isOwnBooking && !b.isPreview ? '#000000' : textColor,
-                                        padding: '6px 8px',
-                                        margin: '-6px -8px 0 -8px',
-                                        borderBottom: isOwnBooking && !b.isPreview ? 'none' : `1px solid ${leftAccentColor}15`,
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '2px'
-                                      }}>
-                                        {/* Time range */}
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.64rem', fontWeight: 800 }}>
-                                          <span style={{ display: 'flex', alignItems: 'center' }}>
-                                            {isSchedule && <GraduationCap size={10} style={{ marginRight: '3px' }} />}
-                                            {b.startTime} - {b.endTime}{b.isPreview && ' (Vorschau)'}
-                                          </span>
-                                        </div>
-
-                                        {/* Conflict badge */}
-                                        {hasConflict && (
+                                      {isOwnSchedule && !b.isPreview ? (
+                                        <>
                                           <div style={{
-                                            fontSize: '0.58rem',
-                                            fontWeight: 900,
-                                            textTransform: 'uppercase',
-                                            color: '#ff9500',
-                                            background: 'rgba(255, 149, 0, 0.12)',
-                                            border: '1px solid rgba(255, 149, 0, 0.25)',
-                                            padding: '1px 3px',
-                                            borderRadius: '3px',
-                                            width: 'fit-content'
+                                            background: '#ffffff',
+                                            color: '#000000',
+                                            padding: '6px 8px',
+                                            margin: '-6px -8px 0 -8px',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '2px'
                                           }}>
-                                            ⚠️ Doppelbelegung
+                                            {/* Time range */}
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.64rem', fontWeight: 800 }}>
+                                              <span style={{ display: 'flex', alignItems: 'center' }}>
+                                                <GraduationCap size={10} style={{ marginRight: '3px' }} />
+                                                {b.startTime} - {b.endTime}
+                                              </span>
+                                            </div>
+                                            {/* Teacher Name */}
+                                            {durationHrs >= 0.75 && (
+                                              <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', fontWeight: 700 }}>
+                                                {b.teacherName}
+                                              </div>
+                                            )}
                                           </div>
-                                        )}
-
-                                        {/* Teacher Name */}
-                                        {durationHrs >= 0.75 && (
-                                          <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', fontWeight: 700 }}>
-                                            {b.teacherName}
+                                          {/* Purpose */}
+                                          {durationHrs >= 1.0 && b.purpose && b.purpose.trim().toLowerCase() !== 'eigennutzung' && (
+                                            <div style={{ fontSize: '0.64rem', opacity: 0.8, marginTop: '5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                              {b.isPreview ? 'Vorschau' : b.purpose}
+                                            </div>
+                                          )}
+                                        </>
+                                      ) : (
+                                        <>
+                                          {/* Time range */}
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.64rem', marginBottom: '4px', fontWeight: 800 }}>
+                                            <span style={{ display: 'flex', alignItems: 'center' }}>
+                                              {isSchedule && <GraduationCap size={10} style={{ marginRight: '3px' }} />}
+                                              {b.startTime} - {b.endTime}{b.isPreview && ' (Vorschau)'}
+                                            </span>
                                           </div>
-                                        )}
-                                      </div>
 
-                                      {/* Purpose */}
-                                      {durationHrs >= 1.0 && b.purpose && b.purpose.trim().toLowerCase() !== 'eigennutzung' && (
-                                        <div style={{ fontSize: '0.64rem', opacity: 0.8, marginTop: '5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                          {b.isPreview ? 'Vorschau' : b.purpose}
-                                        </div>
+                                          {/* Conflict badge */}
+                                          {hasConflict && (
+                                            <div style={{
+                                              fontSize: '0.58rem',
+                                              fontWeight: 900,
+                                              textTransform: 'uppercase',
+                                              color: '#ff9500',
+                                              background: 'rgba(255, 149, 0, 0.12)',
+                                              border: '1px solid rgba(255, 149, 0, 0.25)',
+                                              padding: '1px 3px',
+                                              borderRadius: '3px',
+                                              width: 'fit-content'
+                                            }}>
+                                              ⚠️ Doppelbelegung
+                                            </div>
+                                          )}
+
+                                          {/* Teacher Name */}
+                                          {durationHrs >= 0.75 && (
+                                            <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', fontWeight: 700 }}>
+                                              {b.teacherName}
+                                            </div>
+                                          )}
+
+                                          {/* Purpose */}
+                                          {durationHrs >= 1.0 && b.purpose && b.purpose.trim().toLowerCase() !== 'eigennutzung' && (
+                                            <div style={{ fontSize: '0.64rem', opacity: 0.8, marginTop: '5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                              {b.isPreview ? 'Vorschau' : b.purpose}
+                                            </div>
+                                          )}
+                                        </>
                                       )}
                                     </div>
                                   );
