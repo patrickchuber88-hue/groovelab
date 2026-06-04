@@ -4935,19 +4935,61 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '0px' }}>
         <style>{`
           .custom-calendar-scrollbar::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
+            width: 5px;
+            height: 5px;
           }
           .custom-calendar-scrollbar::-webkit-scrollbar-track {
-            background: #f8fafc;
-            border-radius: 4px;
+            background: transparent;
+            border-radius: 10px;
           }
           .custom-calendar-scrollbar::-webkit-scrollbar-thumb {
             background: #cbd5e1;
-            border-radius: 4px;
+            border-radius: 10px;
+            transition: background 0.2s;
           }
           .custom-calendar-scrollbar::-webkit-scrollbar-thumb:hover {
             background: #94a3b8;
+          }
+          @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.4); opacity: 0.6; }
+            100% { transform: scale(1); opacity: 1; }
+          }
+          .pulsing-dot {
+            animation: pulse 2.5s infinite ease-in-out;
+          }
+          .premium-input {
+            padding: 10px 14px;
+            border-radius: 12px;
+            border: 1.5px solid #cbd5e1;
+            font-size: 0.85rem;
+            font-weight: 700;
+            outline: none;
+            color: #1e293b;
+            background: #f8fafc;
+            height: 42px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
+          }
+          .premium-input:focus {
+            border-color: ${brandColor};
+            background: #ffffff;
+            color: #000000;
+            box-shadow: 0 0 0 3px ${brandColor}18, inset 0 1px 2px rgba(0, 0, 0, 0.01);
+          }
+          .room-picker-card {
+            min-width: 190px;
+            padding: 14px;
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+          }
+          .room-picker-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.04);
           }
           @media (max-width: 1024px) {
             .calendar-header-flex {
@@ -4961,23 +5003,24 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               gap: 12px !important;
             }
             .calendar-today-btn {
-              padding: 8px 16px !important;
+              padding: 10px 18px !important;
               font-size: 0.8rem !important;
-              height: 40px !important;
-              border-radius: 12px !important;
-              min-width: 80px !important;
+              height: 44px !important;
+              border-radius: 14px !important;
+              min-width: 88px !important;
             }
             .calendar-week-pagination {
-              padding: 6px 12px !important;
-              border-radius: 14px !important;
-              height: 40px !important;
+              padding: 6px 14px !important;
+              border-radius: 16px !important;
+              height: 44px !important;
               flex-grow: 1 !important;
               justify-content: space-between !important;
             }
             .calendar-week-chevron-btn {
-              padding: 8px 12px !important;
-              border-radius: 10px !important;
-              min-width: 36px !important;
+              padding: 10px 14px !important;
+              border-radius: 12px !important;
+              min-width: 44px !important;
+              height: 44px !important;
             }
           }
           .rooms-board-grid {
@@ -4999,53 +5042,87 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               className="glass-panel" 
               style={{ 
                 background: 'white', 
-                borderRadius: '20px', 
-                border: '1px solid rgba(0, 0, 0, 0.05)', 
-                padding: '16px 20px', 
-                boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)'
+                borderRadius: '24px', 
+                border: '1px solid rgba(0, 0, 0, 0.04)', 
+                padding: '18px 24px', 
+                boxShadow: '0 4px 24px -4px rgba(0, 0, 0, 0.02), 0 2px 12px -2px rgba(0, 0, 0, 0.01)'
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
-                <h2 style={{ fontSize: '1.4rem', fontWeight: 900, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                  <div style={{ background: `${brandColor}15`, color: brandColor, padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+                <h2 style={{ fontSize: '1.35rem', fontWeight: 900, color: '#1c1c1e', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, letterSpacing: '-0.02em' }}>
+                  <div style={{ background: `${brandColor}12`, color: brandColor, padding: '6px', borderRadius: '10px', display: 'flex', alignItems: 'center' }}>
                     <Box size={16} />
                   </div>
                   Campus Räumlichkeiten
                 </h2>
 
-                <div style={{ 
-                  background: '#f1f5f9', 
-                  borderRadius: '12px', 
-                  padding: '3px', 
-                  display: 'flex', 
-                  gap: '2px', 
-                  border: '1px solid rgba(0,0,0,0.02)',
-                  alignItems: 'center',
-                  flexWrap: 'wrap'
-                }}>
-                  {['Alle', ...uniqueFloors].map((floor) => {
-                    const isSelected = selectedFloor === floor;
-                    return (
-                      <button
-                        key={floor}
-                        onClick={() => setSelectedFloor(floor)}
-                        style={{
-                          padding: '6px 14px',
-                          borderRadius: '9px',
-                          border: 'none',
-                          background: isSelected ? '#ffffff' : 'transparent',
-                          color: isSelected ? brandColor : '#64748b',
-                          fontWeight: isSelected ? 800 : 600,
-                          fontSize: '0.75rem',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                        }}
-                      >
-                        {floor === 'Allgemein' ? 'Standard' : floor}
-                      </button>
-                    );
-                  })}
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {/* Segmented Control for Floor filter */}
+                  <div style={{ 
+                    background: '#f2f2f7', 
+                    borderRadius: '14px', 
+                    padding: '3px', 
+                    display: 'flex', 
+                    gap: '2px', 
+                    border: '1px solid rgba(0,0,0,0.01)',
+                    alignItems: 'center',
+                  }}>
+                    {['Alle', ...uniqueFloors].map((floor) => {
+                      const isSelected = selectedFloor === floor;
+                      return (
+                        <button
+                          key={floor}
+                          onClick={() => setSelectedFloor(floor)}
+                          style={{
+                            padding: '6px 14px',
+                            borderRadius: '11px',
+                            border: 'none',
+                            background: isSelected ? '#ffffff' : 'transparent',
+                            color: isSelected ? brandColor : '#636366',
+                            fontWeight: isSelected ? 800 : 600,
+                            fontSize: '0.75rem',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                            boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+                          }}
+                        >
+                          {floor === 'Allgemein' ? 'Standard' : floor}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Highlighted "Meine Buchungen" Button */}
+                  <button
+                    onClick={() => setShowMyBookingsOnly(prev => !prev)}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '14px',
+                      border: showMyBookingsOnly ? `2px solid ${brandColor}` : '1.5px solid #e5e5ea',
+                      background: showMyBookingsOnly ? `${brandColor}12` : '#ffffff',
+                      color: showMyBookingsOnly ? brandColor : '#1c1c1e',
+                      fontWeight: 800,
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      boxShadow: showMyBookingsOnly ? `0 4px 12px ${brandColor}15` : '0 2px 4px rgba(0,0,0,0.02)',
+                    }}
+                  >
+                    <span>Meine Buchungen</span>
+                    <span style={{ 
+                      fontSize: '0.7rem', 
+                      background: showMyBookingsOnly ? brandColor : '#f2f2f7', 
+                      color: showMyBookingsOnly ? '#ffffff' : '#555559', 
+                      padding: '2px 8px', 
+                      borderRadius: '8px', 
+                      fontWeight: 900 
+                    }}>
+                      {myBookings.length}
+                    </span>
+                  </button>
                 </div>
               </div>
 
@@ -5055,14 +5132,14 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   display: 'flex', 
                   justifyContent: 'space-between', 
                   alignItems: 'center', 
-                  background: '#fffbeb', 
-                  border: '1px solid #fef3c7', 
-                  borderRadius: '12px', 
-                  padding: '10px 14px', 
-                  marginBottom: '14px',
-                  animation: 'fadeIn 0.2s ease'
+                  background: '#fff9e6', 
+                  border: '1px solid #ffe699', 
+                  borderRadius: '14px', 
+                  padding: '10px 16px', 
+                  marginBottom: '16px',
+                  animation: 'fadeIn 0.25s ease'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: '#b45309', fontWeight: 700 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: '#b27b00', fontWeight: 700 }}>
                     <span>📅</span>
                     <span>Anzeige gefiltert für: {new Date(bookingDate).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit' })}, {bookingStartTime} - {bookingEndTime} Uhr</span>
                   </div>
@@ -5074,7 +5151,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     style={{ 
                       background: 'transparent', 
                       border: 'none', 
-                      color: '#b45309', 
+                      color: '#b27b00', 
                       fontWeight: 800, 
                       fontSize: '0.75rem', 
                       cursor: 'pointer',
@@ -5088,7 +5165,19 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px', width: '100%', minWidth: 0 }}>
+              {/* Rooms List Container */}
+              <div 
+                className="custom-calendar-scrollbar" 
+                style={{ 
+                  display: 'flex', 
+                  gap: '12px', 
+                  overflowX: 'auto', 
+                  paddingBottom: '8px', 
+                  width: '100%', 
+                  minWidth: 0,
+                  WebkitOverflowScrolling: 'touch'
+                }}
+              >
                 {roomsToRender.map((room) => {
                   const isSelected = selectedCampusRoomId === room.id;
                   const occupied = isRoomOccupied(room.id);
@@ -5096,40 +5185,40 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     <div
                       key={room.id}
                       onClick={() => setSelectedCampusRoomId(room.id)}
+                      className="room-picker-card"
                       style={{
-                        minWidth: '180px',
-                        padding: '12px 14px',
-                        background: isSelected ? `${brandColor}08` : 'white',
-                        border: isSelected ? `2px solid ${brandColor}` : '1.5px solid #e2e8f0',
-                        borderRadius: '14px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                        boxShadow: isSelected ? `0 4px 12px ${brandColor}15` : 'none',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '6px',
-                        opacity: (isDateFilterActive && occupied) ? 0.4 : 1
+                        background: isSelected ? `${brandColor}06` : 'white',
+                        border: isSelected ? `2px solid ${brandColor}` : '1.5px solid #e5e5ea',
+                        boxShadow: isSelected ? `0 8px 24px ${brandColor}12` : 'none',
+                        opacity: (isDateFilterActive && occupied) ? 0.45 : 1
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ fontWeight: 800, fontSize: '0.85rem', color: isSelected ? brandColor : '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '120px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                        <div style={{ 
+                          fontWeight: 800, 
+                          fontSize: '0.85rem', 
+                          color: isSelected ? brandColor : '#1c1c1e',
+                          lineHeight: 1.25,
+                          wordBreak: 'break-word'
+                        }}>
                           {room.name}
                         </div>
                         <span style={{ 
-                          width: '8px', 
-                          height: '8px', 
+                          width: '9px', 
+                          height: '9px', 
                           borderRadius: '50%', 
-                          background: occupied ? '#ef4444' : '#22c55e',
+                          background: occupied ? '#ff453a' : '#30d158',
                           display: 'inline-block',
-                          boxShadow: '0 0 4px rgba(0,0,0,0.05)'
+                          flexShrink: 0,
+                          marginTop: '3px'
                         }} title={occupied ? 'Belegt' : 'Verfügbar'} />
                       </div>
-                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
-                        <span style={{ padding: '2px 6px', background: '#f1f5f9', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 700, color: '#475569' }}>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', marginTop: 'auto' }}>
+                        <span style={{ padding: '3px 8px', background: '#f2f2f7', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 700, color: '#555559' }}>
                           Kapazität: {room.capacity || 4}
                         </span>
                         {occupied && (
-                          <span style={{ padding: '2px 6px', background: '#fee2e2', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#ef4444' }}>
+                          <span style={{ padding: '3px 8px', background: '#ffebeb', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 800, color: '#ff453a' }}>
                             Belegt
                           </span>
                         )}
@@ -5145,24 +5234,24 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               className="glass-panel" 
               style={{ 
                 background: 'white', 
-                borderRadius: '20px', 
-                border: '1px solid rgba(0, 0, 0, 0.05)', 
-                padding: '18px 20px', 
-                boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)'
+                borderRadius: '24px', 
+                border: '1px solid rgba(0, 0, 0, 0.04)', 
+                padding: '20px 24px', 
+                boxShadow: '0 4px 24px -4px rgba(0, 0, 0, 0.02), 0 2px 12px -2px rgba(0, 0, 0, 0.01)'
               }}
             >
-              <div className="calendar-header-flex" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div className="calendar-header-flex" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <div>
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#1c1c1e', margin: 0, letterSpacing: '-0.01em' }}>
                     Wochenübersicht: {selectedRoom?.name || 'Wähle einen Raum'}
                   </h3>
-                  <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '2px 0 0 0', fontWeight: 600 }}>
+                  <p style={{ fontSize: '0.74rem', color: '#8e8e93', margin: '3px 0 0 0', fontWeight: 600 }}>
                     Angezeigt für die Woche der Buchungsauswahl ({new Date(bookingDate).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })})
                   </p>
                 </div>
 
                 {/* Week Pagination and Today Button */}
-                <div className="calendar-controls-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="calendar-controls-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <button
                     onClick={() => {
                       const today = new Date();
@@ -5171,28 +5260,29 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     }}
                     className="calendar-today-btn"
                     style={{
-                      border: '1px solid #e2e8f0',
+                      border: '1px solid #e5e5ea',
                       background: 'white',
                       cursor: 'pointer',
-                      padding: '6px 12px',
-                      borderRadius: '10px',
-                      color: '#475569',
-                      fontSize: '0.72rem',
+                      padding: '8px 14px',
+                      borderRadius: '12px',
+                      color: '#1c1c1e',
+                      fontSize: '0.75rem',
                       fontWeight: 800,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       transition: 'all 0.2s',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
-                      height: '32px'
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                      height: '38px',
+                      minWidth: '70px'
                     }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = brandColor; e.currentTarget.style.color = brandColor; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = 'white'; e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.color = '#475569'; }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = '#f2f2f7'; e.currentTarget.style.borderColor = brandColor; e.currentTarget.style.color = brandColor; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'white'; e.currentTarget.style.borderColor = '#e5e5ea'; e.currentTarget.style.color = '#1c1c1e'; }}
                   >
                     Heute
                   </button>
 
-                  <div className="calendar-week-pagination" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '4px 8px', borderRadius: '12px', border: '1px solid #e2e8f0', height: '32px' }}>
+                  <div className="calendar-week-pagination" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f2f2f7', padding: '4px 10px', borderRadius: '14px', border: '1px solid #e5e5ea', height: '38px' }}>
                     <button
                       onClick={() => changeWeek(-1)}
                       className="calendar-week-chevron-btn"
@@ -5200,17 +5290,22 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                         border: 'none',
                         background: 'none',
                         cursor: 'pointer',
-                        padding: '4px',
+                        padding: '6px',
                         display: 'flex',
                         alignItems: 'center',
-                        color: '#64748b'
+                        justifyContent: 'center',
+                        color: '#8e8e93',
+                        borderRadius: '10px',
+                        transition: 'background 0.2s'
                       }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                     >
-                      <ChevronLeft size={16} />
+                      <ChevronLeft size={18} />
                     </button>
-                    <span className="calendar-week-label" style={{ fontSize: '0.74rem', fontWeight: 800, color: '#334155', minWidth: '150px', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                      <span style={{ color: brandColor, fontWeight: 800 }}>KW {getCalendarWeek(bookingDate)}</span>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b' }}>({getWeekRange(bookingDate)})</span>
+                    <span className="calendar-week-label" style={{ fontSize: '0.76rem', fontWeight: 800, color: '#1c1c1e', minWidth: '155px', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                      <span style={{ color: brandColor, fontWeight: 900 }}>KW {getCalendarWeek(bookingDate)}</span>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#636366' }}>({getWeekRange(bookingDate)})</span>
                     </span>
                     <button
                       onClick={() => changeWeek(1)}
@@ -5219,13 +5314,18 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                         border: 'none',
                         background: 'none',
                         cursor: 'pointer',
-                        padding: '4px',
+                        padding: '6px',
                         display: 'flex',
                         alignItems: 'center',
-                        color: '#64748b'
+                        justifyContent: 'center',
+                        color: '#8e8e93',
+                        borderRadius: '10px',
+                        transition: 'background 0.2s'
                       }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                     >
-                      <ChevronRight size={16} />
+                      <ChevronRight size={18} />
                     </button>
                   </div>
                 </div>
@@ -5233,214 +5333,209 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
               {/* Calendar Grid Container */}
               <div style={{ overflowX: 'auto', width: '100%' }} className="custom-calendar-scrollbar">
-                <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', minWidth: '950px' }}>
-                {/* Header Row */}
-                <div style={{ display: 'grid', gridTemplateColumns: '80px repeat(7, 1fr)', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                  <div style={{ padding: '10px', fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textAlign: 'center', borderRight: '1px solid #e2e8f0' }}>Zeit</div>
-                  {DAYS_OF_WEEK.map((day, dayIdx) => {
-                    const isToday = isTodayInWeek(bookingDate) && isDayToday(dayIdx, bookingDate);
-                    return (
-                      <div 
-                        key={day.value} 
-                        style={{ 
-                          padding: '10px 4px', 
-                          fontSize: '0.72rem', 
-                          fontWeight: 800, 
-                          color: '#1e293b', 
-                          textAlign: 'center', 
-                          borderRight: dayIdx < 6 ? '1px solid #e2e8f0' : 'none',
-                          position: 'relative',
-                          background: isToday ? `${brandColor}06` : '#f8fafc'
-                        }}
-                      >
-                        {isToday && (
-                          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: brandColor }} />
-                        )}
-                        <div>{day.label}</div>
-                        <div style={{ fontSize: '0.62rem', color: '#64748b', marginTop: '2px', fontWeight: 700 }}>
-                          {getWeekdayDate(dayIdx, bookingDate)}
+                <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid #e5e5ea', borderRadius: '16px', overflow: 'hidden', minWidth: '950px' }}>
+                  {/* Header Row */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '80px repeat(7, 1fr)', background: '#ffffff', borderBottom: '1px solid #e5e5ea' }}>
+                    <div style={{ padding: '12px 10px', fontSize: '0.72rem', fontWeight: 800, color: '#8e8e93', textAlign: 'center', borderRight: '1px solid #e5e5ea' }}>Zeit</div>
+                    {DAYS_OF_WEEK.map((day, dayIdx) => {
+                      const isToday = isTodayInWeek(bookingDate) && isDayToday(dayIdx, bookingDate);
+                      return (
+                        <div 
+                          key={day.value} 
+                          style={{ 
+                            padding: '12px 4px', 
+                            fontSize: '0.74rem', 
+                            fontWeight: 800, 
+                            color: isToday ? brandColor : '#1c1c1e', 
+                            textAlign: 'center', 
+                            borderRight: dayIdx < 6 ? '1px solid #e5e5ea' : 'none',
+                            position: 'relative',
+                            background: isToday ? `${brandColor}04` : '#ffffff'
+                          }}
+                        >
+                          {isToday && (
+                            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: brandColor }} />
+                          )}
+                          <div>{day.label}</div>
+                          <div style={{ fontSize: '0.65rem', color: isToday ? brandColor : '#8e8e93', marginTop: '3px', fontWeight: 700 }}>
+                            {getWeekdayDate(dayIdx, bookingDate)}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
 
-                {/* Hourly Rows */}
-                <div className="custom-calendar-scrollbar" style={{ display: 'flex', flexDirection: 'column', maxHeight: '420px', overflowY: 'auto', position: 'relative' }}>
-                  {TIME_SLOTS.map((hour) => {
-                    const slotHourInt = parseInt(hour.split(':')[0]);
-                    
-                    return (
-                      <div key={hour} style={{ display: 'grid', gridTemplateColumns: '80px repeat(7, 1fr)', borderBottom: '1px solid #f1f5f9', minHeight: '52px', position: 'relative' }}>
-                        {/* Time cell */}
-                        <div style={{ padding: '10px 4px', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textAlign: 'center', background: '#f8fafc', borderRight: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {hour}
-                        </div>
-                        {/* Day cells */}
-                        {DAYS_OF_WEEK.map((day, dayIdx) => {
-                          const slotBookings = getBookingsForSlot(dayIdx, hour);
-                          const isToday = isTodayInWeek(bookingDate) && isDayToday(dayIdx, bookingDate);
-                          const currentHour = new Date().getHours();
-                          const currentMin = new Date().getMinutes();
-                          const showTimeIndicator = isToday && currentHour === slotHourInt;
+                  {/* Hourly Rows */}
+                  <div className="custom-calendar-scrollbar" style={{ display: 'flex', flexDirection: 'column', maxHeight: '420px', overflowY: 'auto', position: 'relative' }}>
+                    {TIME_SLOTS.map((hour) => {
+                      const slotHourInt = parseInt(hour.split(':')[0]);
+                      
+                      return (
+                        <div key={hour} style={{ display: 'grid', gridTemplateColumns: '80px repeat(7, 1fr)', borderBottom: '1px solid #f2f2f7', minHeight: '56px', position: 'relative' }}>
+                          {/* Time cell - Apple Minimalist Style */}
+                          <div style={{ padding: '10px 4px', fontSize: '0.72rem', fontWeight: 700, color: '#8e8e93', textAlign: 'center', background: '#ffffff', borderRight: '1px solid #e5e5ea', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {hour}
+                          </div>
+                          {/* Day cells */}
+                          {DAYS_OF_WEEK.map((day, dayIdx) => {
+                            const slotBookings = getBookingsForSlot(dayIdx, hour);
+                            const isToday = isTodayInWeek(bookingDate) && isDayToday(dayIdx, bookingDate);
+                            const currentHour = new Date().getHours();
+                            const currentMin = new Date().getMinutes();
+                            const showTimeIndicator = isToday && currentHour === slotHourInt;
 
-                          return (
-                            <div
-                              key={day.value}
-                              onClick={() => handleCellClick(dayIdx, hour)}
-                              style={{
-                                padding: '4px',
-                                borderRight: dayIdx < 6 ? '1px solid #f1f5f9' : 'none',
-                                position: 'relative',
-                                background: isToday ? `${brandColor}02` : 'white',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '3px',
-                                justifyContent: 'stretch',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              {/* Real-time indicator line */}
-                              {showTimeIndicator && (
-                                <div style={{ 
-                                  position: 'absolute', 
-                                  top: `${(currentMin / 60) * 100}%`, 
-                                  left: 0, 
-                                  right: 0, 
-                                  height: '2px', 
-                                  background: '#ef4444', 
-                                  zIndex: 10,
-                                  pointerEvents: 'none',
+                            return (
+                              <div
+                                key={day.value}
+                                onClick={() => handleCellClick(dayIdx, hour)}
+                                style={{
+                                  padding: '4px',
+                                  borderRight: dayIdx < 6 ? '1px solid #f2f2f7' : 'none',
+                                  position: 'relative',
+                                  background: isToday ? `${brandColor}01` : 'white',
                                   display: 'flex',
-                                  alignItems: 'center'
-                                }}>
-                                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444', marginLeft: '-3px' }} />
-                                </div>
-                              )}
-
-                              {slotBookings.map((b: any) => {
-                                const isOwnBooking = b.teacherId === userId;
-                                const isSchedule = b.isSchedule;
-                                
-                                // Color Scheme
-                                let bg = '#f1f5f9';
-                                let borderStyle = '1px solid #cbd5e1';
-                                let textColor = '#475569';
-                                let leftAccentColor = '#94a3b8';
-
-                                if (isSchedule) {
-                                  if (b.isApproved) {
-                                    bg = '#e6f4ea';
-                                    borderStyle = '1px solid #a7f3d0';
-                                    textColor = '#137333';
-                                    leftAccentColor = '#34a853';
-                                  } else {
-                                    bg = '#fef3c7';
-                                    borderStyle = '1px dashed #fde68a';
-                                    textColor = '#b45309';
-                                    leftAccentColor = '#d97706';
-                                  }
-                                } else if (isOwnBooking) {
-                                  // Meine Buchung (lila/purple)
-                                  bg = '#f3e8ff';
-                                  borderStyle = '1px solid #e9d5ff';
-                                  textColor = '#6b21a8';
-                                  leftAccentColor = '#8b5cf6';
-                                }
-
-                                const [shStr, smStr] = b.startTime.split(':');
-                                const sh = parseInt(shStr) || 0;
-                                const sm = parseInt(smStr) || 0;
-                                const [ehStr, emStr] = b.endTime.split(':');
-                                const eh = parseInt(ehStr) || 0;
-                                const em = parseInt(emStr) || 0;
-                                const durationHrs = (eh * 60 + em - (sh * 60 + sm)) / 60;
-                                const slotH = parseInt(hour.split(':')[0]);
-                                
-                                // Only draw on starting hour slot
-                                if (slotH !== sh) return null;
-
-                                return (
-                                  <div
-                                    key={b.id}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSelectedBooking(b);
-                                    }}
-                                    title={`${b.purpose} (${b.startTime} - ${b.endTime}) - ${b.teacherName}`}
-                                    style={{
-                                      background: bg,
-                                      border: borderStyle,
-                                      borderRadius: '0 8px 8px 0',
-                                      padding: '4px 6px 4px 8px',
-                                      fontSize: '0.62rem',
-                                      fontWeight: 800,
-                                      color: textColor,
-                                      position: 'absolute',
-                                      top: `calc(${(sm / 60) * 100}% + 4px)`,
-                                      left: '4px',
-                                      right: '4px',
-                                      height: `calc(${durationHrs * 100}% - 8px)`,
-                                      zIndex: 5,
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      justifyContent: 'flex-start',
-                                      boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-                                      overflow: 'hidden',
-                                      textOverflow: 'ellipsis'
-                                    }}
-                                  >
-                                    <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '4px', background: leftAccentColor, borderRadius: '0' }} />
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.55rem', opacity: 0.8, marginBottom: '2px', fontWeight: 700 }}>
-                                      <span style={{ display: 'flex', alignItems: 'center' }}>
-                                        {isSchedule && <GraduationCap size={10} style={{ marginRight: '3px' }} />}
-                                        {b.startTime} - {b.endTime}
-                                      </span>
-                                    </div>
-                                    <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
-                                      {isSchedule ? b.teacherName : b.purpose}
-                                    </div>
-                                    <div style={{ fontSize: '0.55rem', opacity: 0.8, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                      {isSchedule ? b.purpose : (isOwnBooking ? 'Meine Buchung' : b.teacherName)}
-                                    </div>
+                                  flexDirection: 'column',
+                                  gap: '3px',
+                                  justifyContent: 'stretch',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                {/* Real-time indicator line */}
+                                {showTimeIndicator && (
+                                  <div style={{ 
+                                    position: 'absolute', 
+                                    top: `${(currentMin / 60) * 100}%`, 
+                                    left: 0, 
+                                    right: 0, 
+                                    height: '2px', 
+                                    background: '#ff453a', 
+                                    zIndex: 10,
+                                    pointerEvents: 'none',
+                                    display: 'flex',
+                                    alignItems: 'center'
+                                  }}>
+                                    <div className="pulsing-dot" style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ff453a', marginLeft: '-4px', boxShadow: '0 0 6px rgba(255, 69, 58, 0.6)' }} />
                                   </div>
-                                );
-                              })}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
+                                )}
+
+                                {slotBookings.map((b: any) => {
+                                  const isOwnBooking = b.teacherId === userId;
+                                  const isSchedule = b.isSchedule;
+                                  
+                                  // Apple Calendar Color Schemes
+                                  let bg = '#f2f2f7';
+                                  let textColor = '#48484a';
+                                  let leftAccentColor = '#8e8e93';
+
+                                  if (isSchedule) {
+                                    if (b.isApproved) {
+                                      bg = '#eafaf1';
+                                      textColor = '#1e7a44';
+                                      leftAccentColor = '#34c759';
+                                    } else {
+                                      bg = '#fff9e6';
+                                      textColor = '#946600';
+                                      leftAccentColor = '#ffcc00';
+                                    }
+                                  } else if (isOwnBooking) {
+                                    bg = '#f6f0ff';
+                                    textColor = '#6d28d9';
+                                    leftAccentColor = '#af52de';
+                                  }
+
+                                  const [shStr, smStr] = b.startTime.split(':');
+                                  const sh = parseInt(shStr) || 0;
+                                  const sm = parseInt(smStr) || 0;
+                                  const [ehStr, emStr] = b.endTime.split(':');
+                                  const eh = parseInt(ehStr) || 0;
+                                  const em = parseInt(emStr) || 0;
+                                  const durationHrs = (eh * 60 + em - (sh * 60 + sm)) / 60;
+                                  const slotH = parseInt(hour.split(':')[0]);
+                                  
+                                  // Only draw on starting hour slot
+                                  if (slotH !== sh) return null;
+
+                                  return (
+                                    <div
+                                      key={b.id}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedBooking(b);
+                                      }}
+                                      title={`${b.purpose} (${b.startTime} - ${b.endTime}) - ${b.teacherName}`}
+                                      style={{
+                                        background: bg,
+                                        border: 'none',
+                                        // Straight on the left accent edge, rounded on the right edge
+                                        borderRadius: '0 8px 8px 0',
+                                        padding: '4px 6px 4px 10px',
+                                        fontSize: '0.64rem',
+                                        fontWeight: 800,
+                                        color: textColor,
+                                        position: 'absolute',
+                                        top: `calc(${(sm / 60) * 100}% + 4px)`,
+                                        left: '4px',
+                                        right: '4px',
+                                        height: `calc(${durationHrs * 100}% - 8px)`,
+                                        zIndex: 5,
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        justifyContent: 'flex-start',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                                        overflow: 'hidden'
+                                      }}
+                                    >
+                                      <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '5px', background: leftAccentColor }} />
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.58rem', opacity: 0.8, marginBottom: '2px', fontWeight: 800 }}>
+                                        <span style={{ display: 'flex', alignItems: 'center' }}>
+                                          {isSchedule && <GraduationCap size={10} style={{ marginRight: '3px' }} />}
+                                          {b.startTime} - {b.endTime}
+                                        </span>
+                                      </div>
+                                      <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                                        {isSchedule ? b.teacherName : b.purpose}
+                                      </div>
+                                      <div style={{ fontSize: '0.58rem', opacity: 0.8, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {isSchedule ? b.purpose : (isOwnBooking ? 'Meine Buchung' : b.teacherName)}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
             </div>
           </div>
 
           {/* Right Sidebar: Booking Form & Meine Buchungen */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: '100%', alignSelf: 'stretch' }}>
             
-            {/* Meine Buchungen (Promoted to the top) */}
+            {/* Meine Buchungen */}
             <div 
               className="glass-panel" 
               style={{ 
                 background: 'white', 
-                borderRadius: '20px', 
-                border: '1px solid rgba(0, 0, 0, 0.05)', 
-                padding: '18px', 
-                boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
+                borderRadius: '24px', 
+                border: '1px solid rgba(0, 0, 0, 0.04)', 
+                padding: '20px', 
+                boxShadow: '0 4px 24px -4px rgba(0, 0, 0, 0.02), 0 2px 12px -2px rgba(0, 0, 0, 0.01)',
                 display: 'flex',
                 flexDirection: 'column',
                 flexGrow: showMyBookingsOnly ? 1 : 0,
-                transition: 'all 0.3s ease',
+                transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
                 height: showMyBookingsOnly ? '100%' : 'auto'
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1c1c1e', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
                   Meine Buchungen
-                  <span style={{ fontSize: '0.72rem', background: '#f3e8ff', color: '#8b5cf6', padding: '2px 6px', borderRadius: '6px', fontWeight: 800 }}>
+                  <span style={{ fontSize: '0.72rem', background: '#f3e8ff', color: '#af52de', padding: '2px 8px', borderRadius: '8px', fontWeight: 900 }}>
                     {myBookings.length}
                   </span>
                 </h3>
@@ -5450,15 +5545,16 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   style={{
                     background: 'transparent',
                     border: 'none',
-                    color: '#94a3b8',
+                    color: '#8e8e93',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    padding: '4px',
-                    transition: 'color 0.2s'
+                    padding: '6px',
+                    borderRadius: '50%',
+                    transition: 'all 0.2s'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.color = brandColor}
-                  onMouseLeave={(e) => e.currentTarget.style.color = '#94a3b8'}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = brandColor; e.currentTarget.style.background = 'rgba(0,0,0,0.04)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = '#8e8e93'; e.currentTarget.style.background = 'transparent'; }}
                 >
                   {showMyBookingsOnly ? <ArrowLeft size={16} /> : <Maximize2 size={16} />}
                 </button>
@@ -5472,29 +5568,29 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     handleCancelBooking(allIds);
                   }}
                   style={{
-                    background: '#fff1f2',
-                    color: '#ef4444',
-                    border: '1px solid #fecaca',
-                    padding: '6px 12px',
-                    borderRadius: '10px',
-                    fontSize: '0.72rem',
+                    background: '#ff453a15',
+                    color: '#ff453a',
+                    border: 'none',
+                    padding: '8px 14px',
+                    borderRadius: '12px',
+                    fontSize: '0.75rem',
                     fontWeight: 800,
                     cursor: 'pointer',
-                    marginBottom: '10px',
+                    marginBottom: '12px',
                     width: '100%',
                     textAlign: 'center',
                     transition: 'all 0.2s'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#ffe4e6'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = '#fff1f2'}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#ff453a25'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = '#ff453a15'}
                 >
                   Alle stornieren
                 </button>
               )}
 
-              <div className="custom-calendar-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: showMyBookingsOnly ? 'calc(100vh - 300px)' : '180px', overflowY: 'auto' }}>
+              <div className="custom-calendar-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: showMyBookingsOnly ? 'calc(100vh - 300px)' : '180px', overflowY: 'auto' }}>
                 {myBookings.length === 0 ? (
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, textAlign: 'center', padding: '12px', border: '1.5px dashed #cbd5e1', borderRadius: '10px', background: '#f9f9fb' }}>
+                  <div style={{ fontSize: '0.78rem', color: '#8e8e93', fontWeight: 700, textAlign: 'center', padding: '16px', border: '1.5px dashed #e5e5ea', borderRadius: '14px', background: '#f2f2f7' }}>
                     Du hast noch keine Buchungen vorgenommen.
                   </div>
                 ) : (
@@ -5502,32 +5598,32 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     <div
                       key={b.id}
                       style={{
-                        padding: '10px 12px',
-                        background: '#f8fafc',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '12px',
+                        padding: '12px 14px',
+                        background: '#f2f2f7',
+                        border: 'none',
+                        borderRadius: '14px',
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center'
                       }}
                     >
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-                        <span style={{ fontSize: '0.78rem', fontWeight: 850, color: '#1e293b', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0 }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 850, color: '#1c1c1e', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
                           {b.roomName}
                         </span>
-                        <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700 }}>
+                        <span style={{ fontSize: '0.7rem', color: '#636366', fontWeight: 700 }}>
                           {new Date(b.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} • {b.startTime} - {b.endTime}
                         </span>
                       </div>
                       <button
                         onClick={() => handleCancelBooking(b.ids || b.id)}
                         style={{
-                          background: '#fff1f2',
-                          color: '#ef4444',
+                          background: '#ff453a15',
+                          color: '#ff453a',
                           border: 'none',
-                          borderRadius: '8px',
-                          width: '28px',
-                          height: '28px',
+                          borderRadius: '10px',
+                          width: '32px',
+                          height: '32px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -5536,7 +5632,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                         }}
                         title="Buchung stornieren"
                       >
-                        <Trash2 size={13} />
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   ))
@@ -5550,21 +5646,21 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 className="glass-panel" 
                 style={{ 
                   background: 'white', 
-                  borderRadius: '20px', 
-                  border: '1px solid rgba(0, 0, 0, 0.05)', 
-                  padding: '18px', 
-                  boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
+                  borderRadius: '24px', 
+                  border: '1px solid rgba(0, 0, 0, 0.04)', 
+                  padding: '20px', 
+                  boxShadow: '0 4px 24px -4px rgba(0, 0, 0, 0.02), 0 2px 12px -2px rgba(0, 0, 0, 0.01)',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '12px'
+                  gap: '14px'
                 }}
               >
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1c1c1e', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ color: brandColor }}>⚡</span> Raum buchen
                 </h3>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '0.7rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase' }}>Datum</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Datum</label>
                   <input
                     type="date"
                     value={bookingDate}
@@ -5573,24 +5669,13 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                       setIsDateFilterActive(true);
                     }}
                     onFocus={() => setIsDateFilterActive(true)}
-                    style={{
-                      padding: '8px 12px',
-                      borderRadius: '10px',
-                      border: `1.5px solid ${isDateFilterActive ? brandColor : '#cbd5e1'}`,
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      outline: 'none',
-                      color: isDateFilterActive ? '#000000' : '#cbd5e1',
-                      background: isDateFilterActive ? '#ffffff' : '#f8fafc',
-                      height: '40px',
-                      transition: 'all 0.2s ease'
-                    }}
+                    className="premium-input"
                   />
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.7rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase' }}>Von</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Von</label>
                     <select
                       value={bookingStartTime}
                       onChange={(e) => {
@@ -5598,18 +5683,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                         setIsDateFilterActive(true);
                       }}
                       onFocus={() => setIsDateFilterActive(true)}
-                      style={{
-                        padding: '8px 10px',
-                        borderRadius: '10px',
-                        border: `1.5px solid ${isDateFilterActive ? brandColor : '#cbd5e1'}`,
-                        fontSize: '0.8rem',
-                        fontWeight: 700,
-                        outline: 'none',
-                        color: isDateFilterActive ? '#000000' : '#cbd5e1',
-                        background: isDateFilterActive ? '#ffffff' : '#f8fafc',
-                        height: '40px',
-                        transition: 'all 0.2s ease'
-                      }}
+                      className="premium-input"
                     >
                       {Array.from({ length: 27 }, (_, i) => {
                         const min = i * 30 + 480;
@@ -5620,8 +5694,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     </select>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.7rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase' }}>Bis</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Bis</label>
                     <select
                       value={bookingEndTime}
                       onChange={(e) => {
@@ -5629,18 +5703,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                         setIsDateFilterActive(true);
                       }}
                       onFocus={() => setIsDateFilterActive(true)}
-                      style={{
-                        padding: '8px 10px',
-                        borderRadius: '10px',
-                        border: `1.5px solid ${isDateFilterActive ? brandColor : '#cbd5e1'}`,
-                        fontSize: '0.8rem',
-                        fontWeight: 700,
-                        outline: 'none',
-                        color: isDateFilterActive ? '#000000' : '#cbd5e1',
-                        background: isDateFilterActive ? '#ffffff' : '#f8fafc',
-                        height: '40px',
-                        transition: 'all 0.2s ease'
-                      }}
+                      className="premium-input"
                     >
                       {Array.from({ length: 27 }, (_, i) => {
                         const min = (i + 1) * 30 + 480;
@@ -5652,22 +5715,13 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '0.7rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase' }}>Verwendungszweck</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Verwendungszweck</label>
                   <input
                     placeholder="z.B. Klavierunterricht"
                     value={bookingPurpose}
                     onChange={(e) => setBookingPurpose(e.target.value)}
-                    style={{
-                      padding: '8px 12px',
-                      borderRadius: '10px',
-                      border: '1px solid #cbd5e1',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      outline: 'none',
-                      color: '#1e293b',
-                      height: '40px'
-                    }}
+                    className="premium-input"
                   />
                 </div>
 
@@ -5678,20 +5732,32 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     background: brandColor,
                     color: 'white',
                     border: 'none',
-                    borderRadius: '10px',
-                    padding: '10px 14px',
-                    fontSize: '0.8rem',
+                    borderRadius: '12px',
+                    padding: '12px 14px',
+                    fontSize: '0.85rem',
                     fontWeight: 800,
                     cursor: (!selectedRoom || isRoomOccupied(selectedRoom.id)) ? 'not-allowed' : 'pointer',
-                    opacity: (!selectedRoom || isRoomOccupied(selectedRoom.id)) ? 0.5 : 1,
-                    transition: 'all 0.2s ease',
-                    marginTop: '4px',
+                    opacity: (!selectedRoom || isRoomOccupied(selectedRoom.id)) ? 0.45 : 1,
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    marginTop: '6px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '6px',
-                    height: '40px',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                    gap: '8px',
+                    height: '44px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedRoom && !isRoomOccupied(selectedRoom.id)) {
+                      e.currentTarget.style.opacity = '0.9';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedRoom && !isRoomOccupied(selectedRoom.id)) {
+                      e.currentTarget.style.opacity = '1';
+                      e.currentTarget.style.transform = 'none';
+                    }
                   }}
                 >
                   {!selectedRoom 
