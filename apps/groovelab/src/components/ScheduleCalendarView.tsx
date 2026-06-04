@@ -1144,7 +1144,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
         gap: '16px'
       }}>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
-          <div style={{ height: '40px', width: '40px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.15)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <div style={{ height: '40px', width: '40px', borderRadius: '12px', background: 'rgba(22, 163, 74, 0.15)', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <CalendarIcon size={20} />
           </div>
           <div style={{ minWidth: 0 }}>
@@ -1866,9 +1866,9 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                     </button>
                     <button 
                       onClick={handleSaveEdit} 
-                      style={{ padding: '10px 18px', borderRadius: '100px', border: 'none', background: '#0071e3', color: 'white', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
-                      onMouseOver={e => e.currentTarget.style.background = '#0077ed'}
-                      onMouseOut={e => e.currentTarget.style.background = '#0071e3'}
+                      style={{ padding: '10px 18px', borderRadius: '100px', border: 'none', background: '#16a34a', color: 'white', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                      onMouseOver={e => e.currentTarget.style.background = '#15803d'}
+                      onMouseOut={e => e.currentTarget.style.background = '#16a34a'}
                     >
                       Speichern
                     </button>
@@ -2107,7 +2107,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
               <button
                 onClick={savePendingChanges}
                 style={{
-                  background: '#0071e3',
+                  background: '#16a34a',
                   border: 'none',
                   color: 'white',
                   padding: '8px 20px',
@@ -2115,19 +2115,19 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                   fontSize: '0.78rem',
                   fontWeight: 700,
                   cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(0, 113, 227, 0.3)',
+                  boxShadow: '0 4px 12px rgba(22, 163, 74, 0.3)',
                   transition: 'all 0.2s',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px'
                 }}
                 onMouseOver={e => {
-                  e.currentTarget.style.background = '#0077ed';
-                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 113, 227, 0.45)';
+                  e.currentTarget.style.background = '#15803d';
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(22, 163, 74, 0.45)';
                 }}
                 onMouseOut={e => {
-                  e.currentTarget.style.background = '#0071e3';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 113, 227, 0.3)';
+                  e.currentTarget.style.background = '#16a34a';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(22, 163, 74, 0.3)';
                 }}
               >
                 Jetzt speichern
