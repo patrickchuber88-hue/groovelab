@@ -1045,6 +1045,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
         }
       }
       setPendingChanges({});
+      setSwapLinks([]);
       await loadOccurrences();
     } catch (err) {
       console.error(err);
@@ -2079,7 +2080,10 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <button
-                onClick={() => setPendingChanges({})}
+                onClick={() => {
+                  setPendingChanges({});
+                  setSwapLinks([]);
+                }}
                 style={{
                   background: 'transparent',
                   border: 'none',
