@@ -327,235 +327,256 @@ function MobileBriefingView({
         </div>
       </div>
 
-      {/* HAUSAUFGABEN FITBIT STYLE */}
-      <div style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', borderLeft: '6px solid #22c55e' }}>
-        {(() => {
-          const activeHWs = progressItems.filter(item => item.is_current_homework && !item.topic_name.startsWith('Hausaufgabe KW '));
-          const currentWeek = getISOWeek();
-          const activeTheories = progressItems.filter(item => 
-            item.status === 'THEORY_DONE' && 
-            item.updated_at && 
-            getISOWeek(item.updated_at) === currentWeek &&
-            !item.topic_name.startsWith('Hausaufgabe KW ')
-          );
-          const allActive = [...activeHWs, ...activeTheories];
+      {/* RESPONSIVE PRACTICE HUB FOR MOBILE & TABLETS */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
+        gap: '20px',
+        alignItems: 'stretch'
+      }}>
+        {/* Widget 1: Hausaufgaben */}
+        <div style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1px solid rgba(0, 0, 0, 0.04)' }}>
+          {(() => {
+            const activeHWs = progressItems.filter(item => item.is_current_homework && !item.topic_name.startsWith('Hausaufgabe KW '));
+            const currentWeek = getISOWeek();
+            const activeTheories = progressItems.filter(item => 
+              item.status === 'THEORY_DONE' && 
+              item.updated_at && 
+              getISOWeek(item.updated_at) === currentWeek &&
+              !item.topic_name.startsWith('Hausaufgabe KW ')
+            );
+            const allActive = [...activeHWs, ...activeTheories];
 
-          const getHomeworkNotes = (): string[] => {
-            for (const item of progressItems) {
-              if (item.homework_notes && item.homework_notes.trim()) {
-                try {
-                  const raw = item.homework_notes;
-                  if (raw.startsWith('[') && raw.endsWith(']')) {
-                    const parsed = JSON.parse(raw);
-                    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-                  } else {
-                    const lines = raw
-                      .split('\n')
-                      .filter((line: string) => !line.trim().startsWith('• 📖') && !line.trim().startsWith('• 🎵') && !line.trim().startsWith('• 🗑️'))
-                      .map((l: string) => l.trim())
-                      .filter(Boolean);
-                    if (lines.length > 0) return lines;
+            const getHomeworkNotes = (): string[] => {
+              for (const item of progressItems) {
+                if (item.homework_notes && item.homework_notes.trim()) {
+                  try {
+                    const raw = item.homework_notes;
+                    if (raw.startsWith('[') && raw.endsWith(']')) {
+                      const parsed = JSON.parse(raw);
+                      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+                    } else {
+                      const lines = raw
+                        .split('\n')
+                        .filter((line: string) => !line.trim().startsWith('• 📖') && !line.trim().startsWith('• 🎵') && !line.trim().startsWith('• 🗑️'))
+                        .map((l: string) => l.trim())
+                        .filter(Boolean);
+                      if (lines.length > 0) return lines;
+                    }
+                  } catch (e) {
+                    console.error(e);
                   }
-                } catch (e) {
-                  console.error(e);
                 }
               }
-            }
-            return [];
-          };
-          const notesList = getHomeworkNotes();
-          const totalItemsCount = allActive.length + notesList.length;
+              return [];
+            };
+            const notesList = getHomeworkNotes();
+            const totalItemsCount = allActive.length + notesList.length;
 
-          if (totalItemsCount === 0) {
-            return (
-              <>
-                <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#16a34a', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '12px' }}>AKTUELLE HAUSAUFGABEN (0):</div>
-                <div style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem', fontStyle: 'italic' }}>
-                  Keine aktuellen Hausaufgaben erfasst ✨
+            if (totalItemsCount === 0) {
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, justifyContent: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <BookOpen size={16} color="#4f46e5" />
+                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>Hausaufgaben</span>
+                  </div>
+                  <div style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem', fontStyle: 'italic' }}>
+                    Keine aktuellen Hausaufgaben erfasst ✨
+                  </div>
                 </div>
-              </>
-            );
-          }
-
-          const formatPageNumbers = (pages: number[]): string => {
-            if (pages.length === 0) return '';
-            const sorted = [...pages].sort((a, b) => a - b);
-            const ranges: string[] = [];
-            let start = sorted[0];
-            let end = start;
-            
-            for (let i = 1; i < sorted.length; i++) {
-              if (sorted[i] === end + 1) {
-                end = sorted[i];
-              } else {
-                if (start === end) ranges.push(`${start}`);
-                else ranges.push(`${start}–${end}`);
-                start = sorted[i];
-                end = start;
-              }
+              );
             }
-            if (start === end) ranges.push(`${start}`);
-            else ranges.push(`${start}–${end}`);
-            
-            if (ranges.length === 1) return `S. ${ranges[0]}`;
-            const last = ranges.pop();
-            return `S. ${ranges.join(', ')} & ${last}`;
-          };
 
-          const groupedLehrwerke: Record<string, { pages: { num: number; notes: string; status: string; id: string }[] }> = {};
-          const otherHWs: any[] = [];
-
-          allActive.forEach(item => {
-            if (item.topic_name.includes(' - Seite ')) {
-              const parts = item.topic_name.split(' - Seite ');
-              const bookTitle = parts[0].trim();
-              const pageNum = parseInt(parts[1], 10);
+            const formatPageNumbers = (pages: number[]): string => {
+              if (pages.length === 0) return '';
+              const sorted = [...pages].sort((a, b) => a - b);
+              const ranges: string[] = [];
+              let start = sorted[0];
+              let end = start;
               
-              if (!groupedLehrwerke[bookTitle]) {
-                groupedLehrwerke[bookTitle] = { pages: [] };
+              for (let i = 1; i < sorted.length; i++) {
+                if (sorted[i] === end + 1) {
+                  end = sorted[i];
+                } else {
+                  if (start === end) ranges.push(`${start}`);
+                  else ranges.push(`${start}–${end}`);
+                  start = sorted[i];
+                  end = start;
+                }
               }
-              if (!isNaN(pageNum) && !groupedLehrwerke[bookTitle].pages.some(p => p.num === pageNum)) {
-                groupedLehrwerke[bookTitle].pages.push({
-                  num: pageNum,
-                  notes: item.teacher_notes || '',
-                  status: item.status,
-                  id: item.id
-                });
+              if (start === end) ranges.push(`${start}`);
+              else ranges.push(`${start}–${end}`);
+              
+              if (ranges.length === 1) return `S. ${ranges[0]}`;
+              const last = ranges.pop();
+              return `S. ${ranges.join(', ')} & ${last}`;
+            };
+
+            const groupedLehrwerke: Record<string, { pages: { num: number; notes: string; status: string; id: string }[] }> = {};
+            const otherHWs: any[] = [];
+
+            allActive.forEach(item => {
+              if (item.topic_name.includes(' - Seite ')) {
+                const parts = item.topic_name.split(' - Seite ');
+                const bookTitle = parts[0].trim();
+                const pageNum = parseInt(parts[1], 10);
+                
+                if (!groupedLehrwerke[bookTitle]) {
+                  groupedLehrwerke[bookTitle] = { pages: [] };
+                }
+                if (!isNaN(pageNum) && !groupedLehrwerke[bookTitle].pages.some(p => p.num === pageNum)) {
+                  groupedLehrwerke[bookTitle].pages.push({
+                    num: pageNum,
+                    notes: item.teacher_notes || '',
+                    status: item.status,
+                    id: item.id
+                  });
+                }
+              } else {
+                otherHWs.push(item);
               }
-            } else {
-              otherHWs.push(item);
-            }
-          });
+            });
 
-          Object.keys(groupedLehrwerke).forEach(title => {
-            groupedLehrwerke[title].pages.sort((a, b) => a.num - b.num);
-          });
+            Object.keys(groupedLehrwerke).forEach(title => {
+              groupedLehrwerke[title].pages.sort((a, b) => a.num - b.num);
+            });
 
-          return (
-            <>
-              <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#16a34a', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '12px' }}>
-                AKTUELLE HAUSAUFGABEN ({totalItemsCount}):
-              </div>
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <BookOpen size={16} color="#4f46e5" />
+                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>Hausaufgaben ({totalItemsCount})</span>
+                </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {Object.entries(groupedLehrwerke).map(([title, info]) => {
-                  const pageNums = info.pages.map(p => p.num);
-                  const formattedPages = formatPageNumbers(pageNums);
-                  const combinedNotes = info.pages
-                    .map(p => p.notes)
-                    .filter(Boolean)
-                    .filter(n => n !== 'Inhalte in der Premium-Version freischalten')
-                    .join('; ');
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, overflowY: 'auto' }}>
+                  {Object.entries(groupedLehrwerke).map(([title, info]) => {
+                    const pageNums = info.pages.map(p => p.num);
+                    const formattedPages = formatPageNumbers(pageNums);
+                    const combinedNotes = info.pages
+                      .map(p => p.notes)
+                      .filter(Boolean)
+                      .filter(n => n !== 'Inhalte in der Premium-Version freischalten')
+                      .join('; ');
 
-                  return (
-                    <div key={title} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '10px 14px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '1.1rem' }}>📖</span>
-                        <div>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b' }}>{title}</div>
-                          <div style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 650, marginTop: '2px' }}>
-                            <strong>{formattedPages}</strong>
-                            {combinedNotes ? ` • ${combinedNotes}` : ''}
+                    return (
+                      <div key={title} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '8px 12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                          <span style={{ fontSize: '1rem', flexShrink: 0 }}>📖</span>
+                          <div style={{ overflow: 'hidden' }}>
+                            <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{title}</div>
+                            <div style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 650, marginTop: '2px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                              <strong>{formattedPages}</strong>
+                              {combinedNotes ? ` • ${combinedNotes}` : ''}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div style={{ background: '#dcfce7', color: '#16a34a', borderRadius: '50%', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <Check size={14} strokeWidth={3} />
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {otherHWs.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b' }}>🎵 Songs & Projekte</div>
-                    {otherHWs.map((item, idx) => (
-                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '8px 12px', borderRadius: '12px' }}>
-                        <span style={{ fontSize: '0.78rem', color: '#334155', fontWeight: 600 }}>
-                          {item.topic_name} {item.teacher_notes ? ` - ${item.teacher_notes}` : ''}
-                        </span>
-                        <div style={{ background: '#dcfce7', color: '#16a34a', borderRadius: '4px', padding: '2px 4px' }}>
+                        <div style={{ background: '#dcfce7', color: '#16a34a', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                           <Check size={12} strokeWidth={3} />
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    );
+                  })}
 
-                {notesList.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid #e2e8f0', paddingTop: '10px', marginTop: '2px' }}>
-                    <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                      💡 Übe-Tipps:
+                  {otherHWs.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e293b' }}>🎵 Songs & Projekte</div>
+                      {otherHWs.map((item, idx) => (
+                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '8px 12px', borderRadius: '12px' }}>
+                          <span style={{ fontSize: '0.75rem', color: '#334155', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {item.topic_name} {item.teacher_notes ? ` - ${item.teacher_notes}` : ''}
+                          </span>
+                          <div style={{ background: '#dcfce7', color: '#16a34a', borderRadius: '4px', padding: '2px 4px', flexShrink: 0 }}>
+                            <Check size={10} strokeWidth={3} />
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    {notesList.map((note: string, nIdx: number) => (
-                      <div key={nIdx} style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 550, fontStyle: 'italic', background: '#f8fafc', padding: '8px 12px', borderRadius: '12px', borderLeft: '3px solid #3b82f6', lineHeight: '1.35', whiteSpace: 'pre-line' }}>
-                        {note}
-                      </div>
-                    ))}
-                  </div>
-                )}
+                  )}
+
+                  {notesList.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid #e2e8f0', paddingTop: '8px' }}>
+                      {notesList.map((note: string, nIdx: number) => (
+                        <div key={nIdx} style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 550, fontStyle: 'italic', background: '#f8fafc', padding: '8px 12px', borderRadius: '12px', borderLeft: '3px solid #3b82f6', lineHeight: '1.3', whiteSpace: 'pre-line' }}>
+                          {note}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </>
-          );
-        })()}
-      </div>
+            );
+          })()}
+        </div>
 
-      {/* ÜBESOLL ACTION CARD */}
-      <div style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <div style={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', borderRadius: '12px', width: '40px', height: '40px', flexShrink: 0 }}>
-            <Flame size={24} fill="currentColor" />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.05em', textTransform: 'uppercase' }}>TÄGLICHES ÜBESOLL</div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1e293b', marginTop: '2px' }}>Übezeit noch offen</div>
-            <div style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.3, marginTop: '2px' }}>Starte jetzt deinen Fokus-Übemodus! ⚡️</div>
-          </div>
-        </div>
-        <button 
-          onClick={() => setActiveTab('practice_board')}
-          style={{ background: '#4f46e5', color: 'white', border: 'none', borderRadius: '12px', padding: '10px 14px', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', boxShadow: '0 4px 10px rgba(79, 70, 229, 0.15)' }}>
-          🚀 Üben starten
-        </button>
-      </div>
-
-      {/* ÜBE-SERIE & FLAMMEN DUOLINGO STYLE */}
-      <div style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>🔥 Übe-Serie & Flammen</h3>
-          <div style={{ background: '#ffedd5', color: '#ea580c', fontSize: '0.7rem', fontWeight: 800, padding: '3px 10px', borderRadius: '100px' }}>0 Tage</div>
-        </div>
-        
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '14px' }}>
-          {/* Kleine Flamme */}
-          <div style={{ background: '#fef08a', borderRadius: '12px', padding: '10px 6px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', minHeight: '80px', textAlign: 'center' }}>
-            <div style={{ color: '#eab308' }}><Flame size={18} fill="currentColor" /></div>
-            <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#854d0e' }}>Kleine</div>
-            <div style={{ fontSize: '0.58rem', color: '#a16207' }}>3 Min</div>
-          </div>
-          {/* Mittlere Flamme */}
-          <div style={{ background: '#ffedd5', borderRadius: '12px', padding: '10px 6px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', minHeight: '80px', textAlign: 'center' }}>
-            <div style={{ color: '#f97316' }}><Flame size={18} fill="currentColor" /></div>
-            <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#9a3412' }}>Mittlere</div>
-            <div style={{ fontSize: '0.58rem', color: '#c2410c' }}>5 Min</div>
-          </div>
-          {/* Helden-Feuer */}
-          <div style={{ background: '#fee2e2', borderRadius: '12px', padding: '10px 6px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', minHeight: '80px', textAlign: 'center' }}>
-            <div style={{ color: '#ef4444' }}><Flame size={18} fill="currentColor" /></div>
-            <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#991b1b' }}>Helden</div>
-            <div style={{ fontSize: '0.58rem', color: '#b91c1c' }}>10 Min</div>
-          </div>
-        </div>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.7rem', color: '#64748b', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-            <span>👍 Joker bereit</span>
-            <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
-              <select style={{ border: '1px solid #e2e8f0', borderRadius: '4px', padding: '2px 4px', fontSize: '0.65rem', background: '#f8fafc' }}><option>Tag 0</option></select>
-              <select style={{ border: '1px solid #e2e8f0', borderRadius: '4px', padding: '2px 4px', fontSize: '0.65rem', background: '#f8fafc' }}><option>0 Fehl</option></select>
-              <button style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '2px 6px', fontSize: '0.65rem', fontWeight: 600 }}>Real Geübt</button>
+        {/* Widget 2: Tägliche Übezeit */}
+        <div style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '14px', border: '1px solid rgba(0, 0, 0, 0.04)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ background: 'rgba(251, 188, 5, 0.12)', color: '#d97706', width: '28px', height: '28px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Zap size={14} fill="currentColor" />
+              </div>
+              <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Dein tägliches Ritual</span>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b' }}>Tägliche Übezeit</div>
+              <p style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.35, margin: '4px 0 0 0' }}>
+                Schön, dass du da bist! Lass uns gemeinsam Musik machen. Jede Minute, die du heute übst, stärkt deine Superkräfte am Instrument und bringt dich deinen Zielen ein Stück näher. 🎸✨
+              </p>
             </div>
           </div>
+          <button 
+            onClick={() => setActiveTab('practice_board')}
+            style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', color: 'white', border: 'none', borderRadius: '12px', padding: '10px 14px', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', boxShadow: '0 4px 10px rgba(79, 70, 229, 0.15)' }}>
+            🚀 Üben starten
+          </button>
+        </div>
+
+        {/* Widget 3: Flammen-Pfad */}
+        <div style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: '1px solid rgba(0, 0, 0, 0.04)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {(() => {
+            const streak = avatar?.streak_flame || 0;
+            return (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Flame size={16} color="#ea580c" />
+                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>Flammen-Pfad</span>
+                  </div>
+                  <div style={{ 
+                    background: streak === 0 ? '#fee2e2' : '#ffedd5', 
+                    color: streak === 0 ? '#ffffff' : '#ea580c', 
+                    fontSize: '0.68rem', 
+                    fontWeight: 800, 
+                    padding: '2px 8px', 
+                    borderRadius: '100px' 
+                  }}>
+                    {streak} {streak === 1 ? 'Tag' : 'Tage'}
+                  </div>
+                </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', flex: 1, alignItems: 'center' }}>
+                  {/* Kleine Flamme */}
+                  <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '8px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', minHeight: '70px', textAlign: 'center', border: '1px solid rgba(0,0,0,0.02)' }}>
+                    <div style={{ color: streak >= 3 ? '#eab308' : '#cbd5e1' }}><Flame size={16} fill={streak >= 3 ? 'currentColor' : 'none'} /></div>
+                    <div style={{ fontSize: '0.68rem', fontWeight: 800, color: streak >= 3 ? '#854d0e' : '#64748b' }}>Kleine</div>
+                    <div style={{ fontSize: '0.55rem', color: '#94a3b8' }}>3 Min</div>
+                  </div>
+                  {/* Mittlere Flamme */}
+                  <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '8px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', minHeight: '70px', textAlign: 'center', border: '1px solid rgba(0,0,0,0.02)' }}>
+                    <div style={{ color: streak >= 6 ? '#f97316' : '#cbd5e1' }}><Flame size={16} fill={streak >= 6 ? 'currentColor' : 'none'} /></div>
+                    <div style={{ fontSize: '0.68rem', fontWeight: 800, color: streak >= 6 ? '#9a3412' : '#64748b' }}>Mittlere</div>
+                    <div style={{ fontSize: '0.55rem', color: '#94a3b8' }}>5 Min</div>
+                  </div>
+                  {/* Helden-Feuer */}
+                  <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '8px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', minHeight: '70px', textAlign: 'center', border: '1px solid rgba(0,0,0,0.02)' }}>
+                    <div style={{ color: streak >= 9 ? '#ef4444' : '#cbd5e1' }}><Flame size={16} fill={streak >= 9 ? 'currentColor' : 'none'} /></div>
+                    <div style={{ fontSize: '0.68rem', fontWeight: 800, color: streak >= 9 ? '#991b1b' : '#64748b' }}>Helden</div>
+                    <div style={{ fontSize: '0.55rem', color: '#94a3b8' }}>10 Min</div>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
         </div>
       </div>
 
