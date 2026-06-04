@@ -316,6 +316,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     });
   };
 
+  const [hasInitializedRoom, setHasInitializedRoom] = useState(false);
+
   const myRooms = React.useMemo(() => {
     const roomIds = new Set<string>();
     
@@ -344,6 +346,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
   // Pre-select the room where the teacher teaches today
   useEffect(() => {
+    if (hasInitializedRoom) return;
     if (!userId || !myRooms || myRooms.length === 0) return;
     
     const today = new Date();
@@ -361,6 +364,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
     if (todaySchedule && todaySchedule.room_id) {
       setSelectedCampusRoomId(todaySchedule.room_id);
+      setHasInitializedRoom(true);
       return;
     }
 
@@ -372,6 +376,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
     if (todayBooking && todayBooking.roomId) {
       setSelectedCampusRoomId(todayBooking.roomId);
+      setHasInitializedRoom(true);
       return;
     }
 
@@ -380,7 +385,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     if (!selectedCampusRoomId || !currentIsValid) {
       setSelectedCampusRoomId(myRooms[0].id);
     }
-  }, [myRooms, schedules, campusBookings, userId, admin, selectedCampusRoomId]);
+    setHasInitializedRoom(true);
+  }, [myRooms, schedules, campusBookings, userId, admin, hasInitializedRoom, selectedCampusRoomId]);
 
 
   const [bookingDate, setBookingDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
@@ -6227,13 +6233,13 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                  fontWeight: 900,
                                  cursor: 'pointer',
                                  transition: 'all 0.15s ease',
-                                 border: isSelected ? `1.5px solid ${brandColor}` : '1.5px solid #e5e5ea',
-                                 background: isSelected ? `${brandColor}12` : '#f8fafc',
-                                 color: isSelected ? brandColor : '#48484a',
+                                 border: isSelected ? `1.5px solid ${brandColor}` : '1.5px solid #e8dec9',
+                                 background: isSelected ? '#f5ebd6' : '#faf6ee',
+                                 color: isSelected ? brandColor : '#6e6450',
                                  boxShadow: isSelected ? `0 2px 6px ${brandColor}15` : 'none'
                                }}
                              >
-                               <span style={{ fontSize: '0.68rem', color: isSelected ? brandColor : '#8e8e93' }}>★</span>
+                               <span style={{ fontSize: '0.68rem', color: isSelected ? brandColor : '#c2b39a' }}>★</span>
                                {r.name.length > 10 ? r.name.substring(0, 10) + '...' : r.name}
                              </button>
                            );
