@@ -3922,134 +3922,160 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
           {/* TOP 4 KPIs ROW */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
             
             {/* KPI 1: XP */}
             <div style={{ 
-              position: 'relative', overflow: 'hidden', background: '#007aff', color: 'white',
-              borderRadius: '14px', boxShadow: '0 4px 12px rgba(0, 122, 255, 0.06)',
-              display: 'flex', alignItems: 'center', minHeight: '48px',
-              transition: 'all 0.25s ease'
+              background: '#ffffff', color: '#1e293b',
+              borderRadius: '16px', border: '1px solid rgba(0, 0, 0, 0.04)',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '12px 16px', minHeight: '60px',
+              transition: 'all 0.25s ease',
+              boxSizing: 'border-box'
             }} className="hover-scale">
-              <div style={{ padding: '8px 12px', position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
-                <div style={{ fontSize: '1.25rem', fontWeight: 900, lineHeight: 1, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>XP</span>
+                <span style={{ fontSize: '1.3rem', fontWeight: 900, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#007aff' }}>
                   {currentXp || 0}
-                </div>
-                <div style={{ fontSize: '0.72rem', fontWeight: 700, opacity: 0.9, whiteSpace: 'nowrap' }}>XP gesammelt</div>
+                </span>
               </div>
-              <div style={{ position: 'absolute', top: '50%', right: '12px', transform: 'translateY(-50%)', zIndex: 1, opacity: 0.15, pointerEvents: 'none' }}>
-                <Star size={18} color="white" fill="white" />
+              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(0, 122, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Star size={16} color="#007aff" fill="#007aff" />
               </div>
             </div>
 
             {/* KPI 2: Songs */}
             <div style={{ 
-              position: 'relative', overflow: 'hidden', background: '#34c759', color: 'white',
-              borderRadius: '14px', boxShadow: '0 4px 12px rgba(52, 199, 89, 0.06)',
-              display: 'flex', alignItems: 'center', minHeight: '48px',
-              transition: 'all 0.25s ease'
+              background: '#ffffff', color: '#1e293b',
+              borderRadius: '16px', border: '1px solid rgba(0, 0, 0, 0.04)',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '12px 16px', minHeight: '60px',
+              transition: 'all 0.25s ease',
+              boxSizing: 'border-box'
             }} className="hover-scale">
-              <div style={{ padding: '8px 12px', position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
-                <div style={{ fontSize: '1.25rem', fontWeight: 900, lineHeight: 1, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                  {wrappedData?.monthlyFlashback?.masteredSongsCount || 0} / 3
-                </div>
-                <div style={{ fontSize: '0.72rem', fontWeight: 700, opacity: 0.9, whiteSpace: 'nowrap' }}>Songs verifiziert</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Songs</span>
+                <span style={{ fontSize: '1.3rem', fontWeight: 900, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#34c759' }}>
+                  {wrappedData?.monthlyFlashback?.masteredSongsCount || 0} <span style={{ fontSize: '0.9rem', color: '#94a3b8', fontWeight: 600 }}>/ 3</span>
+                </span>
               </div>
-              <div style={{ position: 'absolute', top: '50%', right: '12px', transform: 'translateY(-50%)', zIndex: 1, opacity: 0.18, pointerEvents: 'none' }}>
-                <Award size={18} color="white" />
+              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(52, 199, 89, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Award size={16} color="#34c759" />
               </div>
             </div>
 
             {/* KPI 3: Fokus */}
             <div style={{ 
-              position: 'relative', overflow: 'hidden', background: '#ffcc00', color: '#1c1c1e',
-              borderRadius: '14px', boxShadow: '0 4px 12px rgba(255, 204, 0, 0.06)',
-              display: 'flex', alignItems: 'center', minHeight: '48px',
-              transition: 'all 0.25s ease'
+              background: '#ffffff', color: '#1e293b',
+              borderRadius: '16px', border: '1px solid rgba(0, 0, 0, 0.04)',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '12px 16px', minHeight: '60px',
+              transition: 'all 0.25s ease',
+              boxSizing: 'border-box'
             }} className="hover-scale">
-              <div style={{ padding: '8px 12px', position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
-                <div style={{ fontSize: '1.25rem', fontWeight: 900, lineHeight: 1, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#1c1c1e' }}>
-                  {wrappedData?.monthlyFlashback?.focusMinutes || 0} Min
-                </div>
-                <div style={{ fontSize: '0.72rem', fontWeight: 700, opacity: 0.9, color: '#1c1c1e', whiteSpace: 'nowrap' }}>Fokus-Übezeit</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Fokus</span>
+                <span style={{ fontSize: '1.3rem', fontWeight: 900, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#eab308' }}>
+                  {wrappedData?.monthlyFlashback?.focusMinutes || 0} <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600 }}>Min</span>
+                </span>
               </div>
-              <div style={{ position: 'absolute', top: '50%', right: '12px', transform: 'translateY(-50%)', zIndex: 1, opacity: 0.22, pointerEvents: 'none' }}>
-                <Clock size={18} color="#1c1c1e" />
+              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(255, 204, 0, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Clock size={16} color="#eab308" />
               </div>
             </div>
 
             {/* KPI 4: Streak */}
             <div style={{ 
-              position: 'relative', overflow: 'hidden', background: '#ff3b30', color: 'white',
-              borderRadius: '14px', boxShadow: '0 4px 12px rgba(255, 59, 48, 0.06)',
-              display: 'flex', alignItems: 'center', minHeight: '48px',
-              transition: 'all 0.25s ease'
+              background: '#ffffff', color: '#1e293b',
+              borderRadius: '16px', border: '1px solid rgba(0, 0, 0, 0.04)',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '12px 16px', minHeight: '60px',
+              transition: 'all 0.25s ease',
+              boxSizing: 'border-box'
             }} className="hover-scale">
-              <div style={{ padding: '8px 12px', position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
-                <div style={{ fontSize: '1.25rem', fontWeight: 900, lineHeight: 1, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                  {avatar?.streak_flame || 0} Tage
-                </div>
-                <div style={{ fontSize: '0.72rem', fontWeight: 700, opacity: 0.9, whiteSpace: 'nowrap' }}>Serie am Laufen</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Streak</span>
+                <span style={{ fontSize: '1.3rem', fontWeight: 900, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#ff3b30' }}>
+                  {avatar?.streak_flame || 0} <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600 }}>Tage</span>
+                </span>
               </div>
-              <div style={{ position: 'absolute', top: '50%', right: '12px', transform: 'translateY(-50%)', zIndex: 1, opacity: 0.18, pointerEvents: 'none' }}>
-                <Flame size={18} color="white" />
+              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(255, 59, 48, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Flame size={16} color="#ff3b30" />
               </div>
             </div>
 
           </div>
 
           {/* MAIN 2-COLUMN LAYOUT */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '24px', alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '32px', alignItems: 'start' }}>
             
             {/* LEFT COLUMN */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
               
               {/* Welcome Block */}
               <div style={{
-                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
-                backdropFilter: 'blur(24px) saturate(1.8)',
-                WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
-                border: '1px solid rgba(255, 255, 255, 0.5)',
+                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.5) 100%)',
+                backdropFilter: 'blur(20px) saturate(1.6)',
+                WebkitBackdropFilter: 'blur(20px) saturate(1.6)',
+                border: '1px solid rgba(255, 255, 255, 0.7)',
                 borderRadius: '24px',
                 display: 'flex',
-                alignItems: 'stretch',
-                boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
-                transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                alignItems: 'center',
+                boxShadow: '0 8px 32px rgba(15, 23, 42, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
                 width: '100%',
-                minHeight: '110px',
                 boxSizing: 'border-box',
                 overflow: 'hidden',
-                position: 'relative'
+                position: 'relative',
+                padding: '24px 28px'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
-                  {/* Photo of the student on the left */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flex: 1, minWidth: 0 }}>
+                  {/* Instrument Avatar on the left */}
                   <div style={{
-                    width: '100px',
-                    height: '100%',
-                    flexShrink: 0,
-                    position: 'relative',
+                    width: '80px',
+                    height: '80px',
+                    borderRadius: '20px',
+                    background: 'rgba(255, 255, 255, 0.9)',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.04)',
+                    border: '1.5px solid rgba(255, 255, 255, 0.8)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    overflow: 'hidden',
-                    borderRight: '1px solid rgba(0, 0, 0, 0.05)'
+                    flexShrink: 0
                   }}>
                     <img 
-                      src={studentUser?.photo_url || '/avatar_ghost.jpg'} 
+                      src={
+                        studentUser?.photo_url && (
+                          studentUser.photo_url.includes('avatar') || 
+                          studentUser.photo_url.includes('gitarre') || 
+                          studentUser.photo_url.includes('bass') || 
+                          studentUser.photo_url.includes('drum') || 
+                          studentUser.photo_url.includes('piano') || 
+                          studentUser.photo_url.includes('klavier') || 
+                          studentUser.photo_url.includes('vocal') || 
+                          studentUser.photo_url.includes('trompete') || 
+                          studentUser.photo_url.includes('cello') || 
+                          studentUser.photo_url.includes('geige') || 
+                          studentUser.photo_url.includes('sax')
+                        )
+                          ? studentUser.photo_url
+                          : getInstrumentAvatarUrl(studentUser?.resolved_instrument || studentUser?.instrument)
+                      } 
                       alt="" 
                       style={{ 
-                        width: '100%', 
-                        height: '100%', 
-                        objectFit: 'cover'
+                        width: '75%', 
+                        height: '75%', 
+                        objectFit: 'contain'
                       }} 
                     />
                   </div>
                   
                   <div style={{ 
-                    padding: '16px 24px', 
                     display: 'flex', 
                     flexDirection: 'column', 
-                    justifyContent: 'center',
                     minWidth: 0,
                     flex: 1 
                   }}>
@@ -4059,34 +4085,31 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       alignItems: 'center',
                       gap: '6px',
                       background: '#ffffff',
-                      border: '1px solid rgba(0, 0, 0, 0.06)',
+                      border: '1px solid rgba(0, 0, 0, 0.05)',
                       borderRadius: '100px',
-                      padding: '4px 10px',
+                      padding: '3px 8px',
                       alignSelf: 'flex-start',
-                      marginBottom: '6px',
+                      marginBottom: '8px',
                       flexShrink: 0
                     }}>
-                      <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }} />
-                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#475569', letterSpacing: '0.04em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
+                      <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }} />
+                      <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
                         {new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} UHR
                       </span>
                     </div>
 
                     <h3 style={{ 
                       margin: 0, 
-                      fontSize: '26px', 
+                      fontSize: '24px', 
                       fontWeight: 950, 
                       color: '#0f172a', 
                       fontFamily: "'Plus Jakarta Sans', sans-serif", 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '8px',
                       lineHeight: 1.15
                     }}>
-                      Hi, <span style={{ color: '#10b981', fontWeight: 900 }}>{studentUser?.first_name || 'Student'}</span>! 👋
+                      Hi, <span style={{ color: '#007aff', fontWeight: 900 }}>{studentUser?.first_name || 'Student'}</span>! 👋
                     </h3>
                     
-                    <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#475569', fontWeight: 600, lineHeight: 1.35 }}>
+                    <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 650, lineHeight: 1.4 }}>
                       Ein neuer Moment für Musik. Nimm dir heute ein paar Minuten für deine Übungsziele und sichere dir deine tägliche Serie!
                     </p>
 
@@ -4113,8 +4136,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     
                       return (
                         <div style={{ marginTop: '12px', display: 'inline-flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.08)', color: '#10b981', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
-                            <Calendar size={13} color="#10b981" />
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.06)', color: '#10b981', padding: '5px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 800 }}>
+                            <Calendar size={12} color="#10b981" />
                             <span>Nächster Unterricht: {hasToday ? `Heute, ${briefingData.todayLesson.time} Uhr` : (() => {
                               if(!nextOcc) return 'Demnächst';
                               const d = new Date(nextOcc.date);
@@ -4158,8 +4181,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         </div>
                       );
                     })() : (
-                      <div style={{ marginTop: '12px', display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.08)', color: '#10b981', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
-                        <Calendar size={13} color="#10b981" />
+                      <div style={{ marginTop: '12px', display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.06)', color: '#10b981', padding: '5px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 800 }}>
+                        <Calendar size={12} color="#10b981" />
                         <span>Nächster Unterricht: Demnächst</span>
                       </div>
                     )}
