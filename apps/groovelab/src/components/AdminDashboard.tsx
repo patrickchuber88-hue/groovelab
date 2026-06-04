@@ -7667,12 +7667,12 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               <div style={{ background: `${brandColor}15`, color: brandColor, padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
                 <Library size={20} />
               </div>
-              <span>Songs</span>
+              <span>Mediathek</span>
             </h2>
             <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '4px 0 0 0', fontWeight: 600 }}>
               {admin?.role === 'teacher' 
-                ? 'Verwalte deine Songs für den Unterricht.' 
-                : 'Verwalte alle Songs deiner Musikschule.'}
+                ? 'Verwalte deine Songs und Lehrwerke für den Unterricht.' 
+                : 'Verwalte alle Songs und Lehrwerke deiner Musikschule.'}
             </p>
           </div>
         </div>
@@ -8161,6 +8161,170 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             </div>
           </div>
           )}
+        </div>
+      </div>
+
+      {/* Right Side: Textbausteine Sidebar */}
+      <div 
+        className="glass-panel" 
+        style={{ 
+          flex: '0 0 260px',
+          width: '260px',
+          minWidth: '240px',
+          background: 'white', 
+          borderRadius: '20px', 
+          border: '1px solid rgba(0, 0, 0, 0.05)', 
+          padding: '24px 16px', 
+          boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '16px',
+          alignSelf: 'stretch'
+        }}
+      >
+        {/* Title */}
+        <div>
+          <h2 style={{ fontSize: '1.2rem', color: '#18181b', display: 'flex', alignItems: 'center', gap: '6px', margin: 0, fontWeight: 900 }}>
+            <span style={{ background: `${brandColor}15`, color: brandColor, padding: '4px 6px', borderRadius: '6px', display: 'flex', alignItems: 'center', fontSize: '1rem' }}>⚡</span>
+            <span>Schnell-Text</span>
+          </h2>
+          <p style={{ color: '#64748b', fontSize: '0.72rem', margin: '4px 0 0 0', fontWeight: 600 }}>
+            Vorlagen für Hausaufgaben.
+          </p>
+        </div>
+
+        {/* Manage Button */}
+        <button
+          type="button"
+          onClick={() => setShowTextbausteinModal(true)}
+          style={{
+            width: '100%',
+            background: `${brandColor}10`,
+            border: `1px solid ${brandColor}30`,
+            borderRadius: '12px',
+            padding: '10px 12px',
+            fontSize: '0.78rem',
+            fontWeight: 800,
+            color: brandColor,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            transition: 'all 0.15s'
+          }}
+          className="hover-bg"
+        >
+          <Settings size={14} />
+          <span>Verwalten</span>
+        </button>
+
+        {/* Templates List */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, minHeight: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Deine Bausteine</span>
+            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', background: '#f1f5f9', padding: '2px 6px', borderRadius: '9999px' }}>
+              {textbausteine.filter((tb: any) => tb.active).length}
+            </span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '8px', overflowY: 'auto', flex: 1, maxHeight: '580px', paddingRight: '2px' }}>
+            {textbausteine.filter((tb: any) => tb.active).map((tb: any) => {
+              const parts = tb.label.split(' ');
+              const hasEmoji = parts[0] && /\p{Emoji}/u.test(parts[0]);
+              const emoji = hasEmoji ? parts[0] : '🎵';
+              const name = hasEmoji ? parts.slice(1).join(' ') : tb.label;
+              const isCopied = copiedTbId === tb.id;
+
+              const handleCardClick = () => {
+                if (selectedLehrwerkForDetail && selectedStudentForProgress) {
+                  setNewHomeworkNoteText(prev => prev ? `${prev}\n\n${tb.text}` : tb.text);
+                  setCopiedTbId(tb.id);
+                  setTimeout(() => setCopiedTbId(null), 850);
+                } else if (selectedSongForDetail && selectedStudentForProgress) {
+                  setSongLessonNotes(prev => prev ? `${prev}\n\n${tb.text}` : tb.text);
+                  setCopiedTbId(tb.id);
+                  setTimeout(() => setCopiedTbId(null), 850);
+                } else {
+                  navigator.clipboard.writeText(tb.text);
+                  setCopiedTbId(tb.id);
+                  setTimeout(() => setCopiedTbId(null), 1000);
+                }
+              };
+
+              return (
+                <div 
+                  key={tb.id} 
+                  onClick={handleCardClick}
+                  style={{ 
+                    border: isCopied ? '1.5px solid #22c55e' : '1px solid #e2e8f0', 
+                    borderRadius: '12px', 
+                    padding: '10px 8px', 
+                    background: isCopied ? '#f0fdf4' : 'white',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    textAlign: 'center',
+                    gap: '6px',
+                    opacity: tb.active ? 1 : 0.55,
+                    boxShadow: isCopied ? '0 4px 10px rgba(34, 197, 94, 0.15)' : '0 1px 2px rgba(0,0,0,0.01)',
+                    minHeight: '110px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    transform: isCopied ? 'scale(0.96)' : 'none'
+                  }}
+                  className="hover-scale-mini"
+                >
+                  <span style={{ fontSize: '1.4rem', marginTop: '2px', transform: isCopied ? 'scale(1.15)' : 'none', transition: 'all 0.2s' }}>
+                    {isCopied ? '✅' : emoji}
+                  </span>
+                  
+                  <span style={{ 
+                    fontSize: '0.72rem', 
+                    fontWeight: 800, 
+                    color: isCopied ? '#15803d' : '#1e293b', 
+                    display: '-webkit-box', 
+                    WebkitLineClamp: 2, 
+                    WebkitBoxOrient: 'vertical', 
+                    overflow: 'hidden', 
+                    lineHeight: '1.2', 
+                    height: '2.4em', 
+                    wordBreak: 'break-word',
+                    transition: 'color 0.2s'
+                  }}>
+                    {isCopied ? (selectedLehrwerkForDetail || selectedSongForDetail ? 'Eingefügt! ✓' : 'Kopiert! ✓') : name}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleTextbausteinActive(tb.id);
+                    }}
+                    style={{
+                      background: tb.active ? '#f0fdf4' : '#f1f5f9',
+                      color: tb.active ? '#16a34a' : '#64748b',
+                      border: tb.active ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                      padding: '3px 8px',
+                      borderRadius: '9999px',
+                      fontSize: '0.62rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '3px',
+                      width: '100%',
+                      justifyContent: 'center',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    <span>{tb.active ? '🟢 Aktiv' : '⚪ Inakt.'}</span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
