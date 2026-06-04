@@ -6547,13 +6547,13 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                         </div>
                                       )}
                                       {durationHrs >= 0.75 && (
-                                        <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
-                                          {isSchedule ? b.teacherName : b.purpose}
+                                        <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', fontWeight: 700 }}>
+                                          {b.teacherName}
                                         </div>
                                       )}
                                       {durationHrs >= 1.0 && (
                                         <div style={{ fontSize: '0.58rem', opacity: 0.8, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                          {b.isPreview ? 'Vorschau' : (isSchedule ? b.purpose : (isOwnBooking ? 'Meine Buchung' : b.teacherName))}
+                                          {b.isPreview ? 'Vorschau' : b.purpose}
                                         </div>
                                       )}
                                     </div>
