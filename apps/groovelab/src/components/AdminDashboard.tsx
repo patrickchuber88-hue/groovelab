@@ -6233,13 +6233,13 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                  fontWeight: 900,
                                  cursor: 'pointer',
                                  transition: 'all 0.15s ease',
-                                 border: isSelected ? `1.5px solid ${brandColor}` : '1.5px solid #e8dec9',
-                                 background: isSelected ? '#f5ebd6' : '#faf6ee',
-                                 color: isSelected ? brandColor : '#6e6450',
+                                 border: isSelected ? `1.5px solid ${brandColor}` : '1.5px solid #e5e5ea',
+                                 background: isSelected ? `${brandColor}12` : '#f8fafc',
+                                 color: isSelected ? brandColor : '#48484a',
                                  boxShadow: isSelected ? `0 2px 6px ${brandColor}15` : 'none'
                                }}
                              >
-                               <span style={{ fontSize: '0.68rem', color: isSelected ? brandColor : '#c2b39a' }}>★</span>
+                               <span style={{ fontSize: '0.68rem', color: isSelected ? brandColor : '#8e8e93' }}>★</span>
                                {r.name.length > 10 ? r.name.substring(0, 10) + '...' : r.name}
                              </button>
                            );
@@ -6247,9 +6247,6 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                       </div>
                     )}
                   </h3>
-                  <p style={{ fontSize: '0.74rem', color: '#8e8e93', margin: '3px 0 0 0', fontWeight: 600 }}>
-                    Angezeigt für die Woche der Buchungsauswahl ({new Date(bookingDate).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })})
-                  </p>
                 </div>
 
                 {/* Week Pagination and Today Button */}
