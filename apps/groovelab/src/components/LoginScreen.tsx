@@ -830,6 +830,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
       
       if (!isMaster) {
+        // Enforce GrooveLab activation check
+        if (!user.is_groovelab_active) {
+          alert("Dein GrooveLab-Zugang ist nicht aktiv. Bitte wende dich an deine Musikschule.");
+          await supabase.auth.signOut();
+          setLoading(false);
+          return;
+        }
+
         // Enforce school matching check for students using component-level schoolData state or userSchool fallback
         if (user.role === 'student') {
           const effectiveSchool = schoolData || userSchool;
