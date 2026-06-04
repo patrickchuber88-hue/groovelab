@@ -1369,27 +1369,36 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
             </div>
 
             {/* Gamified KPI Cards row */}
-            <div>
-              {/* Collapse toggle */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '6px' }}>
-                <button
-                  onClick={() => setKpiCollapsed(c => !c)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '5px',
-                    background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: '100px', padding: '3px 10px',
-                    fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8',
-                    cursor: 'pointer', transition: 'all 0.2s', letterSpacing: '0.04em',
-                    textTransform: 'uppercase'
-                  }}
-                >
-                  <svg width="10" height="10" viewBox="0 0 10 10" style={{ transition: 'transform 0.25s', transform: kpiCollapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}>
-                    <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-                  </svg>
-                  {kpiCollapsed ? 'KPIs aufklappen' : 'KPIs einklappen'}
-                </button>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'stretch' }}>
+              {/* Collapse toggle (Vertical) */}
+              <button
+                onClick={() => setKpiCollapsed(c => !c)}
+                title={kpiCollapsed ? 'KPIs aufklappen' : 'KPIs einklappen'}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '16px', padding: '8px 6px', width: '32px',
+                  cursor: 'pointer', transition: 'all 0.2s',
+                  alignSelf: 'stretch'
+                }}
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" style={{ transition: 'transform 0.25s', transform: kpiCollapsed ? 'rotate(0deg)' : 'rotate(180deg)' }}>
+                  <path d="M2 3.5L5 6.5L8 3.5" stroke="#94a3b8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                </svg>
+                <span style={{
+                  writingMode: 'vertical-rl',
+                  textTransform: 'uppercase',
+                  fontSize: '0.55rem',
+                  fontWeight: 800,
+                  color: '#94a3b8',
+                  letterSpacing: '0.08em',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {kpiCollapsed ? 'KPIs auf' : 'KPIs zu'}
+                </span>
+              </button>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', flex: 1 }}>
 
                 {/* Card 1: Heutige Stunden (Blue) */}
                 <div style={{
