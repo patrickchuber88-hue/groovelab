@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
@@ -4130,11 +4130,11 @@ export function TeacherDashboard({
                               const prep = dynamicPrepMirror || briefingData.prepMirror;
                               return (
                                 <>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-                                    <div style={{ background: '#e6f4ea', color: '#137333', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                                    <div style={{ background: 'rgba(16, 185, 129, 0.08)', color: '#10b981', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                       <Award size={18} />
                                     </div>
-                                    <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#1e293b' }}>
+                                    <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                       {activeStudent?.id === prep.studentId ? 'Schüler Notizen' : 'Schüler Notizen (Nächste)'}
                                     </h4>
                                   </div>
@@ -4152,74 +4152,119 @@ export function TeacherDashboard({
                                       }}
                                     >
                                       <div style={{
-                                        width: '44px',
-                                        height: '44px',
-                                        borderRadius: '12px',
-                                        background: '#34a853',
+                                        width: '42px',
+                                        height: '42px',
+                                        borderRadius: '50%',
+                                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                                         color: 'white',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        fontSize: '1.25rem',
-                                        fontWeight: 800
+                                        fontSize: '1.1rem',
+                                        fontWeight: 800,
+                                        boxShadow: '0 2px 8px rgba(16, 185, 129, 0.15)'
                                       }}>
                                         {prep.studentName.charAt(0)}
                                       </div>
                                       <div>
-                                        <div style={{ fontWeight: 900, color: '#0f172a' }}>{prep.studentName}</div>
-                                        <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                                        <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.92rem' }}>{prep.studentName}</div>
+                                        <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
                                           Slot: {prep.timeSlot} Uhr • Level {prep.evolutionLevel}
                                         </div>
                                       </div>
                                     </div>
 
                                     {prep.streakCount > 0 && (
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fffbeb', border: '1px solid #fef3c7', padding: '10px 14px', borderRadius: '12px', color: '#b45309', fontSize: '0.85rem', fontWeight: 700 }}>
-                                        <Flame size={16} fill="#f59e0b" color="#f59e0b" />
-                                        <span>Premium-User Flammen-Streak: {prep.streakCount} Tage!</span>
+                                      <div style={{ 
+                                        display: 'inline-flex', 
+                                        alignItems: 'center', 
+                                        gap: '6px', 
+                                        background: 'rgba(245, 158, 11, 0.08)', 
+                                        border: '1px solid rgba(245, 158, 11, 0.15)', 
+                                        padding: '6px 12px', 
+                                        borderRadius: '100px', 
+                                        color: '#b45309', 
+                                        fontSize: '0.75rem', 
+                                        fontWeight: 750,
+                                        alignSelf: 'flex-start'
+                                      }}>
+                                        <Flame size={14} fill="#f59e0b" color="#f59e0b" />
+                                        <span>Premium Flammen-Streak: {prep.streakCount} Tage!</span>
                                       </div>
                                     )}
 
                                     <div>
-                                      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: '8px' }}>
+                                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
                                         Aktuelle Songs / Hausaufgaben
                                       </div>
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                         {prep.verifiedSongs && prep.verifiedSongs.length > 0 ? (
                                           prep.verifiedSongs.map((song: any, idx: number) => (
                                             <div key={idx} style={{
                                               background: '#f8fafc',
-                                              padding: '10px 12px',
-                                              borderRadius: '12px',
-                                              border: '1px solid #e2e8f0',
-                                              fontSize: '0.85rem'
+                                              padding: '12px 14px',
+                                              borderRadius: '14px',
+                                              border: '1px solid rgba(0, 0, 0, 0.04)',
+                                              display: 'flex',
+                                              flexDirection: 'column',
+                                              gap: '4px'
                                             }}>
-                                              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#1e293b' }}>
-                                                <span>{song.title}</span>
+                                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                                                <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.82rem' }}>{song.title}</span>
                                                 <span style={{
-                                                  color: song.status === 'verifiziert' ? '#137333' : '#b45309',
-                                                  fontSize: '0.75rem',
-                                                  fontWeight: 800
+                                                  background: song.status === 'verifiziert' ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 158, 11, 0.08)',
+                                                  color: song.status === 'verifiziert' ? '#10b981' : '#f59e0b',
+                                                  fontSize: '0.68rem',
+                                                  fontWeight: 800,
+                                                  borderRadius: '100px',
+                                                  padding: '2px 8px',
+                                                  textTransform: 'uppercase',
+                                                  letterSpacing: '0.02em',
+                                                  flexShrink: 0
                                                 }}>
-                                                  {song.status === 'verifiziert' ? '✓ Verifiziert' : 'Übt gerade'}
+                                                  {song.status === 'verifiziert' ? 'Verifiziert' : 'Übt gerade'}
                                                 </span>
                                               </div>
                                               {song.note && (
-                                                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px', fontStyle: 'italic' }}>
-                                                  "{song.note}"
+                                                <div style={{ 
+                                                  fontSize: '0.75rem', 
+                                                  color: '#475569', 
+                                                  fontWeight: 500, 
+                                                  fontStyle: 'italic', 
+                                                  borderLeft: '2.5px solid #10b981', 
+                                                  paddingLeft: '8px', 
+                                                  marginTop: '4px',
+                                                  lineHeight: 1.3
+                                                }}>
+                                                  {song.note}
                                                 </div>
                                               )}
                                             </div>
                                           ))
                                         ) : (
-                                          <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Keine aktiven Songs dokumentiert.</div>
+                                          <div style={{ 
+                                            display: 'flex', 
+                                            flexDirection: 'column', 
+                                            alignItems: 'center', 
+                                            gap: '8px', 
+                                            padding: '24px 0', 
+                                            textAlign: 'center', 
+                                            background: '#f8fafc',
+                                            borderRadius: '14px',
+                                            border: '1px dashed #e2e8f0'
+                                          }}>
+                                            <BookOpen size={20} color="#94a3b8" style={{ strokeWidth: 1.5 }} />
+                                            <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
+                                              Keine aktiven Songs dokumentiert.
+                                            </span>
+                                          </div>
                                         )}
                                       </div>
                                     </div>
 
                                     {/* Premium Quick Actions */}
                                     <div style={{ 
-                                      marginTop: '8px', 
+                                      marginTop: '12px', 
                                       paddingTop: '16px', 
                                       borderTop: '1px solid #f1f5f9', 
                                       display: 'flex', 
@@ -4266,9 +4311,9 @@ export function TeacherDashboard({
                                           });
                                         }}
                                         style={{
-                                          background: '#f1f5f9',
-                                          color: '#475569',
-                                          border: '1px solid #cbd5e1',
+                                          background: 'rgba(0, 122, 255, 0.08)',
+                                          color: '#007aff',
+                                          border: 'none',
                                           padding: '10px 14px',
                                           borderRadius: '12px',
                                           fontSize: '0.8rem',
