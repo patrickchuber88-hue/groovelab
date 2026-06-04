@@ -1493,34 +1493,86 @@ export function TeacherDashboard({
   }, []);
 
   useEffect(() => {
-    const loadMyBookings = () => {
+    const loadMyBookings = async () => {
       try {
+        let allBookings: any[] = [];
         const stored = localStorage.getItem('groovelab_campus_bookings');
         if (stored) {
-          const allBookings = JSON.parse(stored);
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          
-          const twoWeeksLater = new Date(today);
-          twoWeeksLater.setDate(today.getDate() + 14);
-
-          const filtered = allBookings.filter((b: any) => {
-            if (b.teacherId !== userId) return false;
-            if (!b.date) return false;
-            const bDate = new Date(b.date);
-            bDate.setHours(0, 0, 0, 0);
-            return bDate >= today && bDate <= twoWeeksLater;
-          });
-
-          // Sort by date then start time
-          filtered.sort((a: any, b: any) => {
-            const dateDiff = a.date.localeCompare(b.date);
-            if (dateDiff !== 0) return dateDiff;
-            return a.startTime.localeCompare(b.startTime);
-          });
-
-          setMyBookings(filtered);
+          allBookings = JSON.parse(stored);
         }
+
+        const { data: occurs } = await supabase
+          .from('schedule_occurrences')
+          .select(`
+            id,
+            date,
+            start_time,
+            status,
+            schedules (
+              duration,
+              rooms (id, name)
+            ),
+            student:users!schedule_occurrences_student_id_fkey (
+              first_name,
+              last_name
+            )
+          `)
+          .eq('teacher_id', userId)
+          .in('status', ['pending_reschedule', 'rescheduled_confirmed']);
+
+        const mappedOccurs = (occurs || []).map((occ: any) => {
+          const startTimeStr = occ.start_time.substring(0, 5);
+          const durationMin = occ.schedules?.duration || 45;
+          const [shStr, smStr] = startTimeStr.split(':');
+          const sh = parseInt(shStr) || 0;
+          const sm = parseInt(smStr) || 0;
+          const totalMin = sh * 60 + sm + durationMin;
+          const eh = Math.floor(totalMin / 60) % 24;
+          const em = totalMin % 60;
+          const endTimeStr = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
+          
+          return {
+            id: occ.id,
+            roomId: occ.schedules?.rooms?.id,
+            roomName: occ.schedules?.rooms?.name || 'Raum',
+            date: occ.date,
+            startTime: startTimeStr,
+            endTime: endTimeStr,
+            purpose: occ.student ? `Unterricht: ${occ.student.first_name} ${occ.student.last_name}` : 'Unterricht',
+            teacherId: userId,
+            status: occ.status,
+            isSchedule: true,
+            studentName: occ.student ? `${occ.student.first_name} ${occ.student.last_name}` : null
+          };
+        });
+
+        const combinedBookings = [
+          ...allBookings,
+          ...mappedOccurs
+        ];
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const twoWeeksLater = new Date(today);
+        twoWeeksLater.setDate(today.getDate() + 14);
+
+        const filtered = combinedBookings.filter((b: any) => {
+          if (b.teacherId !== userId) return false;
+          if (!b.date) return false;
+          const bDate = new Date(b.date);
+          bDate.setHours(0, 0, 0, 0);
+          return bDate >= today && bDate <= twoWeeksLater;
+        });
+
+        // Sort by date then start time
+        filtered.sort((a: any, b: any) => {
+          const dateDiff = a.date.localeCompare(b.date);
+          if (dateDiff !== 0) return dateDiff;
+          return a.startTime.localeCompare(b.startTime);
+        });
+
+        setMyBookings(filtered);
       } catch (err) {
         console.error('Failed to load my bookings:', err);
       }
@@ -6058,12 +6110,13 @@ export function TeacherDashboard({
                       const dateFormatted = dateObj.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
                       const isPendingReschedule = b.status === 'pending_reschedule' || b.status === 'pending';
                       
-                      const bg = isPendingReschedule ? 'rgba(0, 122, 255, 0.04)' : 'rgba(139, 92, 246, 0.06)';
-                      const border = isPendingReschedule ? '1px dashed rgba(0, 122, 255, 0.25)' : '1px solid rgba(139, 92, 246, 0.18)';
-                      const borderLeft = isPendingReschedule ? '4px solid #007aff' : '4px solid #8b5cf6';
-                      const badgeBg = isPendingReschedule ? 'rgba(0, 122, 255, 0.08)' : 'rgba(139, 92, 246, 0.12)';
-                      const badgeText = isPendingReschedule ? '#007aff' : '#7c3aed';
-                      const roomColor = isPendingReschedule ? '#007aff' : '#7c3aed';
+                      const isRescheduled = b.status === 'pending_reschedule';
+                      const bg = 'rgba(139, 92, 246, 0.06)';
+                      const border = isRescheduled || isPendingReschedule ? '1px dashed rgba(139, 92, 246, 0.25)' : '1px solid rgba(139, 92, 246, 0.18)';
+                      const borderLeft = '4px solid #8b5cf6';
+                      const badgeBg = 'rgba(139, 92, 246, 0.12)';
+                      const badgeText = '#7c3aed';
+                      const roomColor = '#7c3aed';
 
                       return (
                         <div 
@@ -6103,12 +6156,15 @@ export function TeacherDashboard({
                               borderRadius: '6px',
                               textTransform: 'uppercase'
                             }}>
-                              {isPendingReschedule ? 'Reserviert' : 'Gebucht'}
+                              {b.status === 'pending_reschedule' ? 'Verschoben' : (isPendingReschedule ? 'Reserviert' : 'Gebucht')}
                             </span>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem', color: '#475569', fontWeight: 550 }}>
-                            <span>{b.purpose || 'Raumbuchung'}</span>
-                            <span style={{ color: roomColor, fontWeight: 700 }}>{b.roomName || b.rooms?.name || 'Raum'}</span>
+                            <span>{b.isSchedule ? 'Unterricht' : 'Raumbuchung'}</span>
+                            <span style={{ color: roomColor, fontWeight: 700 }}>
+                              {b.roomName || b.rooms?.name || 'Raum'}
+                              {b.purpose && ` (${b.purpose})`}
+                            </span>
                           </div>
                         </div>
                       );

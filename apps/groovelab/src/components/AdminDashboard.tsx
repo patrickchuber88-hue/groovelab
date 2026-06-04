@@ -4722,9 +4722,47 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       return today.toDateString() === targetDate.toDateString();
     };
 
-    const handleCancelBooking = (bookingId: string | string[]) => {
+    const handleCancelBooking = async (bookingId: string | string[]) => {
       const ids = Array.isArray(bookingId) ? bookingId : [bookingId];
-      setCampusBookings(prev => prev.filter(b => !ids.includes(b.id)));
+      
+      const manualIds = ids.filter(id => !id.includes('-') && !scheduleOccurrences.some(o => o.id === id));
+      const occurIds = ids.filter(id => id.includes('-') || scheduleOccurrences.some(o => o.id === id));
+      
+      if (manualIds.length > 0) {
+        setCampusBookings(prev => prev.filter(b => !manualIds.includes(b.id)));
+      }
+      
+      if (occurIds.length > 0) {
+        if (!window.confirm('Möchtest du diese Terminverschiebung wirklich stornieren? Der Termin wird auf die ursprüngliche Zeit zurückgesetzt.')) return;
+        try {
+          for (const occId of occurIds) {
+            const occ = scheduleOccurrences.find(o => o.id === occId);
+            if (occ) {
+              if (occ.original_date && occ.original_start_time) {
+                const { error } = await supabase
+                  .from('schedule_occurrences')
+                  .update({
+                    date: occ.original_date,
+                    start_time: occ.original_start_time,
+                    status: 'scheduled'
+                  })
+                  .eq('id', occId);
+                if (error) throw error;
+              } else {
+                const { error } = await supabase
+                  .from('schedule_occurrences')
+                  .delete()
+                  .eq('id', occId);
+                if (error) throw error;
+              }
+            }
+          }
+          await fetchData();
+        } catch (err) {
+          console.error('Error canceling occurrence reschedule:', err);
+          alert('Fehler beim Stornieren der Verschiebung.');
+        }
+      }
     };
 
     // Map bookings and weekly schedules
@@ -5478,15 +5516,51 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
 
 
-    // Merge overlapping/consecutive bookings for "Meine Buchungen" sidebar
-    const groupedMyBookings: { [key: string]: any[] } = {};
-    campusBookings.filter((b: any) => b.teacherId === userId).forEach((b: any) => {
-      const key = `${b.roomId}_${b.date}`;
-      if (!groupedMyBookings[key]) {
-        groupedMyBookings[key] = [];
-      }
-      groupedMyBookings[key].push(b);
-    });
+     // Merge overlapping/consecutive bookings for "Meine Buchungen" sidebar
+     const groupedMyBookings: { [key: string]: any[] } = {};
+     
+     // Own manual bookings
+     const ownManualBookings = campusBookings.filter((b: any) => b.teacherId === userId);
+     
+     // Own rescheduled occurrences
+     const ownRescheduledOccurs = scheduleOccurrences
+       .filter((occ: any) => occ.teacher_id === userId && (occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed'))
+       .map((occ: any) => {
+         const startTimeStr = occ.start_time.substring(0, 5);
+         const durationMin = occ.duration || 45;
+         const [shStr, smStr] = startTimeStr.split(':');
+         const sh = parseInt(shStr) || 0;
+         const sm = parseInt(smStr) || 0;
+         const totalMin = sh * 60 + sm + durationMin;
+         const eh = Math.floor(totalMin / 60) % 24;
+         const em = totalMin % 60;
+         const endTimeStr = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
+         
+         const roomName = occ.schedules?.rooms?.name || occ.schedules?.room_name || (rooms && rooms.find((r: any) => r.id === occ.schedules?.room_id)?.name) || 'Raum';
+         
+         return {
+           id: occ.id,
+           roomId: occ.schedules?.room_id,
+           roomName: roomName,
+           date: occ.date,
+           startTime: startTimeStr,
+           endTime: endTimeStr,
+           purpose: occ.student ? `Unterricht: ${occ.student.first_name} ${occ.student.last_name}` : 'Unterricht',
+           teacherId: userId,
+           status: occ.status,
+           isSchedule: true
+         };
+       });
+
+     const combinedOwnBookings = [...ownManualBookings, ...ownRescheduledOccurs];
+
+     combinedOwnBookings.forEach((b: any) => {
+       const key = `${b.roomId}_${b.date}`;
+       if (!groupedMyBookings[key]) {
+         groupedMyBookings[key] = [];
+       }
+       groupedMyBookings[key].push(b);
+     });
 
     const myBookings: any[] = [];
     Object.values(groupedMyBookings).forEach((list: any[]) => {
@@ -6208,6 +6282,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                   const colWidth = 100 / slotBookings.length;
                                   const colLeft = bIdx * colWidth;
                                   const isSchedule = b.isSchedule;
+                                  const isRescheduled = b.status === 'pending_reschedule' || b.status === 'rescheduled_confirmed';
+                                  const hasConflict = isRescheduled && slotBookings.length > 1;
                                   
                                   // Apple Calendar Color Schemes
                                   let bg = 'rgba(142, 142, 147, 0.12)';
@@ -6218,10 +6294,16 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                     bg = 'rgba(0, 122, 255, 0.04)';
                                     textColor = '#007aff';
                                     leftAccentColor = '#007aff';
-                                  } else if (b.status === 'pending_reschedule') {
-                                    bg = 'rgba(255, 204, 0, 0.15)';
-                                    textColor = '#946600';
-                                    leftAccentColor = '#ffcc00';
+                                  } else if (isRescheduled) {
+                                    if (isOwnBooking) {
+                                      bg = 'rgba(175, 82, 222, 0.12)';
+                                      textColor = '#6d28d9';
+                                      leftAccentColor = '#af52de';
+                                    } else {
+                                      bg = 'rgba(255, 149, 0, 0.12)';
+                                      textColor = '#b25e00';
+                                      leftAccentColor = '#ff9500';
+                                    }
                                   } else if (isSchedule) {
                                     if (b.isApproved) {
                                       bg = 'rgba(52, 199, 89, 0.12)';
@@ -6287,8 +6369,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                       title={b.isPreview ? `Vorschau: ${b.purpose} (${b.startTime} - ${b.endTime})` : `${b.purpose} (${b.startTime} - ${b.endTime}) - ${b.teacherName}`}
                                       style={{
                                         background: bg,
-                                        border: b.isPreview ? `2.2px dashed ${leftAccentColor}` : `1px solid ${leftAccentColor}25`,
-                                        borderLeft: b.isPreview ? `2.2px dashed ${leftAccentColor}` : `3px solid ${leftAccentColor}`,
+                                        border: b.isPreview ? `2.2px dashed ${leftAccentColor}` : `1px solid ${hasConflict ? '#ff9500' : leftAccentColor + '25'}`,
+                                        borderLeft: b.isPreview ? `2.2px dashed ${leftAccentColor}` : `3px solid ${hasConflict ? '#ff9500' : leftAccentColor}`,
                                         borderRadius: '8px',
                                         padding: '6px 8px',
                                         fontSize: '0.64rem',
@@ -6345,7 +6427,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                         </>
                                       )}
 
-                                      {b.status === 'pending_reschedule' && (
+                                      {isRescheduled && !isOwnBooking && (
                                         <div style={{
                                           position: 'absolute',
                                           right: '8px',
@@ -6362,7 +6444,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                         </div>
                                       )}
 
-                                      {isSchedule && b.status !== 'pending_reschedule' && (
+                                      {isSchedule && !isRescheduled && (
                                         <div style={{
                                           position: 'absolute',
                                           bottom: '4px',
@@ -6385,6 +6467,22 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                           {b.startTime} - {b.endTime}{b.isPreview && ' (Vorschau)'}
                                         </span>
                                       </div>
+                                      {hasConflict && (
+                                        <div style={{
+                                          fontSize: '0.52rem',
+                                          fontWeight: 900,
+                                          textTransform: 'uppercase',
+                                          color: '#ff9500',
+                                          background: 'rgba(255, 149, 0, 0.12)',
+                                          border: '1px solid rgba(255, 149, 0, 0.25)',
+                                          padding: '1px 3px',
+                                          borderRadius: '3px',
+                                          marginBottom: '3px',
+                                          width: 'fit-content'
+                                        }}>
+                                          ⚠️ Doppelbelegung
+                                        </div>
+                                      )}
                                       {durationHrs >= 0.75 && (
                                         <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
                                           {isSchedule ? b.teacherName : b.purpose}
@@ -6433,7 +6531,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1c1c1e', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
                     Meine Buchungen
-                    <span style={{ fontSize: '0.72rem', background: `${brandColor}15`, color: brandColor, padding: '2px 8px', borderRadius: '8px', fontWeight: 900 }}>
+                    <span style={{ fontSize: '0.72rem', background: 'rgba(175, 82, 222, 0.12)', color: '#af52de', padding: '2px 8px', borderRadius: '8px', fontWeight: 900 }}>
                       {myBookings.length}
                     </span>
                   </h3>
@@ -6528,6 +6626,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0 }}>
                           <span style={{ fontSize: '0.8rem', fontWeight: 850, color: '#6d28d9', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
                             {b.roomName}
+                            {b.purpose && <span style={{ fontWeight: 500, opacity: 0.85 }}>{` (${b.purpose})`}</span>}
                           </span>
                           <span style={{ fontSize: '0.7rem', color: '#af52de', fontWeight: 700 }}>
                             {new Date(b.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} • {b.startTime} - {b.endTime}

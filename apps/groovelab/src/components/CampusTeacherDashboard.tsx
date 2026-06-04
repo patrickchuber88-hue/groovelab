@@ -290,7 +290,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
       const exception = (s.schedule_exceptions || []).find((ex: any) => ex.exception_date === targetDateStr);
       return {
         ...s,
-        status: exception ? exception.status : s.status
+        status: exception && exception.status !== 'pending_reschedule' ? exception.status : s.status
       };
     });
 
@@ -2123,29 +2123,38 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                                       <div className="flex flex-col md:flex-row gap-1.5 items-stretch w-full h-full">
                                         {slotBookings.map(booking => {
                                           const isCurrentTeacherBooking = booking && booking.teacher_id === userId;
+                                          const isRescheduled = booking.status === 'pending_reschedule' || booking.status === 'rescheduled_confirmed' || booking.is_dynamic_reschedule;
+                                          const hasConflict = isRescheduled && slotBookings.length > 1;
                                           return (
                                             <div key={booking.id} className={`flex-1 p-2.5 rounded-xl border flex flex-col justify-between h-full min-h-[72px] transition duration-200 relative overflow-hidden ${
-                                              booking.status === 'pending_reschedule'
-                                                ? 'bg-amber-950/20 border-amber-500/30 text-amber-200'
-                                                : isCurrentTeacherBooking
-                                                  ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-200'
-                                                  : 'bg-red-950/25 border-red-900/30 text-red-200'
+                                              isRescheduled && isCurrentTeacherBooking
+                                                ? `bg-purple-950/25 ${hasConflict ? 'border-amber-500/80 shadow-md shadow-amber-500/10' : 'border-purple-500/40'} text-purple-200`
+                                                : isRescheduled
+                                                  ? `bg-amber-950/20 ${hasConflict ? 'border-red-500/60' : 'border-amber-500/30'} text-amber-200`
+                                                  : isCurrentTeacherBooking
+                                                    ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-200'
+                                                    : 'bg-red-950/25 border-red-900/30 text-red-200'
                                             }`}>
-                                              {booking.status === 'pending_reschedule' && (
-                                                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-3xl font-black opacity-20 select-none pointer-events-none text-amber-400 font-sans">
+                                              {isRescheduled && !isCurrentTeacherBooking && (
+                                                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-3xl font-black opacity-20 select-none pointer-events-none font-sans text-amber-400">
                                                   R
                                                 </div>
                                               )}
-                                              {!booking.is_dynamic_reschedule && booking.status !== 'pending_reschedule' && (
+                                              {!booking.is_dynamic_reschedule && booking.status !== 'pending_reschedule' && booking.status !== 'rescheduled_confirmed' && (
                                                 <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 opacity-30 select-none pointer-events-none flex items-center justify-center">
                                                   <Lock size={11} />
                                                 </div>
                                               )}
-                                              <div className="relative z-10">
+                                              <div className="relative z-10 flex flex-col items-start">
+                                                {hasConflict && (
+                                                  <div className="text-[8px] font-black uppercase text-amber-400 bg-amber-950/80 border border-amber-500/40 px-1.5 py-0.5 rounded-md mb-1.5">
+                                                    ⚠️ Doppelbelegung
+                                                  </div>
+                                                )}
                                                 <p className="text-[10px] font-black uppercase tracking-wider opacity-75">
-                                                  {booking.status === 'pending_reschedule' ? 'Reservierung' : (booking.student ? 'Unterricht' : 'Eigennutzung')}
+                                                  {booking.status === 'pending_reschedule' ? 'Reservierung' : booking.status === 'rescheduled_confirmed' ? 'Verschoben' : (booking.student ? 'Unterricht' : 'Eigennutzung')}
                                                 </p>
-                                                <p className="text-[11px] font-bold truncate mt-0.5">
+                                                <p className="text-[11px] font-bold truncate mt-0.5 w-full">
                                                   {booking.student 
                                                     ? `${booking.student.first_name} ${booking.student.last_name[0]}.` 
                                                     : 'Freie Buchung'}
