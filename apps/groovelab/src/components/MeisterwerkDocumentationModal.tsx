@@ -819,10 +819,21 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     setStatus(newStatus);
   };
 
-  const handleRemoveLehrwerk = (lehrwerkId: string, e?: React.MouseEvent) => {
+  const handleRemoveLehrwerk = async (lehrwerkId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (!confirm("Lehrwerk wirklich entfernen?")) return;
     try {
+      const book = globalLehrwerke.find(g => g.id === lehrwerkId);
+      if (book) {
+        // Set is_current_homework to false for all pages of this book
+        const { error } = await supabase
+          .from('progress_matrix')
+          .update({ is_current_homework: false })
+          .eq('student_id', student.id)
+          .like('topic_name', `${book.title} - Seite %`);
+        if (error) console.error('Error updating progress matrix:', error);
+      }
+
       const stored = localStorage.getItem('student_lehrwerke_progress');
       const parsed = stored ? JSON.parse(stored) : [];
       const updated = parsed.filter((item: any) => !(item.studentId === student.id && item.lehrwerkId === lehrwerkId));
@@ -832,6 +843,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         setActiveLehrwerkId(null);
         setActivePageNumber(null);
       }
+
+      await fetchProgress();
+      notifyHomeworkChange();
     } catch (err) {
       console.error(err);
     }
@@ -1360,6 +1374,29 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     };
 
     try {
+      // Clean up any unassigned textbooks' homework status in the database
+      const unassignedHWItems = progressItems.filter(item => {
+        if (!item.is_current_homework) return false;
+        if (item.topic_name.includes(' - Seite ')) {
+          const parts = item.topic_name.split(' - Seite ');
+          const bookTitle = parts[0].trim();
+          const book = globalLehrwerke.find(g => g.title === bookTitle);
+          const isBookAssigned = book && assignedLehrwerke.some(a => a.lehrwerkId === book.id);
+          return !isBookAssigned;
+        }
+        return false;
+      });
+
+      if (unassignedHWItems.length > 0) {
+        const unassignedIds = unassignedHWItems.map(item => item.id).filter(Boolean);
+        if (unassignedIds.length > 0) {
+          await supabase
+            .from('progress_matrix')
+            .update({ is_current_homework: false })
+            .in('id', unassignedIds);
+        }
+      }
+
       // 1. Post to API endpoint
       const response = await fetch('/api/teacher/save-progress', {
         method: 'POST',
@@ -4360,6 +4397,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               if (item.topic_name.includes(' - Seite ')) {
                                 const parts = item.topic_name.split(' - Seite ');
                                 const bookTitle = parts[0].trim();
+                                
+                                // Only include if the book is assigned to this student
+                                const book = globalLehrwerke.find(g => g.title === bookTitle);
+                                const isBookAssigned = book && assignedLehrwerke.some(a => a.lehrwerkId === book.id);
+                                if (!isBookAssigned) return;
+
                                 const pageNum = parseInt(parts[1], 10);
                                 if (!groupedLehrwerke[bookTitle]) {
                                   groupedLehrwerke[bookTitle] = { pages: [] };
