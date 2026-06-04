@@ -4953,7 +4953,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         </div>
                         <div>
                           <h4 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 950, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
-                            Deine Quests (Hausaufgaben)
+                            Hausaufgaben
                           </h4>
                           <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                             Aktuelle Lernziele der Woche
