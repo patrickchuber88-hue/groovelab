@@ -4663,7 +4663,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           position: 'relative',
                           display: 'flex',
                           flexDirection: 'column',
-                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          background: '#10b981',
                           boxShadow: '0 8px 24px rgba(16, 185, 129, 0.12)',
                           borderRadius: '18px',
                           padding: '14px 16px'
@@ -4737,7 +4737,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             <div style={{
                               width: `${visualWidth}%`,
                               height: '100%',
-                              background: 'linear-gradient(90deg, #ffffff 0%, #a7f3d0 100%)',
+                              background: '#ffffff',
                               borderRadius: '99px',
                               transition: 'width 1.2s cubic-bezier(0.16, 1, 0.3, 1)',
                               boxShadow: '0 0 8px rgba(255, 255, 255, 0.3)'
