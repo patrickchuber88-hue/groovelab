@@ -4637,13 +4637,17 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             🔥 Flammen-Pfad
                           </span>
                           <span style={{ 
-                            background: 'linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%)', 
-                            color: '#ea580c', 
+                            background: streak === 0 
+                              ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' 
+                              : 'linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%)', 
+                            color: streak === 0 ? '#ffffff' : '#ea580c', 
                             fontSize: '0.85rem', 
                             fontWeight: 900, 
                             padding: '4px 12px', 
                             borderRadius: '100px',
-                            boxShadow: '0 2px 6px rgba(234, 88, 12, 0.05)'
+                            boxShadow: streak === 0 
+                              ? '0 2px 6px rgba(239, 68, 68, 0.15)' 
+                              : '0 2px 6px rgba(234, 88, 12, 0.05)'
                           }}>
                             {streak} {streak === 1 ? 'Tag' : 'Tage'} Serie
                           </span>
