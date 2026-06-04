@@ -580,14 +580,14 @@ function MobileBriefingView({
                 return (
                   <div key={occ.id} style={{ display: 'flex', gap: '12px', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
                     <div style={{ width: '40px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center', flexShrink: 0 }}>
-                      <div style={{ background: occ.status === 'rescheduled_confirmed' ? '#f97316' : '#ef4444', color: 'white', fontSize: '0.55rem', fontWeight: 800, padding: '2px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
+                      <div style={{ background: occ.status === 'rescheduled_confirmed' ? '#eab308' : '#10b981', color: 'white', fontSize: '0.55rem', fontWeight: 800, padding: '2px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
                       <div style={{ background: 'white', color: '#1e293b', fontSize: '1rem', fontWeight: 900, padding: '4px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span>{d.toLocaleDateString('de-DE', {weekday: 'short'})}</span>
                         {occ.status === 'rescheduled_confirmed' && (
-                          <span style={{ fontSize: '0.52rem', fontWeight: 900, background: '#ffedd5', color: '#ea580c', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase' }}>Verschoben</span>
+                          <span style={{ fontSize: '0.52rem', fontWeight: 900, background: '#fef08a', color: '#854d0e', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase' }}>Verschoben</span>
                         )}
                       </div>
                       <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>{occ.start_time?.substring(0,5)} Uhr</div>
@@ -4366,14 +4366,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         return (
                           <div key={occ.id} style={{ display: 'flex', gap: '16px', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
                             <div style={{ width: '48px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
-                              <div style={{ background: occ.status === 'rescheduled_confirmed' ? '#f97316' : '#ef4444', color: 'white', fontSize: '0.6rem', fontWeight: 800, padding: '4px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
+                              <div style={{ background: occ.status === 'rescheduled_confirmed' ? '#eab308' : '#10b981', color: 'white', fontSize: '0.6rem', fontWeight: 800, padding: '4px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
                               <div style={{ background: 'white', color: '#1e293b', fontSize: '1.2rem', fontWeight: 900, padding: '6px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
                             </div>
                             <div style={{ flex: 1 }}>
                               <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
                                 {occ.status === 'rescheduled_confirmed' && (
-                                  <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#ffedd5', color: '#ea580c', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Verschoben</span>
+                                  <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#fef08a', color: '#854d0e', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Verschoben</span>
                                 )}
                               </div>
                               <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>{occ.start_time?.substring(0,5)} <span style={{ color: '#22c55e' }}>Groovelab</span></div>
