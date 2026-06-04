@@ -4404,7 +4404,7 @@ export function TeacherDashboard({
                                       <Award size={18} />
                                     </div>
                                     <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                      {activeStudent?.id === prep.studentId ? 'Notizen' : 'Notizen (Nächste)'}
+                                      {activeStudent?.id === prep.studentId ? 'Aktuelle Hausaufgaben' : 'Aktuelle Hausaufgaben (Nächste)'}
                                     </h4>
                                   </div>
 

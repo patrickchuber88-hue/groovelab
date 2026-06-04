@@ -3792,207 +3792,229 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 {/* Hausaufgaben */}
                 <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', borderLeft: '6px solid #22c55e' }}>
                   {(() => {
-                    const activeHWs = progressItems.filter(item => item.is_current_homework && !item.topic_name.startsWith('Hausaufgabe KW '));
-                    const currentWeek = getISOWeek();
-                    const activeTheories = progressItems.filter(item => 
-                      item.status === 'THEORY_DONE' && 
-                      item.updated_at && 
-                      getISOWeek(item.updated_at) === currentWeek &&
-                      !item.topic_name.startsWith('Hausaufgabe KW ')
+                    const currentWeekStr = getISOWeekRaw(new Date(), 1);
+                    const prevWeekDate = new Date();
+                    prevWeekDate.setDate(prevWeekDate.getDate() - 7);
+                    const prevWeekStr = getISOWeekRaw(prevWeekDate, 1);
+
+                    const parseHomeworkNotes = (rawNotes: string): string[] => {
+                      if (!rawNotes || rawNotes.trim() === '') return [];
+                      try {
+                        if (rawNotes.startsWith('[') && rawNotes.endsWith(']')) {
+                          return JSON.parse(rawNotes);
+                        }
+                        return rawNotes.split('\n\n').filter(Boolean);
+                      } catch (e) {
+                        return [rawNotes];
+                      }
+                    };
+
+                    const currentWeekItems = progressItems.filter(item => 
+                      !item.topic_name.startsWith('Hausaufgabe KW ') && 
+                      (item.is_current_homework || (item.updated_at && getISOWeekRaw(item.updated_at, 1) === currentWeekStr))
                     );
-                    const allActive = [...activeHWs, ...activeTheories];
 
-                    // Get general weekly homework notes/instructions
-                    const getHomeworkNotes = (): string[] => {
-                      for (const item of progressItems) {
-                        if (item.homework_notes && item.homework_notes.trim()) {
-                          try {
-                            const raw = item.homework_notes;
-                            if (raw.startsWith('[') && raw.endsWith(']')) {
-                              const parsed = JSON.parse(raw);
-                              if (Array.isArray(parsed) && parsed.length > 0) {
-                                return parsed;
-                              }
-                            } else {
-                              const lines = raw
-                                .split('\n')
-                                .filter((line: string) => !line.trim().startsWith('• 📖') && !line.trim().startsWith('• 🎵') && !line.trim().startsWith('• 🗑️'))
-                                .map((l: string) => l.trim())
-                                .filter(Boolean);
-                              if (lines.length > 0) {
-                                return lines;
-                              }
-                            }
-                          } catch (e) {
-                            console.error(e);
-                          }
-                        }
-                      }
-                      return [];
-                    };
-                    const notesList = getHomeworkNotes();
-                    const totalItemsCount = allActive.length + notesList.length;
+                    const currentWeekNotesItem = progressItems.find(item => 
+                      item.topic_name.startsWith('Hausaufgabe KW ') && 
+                      (item.is_current_homework || (item.updated_at && getISOWeekRaw(item.updated_at, 1) === currentWeekStr))
+                    ) || progressItems.find(item => 
+                      item.is_current_homework && 
+                      item.homework_notes && 
+                      item.homework_notes.trim() !== ''
+                    );
 
-                    if (totalItemsCount === 0) {
-                      return (
-                        <>
-                          <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#16a34a', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '16px' }}>AKTUELLE HAUSAUFGABEN (0):</div>
-                          <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', fontStyle: 'italic' }}>
-                            Keine aktuellen Hausaufgaben erfasst ✨
-                          </div>
-                        </>
-                      );
-                    }
+                    const currentWeekNotes = currentWeekNotesItem ? parseHomeworkNotes(currentWeekNotesItem.homework_notes) : [];
 
-                    // Local helper to format page ranges
-                    const formatPageNumbers = (pages: number[]): string => {
-                      if (pages.length === 0) return '';
-                      const sorted = [...pages].sort((a, b) => a - b);
-                      const ranges: string[] = [];
-                      let start = sorted[0];
-                      let end = start;
-                      
-                      for (let i = 1; i < sorted.length; i++) {
-                        if (sorted[i] === end + 1) {
-                          end = sorted[i];
-                        } else {
-                          if (start === end) {
-                            ranges.push(`${start}`);
-                          } else {
-                            ranges.push(`${start}–${end}`);
-                          }
-                          start = sorted[i];
-                          end = start;
-                        }
-                      }
-                      if (start === end) {
-                        ranges.push(`${start}`);
-                      } else {
-                        ranges.push(`${start}–${end}`);
-                      }
-                      
-                      if (ranges.length === 1) return `S. ${ranges[0]}`;
-                      const last = ranges.pop();
-                      return `S. ${ranges.join(', ')} & ${last}`;
-                    };
+                    const prevWeekItems = progressItems.filter(item => 
+                      !item.topic_name.startsWith('Hausaufgabe KW ') && 
+                      item.updated_at && 
+                      getISOWeekRaw(item.updated_at, 1) === prevWeekStr
+                    );
 
-                    // Group textbook pages by book title
-                    const groupedLehrwerke: Record<string, { pages: { num: number; notes: string; status: string; id: string }[] }> = {};
-                    const otherHWs: any[] = [];
+                    const prevWeekNotesItem = progressItems.find(item => 
+                      item.topic_name.startsWith('Hausaufgabe KW ') && 
+                      item.updated_at && 
+                      getISOWeekRaw(item.updated_at, 1) === prevWeekStr
+                    );
 
-                    allActive.forEach(item => {
-                      if (item.topic_name.includes(' - Seite ')) {
-                        const parts = item.topic_name.split(' - Seite ');
-                        const bookTitle = parts[0].trim();
-                        const pageNum = parseInt(parts[1], 10);
-                        
-                        if (!groupedLehrwerke[bookTitle]) {
-                          groupedLehrwerke[bookTitle] = { pages: [] };
-                        }
-                        if (!isNaN(pageNum) && !groupedLehrwerke[bookTitle].pages.some(p => p.num === pageNum)) {
-                          groupedLehrwerke[bookTitle].pages.push({
-                            num: pageNum,
-                            notes: item.teacher_notes || '',
-                            status: item.status,
-                            id: item.id
-                          });
-                        }
-                      } else {
-                        otherHWs.push(item);
-                      }
-                    });
+                    const prevWeekNotes = prevWeekNotesItem ? parseHomeworkNotes(prevWeekNotesItem.homework_notes) : [];
 
-                    // Sort pages
-                    Object.keys(groupedLehrwerke).forEach(title => {
-                      groupedLehrwerke[title].pages.sort((a, b) => a.num - b.num);
-                    });
+                    const currentWeekNum = currentWeekStr.split('-W')[1] || '';
+                    const prevWeekNum = prevWeekStr.split('-W')[1] || '';
 
                     return (
                       <>
-                        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#16a34a', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '16px' }}>
-                          AKTUELLE HAUSAUFGABEN ({totalItemsCount}):
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                          <div style={{ background: 'rgba(16, 185, 129, 0.08)', color: '#10b981', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Award size={18} />
+                          </div>
+                          <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            Aktuelle Hausaufgaben
+                          </h4>
                         </div>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                          {/* Textbook Groups */}
-                          {Object.entries(groupedLehrwerke).map(([title, info]) => {
-                            const pageNums = info.pages.map(p => p.num);
-                            const formattedPages = formatPageNumbers(pageNums);
-                            
-                            // Combine any individual notes
-                            const combinedNotes = info.pages
-                              .map(p => p.notes)
-                              .filter(Boolean)
-                              .filter(n => n !== 'Inhalte in der Premium-Version freischalten')
-                              .join('; ');
-
-                            return (
-                              <div key={title} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          {/* Hausaufgaben der Vorwoche */}
+                          <div>
+                            <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
+                              Hausaufgaben der Vorwoche (KW {prevWeekNum || '?'})
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              {((prevWeekItems && prevWeekItems.length > 0) || (prevWeekNotes && prevWeekNotes.length > 0)) ? (
+                                <>
+                                  {prevWeekItems && prevWeekItems.map((item: any, idx: number) => {
+                                    const isBook = item.topic_name.includes('Seite');
+                                    return (
+                                      <div key={`prev-item-${idx}`} style={{
+                                        background: '#f8fafc',
+                                        padding: '10px 12px',
+                                        borderRadius: '12px',
+                                        border: '1px solid rgba(0, 0, 0, 0.03)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        gap: '8px',
+                                        opacity: 0.85
+                                      }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                                          {isBook ? <BookOpen size={14} color="#64748b" /> : <Music size={14} color="#64748b" />}
+                                          <span style={{ fontWeight: 800, color: '#475569', fontSize: '0.8rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                            {item.topic_name}
+                                          </span>
+                                        </div>
+                                        {(item.status === 'MASTERED' || item.status === 'THEORY_DONE') && (
+                                          <span style={{
+                                            background: 'rgba(16, 185, 129, 0.08)',
+                                            color: '#10b981',
+                                            fontSize: '0.64rem',
+                                            fontWeight: 800,
+                                            borderRadius: '100px',
+                                            padding: '2px 8px',
+                                            textTransform: 'uppercase',
+                                            flexShrink: 0
+                                          }}>
+                                            Erledigt
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                  {prevWeekNotes && prevWeekNotes.map((note: string, idx: number) => (
+                                    <div key={`prev-note-${idx}`} style={{ 
+                                      fontSize: '0.75rem', 
+                                      color: '#64748b', 
+                                      fontWeight: 500, 
+                                      fontStyle: 'italic', 
+                                      borderLeft: '2.5px solid #cbd5e1', 
+                                      paddingLeft: '8px', 
+                                      margin: '2px 4px',
+                                      lineHeight: 1.3,
+                                      opacity: 0.85
+                                    }}>
+                                      {note}
+                                    </div>
+                                  ))}
+                                </>
+                              ) : (
                                 <div style={{ 
                                   display: 'flex', 
-                                  justifyContent: 'space-between', 
                                   alignItems: 'center', 
-                                  background: '#f8fafc', 
-                                  padding: '12px 16px', 
-                                  borderRadius: '16px',
-                                  border: '1px solid #e2e8f0'
+                                  justifyContent: 'center',
+                                  gap: '6px', 
+                                  padding: '14px 0', 
+                                  background: '#f8fafc',
+                                  borderRadius: '12px',
+                                  border: '1px dashed #e2e8f0',
+                                  fontSize: '0.74rem',
+                                  color: '#94a3b8',
+                                  fontWeight: 555
                                 }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <span style={{ fontSize: '1.2rem' }}>📖</span>
-                                    <div>
-                                      <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>
-                                        {title}
-                                      </div>
-                                      <div style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 650, marginTop: '2px' }}>
-                                        <strong>{formattedPages}</strong>
-                                        {combinedNotes ? ` • ${combinedNotes}` : ''}
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div style={{ background: '#dcfce7', color: '#16a34a', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                    <Check size={16} strokeWidth={3} />
-                                  </div>
+                                  <BookOpen size={14} />
+                                  <span>Keine Hausaufgaben erfasst.</span>
                                 </div>
-                              </div>
-                            );
-                          })}
+                              )}
+                            </div>
+                          </div>
 
-                          {/* Songs and other topics */}
-                          {otherHWs.length > 0 && (
+                          {/* Hausaufgaben dieser Woche */}
+                          <div>
+                            <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
+                              Hausaufgaben dieser Woche (KW {currentWeekNum || '?'})
+                            </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                              <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                🎵 Songs & Projekte
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                {otherHWs.map((item, idx) => (
-                                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '8px 12px', borderRadius: '8px' }}>
-                                    <span style={{ fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>
-                                      {item.topic_name} {item.teacher_notes ? ` - ${item.teacher_notes}` : ''}
-                                    </span>
-                                    <div style={{ background: '#dcfce7', color: '#16a34a', borderRadius: '4px', padding: '2px 4px' }}>
-                                      <Check size={14} strokeWidth={3} />
+                              {((currentWeekItems && currentWeekItems.length > 0) || (currentWeekNotes && currentWeekNotes.length > 0)) ? (
+                                <>
+                                  {currentWeekItems && currentWeekItems.map((item: any, idx: number) => {
+                                    const isBook = item.topic_name.includes('Seite');
+                                    return (
+                                      <div key={`curr-item-${idx}`} style={{
+                                        background: '#f8fafc',
+                                        padding: '10px 12px',
+                                        borderRadius: '12px',
+                                        border: '1px solid rgba(0, 0, 0, 0.03)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        gap: '8px'
+                                      }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                                          {isBook ? <BookOpen size={14} color="#64748b" /> : <Music size={14} color="#64748b" />}
+                                          <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.8rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                            {item.topic_name}
+                                          </span>
+                                        </div>
+                                        {(item.status === 'MASTERED' || item.status === 'THEORY_DONE') && (
+                                          <span style={{
+                                            background: 'rgba(16, 185, 129, 0.08)',
+                                            color: '#10b981',
+                                            fontSize: '0.64rem',
+                                            fontWeight: 800,
+                                            borderRadius: '100px',
+                                            padding: '2px 8px',
+                                            textTransform: 'uppercase',
+                                            flexShrink: 0
+                                          }}>
+                                            Erledigt
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                  {currentWeekNotes && currentWeekNotes.map((note: string, idx: number) => (
+                                    <div key={`curr-note-${idx}`} style={{ 
+                                      fontSize: '0.75rem', 
+                                      color: '#475569', 
+                                      fontWeight: 500, 
+                                      fontStyle: 'italic', 
+                                      borderLeft: '2.5px solid #10b981', 
+                                      paddingLeft: '8px', 
+                                      margin: '2px 4px',
+                                      lineHeight: 1.3
+                                    }}>
+                                      {note}
                                     </div>
-                                  </div>
-                                ))}
-                              </div>
+                                  ))}
+                                </>
+                              ) : (
+                                <div style={{ 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'center',
+                                  gap: '6px', 
+                                  padding: '14px 0', 
+                                  background: '#f8fafc',
+                                  borderRadius: '12px',
+                                  border: '1px dashed #e2e8f0',
+                                  fontSize: '0.74rem',
+                                  color: '#94a3b8',
+                                  fontWeight: 550
+                                }}>
+                                  <BookOpen size={14} />
+                                  <span>Keine Hausaufgaben erfasst.</span>
+                                </div>
+                              )}
                             </div>
-                          )}
-
-                          {/* Weekly Custom Instructions / Practice Tips */}
-                          {notesList.length > 0 && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #e2e8f0', paddingTop: '16px', marginTop: '4px' }}>
-                              <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                💡 Übe-Tipps von der Lehrkraft:
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                {notesList.map((note: string, nIdx: number) => (
-                                  <div key={nIdx} style={{ fontSize: '0.82rem', color: '#475569', fontWeight: 550, fontStyle: 'italic', background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', borderLeft: '3px solid #3b82f6', lineHeight: '1.4', whiteSpace: 'pre-line' }}>
-                                    {note}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+                          </div>
                         </div>
                       </>
                     );
