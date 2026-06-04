@@ -6524,38 +6524,55 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                         </div>
                                       )}
 
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.64rem', marginBottom: '4px', fontWeight: 800 }}>
-                                        <span style={{ display: 'flex', alignItems: 'center' }}>
-                                          {isSchedule && <GraduationCap size={10} style={{ marginRight: '3px' }} />}
-                                          {b.startTime} - {b.endTime}{b.isPreview && ' (Vorschau)'}
-                                        </span>
+                                      <div style={{
+                                        background: isOwnBooking && !b.isPreview ? '#ffffff' : 'rgba(0, 0, 0, 0.04)',
+                                        color: isOwnBooking && !b.isPreview ? '#000000' : textColor,
+                                        padding: '6px 8px',
+                                        margin: '-6px -8px 0 -8px',
+                                        borderBottom: isOwnBooking && !b.isPreview ? 'none' : `1px solid ${leftAccentColor}15`,
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '2px'
+                                      }}>
+                                        {/* Time range */}
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.64rem', fontWeight: 800 }}>
+                                          <span style={{ display: 'flex', alignItems: 'center' }}>
+                                            {isSchedule && <GraduationCap size={10} style={{ marginRight: '3px' }} />}
+                                            {b.startTime} - {b.endTime}{b.isPreview && ' (Vorschau)'}
+                                          </span>
+                                        </div>
+
+                                        {/* Conflict badge */}
+                                        {hasConflict && (
+                                          <div style={{
+                                            fontSize: '0.58rem',
+                                            fontWeight: 900,
+                                            textTransform: 'uppercase',
+                                            color: '#ff9500',
+                                            background: 'rgba(255, 149, 0, 0.12)',
+                                            border: '1px solid rgba(255, 149, 0, 0.25)',
+                                            padding: '1px 3px',
+                                            borderRadius: '3px',
+                                            width: 'fit-content'
+                                          }}>
+                                            ⚠️ Doppelbelegung
+                                          </div>
+                                        )}
+
+                                        {/* Teacher Name */}
+                                        {durationHrs >= 0.75 && (
+                                          <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', fontWeight: 700 }}>
+                                            {b.teacherName}
+                                          </div>
+                                        )}
+
+                                        {/* Purpose */}
+                                        {durationHrs >= 1.0 && b.purpose && b.purpose.trim().toLowerCase() !== 'eigennutzung' && (
+                                          <div style={{ fontSize: '0.64rem', opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            {b.isPreview ? 'Vorschau' : b.purpose}
+                                          </div>
+                                        )}
                                       </div>
-                                      {hasConflict && (
-                                        <div style={{
-                                          fontSize: '0.64rem',
-                                          fontWeight: 900,
-                                          textTransform: 'uppercase',
-                                          color: '#ff9500',
-                                          background: 'rgba(255, 149, 0, 0.12)',
-                                          border: '1px solid rgba(255, 149, 0, 0.25)',
-                                          padding: '1px 3px',
-                                          borderRadius: '3px',
-                                          marginBottom: '3px',
-                                          width: 'fit-content'
-                                        }}>
-                                          ⚠️ Doppelbelegung
-                                        </div>
-                                      )}
-                                      {durationHrs >= 0.75 && (
-                                        <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', fontWeight: 700 }}>
-                                          {b.teacherName}
-                                        </div>
-                                      )}
-                                      {durationHrs >= 1.0 && b.purpose && b.purpose.trim().toLowerCase() !== 'eigennutzung' && (
-                                        <div style={{ fontSize: '0.64rem', opacity: 0.8, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                          {b.isPreview ? 'Vorschau' : b.purpose}
-                                        </div>
-                                      )}
                                     </div>
                                   );
                                 })}
