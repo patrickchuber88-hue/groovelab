@@ -1147,6 +1147,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [editingStationColor, setEditingStationColor] = useState<string>('#e5e7eb');
   const [snapToGrid, setSnapToGrid] = useState(true);
   const canvasRef = React.useRef<HTMLDivElement>(null);
+  const calendarScrollRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (customizingRoom) {
@@ -1582,6 +1583,26 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       }
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'rooms') {
+      setTimeout(() => {
+        if (calendarScrollRef.current) {
+          const now = new Date();
+          const currentHour = now.getHours();
+          const currentMin = now.getMinutes();
+          if (currentHour >= 8 && currentHour <= 22) {
+            const rowHeight = 56;
+            const hoursSinceStart = currentHour - 8;
+            const yPos = (hoursSinceStart * rowHeight) + ((currentMin / 60) * rowHeight);
+            const containerHeight = 420;
+            const targetScrollTop = yPos - (containerHeight / 2);
+            calendarScrollRef.current.scrollTop = Math.max(0, targetScrollTop);
+          }
+        }
+      }, 150);
+    }
+  }, [activeTab, selectedCampusRoomId, bookingDate]);
 
   const fetchData = async () => {
     let currentAdmin = admin;
@@ -6240,7 +6261,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   </div>
 
                   {/* Hourly Rows */}
-                  <div className="custom-calendar-scrollbar" style={{ display: 'flex', flexDirection: 'column', maxHeight: '420px', overflowY: 'auto', position: 'relative' }}>
+                  <div ref={calendarScrollRef} className="custom-calendar-scrollbar" style={{ display: 'flex', flexDirection: 'column', maxHeight: '420px', overflowY: 'auto', position: 'relative' }}>
                     {TIME_SLOTS.map((hour) => {
                       const slotHourInt = parseInt(hour.split(':')[0]);
                       
