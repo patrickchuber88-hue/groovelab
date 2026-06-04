@@ -4523,298 +4523,15 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 </div>
               </div>
 
-              {/* ÜBE-ZENTRALE (PRACTICE HUB) - GAMIFIED ACTION CENTER */}
+              {/* PEDAGOGISCHER DREISPALTIER-ÜBEBEREICH */}
               <div style={{ 
-                background: '#ffffff', 
-                borderRadius: '30px', 
-                boxShadow: '0 15px 40px rgba(15, 23, 42, 0.03)',
-                border: '1px solid rgba(0, 0, 0, 0.04)',
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden'
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(3, 1fr)', 
+                gap: '24px', 
+                alignItems: 'stretch' 
               }}>
-                
-                {/* PRACTICE GOAL HERO BLOCK */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'stretch', flexWrap: 'wrap' }}>
-                  
-                  {/* Left: Practice action */}
-                  <div style={{ flex: '1 1 320px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '24px', padding: '32px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ background: 'rgba(251, 188, 5, 0.12)', color: '#d97706', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Zap size={18} fill="currentColor" />
-                        </div>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Tägliche Challenge</span>
-                      </div>
-                      <div>
-                        <h4 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
-                          Tägliche Musikzeit
-                        </h4>
-                        <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#64748b', lineHeight: 1.5 }}>
-                          Starte jetzt deine Übe-Session. Jede Minute bringt dich näher ans nächste Level und schützt deine Flamme! ⚡️
-                        </p>
-                      </div>
-                    </div>
-                    
-                    {/* Modern circular or highlighted quest status */}
-                    {(() => {
-                      const streak = avatar?.streak_flame || 0;
-                      const requiredMins = streak >= 6 ? 10 : streak >= 3 ? 5 : 3;
-                      return (
-                        <div style={{ 
-                          background: 'rgba(251, 188, 5, 0.05)', 
-                          borderRadius: '16px', 
-                          padding: '12px 16px', 
-                          border: '1px dashed rgba(251, 188, 5, 0.3)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '12px',
-                          alignSelf: 'flex-start'
-                        }}>
-                          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#f59e0b', animation: 'pulse 1.5s infinite' }} />
-                          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#854d0e' }}>
-                            Ziel für heute: Mindestens {requiredMins} Min. üben
-                          </span>
-                        </div>
-                      );
-                    })()}
 
-                    <button 
-                      onClick={() => setActiveTab('practice_board')}
-                      style={{ 
-                        background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', 
-                        color: 'white', 
-                        border: 'none', 
-                        borderRadius: '16px', 
-                        padding: '14px 28px', 
-                        fontWeight: 900, 
-                        fontSize: '0.9rem', 
-                        cursor: 'pointer', 
-                        display: 'inline-flex', 
-                        justifyContent: 'center', 
-                        alignItems: 'center', 
-                        gap: '10px', 
-                        boxShadow: '0 10px 25px rgba(79, 70, 229, 0.25)',
-                        transition: 'all 0.2s',
-                        alignSelf: 'flex-start',
-                        marginTop: '8px'
-                      }}
-                      onMouseOver={e => {
-                        e.currentTarget.style.transform = 'translateY(-2px)';
-                        e.currentTarget.style.boxShadow = '0 12px 30px rgba(79, 70, 229, 0.35)';
-                      }}
-                      onMouseOut={e => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 10px 25px rgba(79, 70, 229, 0.25)';
-                      }}
-                    >
-                      <Play size={16} fill="white" />
-                      🚀 Üben starten
-                    </button>
-                  </div>
-
-                  {/* Right: Gamified Level Timeline (Stepper) */}
-                  {(() => {
-                    const streak = avatar?.streak_flame || 0;
-                    
-                    // Determine which tiers are unlocked
-                    const isTier1Unlocked = streak >= 3;
-                    const isTier2Unlocked = streak >= 6;
-                    const isTier3Unlocked = streak >= 9;
-
-                    return (
-                      <div style={{ 
-                        flex: '1 1 300px', 
-                        display: 'flex', 
-                        flexDirection: 'column', 
-                        gap: '20px', 
-                        background: '#f8fafc', 
-                        padding: '32px', 
-                        position: 'relative'
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            🔥 Flammen-Pfad
-                          </span>
-                          <span style={{ 
-                            background: streak === 0 
-                              ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' 
-                              : 'linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%)', 
-                            color: streak === 0 ? '#ffffff' : '#ea580c', 
-                            fontSize: '0.85rem', 
-                            fontWeight: 900, 
-                            padding: '4px 12px', 
-                            borderRadius: '100px',
-                            boxShadow: streak === 0 
-                              ? '0 2px 6px rgba(239, 68, 68, 0.15)' 
-                              : '0 2px 6px rgba(234, 88, 12, 0.05)'
-                          }}>
-                            {streak} {streak === 1 ? 'Tag' : 'Tage'} Serie
-                          </span>
-                        </div>
-
-                        {/* Visual Path Stepper */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative', marginTop: '4px' }}>
-                          
-                          {/* Stepper vertical line connector */}
-                          <div style={{
-                            position: 'absolute',
-                            left: '21px',
-                            top: '28px',
-                            bottom: '28px',
-                            width: '3px',
-                            background: '#e2e8f0',
-                            zIndex: 1
-                          }} />
-                          
-                          {/* Dynamic connector overlay based on streak */}
-                          <div style={{
-                            position: 'absolute',
-                            left: '21px',
-                            top: '28px',
-                            height: streak >= 9 ? '100%' : streak >= 6 ? '50%' : streak >= 3 ? '0%' : '0%',
-                            width: '3px',
-                            background: 'linear-gradient(to bottom, #f97316 0%, #ef4444 100%)',
-                            zIndex: 1,
-                            transition: 'height 0.5s ease'
-                          }} />
-
-                          {/* Tier 1 Item */}
-                          <div style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '16px', 
-                            background: '#ffffff', 
-                            padding: '14px 18px', 
-                            borderRadius: '16px', 
-                            border: '1px solid rgba(0,0,0,0.03)',
-                            zIndex: 2,
-                            boxShadow: isTier1Unlocked ? '0 4px 12px rgba(234, 179, 8, 0.08)' : 'none',
-                            opacity: isTier1Unlocked ? 1 : 0.65,
-                            transition: 'all 0.3s'
-                          }}>
-                            <div style={{ 
-                              width: '12px', 
-                              height: '12px', 
-                              borderRadius: '50%', 
-                              background: isTier1Unlocked ? '#eab308' : '#cbd5e1', 
-                              boxShadow: isTier1Unlocked ? '0 0 10px #eab308' : 'none',
-                              zIndex: 3
-                            }} />
-                            <div style={{ color: isTier1Unlocked ? '#eab308' : '#94a3b8' }}>
-                              <Flame size={22} fill={isTier1Unlocked ? 'currentColor' : 'none'} />
-                            </div>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '0.95rem', fontWeight: 900, color: isTier1Unlocked ? '#854d0e' : '#475569' }}>
-                                  Kleine Flamme
-                                </span>
-                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: isTier1Unlocked ? '#854d0e' : '#94a3b8' }}>
-                                  3+ Tage • 3 Min.
-                                </span>
-                              </div>
-                              <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>
-                                {isTier1Unlocked ? '🎉 Freigeschaltet!' : `Noch ${Math.max(1, 3 - streak)} ${Math.max(1, 3 - streak) === 1 ? 'Tag' : 'Tage'} bis Freischaltung`}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Tier 2 Item */}
-                          <div style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '16px', 
-                            background: '#ffffff', 
-                            padding: '14px 18px', 
-                            borderRadius: '16px', 
-                            border: '1px solid rgba(0,0,0,0.03)',
-                            zIndex: 2,
-                            boxShadow: isTier2Unlocked ? '0 4px 12px rgba(249, 115, 22, 0.08)' : 'none',
-                            opacity: isTier2Unlocked ? 1 : 0.65,
-                            transition: 'all 0.3s'
-                          }}>
-                            <div style={{ 
-                              width: '12px', 
-                              height: '12px', 
-                              borderRadius: '50%', 
-                              background: isTier2Unlocked ? '#f97316' : '#cbd5e1', 
-                              boxShadow: isTier2Unlocked ? '0 0 10px #f97316' : 'none',
-                              zIndex: 3
-                            }} />
-                            <div style={{ color: isTier2Unlocked ? '#f97316' : '#94a3b8' }}>
-                              <Flame size={22} fill={isTier2Unlocked ? 'currentColor' : 'none'} />
-                            </div>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '0.95rem', fontWeight: 900, color: isTier2Unlocked ? '#9a3412' : '#475569' }}>
-                                  Mittlere Flamme
-                                </span>
-                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: isTier2Unlocked ? '#9a3412' : '#94a3b8' }}>
-                                  6+ Tage • 5 Min.
-                                </span>
-                              </div>
-                              <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>
-                                {isTier2Unlocked ? '🎉 Freigeschaltet!' : `Noch ${Math.max(1, 6 - streak)} ${Math.max(1, 6 - streak) === 1 ? 'Tag' : 'Tage'} bis Freischaltung`}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Tier 3 Item */}
-                          <div style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '16px', 
-                            background: '#ffffff', 
-                            padding: '14px 18px', 
-                            borderRadius: '16px', 
-                            border: '1px solid rgba(0,0,0,0.03)',
-                            zIndex: 2,
-                            boxShadow: isTier3Unlocked ? '0 4px 12px rgba(239, 68, 68, 0.08)' : 'none',
-                            opacity: isTier3Unlocked ? 1 : 0.65,
-                            transition: 'all 0.3s'
-                          }}>
-                            <div style={{ 
-                              width: '12px', 
-                              height: '12px', 
-                              borderRadius: '50%', 
-                              background: isTier3Unlocked ? '#ef4444' : '#cbd5e1', 
-                              boxShadow: isTier3Unlocked ? '0 0 10px #ef4444' : 'none',
-                              zIndex: 3
-                            }} />
-                            <div style={{ color: isTier3Unlocked ? '#ef4444' : '#94a3b8' }}>
-                              <Flame size={22} fill={isTier3Unlocked ? 'currentColor' : 'none'} />
-                            </div>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '0.95rem', fontWeight: 900, color: isTier3Unlocked ? '#991b1b' : '#475569' }}>
-                                  Helden-Feuer
-                                </span>
-                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: isTier3Unlocked ? '#991b1b' : '#94a3b8' }}>
-                                  9+ Tage • 10 Min.
-                                </span>
-                              </div>
-                              <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>
-                                {isTier3Unlocked ? '🔥 Helden-Feuer aktiv!' : `Noch ${Math.max(1, 9 - streak)} ${Math.max(1, 9 - streak) === 1 ? 'Tag' : 'Tage'} bis Freischaltung`}
-                              </div>
-                            </div>
-                          </div>
-
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                </div>
-              </div>
-
-              {/* QUEST LOG (HAUSAUFGABEN) - GAMIFIED ADVENTURE BOARD */}
-              <div style={{ 
-                background: '#ffffff', 
-                borderRadius: '30px', 
-                padding: '32px', 
-                boxShadow: '0 15px 40px rgba(15, 23, 42, 0.03)',
-                border: '1px solid rgba(0, 0, 0, 0.04)'
-              }}>
+                {/* Spalte 1: Hausaufgaben (Orientieren & Planen) */}
                 {(() => {
                   const currentWeekStr = getISOWeekRaw(new Date(), 1);
                   const prevWeekDate = new Date();
@@ -4946,35 +4663,43 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   const formattedCurrentWeekItems = groupAndFormatItems(currentWeekItems);
 
                   return (
-                    <>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '28px' }}>
-                        <div style={{ background: 'rgba(99, 102, 241, 0.08)', color: '#4f46e5', width: '40px', height: '40px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <BookOpen size={20} />
+                    <div style={{ 
+                      background: '#ffffff', 
+                      borderRadius: '24px', 
+                      padding: '24px', 
+                      boxShadow: '0 10px 30px rgba(15, 23, 42, 0.03)',
+                      border: '1px solid rgba(0, 0, 0, 0.04)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '16px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ background: 'rgba(99, 102, 241, 0.08)', color: '#4f46e5', width: '32px', height: '32px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <BookOpen size={16} />
                         </div>
                         <div>
-                          <h4 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 950, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
+                          <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 950, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                             Hausaufgaben
                           </h4>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            Aktuelle Lernziele der Woche
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            Deine Wochenziele
                           </span>
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-                        
-                        {/* Hausaufgaben dieser Woche (ACTIVE QUESTS) */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, overflowY: 'auto' }}>
+                        {/* Hausaufgaben dieser Woche */}
                         <div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                            <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                              Aktive Abenteuer (KW {currentWeekNum || '?'})
-                            </div>
-                            <span style={{ background: '#e0e7ff', color: '#4f46e5', fontSize: '0.62rem', fontWeight: 900, padding: '2px 8px', borderRadius: '6px' }}>
-                              Laufend
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              Aktuell (KW {currentWeekNum || '?'})
+                            </span>
+                            <span style={{ background: '#e0e7ff', color: '#4f46e5', fontSize: '0.58rem', fontWeight: 900, padding: '1px 6px', borderRadius: '4px' }}>
+                              Aktiv
                             </span>
                           </div>
                           
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             {((formattedCurrentWeekItems && formattedCurrentWeekItems.length > 0) || (currentWeekNotes && currentWeekNotes.length > 0)) ? (
                               <>
                                 {formattedCurrentWeekItems && formattedCurrentWeekItems.map((item: any, idx: number) => {
@@ -4984,34 +4709,20 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   return (
                                     <div key={`curr-item-${idx}`} style={{
                                       background: isDone ? 'rgba(16, 185, 129, 0.02)' : '#ffffff',
-                                      padding: '16px 20px',
-                                      borderRadius: '18px',
+                                      padding: '10px 12px',
+                                      borderRadius: '12px',
                                       border: isDone ? '1px solid rgba(16, 185, 129, 0.15)' : '1px solid rgba(0, 0, 0, 0.04)',
-                                      boxShadow: '0 4px 15px rgba(0,0,0,0.01)',
                                       display: 'flex',
                                       alignItems: 'center',
                                       justifyContent: 'space-between',
-                                      gap: '16px',
-                                      transition: 'all 0.2s'
-                                    }} className="hover-scale">
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', overflow: 'hidden' }}>
-                                        <div style={{ 
-                                          background: isDone ? 'rgba(16, 185, 129, 0.1)' : 'rgba(79, 70, 229, 0.06)', 
-                                          color: isDone ? '#10b981' : '#4f46e5', 
-                                          width: '32px', 
-                                          height: '32px', 
-                                          borderRadius: '10px', 
-                                          display: 'flex', 
-                                          alignItems: 'center', 
-                                          justifyContent: 'center',
-                                          flexShrink: 0
-                                        }}>
-                                          {isBook ? <BookOpen size={16} /> : <Music size={16} />}
-                                        </div>
+                                      gap: '8px'
+                                    }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                                        {isBook ? <BookOpen size={12} color={isDone ? '#10b981' : '#4f46e5'} /> : <Music size={12} color={isDone ? '#10b981' : '#4f46e5'} />}
                                         <span style={{ 
                                           fontWeight: 800, 
-                                          color: isDone ? '#64748b' : '#1e293b', 
-                                          fontSize: '0.88rem', 
+                                          color: isDone ? '#94a3b8' : '#1e293b', 
+                                          fontSize: '0.78rem', 
                                           textDecoration: isDone ? 'line-through' : 'none',
                                           whiteSpace: 'nowrap', 
                                           textOverflow: 'ellipsis', 
@@ -5022,39 +4733,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                       </div>
                                       
                                       {isDone ? (
-                                        <div style={{
-                                          background: 'rgba(16, 185, 129, 0.08)',
-                                          color: '#10b981',
-                                          fontSize: '0.65rem',
-                                          fontWeight: 900,
-                                          borderRadius: '100px',
-                                          padding: '4px 12px',
-                                          textTransform: 'uppercase',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '4px',
-                                          flexShrink: 0
-                                        }}>
-                                          <Check size={10} strokeWidth={3} />
-                                          Quest gelöst
-                                        </div>
+                                        <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                                          <Check size={12} strokeWidth={3} />
+                                        </span>
                                       ) : (
-                                        <div style={{
-                                          background: 'rgba(79, 70, 229, 0.06)',
-                                          color: '#4f46e5',
-                                          fontSize: '0.65rem',
-                                          fontWeight: 900,
-                                          borderRadius: '100px',
-                                          padding: '4px 12px',
-                                          textTransform: 'uppercase',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '4px',
-                                          flexShrink: 0
-                                        }}>
-                                          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4f46e5', animation: 'pulse 1.5s infinite' }} />
-                                          Aktiv
-                                        </div>
+                                        <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#4f46e5', animation: 'pulse 1.5s infinite', flexShrink: 0 }} />
                                       )}
                                     </div>
                                   );
@@ -5062,17 +4745,17 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                                 {currentWeekNotes && currentWeekNotes.map((note: string, idx: number) => (
                                   <div key={`curr-note-${idx}`} style={{ 
-                                    fontSize: '0.85rem', 
+                                    fontSize: '0.78rem', 
                                     color: '#475569', 
                                     fontWeight: 650, 
                                     fontStyle: 'italic', 
-                                    borderLeft: '4px solid #10b981', 
-                                    paddingLeft: '12px', 
-                                    margin: '6px 8px',
-                                    lineHeight: 1.5,
+                                    borderLeft: '3px solid #10b981', 
+                                    paddingLeft: '8px', 
+                                    margin: '2px 4px',
+                                    lineHeight: 1.4,
                                     background: '#f8fafc',
-                                    padding: '8px 12px 8px 16px',
-                                    borderRadius: '0 12px 12px 0'
+                                    padding: '6px 8px',
+                                    borderRadius: '0 8px 8px 0'
                                   }}>
                                     📝 {note}
                                   </div>
@@ -5080,32 +4763,28 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               </>
                             ) : (
                               <div style={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'center',
-                                gap: '6px', 
-                                padding: '24px 0', 
+                                padding: '12px', 
                                 background: '#f8fafc',
-                                borderRadius: '18px',
+                                borderRadius: '12px',
                                 border: '1px dashed #cbd5e1',
-                                fontSize: '0.8rem',
+                                fontSize: '0.75rem',
                                 color: '#94a3b8',
+                                textAlign: 'center',
                                 fontWeight: 700
                               }}>
-                                <BookOpen size={16} />
-                                <span>Noch keine Quests für diese Woche</span>
+                                Keine Aufgaben erfasst
                               </div>
                             )}
                           </div>
                         </div>
 
-                        {/* Hausaufgaben der Vorwoche (COMPLETED ADVENTURES) - Collapsible or sub-styled */}
-                        <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
-                          <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '14px' }}>
-                            Vorherige Abenteuer (KW {prevWeekNum || '?'})
+                        {/* Hausaufgaben der Vorwoche */}
+                        <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                          <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                            Letzte Woche (KW {prevWeekNum || '?'})
                           </div>
                           
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', opacity: 0.65 }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', opacity: 0.7 }}>
                             {((formattedPrevWeekItems && formattedPrevWeekItems.length > 0) || (prevWeekNotes && prevWeekNotes.length > 0)) ? (
                               <>
                                 {formattedPrevWeekItems && formattedPrevWeekItems.map((item: any, idx: number) => {
@@ -5114,79 +4793,324 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   
                                   return (
                                     <div key={`prev-item-${idx}`} style={{
-                                      background: '#ffffff',
-                                      padding: '10px 16px',
-                                      borderRadius: '14px',
-                                      border: '1px solid rgba(0, 0, 0, 0.03)',
-                                      boxShadow: '0 2px 10px rgba(0,0,0,0.01)',
                                       display: 'flex',
                                       alignItems: 'center',
                                       justifyContent: 'space-between',
-                                      gap: '12px'
+                                      fontSize: '0.75rem',
+                                      gap: '8px'
                                     }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
-                                        {isBook ? <BookOpen size={14} color="#94a3b8" /> : <Music size={14} color="#94a3b8" />}
-                                        <span style={{ fontWeight: 800, color: '#64748b', fontSize: '0.8rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+                                        {isBook ? <BookOpen size={11} color="#94a3b8" /> : <Music size={11} color="#94a3b8" />}
+                                        <span style={{ fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                                           {item.title}
                                         </span>
                                       </div>
-                                      {isDone && (
-                                        <span style={{
-                                          background: 'rgba(16, 185, 129, 0.06)',
-                                          color: '#10b981',
-                                          fontSize: '0.6rem',
-                                          fontWeight: 900,
-                                          borderRadius: '100px',
-                                          padding: '2px 8px',
-                                          textTransform: 'uppercase',
-                                          flexShrink: 0
-                                        }}>
-                                          Erledigt
-                                        </span>
-                                      )}
+                                      {isDone && <Check size={10} color="#10b981" strokeWidth={3} />}
                                     </div>
                                   );
                                 })}
                                 {prevWeekNotes && prevWeekNotes.map((note: string, idx: number) => (
                                   <div key={`prev-note-${idx}`} style={{ 
-                                    fontSize: '0.78rem', 
+                                    fontSize: '0.72rem', 
                                     color: '#64748b', 
                                     fontWeight: 650, 
                                     fontStyle: 'italic', 
-                                    borderLeft: '3px solid #cbd5e1', 
-                                    paddingLeft: '10px', 
-                                    margin: '4px 6px',
-                                    lineHeight: 1.4
+                                    borderLeft: '2px solid #cbd5e1', 
+                                    paddingLeft: '6px', 
+                                    margin: '2px 4px',
+                                    lineHeight: 1.3
                                   }}>
                                     {note}
                                   </div>
                                 ))}
                               </>
                             ) : (
-                              <div style={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'center',
-                                gap: '6px', 
-                                padding: '16px 0', 
-                                background: '#f8fafc',
-                                borderRadius: '14px',
-                                border: '1px dashed #e2e8f0',
-                                fontSize: '0.78rem',
-                                color: '#cbd5e1',
-                                fontWeight: 650
-                              }}>
-                                <BookOpen size={14} />
-                                <span>Keine Aufgaben erfasst</span>
+                              <div style={{ fontSize: '0.72rem', color: '#cbd5e1', fontStyle: 'italic' }}>
+                                Keine Aufgaben erfasst
                               </div>
                             )}
                           </div>
                         </div>
-
                       </div>
-                    </>
+                    </div>
                   );
                 })()}
+
+                {/* Spalte 2: Tägliche Übezeit (Tun & Erleben) */}
+                {(() => {
+                  const streak = avatar?.streak_flame || 0;
+                  const requiredMins = streak >= 6 ? 10 : streak >= 3 ? 5 : 3;
+                  return (
+                    <div style={{ 
+                      background: '#ffffff', 
+                      borderRadius: '24px', 
+                      padding: '24px', 
+                      boxShadow: '0 10px 30px rgba(15, 23, 42, 0.03)',
+                      border: '1px solid rgba(0, 0, 0, 0.04)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      gap: '16px'
+                    }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ background: 'rgba(251, 188, 5, 0.12)', color: '#d97706', width: '32px', height: '32px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Zap size={16} fill="currentColor" />
+                          </div>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#64748b', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Dein tägliches Ritual</span>
+                        </div>
+                        <div>
+                          <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                            Tägliche Übezeit
+                          </h4>
+                          <p style={{ margin: '6px 0 0 0', fontSize: '0.78rem', color: '#64748b', lineHeight: 1.45 }}>
+                            Schön, dass du da bist! Lass uns gemeinsam Musik machen. Jede Minute, die du heute übst, stärkt deine Superkräfte am Instrument und bringt dich deinen Zielen ein Stück näher. 🎸✨
+                          </p>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ 
+                          background: 'rgba(251, 188, 5, 0.05)', 
+                          borderRadius: '12px', 
+                          padding: '10px 14px', 
+                          border: '1px dashed rgba(251, 188, 5, 0.3)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          alignSelf: 'stretch'
+                        }}>
+                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', animation: 'pulse 1.5s infinite' }} />
+                          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#854d0e' }}>
+                            Ziel für heute: Mindestens {requiredMins} Min. üben
+                          </span>
+                        </div>
+
+                        <button 
+                          onClick={() => setActiveTab('practice_board')}
+                          style={{ 
+                            background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', 
+                            color: 'white', 
+                            border: 'none', 
+                            borderRadius: '12px', 
+                            padding: '12px 20px', 
+                            fontWeight: 900, 
+                            fontSize: '0.85rem', 
+                            cursor: 'pointer', 
+                            display: 'flex', 
+                            justifyContent: 'center', 
+                            alignItems: 'center', 
+                            gap: '8px', 
+                            boxShadow: '0 8px 20px rgba(79, 70, 229, 0.2)',
+                            transition: 'all 0.2s',
+                            width: '100%'
+                          }}
+                          onMouseOver={e => {
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                            e.currentTarget.style.boxShadow = '0 10px 25px rgba(79, 70, 229, 0.3)';
+                          }}
+                          onMouseOut={e => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = '0 8px 20px rgba(79, 70, 229, 0.2)';
+                          }}
+                        >
+                          <Play size={14} fill="white" />
+                          🚀 Üben starten
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Spalte 3: Flammen-Pfad (Reflektieren & Belohnen) */}
+                {(() => {
+                  const streak = avatar?.streak_flame || 0;
+                  
+                  const isTier1Unlocked = streak >= 3;
+                  const isTier2Unlocked = streak >= 6;
+                  const isTier3Unlocked = streak >= 9;
+
+                  return (
+                    <div style={{ 
+                      background: '#ffffff', 
+                      borderRadius: '24px', 
+                      padding: '24px', 
+                      boxShadow: '0 10px 30px rgba(15, 23, 42, 0.03)',
+                      border: '1px solid rgba(0, 0, 0, 0.04)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '16px'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          🔥 Flammen-Pfad
+                        </span>
+                        <span style={{ 
+                          background: streak === 0 
+                            ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' 
+                            : 'linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%)', 
+                          color: streak === 0 ? '#ffffff' : '#ea580c', 
+                          fontSize: '0.75rem', 
+                          fontWeight: 900, 
+                          padding: '3px 10px', 
+                          borderRadius: '100px',
+                          boxShadow: streak === 0 
+                            ? '0 2px 6px rgba(239, 68, 68, 0.15)' 
+                            : '0 2px 6px rgba(234, 88, 12, 0.05)'
+                        }}>
+                          {streak} {streak === 1 ? 'Tag' : 'Tage'}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', position: 'relative', flex: 1, justifyContent: 'center' }}>
+                        {/* Stepper vertical line connector */}
+                        <div style={{
+                          position: 'absolute',
+                          left: '17px',
+                          top: '20px',
+                          bottom: '20px',
+                          width: '2px',
+                          background: '#e2e8f0',
+                          zIndex: 1
+                        }} />
+                        
+                        {/* Dynamic connector overlay based on streak */}
+                        <div style={{
+                          position: 'absolute',
+                          left: '17px',
+                          top: '20px',
+                          height: streak >= 9 ? '100%' : streak >= 6 ? '50%' : streak >= 3 ? '0%' : '0%',
+                          width: '2px',
+                          background: 'linear-gradient(to bottom, #f97316 0%, #ef4444 100%)',
+                          zIndex: 1,
+                          transition: 'height 0.5s ease'
+                        }} />
+
+                        {/* Tier 1 Item */}
+                        <div style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '12px', 
+                          background: '#f8fafc', 
+                          padding: '10px 14px', 
+                          borderRadius: '12px', 
+                          border: '1px solid rgba(0,0,0,0.03)',
+                          zIndex: 2,
+                          boxShadow: isTier1Unlocked ? '0 2px 8px rgba(234, 179, 8, 0.05)' : 'none',
+                          opacity: isTier1Unlocked ? 1 : 0.6,
+                          transition: 'all 0.3s'
+                        }}>
+                          <div style={{ 
+                            width: '8px', 
+                            height: '8px', 
+                            borderRadius: '50%', 
+                            background: isTier1Unlocked ? '#eab308' : '#cbd5e1', 
+                            boxShadow: isTier1Unlocked ? '0 0 8px #eab308' : 'none',
+                            zIndex: 3
+                          }} />
+                          <div style={{ color: isTier1Unlocked ? '#eab308' : '#94a3b8', display: 'flex', alignItems: 'center' }}>
+                            <Flame size={18} fill={isTier1Unlocked ? 'currentColor' : 'none'} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 900, color: isTier1Unlocked ? '#854d0e' : '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                Kleine Flamme
+                              </span>
+                              <span style={{ fontSize: '0.65rem', fontWeight: 800, color: isTier1Unlocked ? '#854d0e' : '#94a3b8', flexShrink: 0 }}>
+                                3+ Tage • 3m
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {isTier1Unlocked ? '🎉 Freigeschaltet!' : `Noch ${Math.max(1, 3 - streak)} ${Math.max(1, 3 - streak) === 1 ? 'Tag' : 'Tage'}`}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Tier 2 Item */}
+                        <div style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '12px', 
+                          background: '#f8fafc', 
+                          padding: '10px 14px', 
+                          borderRadius: '12px', 
+                          border: '1px solid rgba(0,0,0,0.03)',
+                          zIndex: 2,
+                          boxShadow: isTier2Unlocked ? '0 2px 8px rgba(249, 115, 22, 0.05)' : 'none',
+                          opacity: isTier2Unlocked ? 1 : 0.6,
+                          transition: 'all 0.3s'
+                        }}>
+                          <div style={{ 
+                            width: '8px', 
+                            height: '8px', 
+                            borderRadius: '50%', 
+                            background: isTier2Unlocked ? '#f97316' : '#cbd5e1', 
+                            boxShadow: isTier2Unlocked ? '0 0 8px #f97316' : 'none',
+                            zIndex: 3
+                          }} />
+                          <div style={{ color: isTier2Unlocked ? '#f97316' : '#94a3b8', display: 'flex', alignItems: 'center' }}>
+                            <Flame size={18} fill={isTier2Unlocked ? 'currentColor' : 'none'} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 900, color: isTier2Unlocked ? '#9a3412' : '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                Mittlere Flamme
+                              </span>
+                              <span style={{ fontSize: '0.65rem', fontWeight: 800, color: isTier2Unlocked ? '#9a3412' : '#94a3b8', flexShrink: 0 }}>
+                                6+ Tage • 5m
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {isTier2Unlocked ? '🎉 Freigeschaltet!' : `Noch ${Math.max(1, 6 - streak)} ${Math.max(1, 6 - streak) === 1 ? 'Tag' : 'Tage'}`}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Tier 3 Item */}
+                        <div style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '12px', 
+                          background: '#f8fafc', 
+                          padding: '10px 14px', 
+                          borderRadius: '12px', 
+                          border: '1px solid rgba(0,0,0,0.03)',
+                          zIndex: 2,
+                          boxShadow: isTier3Unlocked ? '0 2px 8px rgba(239, 68, 68, 0.05)' : 'none',
+                          opacity: isTier3Unlocked ? 1 : 0.6,
+                          transition: 'all 0.3s'
+                        }}>
+                          <div style={{ 
+                            width: '8px', 
+                            height: '8px', 
+                            borderRadius: '50%', 
+                            background: isTier3Unlocked ? '#ef4444' : '#cbd5e1', 
+                            boxShadow: isTier3Unlocked ? '0 0 8px #ef4444' : 'none',
+                            zIndex: 3
+                          }} />
+                          <div style={{ color: isTier3Unlocked ? '#ef4444' : '#94a3b8', display: 'flex', alignItems: 'center' }}>
+                            <Flame size={18} fill={isTier3Unlocked ? 'currentColor' : 'none'} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 900, color: isTier3Unlocked ? '#991b1b' : '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                Helden-Feuer
+                              </span>
+                              <span style={{ fontSize: '0.65rem', fontWeight: 800, color: isTier3Unlocked ? '#991b1b' : '#94a3b8', flexShrink: 0 }}>
+                                9+ Tage • 10m
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {isTier3Unlocked ? '🔥 Helden-Feuer aktiv!' : `Noch ${Math.max(1, 9 - streak)} ${Math.max(1, 9 - streak) === 1 ? 'Tag' : 'Tage'}`}
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+                  );
+                })()}
+
               </div>
 
             </div>
