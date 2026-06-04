@@ -4619,112 +4619,152 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               {classGoals.length > 0 && (
                 <div style={{
                   background: '#ffffff',
-                  borderRadius: '24px',
-                  padding: '24px',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
-                  border: '1px solid #e2e8f0'
+                  borderRadius: '20px',
+                  padding: '20px 22px',
+                  boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+                  border: '1px solid #e8edf3',
+                  fontFamily: "'Inter', sans-serif"
                 }}>
                   {/* Header */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' }}>
                     <div style={{
-                      width: '32px', height: '32px', borderRadius: '10px',
+                      width: '30px', height: '30px', borderRadius: '8px',
                       background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      flexShrink: 0, boxShadow: '0 4px 10px rgba(16,185,129,0.25)'
+                      flexShrink: 0, boxShadow: '0 3px 8px rgba(16,185,129,0.22)'
                     }}>
-                      <span style={{ fontSize: '1rem' }}>🌱</span>
+                      <span style={{ fontSize: '0.9rem', lineHeight: 1 }}>🌱</span>
                     </div>
                     <div>
-                      <h3 style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1e293b', margin: 0, letterSpacing: '-0.01em' }}>
+                      <h3 style={{
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        color: '#0f172a',
+                        margin: 0,
+                        letterSpacing: '-0.02em',
+                        fontFamily: "'Inter', sans-serif"
+                      }}>
                         Klassen-Übe-Ziel
                       </h3>
-                      <p style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '2px 0 0 0' }}>
+                      <p style={{
+                        fontSize: '0.6rem',
+                        fontWeight: 600,
+                        color: '#94a3b8',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.07em',
+                        margin: '2px 0 0 0',
+                        fontFamily: "'Inter', sans-serif"
+                      }}>
                         Gemeinsam stärker
                       </p>
                     </div>
                   </div>
 
                   {/* Goals */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                     {classGoals.map((goal: any) => {
                       const pct = goal.minutes > 0 ? Math.round((classWeeklyMins / goal.minutes) * 100) : 0;
                       const isDeadlinePassed = goal.deadline ? new Date(goal.deadline) < new Date() : false;
-                      // Crowdfunding: 100% goal sits at 75% of bar width
                       const maxPercentOnBar = 133;
                       const visualWidth = Math.min(100, (pct / maxPercentOnBar) * 100);
                       const isAchieved = pct >= 100;
 
                       return (
                         <div key={goal.id} style={{
-                          background: isAchieved ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' : '#f8fafc',
-                          borderRadius: '16px',
-                          padding: '16px',
-                          border: isAchieved ? '1.5px solid #86efac' : '1px solid #e2e8f0'
+                          background: isAchieved ? '#f0fdf4' : '#f8fafc',
+                          borderRadius: '12px',
+                          padding: '14px 16px',
+                          border: isAchieved ? '1px solid #a7f3d0' : '1px solid #e8edf3'
                         }}>
-                          {/* Goal Title & deadline */}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                            <div>
-                              <div style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a' }}>
-                                {goal.title || 'Wochenziel'}
-                              </div>
-                              {goal.deadline && (
-                                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: isDeadlinePassed ? '#ef4444' : '#64748b', marginTop: '2px' }}>
-                                  ⏱️ bis {new Date(goal.deadline).toLocaleDateString('de-DE')}{isDeadlinePassed ? ' (Abgelaufen)' : ''}
-                                </div>
-                              )}
-                            </div>
+                          {/* Title row */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                             <span style={{
                               fontSize: '0.78rem',
-                              fontWeight: 900,
+                              fontWeight: 600,
+                              color: '#1e293b',
+                              letterSpacing: '-0.01em',
+                              fontFamily: "'Inter', sans-serif"
+                            }}>
+                              {goal.title || 'Wochenziel'}
+                            </span>
+                            <span style={{
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
                               color: isAchieved ? '#059669' : '#0b57d0',
-                              background: isAchieved ? '#dcfce7' : 'rgba(11,87,208,0.08)',
-                              padding: '2px 8px',
-                              borderRadius: '6px'
+                              background: isAchieved ? 'rgba(16,185,129,0.1)' : 'rgba(11,87,208,0.07)',
+                              padding: '1px 7px',
+                              borderRadius: '5px',
+                              letterSpacing: '-0.02em',
+                              fontFamily: "'Inter', sans-serif",
+                              fontFeatureSettings: '"tnum"'
                             }}>
                               {pct}%
                             </span>
                           </div>
 
-                          {/* Minutes label */}
-                          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '8px' }}>
-                            {classWeeklyMins} Min. von {goal.minutes} Min. geübt
-                          </div>
+                          {/* Deadline */}
+                          {goal.deadline && (
+                            <div style={{
+                              fontSize: '0.62rem',
+                              fontWeight: 500,
+                              color: isDeadlinePassed ? '#ef4444' : '#94a3b8',
+                              marginBottom: '10px',
+                              letterSpacing: '0.01em',
+                              fontFamily: "'Inter', sans-serif"
+                            }}>
+                              bis {new Date(goal.deadline).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                              {isDeadlinePassed && <span style={{ marginLeft: '4px', color: '#ef4444' }}>· abgelaufen</span>}
+                            </div>
+                          )}
 
-                          {/* Crowdfunding progress bar */}
-                          <div style={{ position: 'relative', height: '10px', background: '#e2e8f0', borderRadius: '99px', overflow: 'hidden' }}>
+                          {/* Progress bar */}
+                          <div style={{ position: 'relative', height: '7px', background: '#e2e8f0', borderRadius: '99px', overflow: 'hidden', marginBottom: '8px' }}>
                             <div style={{
                               width: `${visualWidth}%`,
                               height: '100%',
                               background: isAchieved
-                                ? 'linear-gradient(90deg, #10b981 0%, #059669 75%, #047857 100%)'
-                                : 'linear-gradient(90deg, #0b57d0 0%, #10b981 100%)',
+                                ? 'linear-gradient(90deg, #34d399 0%, #059669 100%)'
+                                : 'linear-gradient(90deg, #3b82f6 0%, #10b981 100%)',
                               borderRadius: '99px',
-                              transition: 'width 1s cubic-bezier(0.4, 0, 0.2, 1)'
+                              transition: 'width 1.2s cubic-bezier(0.4, 0, 0.2, 1)'
                             }} />
-                            {/* 100% marker line at 75% of bar */}
+                            {/* Goal line at 75% = 100% mark */}
                             <div style={{
                               position: 'absolute', left: '75%', top: 0, bottom: 0,
-                              width: '2px', background: 'rgba(255,255,255,0.9)',
+                              width: '1.5px', background: 'rgba(255,255,255,0.95)',
                               zIndex: 2
                             }} />
                           </div>
 
-                          {/* Achievement banner */}
-                          {isAchieved && (
-                            <div style={{
-                              display: 'flex', alignItems: 'center', gap: '6px',
-                              marginTop: '10px',
-                              background: 'rgba(16,185,129,0.1)',
-                              padding: '7px 10px',
-                              borderRadius: '10px',
-                              border: '1px solid rgba(16,185,129,0.2)'
+                          {/* Minutes sub-label */}
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}>
+                            <span style={{
+                              fontSize: '0.64rem',
+                              fontWeight: 500,
+                              color: '#64748b',
+                              fontFamily: "'Inter', sans-serif",
+                              letterSpacing: '0',
+                              fontFeatureSettings: '"tnum"'
                             }}>
-                              <span style={{ fontSize: '0.9rem' }}>🎉</span>
-                              <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#065f46' }}>
-                                Ziel geknackt! Weiter so!
+                              <span style={{ fontWeight: 700, color: '#334155' }}>{classWeeklyMins}</span> / {goal.minutes} Min.
+                            </span>
+                            {isAchieved && (
+                              <span style={{
+                                fontSize: '0.6rem',
+                                fontWeight: 700,
+                                color: '#059669',
+                                letterSpacing: '0.02em',
+                                fontFamily: "'Inter', sans-serif",
+                                textTransform: 'uppercase'
+                              }}>
+                                ✓ Ziel erreicht
                               </span>
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </div>
                       );
                     })}
