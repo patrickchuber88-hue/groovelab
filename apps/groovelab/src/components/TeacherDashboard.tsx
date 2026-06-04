@@ -4026,81 +4026,96 @@ export function TeacherDashboard({
                 <div style={{ padding: '60px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Briefing wird geladen...</div>
               ) : briefingData ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  {/* AdminLTE style KPI Cards row (Bold Swiss design, now super-compact and strictly one-line) */}
+                  {/* Gamified KPI Cards row */}
                   {!teacher?.sick_until && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '0px' }}>
-                    {/* Heutige Schüler Card (Blue) */}
-                    <div style={{ 
-                      position: 'relative', overflow: 'hidden', background: '#007bff', color: 'white',
-                      borderRadius: '12px', boxShadow: '0 4px 12px rgba(0, 123, 255, 0.06)',
-                      display: 'flex', alignItems: 'center', minHeight: '44px',
-                      transition: 'all 0.25s ease'
-                    }} className="hover-scale">
-                      <div style={{ padding: '8px 12px', position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
-                        <div style={{ fontSize: '1.3rem', fontWeight: 900, lineHeight: 1, fontFamily: "'Urbanist', sans-serif" }}>
-                          {activeLessonsCount}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+
+                      {/* Card 1: Heutige Schüler (Blue) */}
+                      <div style={{
+                        position: 'relative', overflow: 'hidden',
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', color: 'white',
+                        borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.35)',
+                        display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
+                        padding: '14px 16px', boxSizing: 'border-box',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)'
+                      }} className="hover-scale">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Schüler Heute</span>
+                          <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px' }}>
+                            <Users size={13} color="white" />
+                          </div>
                         </div>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, opacity: 0.9, whiteSpace: 'nowrap' }}>Heutige Schüler</div>
-                      </div>
-                      <div style={{ position: 'absolute', top: '50%', right: '12px', transform: 'translateY(-50%)', zIndex: 1, opacity: 0.12, pointerEvents: 'none' }}>
-                        <Users size={20} color="white" />
-                      </div>
-                    </div>
- 
-                    {/* Card 2: Geburtstage Heute (Green) */}
-                    <div style={{ 
-                      position: 'relative', overflow: 'hidden', background: '#28a745', color: 'white',
-                      borderRadius: '12px', boxShadow: '0 4px 12px rgba(40, 167, 69, 0.06)',
-                      display: 'flex', alignItems: 'center', minHeight: '44px',
-                      transition: 'all 0.25s ease'
-                    }} className="hover-scale">
-                      <div style={{ padding: '8px 12px', position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
-                        <div style={{ fontSize: '1.3rem', fontWeight: 900, lineHeight: 1, fontFamily: "'Urbanist', sans-serif" }}>
-                          {birthdaysCount}
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+                          <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{activeLessonsCount}</span>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Std.</span>
                         </div>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, opacity: 0.9, whiteSpace: 'nowrap' }}>Geburtstage Heute</div>
                       </div>
-                      <div style={{ position: 'absolute', top: '50%', right: '12px', transform: 'translateY(-50%)', zIndex: 1, opacity: 0.25, fontSize: '1.2rem', pointerEvents: 'none' }}>
-                        🎂
-                      </div>
-                    </div>
- 
-                    {/* Card 3: Tages-Pensum (Yellow) */}
-                    <div style={{ 
-                      position: 'relative', overflow: 'hidden', background: '#ffc107', color: '#0f172a',
-                      borderRadius: '12px', boxShadow: '0 4px 12px rgba(255, 193, 7, 0.06)',
-                      display: 'flex', alignItems: 'center', minHeight: '44px',
-                      transition: 'all 0.25s ease'
-                    }} className="hover-scale">
-                      <div style={{ padding: '8px 12px', position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
-                        <div style={{ fontSize: '1.2rem', fontWeight: 900, lineHeight: 1, fontFamily: "'Urbanist', sans-serif", color: '#0f172a' }}>
-                          {workloadHoursStr}
+
+                      {/* Card 2: Geburtstage Heute (Green) */}
+                      <div style={{
+                        position: 'relative', overflow: 'hidden',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white',
+                        borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.35)',
+                        display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
+                        padding: '14px 16px', boxSizing: 'border-box',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)'
+                      }} className="hover-scale">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Geburtstage</span>
+                          <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', fontSize: '0.8rem' }}>🎂</div>
                         </div>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, opacity: 0.9, color: '#0f172a', whiteSpace: 'nowrap' }}>Tages-Pensum</div>
-                      </div>
-                      <div style={{ position: 'absolute', top: '50%', right: '12px', transform: 'translateY(-50%)', zIndex: 1, opacity: 0.2, pointerEvents: 'none' }}>
-                        <Clock size={20} color="#0f172a" />
-                      </div>
-                    </div>
- 
-                    {/* Card 4: Ausfälle Heute (Red) */}
-                    <div style={{ 
-                      position: 'relative', overflow: 'hidden', background: '#dc3545', color: 'white',
-                      borderRadius: '12px', boxShadow: '0 4px 12px rgba(220, 53, 69, 0.06)',
-                      display: 'flex', alignItems: 'center', minHeight: '44px',
-                      transition: 'all 0.25s ease'
-                    }} className="hover-scale">
-                      <div style={{ padding: '8px 12px', position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
-                        <div style={{ fontSize: '1.3rem', fontWeight: 900, lineHeight: 1, fontFamily: "'Urbanist', sans-serif" }}>
-                          {cancellationsCount}
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+                          <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{birthdaysCount}</span>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Heute</span>
                         </div>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, opacity: 0.9, whiteSpace: 'nowrap' }}>Ausfälle Heute</div>
                       </div>
-                      <div style={{ position: 'absolute', top: '50%', right: '12px', transform: 'translateY(-50%)', zIndex: 1, opacity: 0.15, pointerEvents: 'none' }}>
-                        <AlertCircle size={20} color="white" />
+
+                      {/* Card 3: Tages-Pensum (Amber) */}
+                      <div style={{
+                        position: 'relative', overflow: 'hidden',
+                        background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: 'white',
+                        borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(245, 158, 11, 0.35)',
+                        display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
+                        padding: '14px 16px', boxSizing: 'border-box',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)'
+                      }} className="hover-scale">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Tages-Pensum</span>
+                          <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px' }}>
+                            <Clock size={13} color="white" />
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+                          <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{workloadHoursStr}</span>
+                        </div>
                       </div>
+
+                      {/* Card 4: Ausfälle Heute (Red) */}
+                      <div style={{
+                        position: 'relative', overflow: 'hidden',
+                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: 'white',
+                        borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.35)',
+                        display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
+                        padding: '14px 16px', boxSizing: 'border-box',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)'
+                      }} className="hover-scale">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ausfälle</span>
+                          <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px' }}>
+                            <AlertCircle size={13} color="white" />
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+                          <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{cancellationsCount}</span>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Heute</span>
+                        </div>
+                      </div>
+
                     </div>
-                  </div>
                   )}
 
                   {/* SCHEDULE & PREP-MIRROR ROW (Two Columns: Left has greeting banner and Schüler Notizen, Right has Tagesplan) */}

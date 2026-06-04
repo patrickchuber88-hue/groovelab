@@ -1367,43 +1367,89 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
               </div>
             </div>
 
-            {/* AdminLTE style KPI Cards row */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' }}>
-              {/* Card 1: Blue */}
-              <div style={{ background: '#007bff', color: '#ffffff', borderRadius: '14px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '76px' }}>
-                <div style={{ padding: '12px 16px', position: 'relative', zIndex: 2 }}>
-                  <div style={{ fontSize: '1.6rem', fontWeight: 900, lineHeight: 1 }}>{sortedTodaySchedules.length}</div>
-                  <div style={{ fontSize: '0.74rem', fontWeight: 700, marginTop: '4px', opacity: 0.9 }}>Heutige Stunden</div>
+            {/* Gamified KPI Cards row */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
+
+              {/* Card 1: Heutige Stunden (Blue) */}
+              <div style={{
+                position: 'relative', overflow: 'hidden',
+                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', color: 'white',
+                borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.4)',
+                display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
+                padding: '14px 16px', boxSizing: 'border-box',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                border: '1px solid rgba(255, 255, 255, 0.12)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Heutige Stunden</span>
+                  <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', fontSize: '0.8rem' }}>📅</div>
                 </div>
-                <div style={{ position: 'absolute', top: '8px', right: '12px', fontSize: '2.2rem', opacity: 0.2, pointerEvents: 'none', zIndex: 1 }}>📅</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+                  <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{sortedTodaySchedules.length}</span>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Std.</span>
+                </div>
               </div>
 
-              {/* Card 2: Green */}
-              <div style={{ background: '#28a745', color: '#ffffff', borderRadius: '14px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '76px' }}>
-                <div style={{ padding: '12px 16px', position: 'relative', zIndex: 2 }}>
-                  <div style={{ fontSize: '1.6rem', fontWeight: 900, lineHeight: 1 }}>{rooms.length ? Math.min(100, Math.round((sortedTodaySchedules.length / 9) * 100)) : 75}%</div>
-                  <div style={{ fontSize: '0.74rem', fontWeight: 700, marginTop: '4px', opacity: 0.9 }}>Cockpit Auslastung</div>
+              {/* Card 2: Cockpit Auslastung (Green) */}
+              <div style={{
+                position: 'relative', overflow: 'hidden',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white',
+                borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.4)',
+                display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
+                padding: '14px 16px', boxSizing: 'border-box',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                border: '1px solid rgba(255, 255, 255, 0.12)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Auslastung</span>
+                  <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', fontSize: '0.8rem' }}>📈</div>
                 </div>
-                <div style={{ position: 'absolute', top: '8px', right: '12px', fontSize: '2.2rem', opacity: 0.2, pointerEvents: 'none', zIndex: 1 }}>📈</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+                  <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{rooms.length ? Math.min(100, Math.round((sortedTodaySchedules.length / 9) * 100)) : 75}</span>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>%</span>
+                </div>
               </div>
 
-              {/* Card 3: Yellow */}
-              <div style={{ background: '#fbbc05', color: '#1f2937', borderRadius: '14px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '76px' }}>
-                <div style={{ padding: '12px 16px', position: 'relative', zIndex: 2 }}>
-                  <div style={{ fontSize: '1.6rem', fontWeight: 900, lineHeight: 1 }}>{notifications.filter(n => !n.resolved).length}</div>
-                  <div style={{ fontSize: '0.74rem', fontWeight: 700, marginTop: '4px', opacity: 0.9 }}>Ausstehende Alerts</div>
+              {/* Card 3: Ausstehende Alerts (Amber) */}
+              <div style={{
+                position: 'relative', overflow: 'hidden',
+                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: 'white',
+                borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(245, 158, 11, 0.4)',
+                display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
+                padding: '14px 16px', boxSizing: 'border-box',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                border: '1px solid rgba(255, 255, 255, 0.12)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Offene Alerts</span>
+                  <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', fontSize: '0.8rem' }}>🔔</div>
                 </div>
-                <div style={{ position: 'absolute', top: '8px', right: '12px', fontSize: '2.2rem', opacity: 0.25, pointerEvents: 'none', zIndex: 1 }}>🔔</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+                  <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{notifications.filter(n => !n.resolved).length}</span>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Offen</span>
+                </div>
               </div>
 
-              {/* Card 4: Red */}
-              <div style={{ background: '#dc3545', color: '#ffffff', borderRadius: '14px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '76px' }}>
-                <div style={{ padding: '12px 16px', position: 'relative', zIndex: 2 }}>
-                  <div style={{ fontSize: '1.6rem', fontWeight: 900, lineHeight: 1 }}>{sortedTodaySchedules.filter(s => s.status === 'canceled_by_student').length}</div>
-                  <div style={{ fontSize: '0.74rem', fontWeight: 700, marginTop: '4px', opacity: 0.9 }}>Abgesagte Termine</div>
+              {/* Card 4: Abgesagte Termine (Red) */}
+              <div style={{
+                position: 'relative', overflow: 'hidden',
+                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: 'white',
+                borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.4)',
+                display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
+                padding: '14px 16px', boxSizing: 'border-box',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                border: '1px solid rgba(255, 255, 255, 0.12)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Abgesagt</span>
+                  <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', fontSize: '0.8rem' }}>✕</div>
                 </div>
-                <div style={{ position: 'absolute', top: '8px', right: '12px', fontSize: '2.2rem', opacity: 0.2, pointerEvents: 'none', zIndex: 1 }}>✕</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+                  <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{sortedTodaySchedules.filter(s => s.status === 'canceled_by_student').length}</span>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Heute</span>
+                </div>
               </div>
+
             </div>
 
             {/* Terminänderungen & Alerts Widget */}
