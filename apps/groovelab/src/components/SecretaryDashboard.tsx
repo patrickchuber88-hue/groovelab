@@ -7882,7 +7882,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                           draggable
                                           onDragStart={() => handleDragStartMatrix(plan.id)}
                                           onClick={() => setSelectedDayPlan(plan)}
-                                          style={{ background: 'white', border: '1px solid #fde68a', borderLeft: '4px solid #f59e0b', borderRadius: '10px', padding: '7px 9px', cursor: 'grab', display: 'flex', flexDirection: 'column', gap: '2px', boxShadow: '0 1px 4px rgba(245,158,11,0.08)', transition: 'all 0.15s' }}
+                                          style={{ background: 'rgba(254, 243, 199, 0.45)', border: '1px solid #fde68a', borderLeft: '4px solid #f59e0b', borderRadius: '10px', padding: '7px 9px', cursor: 'grab', display: 'flex', flexDirection: 'column', gap: '2px', boxShadow: '0 1px 4px rgba(245,158,11,0.08)', transition: 'all 0.15s' }}
                                         >
                                           <span style={{ fontSize: '0.73rem', fontWeight: 800, color: '#92400e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{plan.teacherName}</span>
                                           <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#b45309' }}>{plan.instrument}</span>
@@ -7963,7 +7963,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                                 draggable
                                                 onDragStart={() => handleDragStartMatrix(plan.id)}
                                                 onClick={() => setSelectedDayPlan(plan)}
-                                                style={{ background: hasOverlap ? '#fef2f2' : 'white', border: hasOverlap ? '2px dashed #ef4444' : '1px solid #e2e8f0', borderLeft: hasOverlap ? '4px solid #ef4444' : '4px solid #10b981', borderRadius: '10px', padding: '7px 9px', cursor: 'grab', display: 'flex', flexDirection: 'column', gap: '2px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', transition: 'all 0.15s' }}
+                                                style={{ background: hasOverlap ? 'rgba(254, 226, 226, 0.45)' : 'rgba(220, 252, 231, 0.45)', border: hasOverlap ? '2px dashed #ef4444' : '1px solid #e2e8f0', borderLeft: hasOverlap ? '4px solid #ef4444' : '4px solid #10b981', borderRadius: '10px', padding: '7px 9px', cursor: 'grab', display: 'flex', flexDirection: 'column', gap: '2px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', transition: 'all 0.15s' }}
                                               >
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
                                                   <span style={{ fontSize: '0.73rem', fontWeight: 800, color: hasOverlap ? '#991b1b' : '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

@@ -5789,22 +5789,22 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                   const isSchedule = b.isSchedule;
                                   
                                   // Apple Calendar Color Schemes
-                                  let bg = '#f2f2f7';
+                                  let bg = 'rgba(142, 142, 147, 0.12)';
                                   let textColor = '#48484a';
                                   let leftAccentColor = '#8e8e93';
 
                                   if (isSchedule) {
                                     if (b.isApproved) {
-                                      bg = '#eafaf1';
+                                      bg = 'rgba(52, 199, 89, 0.12)';
                                       textColor = '#1e7a44';
                                       leftAccentColor = '#34c759';
                                     } else {
-                                      bg = '#fff9e6';
+                                      bg = 'rgba(255, 204, 0, 0.15)';
                                       textColor = '#946600';
                                       leftAccentColor = '#ffcc00';
                                     }
                                   } else if (isOwnBooking) {
-                                    bg = '#f6f0ff';
+                                    bg = 'rgba(175, 82, 222, 0.12)';
                                     textColor = '#6d28d9';
                                     leftAccentColor = '#af52de';
                                   }
