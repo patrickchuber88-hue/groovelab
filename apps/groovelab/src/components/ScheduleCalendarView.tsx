@@ -925,14 +925,14 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'scheduled': return { bg: '#dcfce7', border: '#10b981', text: '#065f46' };
+      case 'scheduled': return { bg: 'rgba(220, 252, 231, 0.45)', border: '#10b981', text: '#065f46' };
       case 'cancelled':
       case 'teacher_sick':
       case 'canceled_by_teacher_sick':
-        return { bg: '#fee2e2', border: '#ef4444', text: '#991b1b' };
-      case 'pending_reschedule': return { bg: '#fef3c7', border: '#f59e0b', text: '#92400e' };
-      case 'rescheduled_confirmed': return { bg: '#dcfce7', border: '#10b981', text: '#065f46' };
-      default: return { bg: '#f1f5f9', border: '#cbd5e1', text: '#475569' };
+        return { bg: 'rgba(254, 226, 226, 0.45)', border: '#ef4444', text: '#991b1b' };
+      case 'pending_reschedule': return { bg: 'rgba(254, 243, 199, 0.45)', border: '#f59e0b', text: '#92400e' };
+      case 'rescheduled_confirmed': return { bg: 'rgba(220, 252, 231, 0.45)', border: '#10b981', text: '#065f46' };
+      default: return { bg: 'rgba(241, 245, 249, 0.45)', border: '#cbd5e1', text: '#475569' };
     }
   };
 
@@ -1130,7 +1130,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                   const colors = isBreak 
                     ? { bg: 'rgba(254, 243, 199, 0.5)', border: '#f59e0b', text: '#b45309' } 
                     : isSick 
-                      ? { bg: '#fee2e2', border: '#ef4444', text: '#991b1b' }
+                      ? { bg: 'rgba(254, 226, 226, 0.45)', border: '#ef4444', text: '#991b1b' }
                       : getStatusColor(occ.status);
                   let finalColors = { ...colors };
                   let cardBackground = '';
@@ -1144,11 +1144,11 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                   if (isRescheduled) {
                     const isConfirmed = occ.status === 'rescheduled_confirmed' || occ.student_acknowledged;
                     if (isConfirmed) {
-                      cardBackground = '#fef3c7';
+                      cardBackground = 'rgba(254, 243, 199, 0.45)';
                       finalColors.border = '#10b981';
                       finalColors.text = '#713f12';
                     } else {
-                      cardBackground = '#fef3c7';
+                      cardBackground = 'rgba(254, 243, 199, 0.45)';
                       finalColors.border = '#f59e0b';
                       finalColors.text = '#92400e';
                     }

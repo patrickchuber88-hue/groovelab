@@ -1371,7 +1371,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   handleDropOnBoard(board.id, index);
                               }}
                               style={{ 
-                                background: '#dcfce7', 
+                                background: 'rgba(220, 252, 231, 0.45)', 
                                 border: '1px solid rgba(16, 185, 129, 0.15)',
                                 borderLeft: '3px solid #10b981', 
                                 borderRadius: '10px', 
