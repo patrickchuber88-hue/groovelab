@@ -1410,11 +1410,11 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                 </div>
               </div>
 
-              {/* Card 3: Ausstehende Alerts (Amber) */}
+              {/* Card 3: Ausstehende Alerts (Yellow) */}
               <div style={{
                 position: 'relative', overflow: 'hidden',
-                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: 'white',
-                borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(245, 158, 11, 0.4)',
+                background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: 'white',
+                borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(234, 179, 8, 0.4)',
                 display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
                 padding: '14px 16px', boxSizing: 'border-box',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
