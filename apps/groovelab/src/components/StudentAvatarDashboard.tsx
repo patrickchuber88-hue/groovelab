@@ -3926,123 +3926,150 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             
             {/* LEFT COLUMN */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-              
-              {/* TOP 4 KPIs ROW */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+              {/* TOP 4 KPIs ROW - SLEEK GAMIFIED TILES */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
                 
                 {/* KPI 1: XP */}
                 <div style={{ 
                   position: 'relative', overflow: 'hidden',
-                  background: 'linear-gradient(135deg, #007aff 0%, #0051b3 100%)', color: 'white',
-                  borderRadius: '12px', boxShadow: '0 4px 12px rgba(0, 122, 255, 0.1)',
-                  display: 'flex', alignItems: 'center', minHeight: '40px',
-                  transition: 'all 0.25s ease'
+                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white',
+                  borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.3)',
+                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '90px',
+                  padding: '16px', boxSizing: 'border-box',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)'
                 }} className="hover-scale">
-                  <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box' }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                      <span style={{ fontSize: '1.1rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                        {currentXp || 0}
-                      </span>
-                      <span style={{ fontSize: '0.62rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.04em' }}>XP</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Level XP</span>
+                    <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
+                      <Star size={14} color="white" fill="white" />
                     </div>
-                    <Star size={13} color="white" fill="white" style={{ opacity: 0.9 }} />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                    <span style={{ fontSize: '1.6rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
+                      {currentXp || 0}
+                    </span>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>XP</span>
                   </div>
                 </div>
 
                 {/* KPI 2: Songs */}
                 <div style={{ 
                   position: 'relative', overflow: 'hidden',
-                  background: 'linear-gradient(135deg, #34c759 0%, #20993f 100%)', color: 'white',
-                  borderRadius: '12px', boxShadow: '0 4px 12px rgba(52, 199, 89, 0.1)',
-                  display: 'flex', alignItems: 'center', minHeight: '40px',
-                  transition: 'all 0.25s ease'
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white',
+                  borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.3)',
+                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '90px',
+                  padding: '16px', boxSizing: 'border-box',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)'
                 }} className="hover-scale">
-                  <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box' }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                      <span style={{ fontSize: '1.1rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                        {wrappedData?.monthlyFlashback?.masteredSongsCount || 0}/3
-                      </span>
-                      <span style={{ fontSize: '0.62rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Songs</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Songs</span>
+                    <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
+                      <Award size={14} color="white" />
                     </div>
-                    <Award size={13} color="white" style={{ opacity: 0.9 }} />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                    <span style={{ fontSize: '1.6rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
+                      {wrappedData?.monthlyFlashback?.masteredSongsCount || 0}/3
+                    </span>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>Songs</span>
                   </div>
                 </div>
 
                 {/* KPI 3: Fokus */}
                 <div style={{ 
                   position: 'relative', overflow: 'hidden',
-                  background: 'linear-gradient(135deg, #ffcc00 0%, #d4a000 100%)', color: '#1c1c1e',
-                  borderRadius: '12px', boxShadow: '0 4px 12px rgba(255, 204, 0, 0.1)',
-                  display: 'flex', alignItems: 'center', minHeight: '40px',
-                  transition: 'all 0.25s ease'
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: 'white',
+                  borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(245, 158, 11, 0.3)',
+                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '90px',
+                  padding: '16px', boxSizing: 'border-box',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)'
                 }} className="hover-scale">
-                  <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box' }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                      <span style={{ fontSize: '1.1rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                        {wrappedData?.monthlyFlashback?.focusMinutes || 0}
-                      </span>
-                      <span style={{ fontSize: '0.62rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Min</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Übeminuten</span>
+                    <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
+                      <Clock size={14} color="white" />
                     </div>
-                    <Clock size={13} color="#1c1c1e" style={{ opacity: 0.9 }} />
                   </div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                    <span style={{ fontSize: '1.6rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
+                      {wrappedData?.monthlyFlashback?.focusMinutes || 0}
+                    </span>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>Min</span>
+                  </div>
+                  <span style={{ fontSize: '0.6rem', fontWeight: 700, opacity: 0.7, marginTop: '2px' }}>Fokuszeit gesamt</span>
                 </div>
 
                 {/* KPI 4: Streak */}
                 <div style={{ 
                   position: 'relative', overflow: 'hidden',
-                  background: 'linear-gradient(135deg, #ff3b30 0%, #c92018 100%)', color: 'white',
-                  borderRadius: '12px', boxShadow: '0 4px 12px rgba(255, 59, 48, 0.1)',
-                  display: 'flex', alignItems: 'center', minHeight: '40px',
-                  transition: 'all 0.25s ease'
+                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: 'white',
+                  borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.3)',
+                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '90px',
+                  padding: '16px', boxSizing: 'border-box',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)'
                 }} className="hover-scale">
-                  <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box' }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                      <span style={{ fontSize: '1.1rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                        {avatar?.streak_flame || 0}
-                      </span>
-                      <span style={{ fontSize: '0.62rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Tage</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Tagesserie</span>
+                    <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
+                      <Flame size={14} color="white" fill="white" />
                     </div>
-                    <Flame size={13} color="white" style={{ opacity: 0.9 }} />
                   </div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                    <span style={{ fontSize: '1.6rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
+                      {avatar?.streak_flame || 0}
+                    </span>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>Tage</span>
+                  </div>
+                  <span style={{ fontSize: '0.6rem', fontWeight: 700, opacity: 0.7, marginTop: '2px' }}>Tage in Folge geübt</span>
                 </div>
 
               </div>
 
               {/* Welcome Block */}
               <div style={{
-                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.65) 100%)',
-                backdropFilter: 'blur(20px) saturate(1.6)',
-                WebkitBackdropFilter: 'blur(20px) saturate(1.6)',
-                border: '1px solid rgba(255, 255, 255, 0.8)',
-                borderRadius: '24px',
+                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.5) 100%)',
+                backdropFilter: 'blur(24px) saturate(1.8)',
+                WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
+                border: '1px solid rgba(255, 255, 255, 0.7)',
+                borderRadius: '30px',
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                boxShadow: '0 10px 40px rgba(15, 23, 42, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
+                alignItems: 'stretch',
+                boxShadow: '0 20px 50px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
                 width: '100%',
                 boxSizing: 'border-box',
                 overflow: 'hidden',
                 position: 'relative',
-                padding: '24px 32px 24px 190px'
+                minHeight: '200px'
               }}>
                 {/* Background decorative music note */}
-                <Music size={140} style={{ position: 'absolute', right: '10%', bottom: '-30px', opacity: 0.02, color: '#007aff', pointerEvents: 'none' }} />
+                <Music size={160} style={{ position: 'absolute', right: '5%', bottom: '-40px', opacity: 0.03, color: '#6366f1', pointerEvents: 'none' }} />
 
                 {/* Left Instrument Avatar Sticker Container - Full Height */}
                 <div style={{
-                  position: 'absolute',
-                  top: 0,
-                  bottom: 0,
-                  left: 0,
-                  width: '160px',
-                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.1) 100%)',
-                  backdropFilter: 'blur(10px)',
-                  borderRight: '1px solid rgba(255, 255, 255, 0.6)',
+                  width: '190px',
+                  background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  zIndex: 2
+                  zIndex: 2,
+                  position: 'relative',
+                  overflow: 'hidden',
+                  borderRight: '1px solid rgba(0, 0, 0, 0.1)'
                 }}>
+                  {/* Glowing background behind instrument */}
+                  <div style={{
+                    position: 'absolute',
+                    width: '120px',
+                    height: '120px',
+                    borderRadius: '50%',
+                    background: 'radial-gradient(circle, rgba(99, 102, 241, 0.25) 0%, rgba(99, 102, 241, 0) 70%)',
+                    filter: 'blur(10px)',
+                    zIndex: 1
+                  }} />
                   <img 
                     src={
                       studentUser?.photo_url && (
@@ -4065,45 +4092,89 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     style={{ 
                       width: '100%', 
                       height: '100%', 
-                      objectFit: 'cover'
+                      objectFit: 'cover',
+                      zIndex: 2,
+                      transform: 'scale(1.05)',
+                      transition: 'transform 0.5s ease'
                     }} 
+                    className="hover-zoom"
                   />
+                  
+                  {/* Premium evolution indicator */}
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '12px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: 'rgba(255, 255, 255, 0.15)',
+                    backdropFilter: 'blur(8px)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '100px',
+                    padding: '3px 10px',
+                    fontSize: '0.62rem',
+                    fontWeight: 900,
+                    color: '#ffffff',
+                    letterSpacing: '0.05em',
+                    textTransform: 'uppercase',
+                    whiteSpace: 'nowrap',
+                    zIndex: 3
+                  }}>
+                    Lvl {avatar?.evolution_level || 1} • {LEVEL_NAMES[avatar?.instrument_type || 'guitarist']?.[avatar?.evolution_level || 1]?.split(' (')[0] || 'Musiker'}
+                  </div>
                 </div>
 
                 {/* Right Text & Info Column */}
-                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1, zIndex: 2 }}>
-                  {/* Live Clock Badge */}
-                  <div style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    background: '#ffffff',
-                    border: '1px solid rgba(0, 0, 0, 0.04)',
-                    borderRadius: '100px',
-                    padding: '3px 10px',
-                    alignSelf: 'flex-start',
-                    marginBottom: '8px',
-                    flexShrink: 0,
-                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.01)'
-                  }}>
-                    <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }} />
-                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.05em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
-                      {new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} UHR
-                    </span>
+                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0, flex: 1, zIndex: 2, padding: '24px 32px' }}>
+                  {/* Live Clock Badge & Status Indicator */}
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: '#ffffff',
+                      border: '1px solid rgba(0, 0, 0, 0.05)',
+                      borderRadius: '100px',
+                      padding: '4px 12px',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
+                    }}>
+                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }} />
+                      <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#475569', letterSpacing: '0.05em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
+                        {new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} UHR
+                      </span>
+                    </div>
+
+                    <div style={{
+                      background: 'rgba(99, 102, 241, 0.08)',
+                      color: '#4f46e5',
+                      fontSize: '0.6rem',
+                      fontWeight: 900,
+                      borderRadius: '100px',
+                      padding: '4px 10px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      Bereit zum Jammen ⚡️
+                    </div>
                   </div>
 
                   <h3 style={{ 
                     margin: 0, 
-                    fontSize: '26px', 
+                    fontSize: '28px', 
                     fontWeight: 950, 
                     color: '#0f172a', 
                     fontFamily: "'Plus Jakarta Sans', sans-serif", 
-                    lineHeight: 1.15
+                    lineHeight: 1.1,
+                    letterSpacing: '-0.02em'
                   }}>
-                    Hi, <span style={{ color: '#007aff', fontWeight: 900 }}>{studentUser?.first_name || 'Student'}</span>! 👋
+                    Hi, <span style={{ 
+                      background: 'linear-gradient(135deg, #4f46e5 0%, #007aff 100%)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      fontWeight: 950
+                    }}>{studentUser?.first_name || 'Student'}</span>! 👋
                   </h3>
                   
-                  <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#475569', fontWeight: 600, lineHeight: 1.45, maxWidth: '95%' }}>
+                  <p style={{ margin: '8px 0 0 0', fontSize: '0.88rem', color: '#475569', fontWeight: 600, lineHeight: 1.45, maxWidth: '95%' }}>
                     Ein neuer Moment für Musik. Nimm dir heute ein paar Minuten für deine Übungsziele und sichere dir deine tägliche Serie!
                   </p>
 
@@ -4129,9 +4200,20 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       : nextOcc?.id;
   
                     return (
-                      <div style={{ marginTop: '14px', display: 'inline-flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.06)', color: '#10b981', padding: '5px 12px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 800 }}>
-                          <Calendar size={12} color="#10b981" />
+                      <div style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        <div style={{ 
+                          display: 'inline-flex', 
+                          alignItems: 'center', 
+                          gap: '8px', 
+                          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(16, 185, 129, 0.02) 100%)', 
+                          color: '#059669', 
+                          padding: '6px 14px', 
+                          borderRadius: '12px', 
+                          fontSize: '0.75rem', 
+                          fontWeight: 800,
+                          border: '1px solid rgba(16, 185, 129, 0.15)'
+                        }}>
+                          <Calendar size={13} color="#059669" />
                           <span>Nächster Unterricht: {hasToday ? `Heute, ${briefingData.todayLesson.time} Uhr` : (() => {
                             if(!nextOcc) return 'Demnächst';
                             const d = new Date(nextOcc.date);
@@ -4156,147 +4238,344 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               display: 'flex', 
                               alignItems: 'center', 
                               justifyContent: 'center',
-                              background: '#dbeafe', 
-                              color: '#1e40af', 
-                              width: '28px',
-                              height: '28px',
+                              background: '#e0e7ff', 
+                              color: '#4f46e5', 
+                              width: '32px',
+                              height: '32px',
                               borderRadius: '50%',
                               border: 'none',
                               cursor: 'pointer',
                               transition: 'all 0.2s',
-                              flexShrink: 0
+                              flexShrink: 0,
+                              boxShadow: '0 4px 10px rgba(79, 70, 229, 0.1)'
                             }}
-                            onMouseOver={e => e.currentTarget.style.background = '#bfdbfe'}
-                            onMouseOut={e => e.currentTarget.style.background = '#dbeafe'}
+                            onMouseOver={e => e.currentTarget.style.background = '#c7d2fe'}
+                            onMouseOut={e => e.currentTarget.style.background = '#e0e7ff'}
                           >
-                            <MessageSquare size={13} />
+                            <MessageSquare size={14} />
                           </button>
                         )}
                       </div>
                     );
                   })() : (
-                    <div style={{ marginTop: '14px', display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.06)', color: '#10b981', padding: '5px 12px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 800 }}>
-                      <Calendar size={12} color="#10b981" />
+                    <div style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.06)', color: '#10b981', padding: '6px 14px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800 }}>
+                      <Calendar size={13} color="#10b981" />
                       <span>Nächster Unterricht: Demnächst</span>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* ÜBE-ZENTRALE (PRACTICE HUB) */}
+              {/* ÜBE-ZENTRALE (PRACTICE HUB) - GAMIFIED ACTION CENTER */}
               <div style={{ 
                 background: '#ffffff', 
-                borderRadius: '24px', 
-                padding: '28px', 
-                boxShadow: '0 8px 32px rgba(15, 23, 42, 0.02)',
+                borderRadius: '30px', 
+                padding: '32px', 
+                boxShadow: '0 15px 40px rgba(15, 23, 42, 0.03)',
                 border: '1px solid rgba(0, 0, 0, 0.04)',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '20px'
+                gap: '28px'
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
-                  {/* Left Column: Practice trigger */}
-                  <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{ background: 'rgba(251, 188, 5, 0.1)', color: '#eab308', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Zap size={16} fill="currentColor" />
+                
+                {/* PRACTICE GOAL HERO BLOCK */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'stretch', flexWrap: 'wrap', gap: '24px' }}>
+                  
+                  {/* Left: Practice action */}
+                  <div style={{ flex: '1 1 320px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '16px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ background: 'rgba(251, 188, 5, 0.12)', color: '#d97706', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Zap size={18} fill="currentColor" />
+                        </div>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Tägliche Challenge</span>
                       </div>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#64748b', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Daily Focus Target</span>
-                    </div>
-                    <div>
-                      <h4 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                        Übezeit für heute offen
-                      </h4>
-                      <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: '#64748b', lineHeight: 1.45 }}>
-                        Starte jetzt deinen Fokus-Übemodus, um deine Flammen-Serie zu schützen und XP zu sammeln! ⚡️
-                      </p>
+                      <div>
+                        <h4 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
+                          Tägliche Musikzeit
+                        </h4>
+                        <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#64748b', lineHeight: 1.5 }}>
+                          Starte jetzt deine Übe-Session. Jede Minute bringt dich näher ans nächste Level und schützt deine Flamme! ⚡️
+                        </p>
+                      </div>
                     </div>
                     
+                    {/* Modern circular or highlighted quest status */}
+                    <div style={{ 
+                      background: 'rgba(251, 188, 5, 0.05)', 
+                      borderRadius: '16px', 
+                      padding: '12px 16px', 
+                      border: '1px dashed rgba(251, 188, 5, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      alignSelf: 'flex-start'
+                    }}>
+                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#f59e0b', animation: 'pulse 1.5s infinite' }} />
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#854d0e' }}>
+                        Ziel für heute: Mindestens 10 Min. üben
+                      </span>
+                    </div>
+
                     <button 
                       onClick={() => setActiveTab('practice_board')}
                       style={{ 
-                        background: 'linear-gradient(135deg, #007aff 0%, #0051b3 100%)', 
+                        background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', 
                         color: 'white', 
                         border: 'none', 
-                        borderRadius: '14px', 
-                        padding: '12px 20px', 
-                        fontWeight: 800, 
-                        fontSize: '0.85rem', 
+                        borderRadius: '16px', 
+                        padding: '14px 28px', 
+                        fontWeight: 900, 
+                        fontSize: '0.9rem', 
                         cursor: 'pointer', 
                         display: 'inline-flex', 
                         justifyContent: 'center', 
                         alignItems: 'center', 
-                        gap: '8px', 
-                        boxShadow: '0 8px 20px rgba(0, 122, 255, 0.15)',
+                        gap: '10px', 
+                        boxShadow: '0 10px 25px rgba(79, 70, 229, 0.25)',
                         transition: 'all 0.2s',
                         alignSelf: 'flex-start',
-                        marginTop: '4px'
+                        marginTop: '8px'
                       }}
-                      onMouseOver={e => e.currentTarget.style.transform = 'translateY(-1px)'}
-                      onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
+                      onMouseOver={e => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 12px 30px rgba(79, 70, 229, 0.35)';
+                      }}
+                      onMouseOut={e => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 10px 25px rgba(79, 70, 229, 0.25)';
+                      }}
                     >
+                      <Play size={16} fill="white" />
                       🚀 Üben starten
                     </button>
                   </div>
 
-                  {/* Right Column: Flame Level Timeline */}
-                  <div style={{ flex: '1 1 280px', display: 'flex', flexDirection: 'column', gap: '12px', background: '#f8fafc', padding: '16px', borderRadius: '18px', border: '1px solid rgba(0,0,0,0.02)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e293b' }}>🔥 Level-Serie</span>
-                      <span style={{ background: '#ffedd5', color: '#ea580c', fontSize: '0.72rem', fontWeight: 900, padding: '3px 10px', borderRadius: '100px' }}>
-                        {avatar?.streak_flame || 0} Tage
-                      </span>
-                    </div>
+                  {/* Right: Gamified Level Timeline (Stepper) */}
+                  {(() => {
+                    const streak = avatar?.streak_flame || 0;
+                    
+                    // Determine which tiers are unlocked
+                    const isTier1Unlocked = streak >= 3;
+                    const isTier2Unlocked = streak >= 6;
+                    const isTier3Unlocked = streak >= 9;
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      {/* Kleine Flamme */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#ffffff', padding: '8px 12px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.03)' }}>
-                        <div style={{ color: '#eab308' }}><Flame size={16} fill="currentColor" /></div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#854d0e' }}>Kleine Flamme</div>
-                          <div style={{ fontSize: '0.6rem', color: '#94a3b8' }}>Stufe 1 (3+ Tage) | 3 Min.</div>
+                    return (
+                      <div style={{ 
+                        flex: '1 1 300px', 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: '16px', 
+                        background: '#f8fafc', 
+                        padding: '24px', 
+                        borderRadius: '24px', 
+                        border: '1px solid rgba(0,0,0,0.02)',
+                        position: 'relative'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            🔥 Flammen-Pfad
+                          </span>
+                          <span style={{ 
+                            background: 'linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%)', 
+                            color: '#ea580c', 
+                            fontSize: '0.75rem', 
+                            fontWeight: 900, 
+                            padding: '4px 12px', 
+                            borderRadius: '100px',
+                            boxShadow: '0 2px 6px rgba(234, 88, 12, 0.05)'
+                          }}>
+                            {streak} {streak === 1 ? 'Tag' : 'Tage'} Serie
+                          </span>
                         </div>
-                      </div>
-                      
-                      {/* Mittlere Flamme */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#ffffff', padding: '8px 12px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.03)' }}>
-                        <div style={{ color: '#f97316' }}><Flame size={16} fill="currentColor" /></div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#9a3412' }}>Mittlere Flamme</div>
-                          <div style={{ fontSize: '0.6rem', color: '#94a3b8' }}>Stufe 2 (6+ Tage) | 5 Min.</div>
-                        </div>
-                      </div>
 
-                      {/* Helden-Feuer */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#ffffff', padding: '8px 12px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.03)' }}>
-                        <div style={{ color: '#ef4444' }}><Flame size={16} fill="currentColor" /></div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#991b1b' }}>Helden-Feuer</div>
-                          <div style={{ fontSize: '0.6rem', color: '#94a3b8' }}>Stufe 3 (9+ Tage) | 10 Min.</div>
+                        {/* Visual Path Stepper */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', position: 'relative', marginTop: '4px' }}>
+                          
+                          {/* Stepper vertical line connector */}
+                          <div style={{
+                            position: 'absolute',
+                            left: '20px',
+                            top: '24px',
+                            bottom: '24px',
+                            width: '3px',
+                            background: '#e2e8f0',
+                            zIndex: 1
+                          }} />
+                          
+                          {/* Dynamic connector overlay based on streak */}
+                          <div style={{
+                            position: 'absolute',
+                            left: '20px',
+                            top: '24px',
+                            height: streak >= 9 ? '100%' : streak >= 6 ? '50%' : streak >= 3 ? '0%' : '0%',
+                            width: '3px',
+                            background: 'linear-gradient(to bottom, #f97316 0%, #ef4444 100%)',
+                            zIndex: 1,
+                            transition: 'height 0.5s ease'
+                          }} />
+
+                          {/* Tier 1 Item */}
+                          <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '16px', 
+                            background: '#ffffff', 
+                            padding: '12px 16px', 
+                            borderRadius: '16px', 
+                            border: '1px solid rgba(0,0,0,0.03)',
+                            zIndex: 2,
+                            boxShadow: isTier1Unlocked ? '0 4px 12px rgba(234, 179, 8, 0.08)' : 'none',
+                            opacity: isTier1Unlocked ? 1 : 0.65,
+                            transition: 'all 0.3s'
+                          }}>
+                            <div style={{ 
+                              width: '10px', 
+                              height: '10px', 
+                              borderRadius: '50%', 
+                              background: isTier1Unlocked ? '#eab308' : '#cbd5e1', 
+                              boxShadow: isTier1Unlocked ? '0 0 10px #eab308' : 'none',
+                              zIndex: 3
+                            }} />
+                            <div style={{ color: isTier1Unlocked ? '#eab308' : '#94a3b8' }}>
+                              <Flame size={20} fill={isTier1Unlocked ? 'currentColor' : 'none'} />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.8rem', fontWeight: 900, color: isTier1Unlocked ? '#854d0e' : '#475569' }}>
+                                  Kleine Flamme
+                                </span>
+                                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: isTier1Unlocked ? '#854d0e' : '#94a3b8' }}>
+                                  3+ Tage • 3 Min.
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '2px' }}>
+                                {isTier1Unlocked ? '🎉 Freigeschaltet!' : `Noch ${Math.max(1, 3 - streak)} ${Math.max(1, 3 - streak) === 1 ? 'Tag' : 'Tage'} bis Freischaltung`}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Tier 2 Item */}
+                          <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '16px', 
+                            background: '#ffffff', 
+                            padding: '12px 16px', 
+                            borderRadius: '16px', 
+                            border: '1px solid rgba(0,0,0,0.03)',
+                            zIndex: 2,
+                            boxShadow: isTier2Unlocked ? '0 4px 12px rgba(249, 115, 22, 0.08)' : 'none',
+                            opacity: isTier2Unlocked ? 1 : 0.65,
+                            transition: 'all 0.3s'
+                          }}>
+                            <div style={{ 
+                              width: '10px', 
+                              height: '10px', 
+                              borderRadius: '50%', 
+                              background: isTier2Unlocked ? '#f97316' : '#cbd5e1', 
+                              boxShadow: isTier2Unlocked ? '0 0 10px #f97316' : 'none',
+                              zIndex: 3
+                            }} />
+                            <div style={{ color: isTier2Unlocked ? '#f97316' : '#94a3b8' }}>
+                              <Flame size={20} fill={isTier2Unlocked ? 'currentColor' : 'none'} />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.8rem', fontWeight: 900, color: isTier2Unlocked ? '#9a3412' : '#475569' }}>
+                                  Mittlere Flamme
+                                </span>
+                                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: isTier2Unlocked ? '#9a3412' : '#94a3b8' }}>
+                                  6+ Tage • 5 Min.
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '2px' }}>
+                                {isTier2Unlocked ? '🎉 Freigeschaltet!' : `Noch ${Math.max(1, 6 - streak)} ${Math.max(1, 6 - streak) === 1 ? 'Tag' : 'Tage'} bis Freischaltung`}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Tier 3 Item */}
+                          <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '16px', 
+                            background: '#ffffff', 
+                            padding: '12px 16px', 
+                            borderRadius: '16px', 
+                            border: '1px solid rgba(0,0,0,0.03)',
+                            zIndex: 2,
+                            boxShadow: isTier3Unlocked ? '0 4px 12px rgba(239, 68, 68, 0.08)' : 'none',
+                            opacity: isTier3Unlocked ? 1 : 0.65,
+                            transition: 'all 0.3s'
+                          }}>
+                            <div style={{ 
+                              width: '10px', 
+                              height: '10px', 
+                              borderRadius: '50%', 
+                              background: isTier3Unlocked ? '#ef4444' : '#cbd5e1', 
+                              boxShadow: isTier3Unlocked ? '0 0 10px #ef4444' : 'none',
+                              zIndex: 3
+                            }} />
+                            <div style={{ color: isTier3Unlocked ? '#ef4444' : '#94a3b8' }}>
+                              <Flame size={20} fill={isTier3Unlocked ? 'currentColor' : 'none'} />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.8rem', fontWeight: 900, color: isTier3Unlocked ? '#991b1b' : '#475569' }}>
+                                  Helden-Feuer
+                                </span>
+                                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: isTier3Unlocked ? '#991b1b' : '#94a3b8' }}>
+                                  9+ Tage • 10 Min.
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '2px' }}>
+                                {isTier3Unlocked ? '🔥 Helden-Feuer aktiv!' : `Noch ${Math.max(1, 9 - streak)} ${Math.max(1, 9 - streak) === 1 ? 'Tag' : 'Tage'} bis Freischaltung`}
+                              </div>
+                            </div>
+                          </div>
+
                         </div>
                       </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
+
                 </div>
 
-                {/* Footer inputs (Test Controls) */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem', color: '#64748b', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
-                  <span>👍 Joker bereit</span>
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.62rem', color: '#94a3b8' }}>Test:</span>
-                    <select style={{ border: '1px solid #e2e8f0', borderRadius: '4px', padding: '2px 4px', fontSize: '0.65rem', background: '#ffffff' }}><option>Tag 0</option></select>
-                    <select style={{ border: '1px solid #e2e8f0', borderRadius: '4px', padding: '2px 4px', fontSize: '0.65rem', background: '#ffffff' }}><option>0 Fehl</option></select>
-                    <button style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '2px 6px', fontSize: '0.65rem', fontWeight: 600, cursor: 'pointer' }}>Real Geübt</button>
+                {/* Footer inputs (Test Controls) Styled nicely as a developer console */}
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  fontSize: '0.68rem', 
+                  color: '#64748b', 
+                  borderTop: '1px solid #f1f5f9', 
+                  paddingTop: '16px',
+                  background: '#f8fafc',
+                  margin: '0 -32px -32px -32px',
+                  padding: '16px 32px',
+                  borderBottomLeftRadius: '30px',
+                  borderBottomRightRadius: '30px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} />
+                    <span style={{ fontWeight: 800, color: '#475569' }}>Joker bereit</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.62rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Console:</span>
+                    <select style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '3px 6px', fontSize: '0.65rem', background: '#ffffff', fontWeight: 700, color: '#475569' }}><option>Tag 0</option></select>
+                    <select style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '3px 6px', fontSize: '0.65rem', background: '#ffffff', fontWeight: 700, color: '#475569' }}><option>0 Fehl</option></select>
+                    <button style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '3px 10px', fontSize: '0.65rem', fontWeight: 800, color: '#475569', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>Real Geübt</button>
                   </div>
                 </div>
               </div>
 
-              {/* QUEST LOG (HAUSAUFGABEN) */}
+              {/* QUEST LOG (HAUSAUFGABEN) - GAMIFIED ADVENTURE BOARD */}
               <div style={{ 
                 background: '#ffffff', 
-                borderRadius: '24px', 
-                padding: '28px', 
-                boxShadow: '0 8px 32px rgba(15, 23, 42, 0.02)',
+                borderRadius: '30px', 
+                padding: '32px', 
+                boxShadow: '0 15px 40px rgba(15, 23, 42, 0.03)',
                 border: '1px solid rgba(0, 0, 0, 0.04)'
               }}>
                 {(() => {
@@ -4431,50 +4710,194 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                   return (
                     <>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px' }}>
-                        <div style={{ background: 'rgba(16, 185, 129, 0.08)', color: '#10b981', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <BookOpen size={18} />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '28px' }}>
+                        <div style={{ background: 'rgba(99, 102, 241, 0.08)', color: '#4f46e5', width: '40px', height: '40px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <BookOpen size={20} />
                         </div>
-                        <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                          Deine Quests für diese Woche
-                        </h4>
+                        <div>
+                          <h4 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 950, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
+                            Deine Quests (Hausaufgaben)
+                          </h4>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            Aktuelle Lernziele der Woche
+                          </span>
+                        </div>
                       </div>
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                        {/* Hausaufgaben der Vorwoche */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+                        
+                        {/* Hausaufgaben dieser Woche (ACTIVE QUESTS) */}
                         <div>
-                          <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
-                            Vorherige Quests (KW {prevWeekNum || '?'})
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                            <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                              Aktive Abenteuer (KW {currentWeekNum || '?'})
+                            </div>
+                            <span style={{ background: '#e0e7ff', color: '#4f46e5', fontSize: '0.62rem', fontWeight: 900, padding: '2px 8px', borderRadius: '6px' }}>
+                              Laufend
+                            </span>
                           </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {((formattedCurrentWeekItems && formattedCurrentWeekItems.length > 0) || (currentWeekNotes && currentWeekNotes.length > 0)) ? (
+                              <>
+                                {formattedCurrentWeekItems && formattedCurrentWeekItems.map((item: any, idx: number) => {
+                                  const isBook = item.isBook;
+                                  const isDone = item.status === 'MASTERED' || item.status === 'THEORY_DONE';
+                                  
+                                  return (
+                                    <div key={`curr-item-${idx}`} style={{
+                                      background: isDone ? 'rgba(16, 185, 129, 0.02)' : '#ffffff',
+                                      padding: '16px 20px',
+                                      borderRadius: '18px',
+                                      border: isDone ? '1px solid rgba(16, 185, 129, 0.15)' : '1px solid rgba(0, 0, 0, 0.04)',
+                                      boxShadow: '0 4px 15px rgba(0,0,0,0.01)',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      gap: '16px',
+                                      transition: 'all 0.2s'
+                                    }} className="hover-scale">
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', overflow: 'hidden' }}>
+                                        <div style={{ 
+                                          background: isDone ? 'rgba(16, 185, 129, 0.1)' : 'rgba(79, 70, 229, 0.06)', 
+                                          color: isDone ? '#10b981' : '#4f46e5', 
+                                          width: '32px', 
+                                          height: '32px', 
+                                          borderRadius: '10px', 
+                                          display: 'flex', 
+                                          alignItems: 'center', 
+                                          justifyContent: 'center',
+                                          flexShrink: 0
+                                        }}>
+                                          {isBook ? <BookOpen size={16} /> : <Music size={16} />}
+                                        </div>
+                                        <span style={{ 
+                                          fontWeight: 800, 
+                                          color: isDone ? '#64748b' : '#1e293b', 
+                                          fontSize: '0.88rem', 
+                                          textDecoration: isDone ? 'line-through' : 'none',
+                                          whiteSpace: 'nowrap', 
+                                          textOverflow: 'ellipsis', 
+                                          overflow: 'hidden' 
+                                        }}>
+                                          {item.title}
+                                        </span>
+                                      </div>
+                                      
+                                      {isDone ? (
+                                        <div style={{
+                                          background: 'rgba(16, 185, 129, 0.08)',
+                                          color: '#10b981',
+                                          fontSize: '0.65rem',
+                                          fontWeight: 900,
+                                          borderRadius: '100px',
+                                          padding: '4px 12px',
+                                          textTransform: 'uppercase',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          flexShrink: 0
+                                        }}>
+                                          <Check size={10} strokeWidth={3} />
+                                          Quest gelöst
+                                        </div>
+                                      ) : (
+                                        <div style={{
+                                          background: 'rgba(79, 70, 229, 0.06)',
+                                          color: '#4f46e5',
+                                          fontSize: '0.65rem',
+                                          fontWeight: 900,
+                                          borderRadius: '100px',
+                                          padding: '4px 12px',
+                                          textTransform: 'uppercase',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          flexShrink: 0
+                                        }}>
+                                          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4f46e5', animation: 'pulse 1.5s infinite' }} />
+                                          Aktiv
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+
+                                {currentWeekNotes && currentWeekNotes.map((note: string, idx: number) => (
+                                  <div key={`curr-note-${idx}`} style={{ 
+                                    fontSize: '0.85rem', 
+                                    color: '#475569', 
+                                    fontWeight: 650, 
+                                    fontStyle: 'italic', 
+                                    borderLeft: '4px solid #10b981', 
+                                    paddingLeft: '12px', 
+                                    margin: '6px 8px',
+                                    lineHeight: 1.5,
+                                    background: '#f8fafc',
+                                    padding: '8px 12px 8px 16px',
+                                    borderRadius: '0 12px 12px 0'
+                                  }}>
+                                    📝 {note}
+                                  </div>
+                                ))}
+                              </>
+                            ) : (
+                              <div style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center',
+                                gap: '6px', 
+                                padding: '24px 0', 
+                                background: '#f8fafc',
+                                borderRadius: '18px',
+                                border: '1px dashed #cbd5e1',
+                                fontSize: '0.8rem',
+                                color: '#94a3b8',
+                                fontWeight: 700
+                              }}>
+                                <BookOpen size={16} />
+                                <span>Noch keine Quests für diese Woche</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Hausaufgaben der Vorwoche (COMPLETED ADVENTURES) - Collapsible or sub-styled */}
+                        <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
+                          <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '14px' }}>
+                            Vorherige Abenteuer (KW {prevWeekNum || '?'})
+                          </div>
+                          
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', opacity: 0.65 }}>
                             {((formattedPrevWeekItems && formattedPrevWeekItems.length > 0) || (prevWeekNotes && prevWeekNotes.length > 0)) ? (
                               <>
                                 {formattedPrevWeekItems && formattedPrevWeekItems.map((item: any, idx: number) => {
                                   const isBook = item.isBook;
+                                  const isDone = item.status === 'MASTERED' || item.status === 'THEORY_DONE';
+                                  
                                   return (
                                     <div key={`prev-item-${idx}`} style={{
                                       background: '#ffffff',
-                                      padding: '12px 16px',
+                                      padding: '10px 16px',
                                       borderRadius: '14px',
                                       border: '1px solid rgba(0, 0, 0, 0.03)',
                                       boxShadow: '0 2px 10px rgba(0,0,0,0.01)',
                                       display: 'flex',
                                       alignItems: 'center',
                                       justifyContent: 'space-between',
-                                      gap: '12px',
-                                      opacity: 0.75
+                                      gap: '12px'
                                     }}>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
-                                        {isBook ? <BookOpen size={15} color="#94a3b8" /> : <Music size={15} color="#94a3b8" />}
-                                        <span style={{ fontWeight: 800, color: '#64748b', fontSize: '0.82rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                        {isBook ? <BookOpen size={14} color="#94a3b8" /> : <Music size={14} color="#94a3b8" />}
+                                        <span style={{ fontWeight: 800, color: '#64748b', fontSize: '0.8rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                                           {item.title}
                                         </span>
                                       </div>
-                                      {(item.status === 'MASTERED' || item.status === 'THEORY_DONE') && (
+                                      {isDone && (
                                         <span style={{
                                           background: 'rgba(16, 185, 129, 0.06)',
                                           color: '#10b981',
-                                          fontSize: '0.62rem',
+                                          fontSize: '0.6rem',
                                           fontWeight: 900,
                                           borderRadius: '100px',
                                           padding: '2px 8px',
@@ -4491,91 +4914,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   <div key={`prev-note-${idx}`} style={{ 
                                     fontSize: '0.78rem', 
                                     color: '#64748b', 
-                                    fontWeight: 600, 
-                                    fontStyle: 'italic', 
-                                    borderLeft: '3px solid #cbd5e1', 
-                                    paddingLeft: '10px', 
-                                    margin: '4px 6px',
-                                    lineHeight: 1.4,
-                                    opacity: 0.75
-                                  }}>
-                                    {note}
-                                  </div>
-                                ))}
-                              </>
-                            ) : (
-                              <div style={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'center',
-                                gap: '6px', 
-                                padding: '16px 0', 
-                                background: '#f8fafc',
-                                borderRadius: '14px',
-                                border: '1px dashed #e2e8f0',
-                                fontSize: '0.78rem',
-                                color: '#cbd5e1',
-                                fontWeight: 650
-                              }}>
-                                <BookOpen size={14} />
-                                <span>Keine Aufgaben erfasst</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Hausaufgaben dieser Woche */}
-                        <div>
-                          <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
-                            Aktive Quests (KW {currentWeekNum || '?'})
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            {((formattedCurrentWeekItems && formattedCurrentWeekItems.length > 0) || (currentWeekNotes && currentWeekNotes.length > 0)) ? (
-                              <>
-                                {formattedCurrentWeekItems && formattedCurrentWeekItems.map((item: any, idx: number) => {
-                                  const isBook = item.isBook;
-                                  return (
-                                    <div key={`curr-item-${idx}`} style={{
-                                      background: '#ffffff',
-                                      padding: '12px 16px',
-                                      borderRadius: '14px',
-                                      border: '1px solid rgba(0, 0, 0, 0.04)',
-                                      boxShadow: '0 4px 15px rgba(0,0,0,0.01)',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'space-between',
-                                      gap: '12px'
-                                    }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
-                                        {isBook ? <BookOpen size={15} color="#007aff" /> : <Music size={15} color="#007aff" />}
-                                        <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.82rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                          {item.title}
-                                        </span>
-                                      </div>
-                                      {(item.status === 'MASTERED' || item.status === 'THEORY_DONE') && (
-                                        <span style={{
-                                          background: 'rgba(16, 185, 129, 0.08)',
-                                          color: '#10b981',
-                                          fontSize: '0.62rem',
-                                          fontWeight: 900,
-                                          borderRadius: '100px',
-                                          padding: '3px 10px',
-                                          textTransform: 'uppercase',
-                                          flexShrink: 0
-                                        }}>
-                                          Erledigt
-                                        </span>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                                {currentWeekNotes && currentWeekNotes.map((note: string, idx: number) => (
-                                  <div key={`curr-note-${idx}`} style={{ 
-                                    fontSize: '0.8rem', 
-                                    color: '#475569', 
                                     fontWeight: 650, 
                                     fontStyle: 'italic', 
-                                    borderLeft: '3px solid #10b981', 
+                                    borderLeft: '3px solid #cbd5e1', 
                                     paddingLeft: '10px', 
                                     margin: '4px 6px',
                                     lineHeight: 1.4
@@ -4604,6 +4945,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             )}
                           </div>
                         </div>
+
                       </div>
                     </>
                   );
@@ -4611,6 +4953,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               </div>
 
             </div>
+
 
             {/* RIGHT COLUMN */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
