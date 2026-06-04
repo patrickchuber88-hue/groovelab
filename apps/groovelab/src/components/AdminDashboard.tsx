@@ -6431,14 +6431,14 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                       }}
                                       title={b.isPreview ? `Vorschau: ${b.purpose} (${b.startTime} - ${b.endTime})` : `${b.purpose} (${b.startTime} - ${b.endTime}) - ${b.teacherName}`}
                                       style={{
-                                        background: bg,
-                                        border: b.isPreview ? `2.2px dashed ${leftAccentColor}` : `1px solid ${hasConflict ? '#ff9500' : leftAccentColor + '25'}`,
-                                        borderLeft: b.isPreview ? `2.2px dashed ${leftAccentColor}` : `3px solid ${hasConflict ? '#ff9500' : leftAccentColor}`,
+                                        background: isOwnBooking && !b.isPreview ? leftAccentColor : bg,
+                                        border: b.isPreview ? `2.2px dashed ${leftAccentColor}` : `1px solid ${hasConflict ? '#ff9500' : (isOwnBooking ? 'rgba(255, 255, 255, 0.15)' : leftAccentColor + '25')}`,
+                                        borderLeft: b.isPreview ? `2.2px dashed ${leftAccentColor}` : `3px solid ${hasConflict ? '#ff9500' : (isOwnBooking ? 'rgba(255, 255, 255, 0.45)' : leftAccentColor)}`,
                                         borderRadius: '8px',
                                         padding: '6px 8px',
                                         fontSize: '0.64rem',
                                         fontWeight: 800,
-                                        color: textColor,
+                                        color: isOwnBooking && !b.isPreview ? '#ffffff' : textColor,
                                         position: 'absolute',
                                         top: `calc(${(sm / 60) * 100}% + 4px)`,
                                         left: `calc(${colLeft}% + 4px)`,
