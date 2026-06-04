@@ -181,6 +181,9 @@ interface MobileBriefingViewProps {
   getISOWeek: (date?: string | Date) => string;
   handleTabChangeLocal: (tab: string) => void;
   campusFeedAnnouncements: any[];
+  classWeeklyMins?: number;
+  weeklyTargets?: any[];
+  brandColor?: string;
 }
 
 function MobileBriefingView({
@@ -199,7 +202,10 @@ function MobileBriefingView({
   handleAcknowledgeCancellation,
   getISOWeek,
   handleTabChangeLocal,
-  campusFeedAnnouncements
+  campusFeedAnnouncements,
+  classWeeklyMins = 0,
+  weeklyTargets = [],
+  brandColor = '#16a34a'
 }: MobileBriefingViewProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '4px' }}>
@@ -325,6 +331,81 @@ function MobileBriefingView({
           <span style={{ fontSize: '1.25rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }}>{avatar?.streak_flame || 0} Tage</span>
         </div>
       </div>
+
+      {/* ÜBE-ZIELE DER KLASSE (CROWDFUNDING STYLE) */}
+      {weeklyTargets.length > 0 && (
+        <div style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+            <Target size={16} color={brandColor} />
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Übe-Ziele der Klasse</h3>
+          </div>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {weeklyTargets.map((target: any) => {
+              const targetPercent = Math.round((classWeeklyMins / target.minutes) * 100);
+              const isDeadlinePassed = target.deadline ? new Date(target.deadline) < new Date() : false;
+              
+              // Crowdfunding scale: 100% goal is marked at 75% width
+              const maxPercentOnBar = 133;
+              const visualWidth = Math.min(100, (targetPercent / maxPercentOnBar) * 100);
+
+              return (
+                <div key={target.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>{target.title || 'Wochenziel'}</span>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b' }}>
+                      {Math.round(classWeeklyMins)} / {target.minutes} Min.
+                    </span>
+                  </div>
+                  
+                  {/* Progress Track */}
+                  <div style={{ position: 'relative', width: '100%', height: '14px', background: '#f1f5f9', borderRadius: '7px', overflow: 'hidden' }}>
+                    <div 
+                      style={{ 
+                        width: `${visualWidth}%`, 
+                        height: '100%', 
+                        background: targetPercent >= 100 
+                          ? `linear-gradient(90deg, ${brandColor} 0%, #10b981 75%, #059669 100%)`
+                          : `linear-gradient(90deg, ${brandColor} 0%, #10b981 100%)`,
+                        borderRadius: '7px', 
+                        transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)' 
+                      }} 
+                    />
+                    {/* Goal line */}
+                    <div style={{ position: 'absolute', left: '75%', top: 0, bottom: 0, width: '2px', background: '#ffffff', opacity: 0.8, zIndex: 2 }} />
+                  </div>
+                  
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    {target.deadline ? (
+                      <span style={{ fontSize: '0.64rem', fontWeight: 700, color: isDeadlinePassed ? '#ef4444' : '#64748b' }}>
+                        ⏱️ Bis: {new Date(target.deadline).toLocaleDateString('de-DE')}
+                      </span>
+                    ) : (
+                      <span />
+                    )}
+                    <span style={{ 
+                      fontSize: '0.7rem', 
+                      fontWeight: 900, 
+                      color: targetPercent >= 100 ? '#10b981' : brandColor, 
+                      background: targetPercent >= 100 ? '#dcfce7' : `${brandColor}12`, 
+                      padding: '1px 5px', 
+                      borderRadius: '4px' 
+                    }}>
+                      {targetPercent}% {targetPercent >= 100 && '🚀'}
+                    </span>
+                  </div>
+
+                  {targetPercent >= 100 && (
+                    <div style={{ fontSize: '0.65rem', fontWeight: 750, color: '#15803d', display: 'flex', alignItems: 'center', gap: '3px', background: '#f0fdf4', padding: '4px 8px', borderRadius: '6px', border: '1px solid #dcfce7' }}>
+                      <span>🎉 Ziel erreicht & übererfüllt!</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* HAUSAUFGABEN FITBIT STYLE */}
       <div style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', borderLeft: '6px solid #22c55e' }}>
@@ -802,11 +883,15 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [isPremiumUser, setIsPremiumUser] = useState(false);
   const [avatar, setAvatar] = useState<Avatar | null>(null);
   const [loading, setLoading] = useState(true);
+  const brandColor = studentUser?.schools?.brand_color || '#16a34a';
   const [error, setError] = useState<string | null>(null);
   
   // Selection Screen State
   const [showSelector, setShowSelector] = useState(false);
   const [submittingSelection, setSubmittingSelection] = useState(false);
+
+  const [classWeeklyMins, setClassWeeklyMins] = useState(0);
+  const [weeklyTargets, setWeeklyTargets] = useState<any[]>([]);
 
   // Daily Briefing State
   const [briefingData, setBriefingData] = useState<any>(null);
@@ -1825,6 +1910,42 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         .eq('student_id', studentId)
         .maybeSingle();
       setMonthlyFocusMinutes(statsData?.monthly_focus_minutes || 0);
+
+      // Fetch classmates focus minutes & targets
+      if (user.teacher_id) {
+        try {
+          const { data: classmates } = await supabase
+            .from('users')
+            .select('id')
+            .eq('teacher_id', user.teacher_id)
+            .eq('role', 'student')
+            .eq('school_id', user.school_id);
+          
+          const classmatesIds = classmates?.map(c => c.id) || [studentId];
+          const oneWeekAgo = new Date();
+          oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+          
+          const { data: classmateLogs } = await supabase
+            .from('fokus_logs')
+            .select('duration_minutes')
+            .in('user_id', classmatesIds)
+            .gte('created_at', oneWeekAgo.toISOString());
+            
+          const weeklyMins = classmateLogs?.reduce((sum: number, log: any) => sum + (log.duration_minutes || 0), 0) || 0;
+          setClassWeeklyMins(weeklyMins);
+          
+          const rawTargets = user.schools?.opening_hours?.weekly_targets?.[user.teacher_id];
+          let weeklyTargetsList: any[] = [];
+          if (Array.isArray(rawTargets)) {
+            weeklyTargetsList = rawTargets;
+          } else if (typeof rawTargets === 'number') {
+            weeklyTargetsList = [{ id: 'default', title: 'Wochenziel', minutes: rawTargets, deadline: '' }];
+          }
+          setWeeklyTargets(weeklyTargetsList);
+        } catch (targetErr) {
+          console.error('Error fetching classmate targets/mins:', targetErr);
+        }
+      }
 
       // Fetch announcements matching student's school_id
       try {
@@ -3698,6 +3819,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             getISOWeek={getISOWeek}
             handleTabChangeLocal={handleTabChangeLocal}
             campusFeedAnnouncements={campusFeedAnnouncements}
+            classWeeklyMins={classWeeklyMins}
+            weeklyTargets={weeklyTargets}
+            brandColor={brandColor}
           />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -4272,6 +4396,97 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
             {/* RIGHT COLUMN */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              
+              {/* Übe-Ziele der Klasse (Crowdfunding Style) */}
+              {weeklyTargets.length > 0 && (
+                <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                    <Target size={18} color={brandColor} />
+                    <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Übe-Ziele der Klasse
+                    </h3>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    {weeklyTargets.map((target: any) => {
+                      const targetPercent = Math.round((classWeeklyMins / target.minutes) * 100);
+                      const isDeadlinePassed = target.deadline ? new Date(target.deadline) < new Date() : false;
+                      
+                      // Crowdfunding scale: 100% goal is marked at 75% width
+                      const maxPercentOnBar = 133;
+                      const visualWidth = Math.min(100, (targetPercent / maxPercentOnBar) * 100);
+
+                      return (
+                        <div key={target.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                            <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>
+                              {target.title || 'Wochenziel'}
+                            </span>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 750, color: '#64748b' }}>
+                              {Math.round(classWeeklyMins)} / {target.minutes} Min.
+                            </span>
+                          </div>
+
+                          {/* Progress Track */}
+                          <div style={{ position: 'relative', width: '100%', height: '16px', background: '#f1f5f9', borderRadius: '8px', overflow: 'hidden' }}>
+                            {/* Visual Progress Bar */}
+                            <div 
+                              style={{ 
+                                width: `${visualWidth}%`, 
+                                height: '100%', 
+                                background: targetPercent >= 100 
+                                  ? `linear-gradient(90deg, ${brandColor} 0%, #10b981 75%, #059669 100%)`
+                                  : `linear-gradient(90deg, ${brandColor} 0%, #10b981 100%)`,
+                                borderRadius: '8px', 
+                                transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)' 
+                              }} 
+                            />
+                            
+                            {/* 100% Goal Marker line (at 75% width) */}
+                            <div style={{ 
+                              position: 'absolute', 
+                              left: '75%', 
+                              top: 0, 
+                              bottom: 0, 
+                              width: '2px', 
+                              background: '#ffffff', 
+                              opacity: 0.8,
+                              zIndex: 2 
+                            }} />
+                          </div>
+
+                          {/* Labels and Deadlines */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            {target.deadline ? (
+                              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: isDeadlinePassed ? '#ef4444' : '#64748b' }}>
+                                ⏱️ Bis: {new Date(target.deadline).toLocaleDateString('de-DE')}
+                              </span>
+                            ) : (
+                              <span />
+                            )}
+                            <span style={{ 
+                              fontSize: '0.75rem', 
+                              fontWeight: 900, 
+                              color: targetPercent >= 100 ? '#10b981' : brandColor, 
+                              background: targetPercent >= 100 ? '#dcfce7' : `${brandColor}12`, 
+                              padding: '2px 6px', 
+                              borderRadius: '4px' 
+                            }}>
+                              {targetPercent}% {targetPercent >= 100 && '🚀'}
+                            </span>
+                          </div>
+
+                          {targetPercent >= 100 && (
+                            <div style={{ fontSize: '0.7rem', fontWeight: 750, color: '#15803d', display: 'flex', alignItems: 'center', gap: '4px', background: '#f0fdf4', padding: '6px 10px', borderRadius: '8px', border: '1px solid #dcfce7' }}>
+                              <span>🎉 Ziel erreicht & übererfüllt!</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               
               {/* Nächste Termine */}
               <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
