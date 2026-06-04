@@ -3576,7 +3576,7 @@ export function TeacherDashboard({
             <div>
               {activeTab !== 'live' && (
                 <>
-                  <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>
+                  <h2 style={{ fontSize: '28px', fontWeight: 900, color: '#1e293b', margin: 0 }}>
                     {activeTab === 'students' ? '🎓 Schülerverwaltung' : '👥 Bands'}
                   </h2>
                   <p style={{ color: '#64748b', fontWeight: 600, fontSize: '0.85rem', marginTop: '4px' }}>
@@ -3648,7 +3648,7 @@ export function TeacherDashboard({
                   
                   {/* AdminLTE style KPI Cards row (Bold Swiss design, now super-compact and strictly one-line) */}
                   {!teacher?.sick_until && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '4px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '8px' }}>
                     {/* Heutige Schüler Card (Blue) */}
                     <div style={{ 
                       position: 'relative', overflow: 'hidden', background: '#007bff', color: 'white',
@@ -3770,7 +3770,7 @@ export function TeacherDashboard({
                               <img src={getInstrumentAvatarUrl(teacher?.instrument)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scale(1.15)' }} />
                             </div>
                             <div>
-                              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <h3 style={{ margin: 0, fontSize: '28px', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 {dynamicGreeting.greeting}, <span style={{ 
                                   color: '#007aff', 
                                   fontSize: '1.15rem',
@@ -5344,7 +5344,7 @@ export function TeacherDashboard({
                       flexWrap: 'wrap'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
-                        <h1 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.04em', margin: 0 }}>
+                        <h1 style={{ fontSize: '28px', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.04em', margin: 0 }}>
                           Live Lab
                         </h1>
                         
@@ -7704,7 +7704,7 @@ export function TeacherDashboard({
                    <TrendingUp size={28} />
                  </div>
                  <div>
-                   <h2 style={{ fontSize: '1.75rem', fontWeight: 1000, color: '#0f172a', margin: 0 }}>Vollständige Pipeline</h2>
+                   <h2 style={{ fontSize: '28px', fontWeight: 1000, color: '#0f172a', margin: 0 }}>Vollständige Pipeline</h2>
                    <p style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 600, margin: '4px 0 0 0' }}>{allSubmissions.length} ausstehende Abnahmen</p>
                  </div>
                </div>
