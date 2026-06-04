@@ -6524,18 +6524,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                         </div>
                                       )}
 
-                                      <div style={{ 
-                                        display: 'flex', 
-                                        justifyContent: 'space-between', 
-                                        alignItems: 'center', 
-                                        fontSize: '0.64rem', 
-                                        fontWeight: 800,
-                                        background: isOwnBooking && !b.isPreview ? '#ffffff' : 'rgba(0, 0, 0, 0.04)',
-                                        color: isOwnBooking && !b.isPreview ? '#000000' : textColor,
-                                        padding: '4px 8px',
-                                        margin: '-6px -8px 6px -8px',
-                                        borderBottom: isOwnBooking && !b.isPreview ? 'none' : `1px solid ${leftAccentColor}15`
-                                      }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.64rem', marginBottom: '4px', fontWeight: 800 }}>
                                         <span style={{ display: 'flex', alignItems: 'center' }}>
                                           {isSchedule && <GraduationCap size={10} style={{ marginRight: '3px' }} />}
                                           {b.startTime} - {b.endTime}{b.isPreview && ' (Vorschau)'}
