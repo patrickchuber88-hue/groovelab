@@ -694,6 +694,11 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
   const handleDragStart = (e: React.DragEvent, id: string) => {
     e.dataTransfer.setData('text/plain', id);
     setDraggedId(id);
+    
+    // Save the vertical offset where the card was grabbed
+    const rect = e.currentTarget.getBoundingClientRect();
+    const grabOffset = e.clientY - rect.top;
+    e.dataTransfer.setData('grabOffset', String(grabOffset));
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -705,11 +710,14 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
     const sourceId = e.dataTransfer.getData('text/plain');
     if (!sourceId) return;
 
+    const grabOffsetStr = e.dataTransfer.getData('grabOffset');
+    const grabOffset = grabOffsetStr ? parseFloat(grabOffsetStr) : 0;
+
     const sourceOcc = occurrences.find(o => o.id === sourceId);
     const duration = sourceOcc?.duration || 30;
 
     const rect = e.currentTarget.getBoundingClientRect();
-    const relativeY = e.clientY - rect.top;
+    const relativeY = e.clientY - rect.top - grabOffset;
     const droppedMinutes = dayBaselineMinutes + (relativeY / 2.5);
     const snappedMinutes = Math.min(1440 - duration, Math.max(dayBaselineMinutes, Math.round(droppedMinutes / 15) * 15));
     const hours = Math.floor(snappedMinutes / 60) % 24;
