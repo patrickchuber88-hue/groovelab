@@ -227,10 +227,94 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
   // Campus Bookings states
   const [selectedCampusRoomId, setSelectedCampusRoomId] = useState<string>(() => rooms[0]?.id || '');
-  const [campusBookings, setCampusBookings] = useState<any[]>(() => {
+  const consolidateBookings = (bookings: any[]) => {
+    const timeToMins = (t: string) => {
+      if (!t) return 0;
+      const [h, m] = t.split(':').map(Number);
+      return (h || 0) * 60 + (m || 0);
+    };
+    const minsToTime = (mins: number) => {
+      const h = Math.floor(mins / 60) % 24;
+      const m = mins % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
+
+    // Group bookings by room, date, teacher, and whether it's a schedule
+    const groups: { [key: string]: any[] } = {};
+    bookings.forEach(b => {
+      if (b.isSchedule) return;
+      const key = `${b.roomId}_${b.date}_${b.teacherId}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(b);
+    });
+
+    const processedIds = new Set<string>();
+    const consolidated: any[] = [];
+
+    // Add all weekly schedules as is
+    bookings.filter(b => b.isSchedule).forEach(b => consolidated.push(b));
+
+    // Process groups
+    Object.keys(groups).forEach(key => {
+      const list = groups[key];
+      if (list.length === 0) return;
+
+      // Sort by start time
+      const sorted = [...list].sort((a, b) => timeToMins(a.startTime) - timeToMins(b.startTime));
+      
+      let current = sorted[0];
+      processedIds.add(current.id);
+
+      for (let i = 1; i < sorted.length; i++) {
+        const next = sorted[i];
+        const currentEnd = timeToMins(current.endTime);
+        const nextStart = timeToMins(next.startTime);
+
+        if (currentEnd >= nextStart) {
+          // Merge next into current
+          const nextEnd = timeToMins(next.endTime);
+          const maxEnd = Math.max(currentEnd, nextEnd);
+          current = {
+            ...current,
+            endTime: minsToTime(maxEnd),
+            purpose: current.purpose === next.purpose 
+              ? current.purpose 
+              : `${current.purpose} / ${next.purpose}`
+          };
+          processedIds.add(next.id);
+        } else {
+          consolidated.push(current);
+          current = next;
+          processedIds.add(current.id);
+        }
+      }
+      consolidated.push(current);
+    });
+
+    // Add any manual bookings that were not processed (just in case)
+    bookings.forEach(b => {
+      if (!b.isSchedule && !processedIds.has(b.id)) {
+        consolidated.push(b);
+      }
+    });
+
+    return consolidated;
+  };
+
+  const [campusBookings, setCampusBookingsRaw] = useState<any[]>(() => {
     const stored = localStorage.getItem('groovelab_campus_bookings');
-    return stored ? JSON.parse(stored) : [];
+    const initial = stored ? JSON.parse(stored) : [];
+    return consolidateBookings(initial);
   });
+
+  const setCampusBookings = (val: any[] | ((prev: any[]) => any[])) => {
+    setCampusBookingsRaw(prev => {
+      const updated = typeof val === 'function' ? val(prev) : val;
+      return consolidateBookings(updated);
+    });
+  };
+
+
   const [bookingDate, setBookingDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [bookingStartTime, setBookingStartTime] = useState<string>('08:00');
   const [bookingEndTime, setBookingEndTime] = useState<string>('09:00');
@@ -240,6 +324,17 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [showMyBookingsOnly, setShowMyBookingsOnly] = useState<boolean>(false);
   const [isDateFilterActive, setIsDateFilterActive] = useState<boolean>(false);
   const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
+  const [draftBooking, setDraftBooking] = useState<{
+    dayIdx: number;
+    hour: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    rect: { top: number; left: number; width: number; height: number } | null;
+  } | null>(null);
+  const [draftPurpose, setDraftPurpose] = useState<string>('');
+  const [dragOverCell, setDragOverCell] = useState<{ dayIdx: number; hour: string } | null>(null);
+
 
   // Textbausteine states
   const [textbausteine, setTextbausteine] = useState<any[]>(() => {
@@ -344,28 +439,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     }
   }, [bookingStartTime, bookingEndTime]);
 
-  useEffect(() => {
-    if (isDateFilterActive && rooms.length > 0) {
-      const dateBookings = campusBookings.filter((b: any) => b.date === bookingDate);
-      const available = rooms.filter(room => {
-        return !dateBookings.some((b: any) => {
-          if (b.roomId !== room.id) return false;
-          const [sh, sm] = b.startTime.split(':').map(Number);
-          const [eh, em] = b.endTime.split(':').map(Number);
-          const bStart = sh * 60 + sm;
-          const bEnd = eh * 60 + em;
-          const [fsh, fsm] = bookingStartTime.split(':').map(Number);
-          const [feh, fem] = bookingEndTime.split(':').map(Number);
-          const fStart = fsh * 60 + fsm;
-          const fEnd = feh * 60 + fem;
-          return !(bEnd <= fStart || bStart >= fEnd);
-        });
-      });
-      if (available.length > 0 && !available.some(r => r.id === selectedCampusRoomId)) {
-        setSelectedCampusRoomId(available[0].id);
-      }
-    }
-  }, [isDateFilterActive, bookingDate, bookingStartTime, bookingEndTime, campusBookings, rooms, selectedCampusRoomId]);
+  // LocalStorage synchronization for campus bookings
 
   useEffect(() => {
     localStorage.setItem('groovelab_campus_bookings', JSON.stringify(campusBookings));
@@ -4518,8 +4592,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   );
 
   const renderCampusRoomsTab = () => {
-    const selectedRoom = rooms.find(r => r.id === selectedCampusRoomId) || rooms[0];
-
+    const isEditing = !!(selectedBooking && selectedBooking.teacherId === userId);
     // Helper to extract unique floors for this school's rooms
     const uniqueFloors = Array.from(new Set(rooms.map(r => r.floor || 'Allgemein'))).sort((a, b) => {
       const order = ['ug', 'eg', 'og', 'allgemein'];
@@ -4597,14 +4670,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       setCampusBookings(prev => prev.filter(b => !ids.includes(b.id)));
     };
 
-    // Filter rooms by floor
-    const roomsToRender = (rooms.filter(room => {
-      if (selectedFloor === 'Alle') return true;
-      return room.floor === selectedFloor;
-    })).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
-
     // Map bookings and weekly schedules
-        // Merge consecutive schedules for this campus view
+    // Merge consecutive schedules for this campus view
     const mergedSchedules = (() => {
       if (!schedules || schedules.length === 0) return [];
       
@@ -4764,8 +4831,10 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
       const hasBooking = dateBookings.some((b: any) => {
         if (b.roomId !== roomId) return false;
+        if (selectedBooking && b.id === selectedBooking.id) return false;
         return !(b.endTime <= bookingStartTime || b.startTime >= bookingEndTime);
       });
+
 
       const hasSchedule = mergedSchedules.some((s: any) => {
         if (s.room_id !== roomId) return false;
@@ -4804,6 +4873,65 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       return hasBooking || hasSchedule;
     };
 
+    // Check if room is occupied *right now* (Ist-Zustand)
+    const isRoomOccupiedNow = (roomId: string) => {
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const todayStr = `${yyyy}-${mm}-${dd}`;
+      const currentMin = now.getHours() * 60 + now.getMinutes();
+
+      const todayBookings = campusBookings.filter((b: any) => b.roomId === roomId && b.date === todayStr);
+      const hasBookingNow = todayBookings.some((b: any) => {
+        const [sh, sm] = b.startTime.split(':').map(Number);
+        const [eh, em] = b.endTime.split(':').map(Number);
+        const bStart = sh * 60 + sm;
+        const bEnd = eh * 60 + em;
+        return currentMin >= bStart && currentMin < bEnd;
+      });
+
+      if (hasBookingNow) return true;
+
+      const DAYS_MAP = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dayVal = now.getDay();
+      const targetDay = DAYS_MAP[dayVal];
+      const targetDayInt = dayVal === 0 ? 7 : dayVal;
+
+      const hasScheduleNow = mergedSchedules.some((s: any) => {
+        if (s.room_id !== roomId) return false;
+        const startTimeStr = s.time_slot || s.start_time;
+        if (!startTimeStr) return false;
+        
+        const matchesDay = s.day_of_week === targetDay || 
+                           s.day_of_week === targetDayInt || 
+                           String(s.day_of_week) === String(targetDayInt);
+        if (!matchesDay) return false;
+
+        const durationMin = s.duration || s.duration_minutes || 45;
+        const [shStr, smStr] = startTimeStr.split(':');
+        const sh = parseInt(shStr) || 0;
+        const sm = parseInt(smStr) || 0;
+        const schedStartMin = sh * 60 + sm;
+        const schedEndMin = schedStartMin + durationMin;
+
+        return currentMin >= schedStartMin && currentMin < schedEndMin;
+      });
+
+      return hasScheduleNow;
+    };
+
+    // Filter rooms by floor AND availability (if date filter is active)
+    const roomsToRender = (rooms.filter(room => {
+      if (selectedFloor !== 'Alle' && room.floor !== selectedFloor) return false;
+      // If date/time filter is active and the room is occupied, hide it
+      if (isDateFilterActive && isRoomOccupied(room.id)) return false;
+      return true;
+    })).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+    // Derived selected room to keep logic aligned
+    const selectedRoom = roomsToRender.find(r => r.id === selectedCampusRoomId) || roomsToRender[0] || rooms.find(r => r.id === selectedCampusRoomId) || rooms[0];
+
     const handleAddBooking = (roomId: string) => {
       const roomName = rooms.find(r => r.id === roomId)?.name || 'Raum';
       const newBooking = {
@@ -4824,7 +4952,46 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       setTimeout(() => setSuccessAnimationRoomId(null), 1000);
     };
 
-    const handleCellClick = (dayIdx: number, hourStr: string) => {
+    const handleUpdateBooking = () => {
+      if (!selectedBooking) return;
+
+      if (selectedBooking.isSchedule) {
+        // Schedule blocks are recurring – create a manual booking override for this specific date
+        const roomName = rooms.find((r: any) => r.id === selectedBooking.roomId)?.name || selectedBooking.roomName || 'Raum';
+        const override = {
+          id: 'cb_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+          roomId: selectedBooking.roomId,
+          roomName,
+          date: bookingDate,
+          startTime: bookingStartTime,
+          endTime: bookingEndTime,
+          purpose: bookingPurpose || 'Unterricht',
+          teacherId: userId,
+          teacherName: admin ? `${admin.first_name} ${admin.last_name}` : 'Lehrer'
+        };
+        setCampusBookings(prev => [...prev, override]);
+      } else {
+        setCampusBookings(prev => prev.map((b: any) => {
+          if (b.id === selectedBooking.id) {
+            return {
+              ...b,
+              date: bookingDate,
+              startTime: bookingStartTime,
+              endTime: bookingEndTime,
+              purpose: bookingPurpose || 'Unterricht'
+            };
+          }
+          return b;
+        }));
+      }
+
+      setSelectedBooking(null);
+      setBookingPurpose('');
+      setIsDateFilterActive(false);
+    };
+
+
+    const handleCellClick = (dayIdx: number, hourStr: string, e: React.MouseEvent<HTMLDivElement>) => {
       const currentSelectedDate = new Date(bookingDate);
       const dayOfWeek = currentSelectedDate.getDay();
       const diffToMon = currentSelectedDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
@@ -4839,7 +5006,178 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       setBookingStartTime(startStr);
       setBookingEndTime(endStr);
       setIsDateFilterActive(true);
+      setShowMyBookingsOnly(false); // Make sure booking sidebar is shown
+
     };
+
+
+    const handleCellDoubleClick = (dayIdx: number, hourStr: string) => {
+      if (!selectedRoom) return;
+
+      const slotBookings = getBookingsForSlot(dayIdx, hourStr);
+      if (slotBookings.length > 0) return;
+
+      const currentSelectedDate = new Date(bookingDate);
+      const dayOfWeek = currentSelectedDate.getDay();
+      const diffToMon = currentSelectedDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
+      const targetDate = new Date(currentSelectedDate.setDate(diffToMon + dayIdx));
+      const targetDateStr = targetDate.toISOString().split('T')[0];
+
+      const startH = parseInt(hourStr.split(':')[0]);
+      const startStr = `${String(startH).padStart(2, '0')}:00`;
+      const endStr = `${String(startH + 1).padStart(2, '0')}:00`;
+
+      const newBooking = {
+        id: 'cb_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+        roomId: selectedRoom.id,
+        roomName: selectedRoom.name,
+        date: targetDateStr,
+        startTime: startStr,
+        endTime: endStr,
+        purpose: 'Unterricht',
+        teacherId: userId,
+        teacherName: admin ? `${admin.first_name} ${admin.last_name}` : 'Lehrer'
+      };
+
+      setCampusBookings(prev => [...prev, newBooking]);
+      setDraftBooking(null);
+      setIsDateFilterActive(false);
+      setSuccessAnimationRoomId(selectedRoom.id);
+      setTimeout(() => setSuccessAnimationRoomId(null), 1000);
+    };
+
+
+    const parseTimeToMinutes = (t: string) => {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
+    };
+
+    const formatMinutesToTime = (mins: number) => {
+      const h = Math.floor(mins / 60) % 24;
+      const m = mins % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
+
+    const handleDragStart = (e: React.DragEvent, bookingId: string) => {
+      e.dataTransfer.setData('text/plain', bookingId);
+      e.dataTransfer.effectAllowed = 'move';
+    };
+
+    const handleDropOnCell = (e: React.DragEvent, targetDayIdx: number, targetHourStr: string) => {
+      e.preventDefault();
+      setDragOverCell(null);
+      const bookingId = e.dataTransfer.getData('text/plain');
+      if (!bookingId) return;
+
+      const booking = campusBookings.find((b: any) => b.id === bookingId);
+      if (!booking) return;
+
+      if (booking.teacherId !== userId) return;
+
+      // Calculate target date
+      const currentSelectedDate = new Date(bookingDate);
+      const dayOfWeek = currentSelectedDate.getDay();
+      const diffToMon = currentSelectedDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
+      const targetDate = new Date(currentSelectedDate.setDate(diffToMon + targetDayIdx));
+      const targetDateStr = targetDate.toISOString().split('T')[0];
+
+      // Calculate duration of original booking
+      const startMins = parseTimeToMinutes(booking.startTime);
+      const endMins = parseTimeToMinutes(booking.endTime);
+      const duration = endMins - startMins;
+
+      // Calculate new start/end times
+      const newStartMins = parseTimeToMinutes(targetHourStr);
+      const newEndMins = newStartMins + duration;
+
+      const newStartTime = formatMinutesToTime(newStartMins);
+      const newEndTime = formatMinutesToTime(newEndMins);
+
+      // Update the booking in local state
+      setCampusBookings(prev => prev.map((b: any) => {
+        if (b.id === bookingId) {
+          return {
+            ...b,
+            date: targetDateStr,
+            startTime: newStartTime,
+            endTime: newEndTime
+          };
+        }
+        return b;
+      }));
+    };
+
+    const handleResizeStart = (
+      e: React.PointerEvent<HTMLDivElement>,
+      booking: any,
+      edge: 'top' | 'bottom'
+    ) => {
+      e.stopPropagation();
+      const handleElement = e.currentTarget;
+      const cardElement = handleElement.parentElement;
+      if (!cardElement) return;
+
+      const parentCell = cardElement.parentElement;
+      if (!parentCell) return;
+
+      const cellHeight = parentCell.clientHeight || 56;
+      const startY = e.clientY;
+
+      const initialStartMins = parseTimeToMinutes(booking.startTime);
+      const initialEndMins = parseTimeToMinutes(booking.endTime);
+
+      handleElement.setPointerCapture(e.pointerId);
+
+      const onPointerMove = (moveEvent: PointerEvent) => {
+        moveEvent.stopPropagation();
+        const deltaY = moveEvent.clientY - startY;
+        const deltaMins = Math.round((deltaY / cellHeight) * 60);
+
+        // Snap to 5 minutes
+        const step = 5;
+        const snappedDeltaMins = Math.round(deltaMins / step) * step;
+
+        if (edge === 'bottom') {
+          let newEndMins = initialEndMins + snappedDeltaMins;
+          if (newEndMins < initialStartMins + 15) {
+            newEndMins = initialStartMins + 15;
+          }
+          if (newEndMins > 24 * 60) {
+            newEndMins = 24 * 60;
+          }
+
+          const newEndTime = formatMinutesToTime(newEndMins);
+          setCampusBookings(prev =>
+            prev.map(b => (b.id === booking.id ? { ...b, endTime: newEndTime } : b))
+          );
+        } else {
+          let newStartMins = initialStartMins + snappedDeltaMins;
+          if (newStartMins > initialEndMins - 15) {
+            newStartMins = initialEndMins - 15;
+          }
+          if (newStartMins < 0) {
+            newStartMins = 0;
+          }
+
+          const newStartTime = formatMinutesToTime(newStartMins);
+          setCampusBookings(prev =>
+            prev.map(b => (b.id === booking.id ? { ...b, startTime: newStartTime } : b))
+          );
+        }
+      };
+
+      const onPointerUp = (upEvent: PointerEvent) => {
+        upEvent.stopPropagation();
+        handleElement.releasePointerCapture(upEvent.pointerId);
+        handleElement.removeEventListener('pointermove', onPointerMove);
+        handleElement.removeEventListener('pointerup', onPointerUp);
+      };
+
+      handleElement.addEventListener('pointermove', onPointerMove);
+      handleElement.addEventListener('pointerup', onPointerUp);
+    };
+
+
 
     // Merge overlapping/consecutive bookings for "Meine Buchungen" sidebar
     const groupedMyBookings: { [key: string]: any[] } = {};
@@ -5096,26 +5434,31 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   <button
                     onClick={() => setShowMyBookingsOnly(prev => !prev)}
                     style={{
-                      padding: '8px 16px',
+                      padding: '8px 18px',
                       borderRadius: '14px',
-                      border: showMyBookingsOnly ? `2px solid ${brandColor}` : '1.5px solid #e5e5ea',
-                      background: showMyBookingsOnly ? `${brandColor}12` : '#ffffff',
-                      color: showMyBookingsOnly ? brandColor : '#1c1c1e',
+                      border: showMyBookingsOnly ? 'none' : '1.5px solid #af52de40',
+                      background: showMyBookingsOnly 
+                        ? 'linear-gradient(135deg, #af52de, #8b5cf6)' 
+                        : '#f6f0ff',
+                      color: showMyBookingsOnly ? '#ffffff' : '#6d28d9',
                       fontWeight: 800,
                       fontSize: '0.75rem',
                       cursor: 'pointer',
-                      transition: 'all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                      transition: 'all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      boxShadow: showMyBookingsOnly ? `0 4px 12px ${brandColor}15` : '0 2px 4px rgba(0,0,0,0.02)',
+                      boxShadow: showMyBookingsOnly 
+                        ? '0 6px 16px rgba(175, 82, 222, 0.35)' 
+                        : '0 2px 4px rgba(0,0,0,0.01)',
+                      transform: showMyBookingsOnly ? 'scale(1.02)' : 'none',
                     }}
                   >
                     <span>Meine Buchungen</span>
                     <span style={{ 
                       fontSize: '0.7rem', 
-                      background: showMyBookingsOnly ? brandColor : '#f2f2f7', 
-                      color: showMyBookingsOnly ? '#ffffff' : '#555559', 
+                      background: showMyBookingsOnly ? '#ffffff' : '#af52de', 
+                      color: showMyBookingsOnly ? '#af52de' : '#ffffff', 
                       padding: '2px 8px', 
                       borderRadius: '8px', 
                       fontWeight: 900 
@@ -5123,6 +5466,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                       {myBookings.length}
                     </span>
                   </button>
+
                 </div>
               </div>
 
@@ -5178,9 +5522,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   WebkitOverflowScrolling: 'touch'
                 }}
               >
-                {roomsToRender.map((room) => {
+                {roomsToRender.filter(room => !(isDateFilterActive && isRoomOccupied(room.id))).map((room) => {
                   const isSelected = selectedCampusRoomId === room.id;
-                  const occupied = isRoomOccupied(room.id);
+                  const occupiedNow = isRoomOccupiedNow(room.id);
                   return (
                     <div
                       key={room.id}
@@ -5190,7 +5534,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                         background: isSelected ? `${brandColor}06` : 'white',
                         border: isSelected ? `2px solid ${brandColor}` : '1.5px solid #e5e5ea',
                         boxShadow: isSelected ? `0 8px 24px ${brandColor}12` : 'none',
-                        opacity: (isDateFilterActive && occupied) ? 0.45 : 1
+                        opacity: 1
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
@@ -5203,26 +5547,19 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                         }}>
                           {room.name}
                         </div>
-                        <span style={{ 
-                          width: '9px', 
-                          height: '9px', 
-                          borderRadius: '50%', 
-                          background: occupied ? '#ff453a' : '#30d158',
-                          display: 'inline-block',
-                          flexShrink: 0,
-                          marginTop: '3px'
-                        }} title={occupied ? 'Belegt' : 'Verfügbar'} />
                       </div>
                       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', marginTop: 'auto' }}>
-                        <span style={{ padding: '3px 8px', background: '#f2f2f7', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 700, color: '#555559' }}>
-                          Kapazität: {room.capacity || 4}
-                        </span>
-                        {occupied && (
+                        {occupiedNow ? (
                           <span style={{ padding: '3px 8px', background: '#ffebeb', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 800, color: '#ff453a' }}>
                             Belegt
                           </span>
+                        ) : (
+                          <span style={{ padding: '3px 8px', background: '#eafaf1', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 800, color: '#1e7a44' }}>
+                            Frei
+                          </span>
                         )}
                       </div>
+
                     </div>
                   );
                 })}
@@ -5231,8 +5568,10 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
             {/* Weekly Availability Calendar Grid */}
             <div 
-              className="glass-panel" 
+              className="calendar-grid-card glass-panel" 
+              onClick={() => setDraftBooking(null)}
               style={{ 
+                position: 'relative',
                 background: 'white', 
                 borderRadius: '24px', 
                 border: '1px solid rgba(0, 0, 0, 0.04)', 
@@ -5383,21 +5722,46 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                             const currentHour = new Date().getHours();
                             const currentMin = new Date().getMinutes();
                             const showTimeIndicator = isToday && currentHour === slotHourInt;
+                            const isDraggedOver = dragOverCell && dragOverCell.dayIdx === dayIdx && dragOverCell.hour === hour;
 
                             return (
                               <div
                                 key={day.value}
-                                onClick={() => handleCellClick(dayIdx, hour)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCellClick(dayIdx, hour, e);
+                                }}
+                                onDoubleClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCellDoubleClick(dayIdx, hour);
+                                }}
+                                onDragOver={(e) => {
+
+                                  e.preventDefault();
+                                  if (!isDraggedOver) {
+                                    setDragOverCell({ dayIdx, hour });
+                                  }
+                                }}
+                                onDragLeave={() => {
+                                  setDragOverCell(null);
+                                }}
+                                onDrop={(e) => {
+                                  handleDropOnCell(e, dayIdx, hour);
+                                }}
                                 style={{
                                   padding: '4px',
                                   borderRight: dayIdx < 6 ? '1px solid #f2f2f7' : 'none',
                                   position: 'relative',
-                                  background: isToday ? `${brandColor}01` : 'white',
+                                  background: isDraggedOver 
+                                    ? `${brandColor}12` 
+                                    : (isToday ? `${brandColor}01` : 'white'),
                                   display: 'flex',
                                   flexDirection: 'column',
                                   gap: '3px',
                                   justifyContent: 'stretch',
-                                  cursor: 'pointer'
+                                  cursor: 'pointer',
+                                  boxShadow: isDraggedOver ? `inset 0 0 0 2px ${brandColor}` : 'none',
+                                  transition: 'background-color 0.15s ease, box-shadow 0.15s ease'
                                 }}
                               >
                                 {/* Real-time indicator line */}
@@ -5417,6 +5781,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                     <div className="pulsing-dot" style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ff453a', marginLeft: '-4px', boxShadow: '0 0 6px rgba(255, 69, 58, 0.6)' }} />
                                   </div>
                                 )}
+
+
 
                                 {slotBookings.map((b: any) => {
                                   const isOwnBooking = b.teacherId === userId;
@@ -5461,6 +5827,26 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setSelectedBooking(b);
+                                        if (b.teacherId === userId) {
+                                          // For schedule blocks, default to today's date; for manual bookings use their stored date
+                                          const dateToUse = b.isSchedule ? bookingDate : b.date;
+                                          setBookingDate(dateToUse);
+                                          setBookingStartTime(b.startTime);
+                                          setBookingEndTime(b.endTime);
+                                          setBookingPurpose(b.purpose || '');
+                                          setIsDateFilterActive(true);
+                                          setShowMyBookingsOnly(false);
+                                        }
+                                      }}
+
+                                      draggable={isOwnBooking && !isSchedule}
+                                      onDragStart={(e) => {
+                                        if (isOwnBooking && !isSchedule) {
+                                          handleDragStart(e, b.id);
+                                        }
+                                      }}
+                                      onDragEnd={() => {
+                                        setDragOverCell(null);
                                       }}
                                       title={`${b.purpose} (${b.startTime} - ${b.endTime}) - ${b.teacherName}`}
                                       style={{
@@ -5482,10 +5868,48 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                         flexDirection: 'column',
                                         justifyContent: 'flex-start',
                                         boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-                                        overflow: 'hidden'
+                                        overflow: 'hidden',
+                                        cursor: isOwnBooking ? 'grab' : 'pointer'
                                       }}
                                     >
                                       <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '5px', background: leftAccentColor }} />
+                                      
+                                      {/* Resize Handles */}
+                                      {isOwnBooking && !isSchedule && (
+                                        <>
+                                          <div
+                                            onPointerDown={(e) => handleResizeStart(e, b, 'top')}
+                                            style={{
+                                              position: 'absolute',
+                                              top: 0,
+                                              left: 5,
+                                              right: 0,
+                                              height: '6px',
+                                              cursor: 'ns-resize',
+                                              zIndex: 20,
+                                              background: 'transparent'
+                                            }}
+                                            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(109, 40, 217, 0.25)'; }}
+                                            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                                          />
+                                          <div
+                                            onPointerDown={(e) => handleResizeStart(e, b, 'bottom')}
+                                            style={{
+                                              position: 'absolute',
+                                              bottom: 0,
+                                              left: 5,
+                                              right: 0,
+                                              height: '6px',
+                                              cursor: 'ns-resize',
+                                              zIndex: 20,
+                                              background: 'transparent'
+                                            }}
+                                            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(109, 40, 217, 0.25)'; }}
+                                            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                                          />
+                                        </>
+                                      )}
+
                                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.58rem', opacity: 0.8, marginBottom: '2px', fontWeight: 800 }}>
                                         <span style={{ display: 'flex', alignItems: 'center' }}>
                                           {isSchedule && <GraduationCap size={10} style={{ marginRight: '3px' }} />}
@@ -5510,138 +5934,16 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   </div>
                 </div>
               </div>
+
+
             </div>
           </div>
 
-          {/* Right Sidebar: Booking Form & Meine Buchungen */}
+          {/* Right Sidebar: Booking Form OR Meine Buchungen */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: '100%', alignSelf: 'stretch' }}>
             
-            {/* Meine Buchungen */}
-            <div 
-              className="glass-panel" 
-              style={{ 
-                background: 'white', 
-                borderRadius: '24px', 
-                border: '1px solid rgba(0, 0, 0, 0.04)', 
-                padding: '20px', 
-                boxShadow: '0 4px 24px -4px rgba(0, 0, 0, 0.02), 0 2px 12px -2px rgba(0, 0, 0, 0.01)',
-                display: 'flex',
-                flexDirection: 'column',
-                flexGrow: showMyBookingsOnly ? 1 : 0,
-                transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
-                height: showMyBookingsOnly ? '100%' : 'auto'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1c1c1e', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  Meine Buchungen
-                  <span style={{ fontSize: '0.72rem', background: '#f3e8ff', color: '#af52de', padding: '2px 8px', borderRadius: '8px', fontWeight: 900 }}>
-                    {myBookings.length}
-                  </span>
-                </h3>
-
-                <button
-                  onClick={() => setShowMyBookingsOnly(!showMyBookingsOnly)}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: '#8e8e93',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '6px',
-                    borderRadius: '50%',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = brandColor; e.currentTarget.style.background = 'rgba(0,0,0,0.04)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = '#8e8e93'; e.currentTarget.style.background = 'transparent'; }}
-                >
-                  {showMyBookingsOnly ? <ArrowLeft size={16} /> : <Maximize2 size={16} />}
-                </button>
-              </div>
-
-              {/* Cancel All Button */}
-              {myBookings.length >= 2 && (
-                <button
-                  onClick={() => {
-                    const allIds = myBookings.flatMap(b => b.ids || [b.id]);
-                    handleCancelBooking(allIds);
-                  }}
-                  style={{
-                    background: '#ff453a15',
-                    color: '#ff453a',
-                    border: 'none',
-                    padding: '8px 14px',
-                    borderRadius: '12px',
-                    fontSize: '0.75rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    marginBottom: '12px',
-                    width: '100%',
-                    textAlign: 'center',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#ff453a25'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = '#ff453a15'}
-                >
-                  Alle stornieren
-                </button>
-              )}
-
-              <div className="custom-calendar-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: showMyBookingsOnly ? 'calc(100vh - 300px)' : '180px', overflowY: 'auto' }}>
-                {myBookings.length === 0 ? (
-                  <div style={{ fontSize: '0.78rem', color: '#8e8e93', fontWeight: 700, textAlign: 'center', padding: '16px', border: '1.5px dashed #e5e5ea', borderRadius: '14px', background: '#f2f2f7' }}>
-                    Du hast noch keine Buchungen vorgenommen.
-                  </div>
-                ) : (
-                  myBookings.map((b: any) => (
-                    <div
-                      key={b.id}
-                      style={{
-                        padding: '12px 14px',
-                        background: '#f2f2f7',
-                        border: 'none',
-                        borderRadius: '14px',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center'
-                      }}
-                    >
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0 }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 850, color: '#1c1c1e', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                          {b.roomName}
-                        </span>
-                        <span style={{ fontSize: '0.7rem', color: '#636366', fontWeight: 700 }}>
-                          {new Date(b.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} • {b.startTime} - {b.endTime}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => handleCancelBooking(b.ids || b.id)}
-                        style={{
-                          background: '#ff453a15',
-                          color: '#ff453a',
-                          border: 'none',
-                          borderRadius: '10px',
-                          width: '32px',
-                          height: '32px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          transition: 'background 0.2s'
-                        }}
-                        title="Buchung stornieren"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Booking Form (Hidden when Maximized) */}
-            {!showMyBookingsOnly && (
+            {showMyBookingsOnly ? (
+              /* Meine Buchungen (Shown only when showMyBookingsOnly is true) */
               <div 
                 className="glass-panel" 
                 style={{ 
@@ -5652,9 +5954,156 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   boxShadow: '0 4px 24px -4px rgba(0, 0, 0, 0.02), 0 2px 12px -2px rgba(0, 0, 0, 0.01)',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '14px'
+                  height: '100%'
                 }}
               >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1c1c1e', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    Meine Buchungen
+                    <span style={{ fontSize: '0.72rem', background: `${brandColor}15`, color: brandColor, padding: '2px 8px', borderRadius: '8px', fontWeight: 900 }}>
+                      {myBookings.length}
+                    </span>
+                  </h3>
+
+                  <button
+                    onClick={() => setShowMyBookingsOnly(false)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#8e8e93',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '6px',
+                      borderRadius: '50%',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = brandColor; e.currentTarget.style.background = 'rgba(0,0,0,0.04)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = '#8e8e93'; e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    <ArrowLeft size={16} />
+                  </button>
+                </div>
+
+                {/* Cancel All Button */}
+                {myBookings.length >= 2 && (
+                  <button
+                    onClick={() => {
+                      const allIds = myBookings.flatMap(b => b.ids || [b.id]);
+                      handleCancelBooking(allIds);
+                    }}
+                    style={{
+                      background: '#ff453a15',
+                      color: '#ff453a',
+                      border: 'none',
+                      padding: '8px 14px',
+                      borderRadius: '12px',
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      marginBottom: '12px',
+                      width: '100%',
+                      textAlign: 'center',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#ff453a25'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = '#ff453a15'}
+                  >
+                    Alle stornieren
+                  </button>
+                )}
+
+                <div className="custom-calendar-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: 'calc(100vh - 300px)', overflowY: 'auto' }}>
+                  {myBookings.length === 0 ? (
+                    <div style={{ fontSize: '0.78rem', color: '#8e8e93', fontWeight: 700, textAlign: 'center', padding: '16px', border: '1.5px dashed #e5e5ea', borderRadius: '14px', background: '#f2f2f7' }}>
+                      Du hast noch keine Buchungen vorgenommen.
+                    </div>
+                  ) : (
+                    myBookings.map((b: any) => (
+                      <div
+                        key={b.id}
+                        onClick={() => {
+                          setBookingDate(b.date);
+                          setSelectedCampusRoomId(b.roomId);
+                          setSelectedBooking(b);
+                          setBookingStartTime(b.startTime);
+                          setBookingEndTime(b.endTime);
+                          setBookingPurpose(b.purpose || '');
+                          setIsDateFilterActive(true);
+                          setShowMyBookingsOnly(false);
+                        }}
+                        style={{
+                          padding: '12px 14px',
+                          background: '#f6f0ff',
+                          border: '1.5px solid #af52de20',
+                          borderRadius: '14px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          cursor: 'pointer',
+                          transition: 'transform 0.15s ease, border-color 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = '#af52de60';
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = '#af52de20';
+                          e.currentTarget.style.transform = 'none';
+                        }}
+                      >
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0 }}>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 850, color: '#6d28d9', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                            {b.roomName}
+                          </span>
+                          <span style={{ fontSize: '0.7rem', color: '#af52de', fontWeight: 700 }}>
+                            {new Date(b.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} • {b.startTime} - {b.endTime}
+                          </span>
+                        </div>
+
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleCancelBooking(b.ids || b.id); }}
+                          style={{
+                            background: '#ff453a15',
+                            color: '#ff453a',
+                            border: 'none',
+                            borderRadius: '10px',
+                            width: '32px',
+                            height: '32px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            transition: 'background 0.2s'
+                          }}
+                          title="Buchung stornieren"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* Booking Form (Shown when showMyBookingsOnly is false) */
+              <div 
+                className="glass-panel" 
+                style={{ 
+                  background: isEditing ? '#f6f0ff' : 'white', 
+                  borderRadius: '24px', 
+                  border: isEditing ? '1.5px solid #af52de40' : '1px solid rgba(0, 0, 0, 0.04)', 
+                  padding: '20px', 
+                  boxShadow: isEditing 
+                    ? '0 8px 32px rgba(175, 82, 222, 0.08), 0 2px 12px rgba(175, 82, 222, 0.04)' 
+                    : '0 4px 24px -4px rgba(0, 0, 0, 0.02), 0 2px 12px -2px rgba(0, 0, 0, 0.01)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '14px',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+
                 <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1c1c1e', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ color: brandColor }}>⚡</span> Raum buchen
                 </h3>
@@ -5668,8 +6117,15 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                       setBookingDate(e.target.value);
                       setIsDateFilterActive(true);
                     }}
+                    onClick={() => setIsDateFilterActive(true)}
                     onFocus={() => setIsDateFilterActive(true)}
                     className="premium-input"
+                    style={{
+                      borderColor: isDateFilterActive ? '#ffe699' : '#e5e5ea',
+                      background: isDateFilterActive ? '#ffffff' : '#f2f2f7',
+                      color: isDateFilterActive ? '#1c1c1e' : '#8e8e93',
+                      boxShadow: isDateFilterActive ? '0 0 0 3px rgba(255, 230, 153, 0.25)' : 'none'
+                    }}
                   />
                 </div>
 
@@ -5684,6 +6140,12 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                       }}
                       onFocus={() => setIsDateFilterActive(true)}
                       className="premium-input"
+                      style={{
+                        borderColor: isDateFilterActive ? '#ffe699' : '#e5e5ea',
+                        background: isDateFilterActive ? '#ffffff' : '#f2f2f7',
+                        color: isDateFilterActive ? '#1c1c1e' : '#8e8e93',
+                        boxShadow: isDateFilterActive ? '0 0 0 3px rgba(255, 230, 153, 0.25)' : 'none'
+                      }}
                     >
                       {Array.from({ length: 27 }, (_, i) => {
                         const min = i * 30 + 480;
@@ -5704,6 +6166,12 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                       }}
                       onFocus={() => setIsDateFilterActive(true)}
                       className="premium-input"
+                      style={{
+                        borderColor: isDateFilterActive ? '#ffe699' : '#e5e5ea',
+                        background: isDateFilterActive ? '#ffffff' : '#f2f2f7',
+                        color: isDateFilterActive ? '#1c1c1e' : '#8e8e93',
+                        boxShadow: isDateFilterActive ? '0 0 0 3px rgba(255, 230, 153, 0.25)' : 'none'
+                      }}
                     >
                       {Array.from({ length: 27 }, (_, i) => {
                         const min = (i + 1) * 30 + 480;
@@ -5726,7 +6194,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 </div>
 
                 <button
-                  onClick={() => selectedRoom && handleAddBooking(selectedRoom.id)}
+                  onClick={() => selectedRoom && (isEditing ? handleUpdateBooking() : handleAddBooking(selectedRoom.id))}
                   disabled={!selectedRoom || isRoomOccupied(selectedRoom.id)}
                   style={{
                     background: brandColor,
@@ -5764,8 +6232,12 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     ? 'Wähle einen Raum' 
                     : isRoomOccupied(selectedRoom.id) 
                       ? 'Raum belegt' 
-                      : `${selectedRoom.name} buchen`}
+                      : isEditing 
+                        ? (selectedBooking?.isSchedule ? 'Als Einzeltermin übernehmen' : 'Änderung speichern')
+                        : `${selectedRoom.name} buchen`}
+
                 </button>
+
               </div>
             )}
           </div>
