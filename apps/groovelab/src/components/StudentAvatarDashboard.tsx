@@ -4505,18 +4505,40 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>
                                 {d.toLocaleDateString('de-DE', {weekday: 'long', day: '2-digit', month: '2-digit'})}
                               </div>
-                              <div style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600, marginTop: '1px' }}>
-                                {occ.start_time?.substring(0,5)} Uhr
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', gap: '8px' }}>
+                                <div style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>
+                                  {occ.start_time?.substring(0,5)} Uhr
+                                </div>
+                                {!isReschedule && (
+                                  <button 
+                                    onClick={() => handleAcknowledgeCancellation(occ.id)}
+                                    style={{ 
+                                      background: isRegularReset ? '#10b981' : '#ef4444', 
+                                      color: 'white', 
+                                      border: 'none', 
+                                      padding: '4px 10px', 
+                                      borderRadius: '6px', 
+                                      fontSize: '0.7rem', 
+                                      fontWeight: 700, 
+                                      cursor: 'pointer',
+                                      boxShadow: `0 2px 4px ${isRegularReset ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'}`,
+                                      transition: 'all 0.2s',
+                                      flexShrink: 0
+                                    }}
+                                  >
+                                    Gelesen abhaken
+                                  </button>
+                                )}
                               </div>
                               {isRegularReset && (
-                                <div style={{ fontSize: '0.7rem', color: '#047857', fontWeight: 500, marginTop: '2px', lineHeight: '1.2' }}>
+                                <div style={{ fontSize: '0.7rem', color: '#047857', fontWeight: 500, marginTop: '4px', lineHeight: '1.2' }}>
                                   Findet wieder regulär statt.
                                 </div>
                               )}
                             </div>
                             
-                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                              {isReschedule ? (
+                            {isReschedule && (
+                              <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', marginTop: '2px' }}>
                                 <div style={{ display: 'flex', gap: '6px' }}>
                                   <button 
                                     onClick={() => handleRejectReschedule(occ)}
@@ -4553,26 +4575,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     Bestätigen
                                   </button>
                                 </div>
-                              ) : (
-                                <button 
-                                  onClick={() => handleAcknowledgeCancellation(occ.id)}
-                                  style={{ 
-                                    background: isRegularReset ? '#10b981' : '#ef4444', 
-                                    color: 'white', 
-                                    border: 'none', 
-                                    padding: '4px 10px', 
-                                    borderRadius: '6px', 
-                                    fontSize: '0.7rem', 
-                                    fontWeight: 700, 
-                                    cursor: 'pointer',
-                                    boxShadow: `0 2px 4px ${isRegularReset ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'}`,
-                                    transition: 'all 0.2s'
-                                  }}
-                                >
-                                  Gelesen abhaken
-                                </button>
-                              )}
-                            </div>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
