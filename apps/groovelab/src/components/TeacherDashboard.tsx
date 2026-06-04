@@ -1397,6 +1397,44 @@ export function TeacherDashboard({
   const [briefingLoading, setBriefingLoading] = useState(true);
   const [myBookings, setMyBookings] = useState<any[]>([]);
 
+  // Helper to check if today is student's birthday
+  const isStudentBirthdayToday = (student: any): boolean => {
+    const birthDateStr = student?.birthDate || student?.birth_date;
+    if (!birthDateStr) return false;
+    const parts = birthDateStr.split('-');
+    if (parts.length !== 3) return false;
+    const birthMonth = parseInt(parts[1], 10) - 1; // 0-indexed
+    const birthDay = parseInt(parts[2], 10);
+    const today = new Date();
+    return today.getDate() === birthDay && today.getMonth() === birthMonth;
+  };
+
+  const activeLessonsCount = briefingData?.timeline 
+    ? briefingData.timeline.filter((s: any) => s.student && s.status !== 'canceled_by_student' && s.status !== 'teacher_sick' && s.status !== 'cancelled' && s.status !== 'canceled_by_teacher_sick' && s.status !== 'rescheduled_away').length 
+    : 0;
+
+  const birthdaysCount = briefingData?.timeline
+    ? briefingData.timeline.filter((s: any) => {
+        if (!s.student) return false;
+        if (s.status === 'canceled_by_student' || s.status === 'teacher_sick' || s.status === 'cancelled' || s.status === 'canceled_by_teacher_sick' || s.status === 'rescheduled_away') return false;
+        return isStudentBirthdayToday(s.student);
+      }).length
+    : 0;
+
+  const workloadMinutes = briefingData?.timeline
+    ? briefingData.timeline
+        .filter((s: any) => s.status !== 'rescheduled_away')
+        .reduce((acc: number, s: any) => acc + (s.duration || 30), 0)
+    : 0;
+  const workloadHours = Math.floor(workloadMinutes / 60);
+  const workloadRemainingMinutes = workloadMinutes % 60;
+  const workloadHoursStr = workloadRemainingMinutes > 0 
+    ? `${workloadHours}h ${workloadRemainingMinutes}m` 
+    : `${workloadHours}h`;
+
+  const cancellationsCount = briefingData?.timeline 
+    ? briefingData.timeline.filter((s: any) => s.status === 'canceled_by_student' || s.status === 'teacher_sick' || s.status === 'cancelled' || s.status === 'canceled_by_teacher_sick').length 
+    : 0;
 
 
   // New Right Sidebar Sickness & Administrative feedback states
@@ -1566,6 +1604,63 @@ export function TeacherDashboard({
       .sort((a: any, b: any) => a.timeSlot.localeCompare(b.timeSlot));
     return sorted.length > 0 ? sorted[0].timeSlot : '';
   }, [briefingData?.timeline]);
+
+  const presenceTimes = useMemo(() => {
+    if (!briefingData?.timeline || briefingData.timeline.length === 0) return null;
+    const activeTimeline = briefingData.timeline.filter((s: any) => s.status !== 'rescheduled_away');
+    if (activeTimeline.length === 0) return null;
+    const sorted = [...activeTimeline].sort((a: any, b: any) => a.timeSlot.localeCompare(b.timeSlot));
+    
+    const firstSlot = sorted[0];
+    const [fh, fm] = firstSlot.timeSlot.split(':').map(Number);
+    const firstStartMin = fh * 60 + fm;
+
+    const lastSlot = sorted[sorted.length - 1];
+    const [lh, lm] = lastSlot.timeSlot.split(':').map(Number);
+    const lastEndMin = lh * 60 + lm + (lastSlot.duration || 30);
+
+    return {
+      firstStartMin,
+      lastEndMin
+    };
+  }, [briefingData?.timeline]);
+
+  const shiftProgress = useMemo(() => {
+    if (!presenceTimes) return { remainingStr: '', progressPercent: 0, remainingMinutes: 0 };
+    const { firstStartMin, lastEndMin } = presenceTimes;
+    
+    // Parse currentTimeStr to minutes
+    if (!currentTimeStr) return { remainingStr: '', progressPercent: 0, remainingMinutes: 0 };
+    const [h, m] = currentTimeStr.split(':').map(Number);
+    const curMin = h * 60 + m;
+
+    const totalShiftMinutes = lastEndMin - firstStartMin;
+    if (totalShiftMinutes <= 0) return { remainingStr: '', progressPercent: 0, remainingMinutes: 0 };
+    
+    let remainingMinutes = 0;
+    let progressPercent = 0;
+
+    if (curMin < firstStartMin) {
+      remainingMinutes = totalShiftMinutes;
+      progressPercent = 0;
+    } else if (curMin > lastEndMin) {
+      remainingMinutes = 0;
+      progressPercent = 100;
+    } else {
+      remainingMinutes = lastEndMin - curMin;
+      progressPercent = ((curMin - firstStartMin) / totalShiftMinutes) * 100;
+    }
+
+    const remainingHours = Math.floor(remainingMinutes / 60);
+    const remainingMins = remainingMinutes % 60;
+    const remainingStr = remainingMins > 0 ? `${remainingHours}h ${remainingMins}m` : `${remainingHours}h`;
+
+    return {
+      remainingStr,
+      progressPercent,
+      remainingMinutes
+    };
+  }, [presenceTimes, currentTimeStr]);
 
   const prepCutoffTimeStr = useMemo(() => {
     if (firstLessonStartMin === null) return '';
@@ -1860,6 +1955,7 @@ export function TeacherDashboard({
                 last_name,
                 is_app_user,
                 instrument,
+                birth_date,
                 avatars (avatar_style, evolution_level, xp)
               )
             `)
@@ -1889,6 +1985,7 @@ export function TeacherDashboard({
                 last_name,
                 is_app_user,
                 instrument,
+                birth_date,
                 avatars (avatar_style, evolution_level, xp)
               )
             `)
@@ -1913,7 +2010,8 @@ export function TeacherDashboard({
                 id: student.id,
                 name: `${student.first_name} ${student.last_name}`,
                 isAppUser: student.is_app_user ?? false,
-                isAnalogStickerUser
+                isAnalogStickerUser,
+                birthDate: student.birth_date
               } : null
             };
           });
@@ -1947,7 +2045,8 @@ export function TeacherDashboard({
                     id: student.id,
                     name: `${student.first_name} ${student.last_name}`,
                     isAppUser: student.is_app_user ?? false,
-                    isAnalogStickerUser
+                    isAnalogStickerUser,
+                    birthDate: student.birth_date
                   } : null
                 };
 
@@ -3875,7 +3974,6 @@ export function TeacherDashboard({
                 <div style={{ padding: '60px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Briefing wird geladen...</div>
               ) : briefingData ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  
                   {/* AdminLTE style KPI Cards row (Bold Swiss design, now super-compact and strictly one-line) */}
                   {!teacher?.sick_until && (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '0px' }}>
@@ -3888,7 +3986,7 @@ export function TeacherDashboard({
                     }} className="hover-scale">
                       <div style={{ padding: '8px 12px', position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
                         <div style={{ fontSize: '1.3rem', fontWeight: 900, lineHeight: 1, fontFamily: "'Urbanist', sans-serif" }}>
-                          {briefingData.timeline ? briefingData.timeline.filter((s: any) => s.student).length : 0}
+                          {activeLessonsCount}
                         </div>
                         <div style={{ fontSize: '0.72rem', fontWeight: 700, opacity: 0.9, whiteSpace: 'nowrap' }}>Heutige Schüler</div>
                       </div>
@@ -3897,7 +3995,7 @@ export function TeacherDashboard({
                       </div>
                     </div>
  
-                    {/* Card 2: Im Live Lab aktiv (Green) */}
+                    {/* Card 2: Geburtstage Heute (Green) */}
                     <div style={{ 
                       position: 'relative', overflow: 'hidden', background: '#28a745', color: 'white',
                       borderRadius: '12px', boxShadow: '0 4px 12px rgba(40, 167, 69, 0.06)',
@@ -3906,16 +4004,16 @@ export function TeacherDashboard({
                     }} className="hover-scale">
                       <div style={{ padding: '8px 12px', position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
                         <div style={{ fontSize: '1.3rem', fontWeight: 900, lineHeight: 1, fontFamily: "'Urbanist', sans-serif" }}>
-                          {activeSessions.length}
+                          {birthdaysCount}
                         </div>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, opacity: 0.9, whiteSpace: 'nowrap' }}>Im Live Lab aktiv</div>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, opacity: 0.9, whiteSpace: 'nowrap' }}>Geburtstage Heute</div>
                       </div>
-                      <div style={{ position: 'absolute', top: '50%', right: '12px', transform: 'translateY(-50%)', zIndex: 1, opacity: 0.15, pointerEvents: 'none' }}>
-                        <Music size={20} color="white" />
+                      <div style={{ position: 'absolute', top: '50%', right: '12px', transform: 'translateY(-50%)', zIndex: 1, opacity: 0.25, fontSize: '1.2rem', pointerEvents: 'none' }}>
+                        🎂
                       </div>
                     </div>
  
-                    {/* Card 3: Aktive Bands (Yellow) */}
+                    {/* Card 3: Tages-Pensum (Yellow) */}
                     <div style={{ 
                       position: 'relative', overflow: 'hidden', background: '#ffc107', color: '#0f172a',
                       borderRadius: '12px', boxShadow: '0 4px 12px rgba(255, 193, 7, 0.06)',
@@ -3923,13 +4021,13 @@ export function TeacherDashboard({
                       transition: 'all 0.25s ease'
                     }} className="hover-scale">
                       <div style={{ padding: '8px 12px', position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
-                        <div style={{ fontSize: '1.3rem', fontWeight: 900, lineHeight: 1, fontFamily: "'Urbanist', sans-serif", color: '#0f172a' }}>
-                          {allBands.length}
+                        <div style={{ fontSize: '1.2rem', fontWeight: 900, lineHeight: 1, fontFamily: "'Urbanist', sans-serif", color: '#0f172a' }}>
+                          {workloadHoursStr}
                         </div>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, opacity: 0.9, color: '#0f172a', whiteSpace: 'nowrap' }}>Aktive Bands</div>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, opacity: 0.9, color: '#0f172a', whiteSpace: 'nowrap' }}>Tages-Pensum</div>
                       </div>
-                      <div style={{ position: 'absolute', top: '50%', right: '12px', transform: 'translateY(-50%)', zIndex: 1, opacity: 0.15, pointerEvents: 'none' }}>
-                        <Award size={20} color="#0f172a" />
+                      <div style={{ position: 'absolute', top: '50%', right: '12px', transform: 'translateY(-50%)', zIndex: 1, opacity: 0.2, pointerEvents: 'none' }}>
+                        <Clock size={20} color="#0f172a" />
                       </div>
                     </div>
  
@@ -3942,7 +4040,7 @@ export function TeacherDashboard({
                     }} className="hover-scale">
                       <div style={{ padding: '8px 12px', position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
                         <div style={{ fontSize: '1.3rem', fontWeight: 900, lineHeight: 1, fontFamily: "'Urbanist', sans-serif" }}>
-                          {briefingData.timeline ? briefingData.timeline.filter((s: any) => s.status === 'canceled_by_student' || s.status === 'teacher_sick').length : 0}
+                          {cancellationsCount}
                         </div>
                         <div style={{ fontSize: '0.72rem', fontWeight: 700, opacity: 0.9, whiteSpace: 'nowrap' }}>Ausfälle Heute</div>
                       </div>
@@ -4836,6 +4934,7 @@ export function TeacherDashboard({
                             const isCurrentSlot = currentTimeStr >= slotStart && currentTimeStr < slotEnd && !isCanceled && !isRescheduledAway;
                             const isRescheduledPending = slot.status === 'rescheduled_pending' || slot.status === 'pending' || slot.status === 'pending_reschedule';
                             const isRescheduledConfirmed = slot.status === 'rescheduled_confirmed';
+                            const isBirthday = slot.student && isStudentBirthdayToday(slot.student);
  
                             let slotBg = '#ffffff';
                             let slotBorder = '1.5px solid #e2e8f0';
@@ -5123,7 +5222,7 @@ export function TeacherDashboard({
                                           textOverflow: 'ellipsis', 
                                           whiteSpace: 'nowrap'
                                         }}>
-                                          {slot.student.name}
+                                          {isBirthday ? '🎂 ' : ''}{slot.student.name}
                                         </span>
                                       ) : (
                                         <span style={{ fontWeight: 700, color: '#78350f', fontSize: '0.85rem' }}>☕️ Pause ({slot.duration || 30} Min.)</span>
