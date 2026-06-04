@@ -4458,13 +4458,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 if (appointmentChanges.length === 0) return null;
                 
                 return (
-                  <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: '2px dashed #f59e0b' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
-                      <Calendar size={18} color="#f59e0b" />
-                      <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Terminänderungen</h3>
+                  <div style={{ background: '#ffffff', borderRadius: '24px', padding: '16px 18px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: '1.5px dashed #f59e0b' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                      <Calendar size={16} color="#f59e0b" />
+                      <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Terminänderungen</h3>
                     </div>
                     
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       {appointmentChanges.map(occ => {
                         const d = new Date(occ.date);
                         const isReschedule = occ.status === 'pending_reschedule';
@@ -4479,57 +4479,57 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         if (isReschedule) {
                           cardBg = '#fffbeb';
                           cardBorder = '#fef08a';
-                          badgeText = '🔄 Neuer Termin vorgeschlagen';
+                          badgeText = '🔄 Verschiebung vorgeschlagen';
                           badgeColor = '#854d0e';
                         } else if (isRegularReset) {
                           cardBg = '#ecfdf5';
                           cardBorder = '#a7f3d0';
-                          badgeText = '❇️ Termin wieder regulär';
+                          badgeText = '❇️ Wieder regulär';
                           badgeColor = '#065f46';
                         }
                         
                         return (
                           <div key={occ.id} style={{ 
-                            padding: '16px', 
-                            borderRadius: '16px', 
+                            padding: '12px', 
+                            borderRadius: '12px', 
                             background: cardBg, 
-                            border: `1.5px solid ${cardBorder}`, 
+                            border: `1px solid ${cardBorder}`, 
                             display: 'flex', 
                             flexDirection: 'column', 
-                            gap: '12px' 
+                            gap: '8px' 
                           }}>
                             <div>
-                              <div style={{ fontSize: '0.75rem', fontWeight: 800, color: badgeColor, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+                              <div style={{ fontSize: '0.65rem', fontWeight: 800, color: badgeColor, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '2px' }}>
                                 {badgeText}
                               </div>
-                              <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>
+                              <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>
                                 {d.toLocaleDateString('de-DE', {weekday: 'long', day: '2-digit', month: '2-digit'})}
                               </div>
-                              <div style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600, marginTop: '2px' }}>
+                              <div style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600, marginTop: '1px' }}>
                                 {occ.start_time?.substring(0,5)} Uhr
                               </div>
                               {isRegularReset && (
-                                <div style={{ fontSize: '0.75rem', color: '#047857', fontWeight: 500, marginTop: '4px' }}>
-                                  Dieser Termin findet nun wieder wie ursprünglich geplant statt.
+                                <div style={{ fontSize: '0.7rem', color: '#047857', fontWeight: 500, marginTop: '2px', lineHeight: '1.2' }}>
+                                  Findet wieder regulär statt.
                                 </div>
                               )}
                             </div>
                             
-                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
                               {isReschedule ? (
-                                <div style={{ display: 'flex', gap: '8px' }}>
+                                <div style={{ display: 'flex', gap: '6px' }}>
                                   <button 
                                     onClick={() => handleRejectReschedule(occ)}
                                     style={{ 
                                       background: '#ef4444', 
                                       color: 'white', 
                                       border: 'none', 
-                                      padding: '6px 12px', 
-                                      borderRadius: '8px', 
-                                      fontSize: '0.75rem', 
+                                      padding: '4px 10px', 
+                                      borderRadius: '6px', 
+                                      fontSize: '0.7rem', 
                                       fontWeight: 700, 
                                       cursor: 'pointer',
-                                      boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)',
+                                      boxShadow: '0 2px 4px rgba(239, 68, 68, 0.15)',
                                       transition: 'all 0.2s'
                                     }}
                                   >
@@ -4541,12 +4541,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                       background: '#eab308', 
                                       color: 'white', 
                                       border: 'none', 
-                                      padding: '6px 12px', 
-                                      borderRadius: '8px', 
-                                      fontSize: '0.75rem', 
+                                      padding: '4px 10px', 
+                                      borderRadius: '6px', 
+                                      fontSize: '0.7rem', 
                                       fontWeight: 700, 
                                       cursor: 'pointer',
-                                      boxShadow: '0 2px 4px rgba(234, 179, 8, 0.2)',
+                                      boxShadow: '0 2px 4px rgba(234, 179, 8, 0.15)',
                                       transition: 'all 0.2s'
                                     }}
                                   >
@@ -4560,12 +4560,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     background: isRegularReset ? '#10b981' : '#ef4444', 
                                     color: 'white', 
                                     border: 'none', 
-                                    padding: '6px 12px', 
-                                    borderRadius: '8px', 
-                                    fontSize: '0.75rem', 
+                                    padding: '4px 10px', 
+                                    borderRadius: '6px', 
+                                    fontSize: '0.7rem', 
                                     fontWeight: 700, 
                                     cursor: 'pointer',
-                                    boxShadow: `0 2px 4px ${isRegularReset ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
+                                    boxShadow: `0 2px 4px ${isRegularReset ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'}`,
                                     transition: 'all 0.2s'
                                   }}
                                 >
