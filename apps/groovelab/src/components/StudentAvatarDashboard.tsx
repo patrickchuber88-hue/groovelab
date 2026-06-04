@@ -4553,68 +4553,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 );
               })()}
 
-              {/* LIVE CAMPUS FEED */}
-              <div style={{ 
-                background: '#ffffff', 
-                borderRadius: '24px', 
-                padding: '24px', 
-                boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
-                  <Sparkles size={18} color="#eab308" />
-                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Live Campus Feed</h3>
-                </div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {campusFeedAnnouncements.length === 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px 0', textAlign: 'center', opacity: 0.6 }}>
-                      <Sparkles size={24} color="#94a3b8" style={{ strokeWidth: 1.5 }} />
-                      <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
-                        Keine aktuellen Campus-Mitteilungen vorhanden.
-                      </span>
-                    </div>
-                  ) : (
-                    campusFeedAnnouncements.slice(0, 5).map((item, idx, arr) => {
-                      return (
-                        <div key={item.id} style={{
-                          paddingBottom: idx === arr.length - 1 ? '0' : '16px',
-                          borderBottom: idx === arr.length - 1 ? 'none' : '1px solid #f1f5f9',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '6px'
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{
-                              fontSize: '9px',
-                              fontWeight: 800,
-                              color: '#475569',
-                              background: '#f1f5f9',
-                              padding: '2px 8px',
-                              borderRadius: '100px',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.04em'
-                            }}>
-                              {item.target_type === 'all' ? 'Alle' : item.target_type === 'teachers' ? 'Lehrer' : item.target_type === 'students' ? 'Schüler' : 'Mitteilung'}
-                            </span>
-                            <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 650 }}>
-                              {new Date(item.created_at).toLocaleDateString('de-DE')}
-                            </span>
-                          </div>
-                          
-                          <h5 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>
-                            {item.title}
-                          </h5>
-                          
-                          <p style={{ fontSize: '0.78rem', color: '#475569', margin: 0, fontWeight: 500, lineHeight: 1.4 }}>
-                            {item.content}
-                          </p>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-
               {/* ÜBE-ZIEL WIDGET (Crowdfunding-Stil) */}
               {classGoals.length > 0 && (
                 <div style={{
@@ -4752,6 +4690,68 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   </div>
                 </div>
               )}
+
+              {/* LIVE CAMPUS FEED */}
+              <div style={{ 
+                background: '#ffffff', 
+                borderRadius: '24px', 
+                padding: '24px', 
+                boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                  <Sparkles size={18} color="#eab308" />
+                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Live Campus Feed</h3>
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {campusFeedAnnouncements.length === 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px 0', textAlign: 'center', opacity: 0.6 }}>
+                      <Sparkles size={24} color="#94a3b8" style={{ strokeWidth: 1.5 }} />
+                      <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
+                        Keine aktuellen Campus-Mitteilungen vorhanden.
+                      </span>
+                    </div>
+                  ) : (
+                    campusFeedAnnouncements.slice(0, 5).map((item, idx, arr) => {
+                      return (
+                        <div key={item.id} style={{
+                          paddingBottom: idx === arr.length - 1 ? '0' : '16px',
+                          borderBottom: idx === arr.length - 1 ? 'none' : '1px solid #f1f5f9',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '6px'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{
+                              fontSize: '9px',
+                              fontWeight: 800,
+                              color: '#475569',
+                              background: '#f1f5f9',
+                              padding: '2px 8px',
+                              borderRadius: '100px',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.04em'
+                            }}>
+                              {item.target_type === 'all' ? 'Alle' : item.target_type === 'teachers' ? 'Lehrer' : item.target_type === 'students' ? 'Schüler' : 'Mitteilung'}
+                            </span>
+                            <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 650 }}>
+                              {new Date(item.created_at).toLocaleDateString('de-DE')}
+                            </span>
+                          </div>
+                          
+                          <h5 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>
+                            {item.title}
+                          </h5>
+                          
+                          <p style={{ fontSize: '0.78rem', color: '#475569', margin: 0, fontWeight: 500, lineHeight: 1.4 }}>
+                            {item.content}
+                          </p>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
 
             </div>
 
