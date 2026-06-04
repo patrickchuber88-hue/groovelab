@@ -705,15 +705,17 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
     const sourceId = e.dataTransfer.getData('text/plain');
     if (!sourceId) return;
 
+    const sourceOcc = occurrences.find(o => o.id === sourceId);
+    const duration = sourceOcc?.duration || 30;
+
     const rect = e.currentTarget.getBoundingClientRect();
     const relativeY = e.clientY - rect.top;
     const droppedMinutes = dayBaselineMinutes + (relativeY / 2.5);
-    const snappedMinutes = Math.round(droppedMinutes / 15) * 15;
+    const snappedMinutes = Math.min(1440 - duration, Math.max(dayBaselineMinutes, Math.round(droppedMinutes / 15) * 15));
     const hours = Math.floor(snappedMinutes / 60) % 24;
     const mins = snappedMinutes % 60;
     const targetStartTime = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:00`;
 
-    const sourceOcc = occurrences.find(o => o.id === sourceId);
     if (sourceOcc) {
       const roomId = sourceOcc.schedules?.room_id || null;
       const conflict = getRoomConflict(sourceId, targetDateStr, targetStartTime, sourceOcc.duration, roomId);
@@ -1311,8 +1313,16 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
               return timeToMinutes(occ.start_time);
             });
             dayBaselineMinutes = Math.min(...origStarts);
-          } else if (dayOccurrences.length > 0) {
-            dayBaselineMinutes = timeToMinutes(dayOccurrences[0].start_time);
+          }
+          
+          const columnHeight = (1440 - dayBaselineMinutes) * 2.5;
+          const startHour = Math.ceil(dayBaselineMinutes / 60);
+          const markers = [];
+          for (let h = startHour; h <= 24; h++) {
+            markers.push({
+              hour: h,
+              top: (h * 60 - dayBaselineMinutes) * 2.5
+            });
           }
 
           return (
@@ -1328,8 +1338,34 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
               <div
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDropOnDay(e, dateStr, dayBaselineMinutes)}
-                style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', minHeight: '320px' }}
+                style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', height: `${columnHeight}px`, minHeight: `${columnHeight}px` }}
               >
+                {markers.map(m => (
+                  <div 
+                    key={m.hour} 
+                    style={{ 
+                      position: 'absolute', 
+                      left: 0, 
+                      right: 0, 
+                      top: `${m.top}px`, 
+                      borderTop: '1px dashed rgba(0, 0, 0, 0.05)', 
+                      height: 0,
+                      pointerEvents: 'none',
+                      zIndex: 0
+                    }}
+                  >
+                    <span style={{ 
+                      position: 'absolute', 
+                      left: '4px', 
+                      top: '-7px', 
+                      fontSize: '0.6rem', 
+                      color: 'rgba(0,0,0,0.25)', 
+                      fontWeight: 600 
+                    }}>
+                      {String(m.hour).padStart(2, '0')}:00
+                    </span>
+                  </div>
+                ))}
               {loading ? (
                 <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8', fontSize: '0.75rem' }}>Lade...</div>
               ) : dayOccurrences.length === 0 ? (
