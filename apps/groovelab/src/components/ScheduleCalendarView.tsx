@@ -90,8 +90,36 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
   }, [schoolId]);
 
   const occurrences: ScheduleOccurrence[] = useMemo(() => {
-    const merged = baseOccurrences.filter(o => !pendingChanges[o.id]);
-    Object.values(pendingChanges).forEach(p => merged.push(p));
+    const merged: ScheduleOccurrence[] = [];
+    baseOccurrences.forEach(o => {
+      const change = pendingChanges[o.id];
+      if (change) {
+        merged.push(change);
+        
+        const isRealStudent = o.student_id && o.student_id !== 'vacant';
+        const hasMoved = change.date !== o.date || change.start_time.substring(0, 5) !== o.start_time.substring(0, 5);
+        if (isRealStudent && hasMoved) {
+          merged.push({
+            id: `vacant-temp-${o.id}`,
+            student_id: 'vacant',
+            vacant_student_id: o.student_id || undefined,
+            teacher_id: o.teacher_id,
+            date: o.date,
+            start_time: o.start_time,
+            duration: o.duration,
+            status: 'scheduled',
+            student: {
+              first_name: '❇️ Freier Slot',
+              last_name: `(zuvor: ${o.student?.first_name || ''})`,
+              instrument: o.student?.instrument || ''
+            },
+            schedules: o.schedules
+          });
+        }
+      } else {
+        merged.push(o);
+      }
+    });
     return merged;
   }, [baseOccurrences, pendingChanges]);
 
