@@ -8802,8 +8802,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     e.preventDefault();
     if (!editingTemplateConfig) return;
     try {
+      let res;
       if (editingTemplateConfig.id) {
-        await supabase
+        res = await supabase
           .from('mission_templates')
           .update({
             title: editingTemplateConfig.title,
@@ -8816,7 +8817,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           })
           .eq('id', editingTemplateConfig.id);
       } else {
-        await supabase
+        res = await supabase
           .from('mission_templates')
           .insert({
             school_id: admin?.school_id,
@@ -8829,11 +8830,16 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             level_6_config: editingTemplateConfig.level_6_config,
           });
       }
+      
+      if (res.error) throw res.error;
+      
       setIsEditingTemplate(false);
       setEditingTemplateConfig(null);
+      alert('Vorlage erfolgreich gespeichert!');
       fetchData();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving template:', err);
+      alert('Fehler beim Speichern der Vorlage: ' + (err.message || err.details || err));
     }
   };
 
