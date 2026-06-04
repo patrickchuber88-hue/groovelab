@@ -4620,50 +4620,37 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 <div style={{
                   background: '#ffffff',
                   borderRadius: '24px',
-                  padding: '24px',
+                  padding: '18px 20px',
                   boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
                   fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif"
                 }}>
                   {/* Header */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '22px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
                     <div style={{
-                      width: '40px', height: '40px', borderRadius: '12px',
+                      width: '32px', height: '32px', borderRadius: '10px',
                       background: '#f0fdf4',
                       border: '1px solid #d1fae5',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      flexShrink: 0,
-                      boxShadow: '0 2px 8px rgba(16,185,129,0.06)'
+                      flexShrink: 0
                     }}>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 3C7.03 3 3 7.03 3 12C3 16.97 7.03 21 12 21C16.97 21 21 16.97 21 12V3H12ZM19 5V12C19 15.86 15.86 19 12 19C8.14 19 5 15.86 5 12C5 8.14 8.14 5 12 5H17.59L13.3 9.29C12.91 9.68 12.91 10.32 13.3 10.71C13.69 11.1 14.33 11.1 14.72 10.71L19 6.42V5Z" fill="#10b981"/>
                       </svg>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{
-                        fontSize: '0.62rem',
-                        fontWeight: 700,
-                        color: '#10b981',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.08em',
-                        lineHeight: '1.2'
-                      }}>
-                        Gemeinsam Stärker
-                      </span>
-                      <h3 style={{
-                        fontSize: '0.975rem',
-                        fontWeight: 700,
-                        color: '#1c1c1e',
-                        margin: '2px 0 0 0',
-                        letterSpacing: '-0.02em',
-                        lineHeight: '1.2'
-                      }}>
-                        Klassen-Übe-Ziel
-                      </h3>
-                    </div>
+                    <h3 style={{
+                      fontSize: '0.92rem',
+                      fontWeight: 750,
+                      color: '#1c1c1e',
+                      margin: 0,
+                      letterSpacing: '-0.02em',
+                      lineHeight: '1.2'
+                    }}>
+                      Klassen-Übe-Ziel
+                    </h3>
                   </div>
 
                   {/* Goals */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     {classGoals.map((goal: any) => {
                       const pct = goal.minutes > 0 ? Math.round((classWeeklyMins / goal.minutes) * 100) : 0;
                       const isDeadlinePassed = goal.deadline ? new Date(goal.deadline) < new Date() : false;
@@ -4679,12 +4666,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                           boxShadow: '0 8px 24px rgba(16, 185, 129, 0.12)',
                           borderRadius: '18px',
-                          padding: '20px'
+                          padding: '14px 16px'
                         }}>
                           {/* Goal Title */}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
                             <span style={{
-                              fontSize: '0.85rem',
+                              fontSize: '0.8rem',
                               fontWeight: 600,
                               color: '#ffffff',
                               letterSpacing: '-0.01em'
@@ -4692,18 +4679,18 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               {goal.title || 'Wochenziel'}
                             </span>
                             <span style={{
-                              fontSize: '0.72rem',
+                              fontSize: '0.7rem',
                               fontWeight: 500,
                               color: isAchieved ? '#a7f3d0' : 'rgba(255, 255, 255, 0.7)'
                             }}>
-                              {isAchieved ? 'Ziel erreicht 🎉' : `Noch ${Math.max(0, goal.minutes - classWeeklyMins)} Min.`}
+                              {isAchieved ? 'Erreicht 🎉' : `Noch ${Math.max(0, goal.minutes - classWeeklyMins)} Min.`}
                             </span>
                           </div>
 
                           {/* Large Number Metrics display */}
-                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '14px' }}>
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '10px' }}>
                             <span style={{
-                              fontSize: '2rem',
+                              fontSize: '1.6rem',
                               fontWeight: 300,
                               color: '#ffffff',
                               letterSpacing: '-0.04em',
@@ -4713,7 +4700,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               {classWeeklyMins}
                             </span>
                             <span style={{
-                              fontSize: '0.9rem',
+                              fontSize: '0.8rem',
                               fontWeight: 400,
                               color: 'rgba(255, 255, 255, 0.7)',
                               letterSpacing: '-0.01em'
@@ -4722,7 +4709,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             </span>
                             <span style={{
                               marginLeft: 'auto',
-                              fontSize: '1rem',
+                              fontSize: '0.95rem',
                               fontWeight: 600,
                               color: '#ffffff',
                               letterSpacing: '-0.02em',
@@ -4733,13 +4720,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           </div>
 
                           {/* Progress bar container */}
-                          <div style={{ position: 'relative', height: '6px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: '99px', marginBottom: '14px' }}>
+                          <div style={{ position: 'relative', height: '6px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: '99px', marginBottom: '10px' }}>
                             {/* Target marker (100% line) at 75% width */}
                             <div style={{
                               position: 'absolute',
                               left: '75%',
-                              top: '-3px',
-                              height: '12px',
+                              top: '-2px',
+                              height: '10px',
                               width: '2px',
                               background: '#ffffff',
                               zIndex: 3,
@@ -4760,20 +4747,20 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           {/* Footer with deadline */}
                           {goal.deadline && (
                             <div style={{
-                              fontSize: '0.66rem',
+                              fontSize: '0.62rem',
                               fontWeight: 500,
                               color: isDeadlinePassed ? '#ff8780' : 'rgba(255, 255, 255, 0.8)',
                               letterSpacing: '-0.01em',
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '6px',
+                              gap: '5px',
                               borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-                              paddingTop: '12px',
-                              marginTop: '4px'
+                              paddingTop: '8px',
+                              marginTop: '2px'
                             }}>
                               <span style={{
-                                width: '5px',
-                                height: '5px',
+                                width: '4px',
+                                height: '4px',
                                 borderRadius: '50%',
                                 background: isDeadlinePassed ? '#ff8780' : '#ffffff',
                                 display: 'inline-block'
