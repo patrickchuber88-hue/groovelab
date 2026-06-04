@@ -1368,36 +1368,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
               </div>
             </div>
 
-            {/* Gamified KPI Cards row */}
             <div style={{ display: 'flex', gap: '12px', alignItems: 'stretch' }}>
-              {/* Collapse toggle (Vertical) */}
-              <button
-                onClick={() => setKpiCollapsed(c => !c)}
-                title={kpiCollapsed ? 'KPIs aufklappen' : 'KPIs einklappen'}
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                  background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)',
-                  borderRadius: '16px', padding: '8px 6px', width: '32px',
-                  cursor: 'pointer', transition: 'all 0.2s',
-                  alignSelf: 'stretch'
-                }}
-              >
-                <svg width="10" height="10" viewBox="0 0 10 10" style={{ transition: 'transform 0.25s', transform: kpiCollapsed ? 'rotate(0deg)' : 'rotate(180deg)' }}>
-                  <path d="M2 3.5L5 6.5L8 3.5" stroke="#94a3b8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-                </svg>
-                <span style={{
-                  writingMode: 'vertical-rl',
-                  textTransform: 'uppercase',
-                  fontSize: '0.55rem',
-                  fontWeight: 800,
-                  color: '#94a3b8',
-                  letterSpacing: '0.08em',
-                  whiteSpace: 'nowrap'
-                }}>
-                  {kpiCollapsed ? 'KPIs auf' : 'KPIs zu'}
-                </span>
-              </button>
-
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', flex: 1 }}>
 
                 {/* Card 1: Heutige Stunden (Blue) */}
@@ -1489,6 +1460,39 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                 </div>
 
               </div>
+
+              {/* Collapse toggle (Vertical Glassmorphism Arrow Only with Light Glow Effect) */}
+              <button
+                onClick={() => setKpiCollapsed(c => !c)}
+                title={kpiCollapsed ? 'KPIs aufklappen' : 'KPIs einklappen'}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.05) 100%)',
+                  backdropFilter: 'blur(16px) saturate(1.8)',
+                  WebkitBackdropFilter: 'blur(16px) saturate(1.8)',
+                  border: '1px solid rgba(255, 255, 255, 0.25)',
+                  borderRadius: '14px', width: '28px',
+                  cursor: 'pointer', transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                  alignSelf: 'stretch',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+                  outline: 'none'
+                }}
+                className="hover-scale"
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.1) 100%)';
+                  e.currentTarget.style.boxShadow = '0 8px 32px rgba(255, 255, 255, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4)';
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.45)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.05) 100%)';
+                  e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2)';
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)';
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 10 10" style={{ transition: 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)', transform: kpiCollapsed ? 'rotate(0deg)' : 'rotate(180deg)' }}>
+                  <path d="M2 3.5L5 6.5L8 3.5" stroke="#f1f5f9" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                </svg>
+              </button>
             </div>
 
             {/* Terminänderungen & Alerts Widget */}
