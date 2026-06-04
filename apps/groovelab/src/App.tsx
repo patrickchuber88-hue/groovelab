@@ -6366,7 +6366,7 @@ function App() {
               ? '#fbbc05'
               : '#0b57d0',
           flexShrink: 0,
-          marginBottom: activePlatform === 'campus' && user.role?.toLowerCase() === 'student' ? '0px' : '10px'
+          marginBottom: activePlatform === 'campus' ? '0px' : '10px'
         }} />
 
 

@@ -3564,7 +3564,7 @@ export function TeacherDashboard({
 
       <div style={{
         flex: 1,
-        padding: hideHeader ? '0' : '10px',
+        padding: hideHeader ? '0' : (activeTab === 'briefing' ? '24px 10px 10px 10px' : '10px'),
         overflowY: activeTab === 'briefing' ? 'hidden' : 'auto',
         height: '100vh',
         boxSizing: 'border-box',
@@ -3644,11 +3644,11 @@ export function TeacherDashboard({
               {briefingLoading ? (
                 <div style={{ padding: '60px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Briefing wird geladen...</div>
               ) : briefingData ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                   
                   {/* AdminLTE style KPI Cards row (Bold Swiss design, now super-compact and strictly one-line) */}
                   {!teacher?.sick_until && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '8px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '0px' }}>
                     {/* Heutige Schüler Card (Blue) */}
                     <div style={{ 
                       position: 'relative', overflow: 'hidden', background: '#007bff', color: 'white',

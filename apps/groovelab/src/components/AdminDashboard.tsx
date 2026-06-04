@@ -8307,7 +8307,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   return (
     <div style={{ 
       flex: 1, 
-      padding: '14px 10px 10px 10px', 
+      padding: activePlatform === 'campus' 
+        ? (activeTab === 'live' ? '0px 10px 10px 10px' : '24px 10px 10px 10px') 
+        : '14px 10px 10px 10px', 
       overflowY: activeTab === 'live' ? 'hidden' : 'auto',
       height: activeTab === 'live' ? '100%' : 'auto',
       display: 'flex',

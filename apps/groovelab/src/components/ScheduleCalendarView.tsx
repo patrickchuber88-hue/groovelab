@@ -956,7 +956,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
             <CalendarIcon size={20} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em', whiteSpace: 'nowrap', display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+            <h2 style={{ fontSize: '28px', fontWeight: 900, color: '#1e293b', margin: 0, letterSpacing: '-0.02em', whiteSpace: 'nowrap', display: 'flex', alignItems: 'baseline', gap: '8px' }}>
               <span>KW {weekNumber}</span>
               <span style={{ color: '#86868b', fontSize: '0.78rem', fontWeight: 500 }}>
                 ({weekStart.toLocaleDateString('de-DE')} - {new Date(weekStart.getTime() + 6 * 86400000).toLocaleDateString('de-DE')})
@@ -1128,7 +1128,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                   );
 
                   const colors = isBreak 
-                    ? { bg: '#f5ebe0', border: '#b45309', text: '#78350f' } 
+                    ? { bg: 'rgba(254, 243, 199, 0.5)', border: '#f59e0b', text: '#b45309' } 
                     : isSick 
                       ? { bg: '#fee2e2', border: '#ef4444', text: '#991b1b' }
                       : getStatusColor(occ.status);
@@ -1175,8 +1175,22 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                       }}
                       style={{ 
                         background: cardBackground || finalColors.bg, 
-                        border: isRescheduled ? `1.5px solid ${finalColors.border}` : isVacant ? '1px dashed #10b981' : '1px solid rgba(255,255,255,0.4)',
-                        borderLeft: isRescheduled ? `5px solid ${finalColors.border}` : isVacant ? '3px dashed #10b981' : `3px solid ${finalColors.border}`,
+                        border: isRescheduled 
+                          ? `1.5px solid ${finalColors.border}` 
+                          : isVacant 
+                            ? '1px dashed #10b981' 
+                            : isBreak 
+                              ? '1.5px dashed rgba(245, 158, 11, 0.25)' 
+                              : isSick 
+                                ? '1px solid rgba(239, 68, 68, 0.15)' 
+                                : '1px solid rgba(16, 185, 129, 0.15)',
+                        borderLeft: isRescheduled 
+                          ? `5px solid ${finalColors.border}` 
+                          : isVacant 
+                            ? '3px dashed #10b981' 
+                            : isBreak 
+                              ? '4px solid #f59e0b' 
+                              : `3px solid ${finalColors.border}`,
                         borderRadius: '8px', 
                         padding: '8px',
                         cursor: isSick ? 'pointer' : isVacant ? 'pointer' : isBreak ? 'default' : 'grab',
@@ -1191,11 +1205,15 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <span style={{ fontSize: '0.75rem', fontWeight: 800, color: finalColors.text, background: 'rgba(0,0,0,0.04)', padding: '2px 4px', borderRadius: '4px' }}>
                             {occ.start_time.substring(0, 5)}
-                            {occ.schedules?.room?.name && (
-                              <span style={{ marginLeft: '4px', fontWeight: 600, opacity: 0.8, fontSize: '0.7rem' }}>
-                                ({occ.schedules.room.name})
-                              </span>
-                            )}
+                            {(() => {
+                              const roomId = occ.schedules?.room_id;
+                              const rName = roomId ? rooms.find(r => r.id === roomId)?.name : (occ.schedules?.room?.name || '');
+                              return rName ? (
+                                <span style={{ marginLeft: '4px', fontWeight: 600, opacity: 0.8, fontSize: '0.7rem' }}>
+                                  ({rName})
+                                </span>
+                              ) : null;
+                            })()}
                           </span>
                           {isSick && (
                             <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid #fecaca' }}>

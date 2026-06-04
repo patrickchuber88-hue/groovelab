@@ -206,7 +206,7 @@ export default function CampusDirectMessages({
 
   return (
     <div className="animation-slide-up" style={{ 
-      padding: '32px', 
+      padding: '24px 10px 10px 10px', 
       display: 'flex', 
       gap: '24px', 
       height: 'calc(100vh - 140px)', 
@@ -226,10 +226,10 @@ export default function CampusDirectMessages({
         flexShrink: 0
       }}>
         {/* Search & Header */}
-        <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', margin: '0' }}>Direct Chat</h3>
+              <h2 style={{ fontSize: '28px', fontWeight: 900, color: '#1e293b', margin: '0' }}>Direct Chat</h2>
               <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>
                 {isStudent ? 'Kommunikation mit deinen Lehrern' : 'Kommunikation mit deinen Schülern'}
               </p>
