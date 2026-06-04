@@ -4023,12 +4023,54 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 boxSizing: 'border-box',
                 overflow: 'hidden',
                 position: 'relative',
-                padding: '24px 190px 24px 32px'
+                padding: '24px 32px 24px 190px'
               }}>
                 {/* Background decorative music note */}
-                <Music size={140} style={{ position: 'absolute', left: '40%', bottom: '-30px', opacity: 0.02, color: '#007aff', pointerEvents: 'none' }} />
+                <Music size={140} style={{ position: 'absolute', right: '10%', bottom: '-30px', opacity: 0.02, color: '#007aff', pointerEvents: 'none' }} />
 
-                {/* Left Text & Info Column */}
+                {/* Left Instrument Avatar Sticker Container - Full Height */}
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  bottom: 0,
+                  left: 0,
+                  width: '160px',
+                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.1) 100%)',
+                  backdropFilter: 'blur(10px)',
+                  borderRight: '1px solid rgba(255, 255, 255, 0.6)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 2
+                }}>
+                  <img 
+                    src={
+                      studentUser?.photo_url && (
+                        studentUser.photo_url.includes('avatar') || 
+                        studentUser.photo_url.includes('gitarre') || 
+                        studentUser.photo_url.includes('bass') || 
+                        studentUser.photo_url.includes('drum') || 
+                        studentUser.photo_url.includes('piano') || 
+                        studentUser.photo_url.includes('klavier') || 
+                        studentUser.photo_url.includes('vocal') || 
+                        studentUser.photo_url.includes('trompete') || 
+                        studentUser.photo_url.includes('cello') || 
+                        studentUser.photo_url.includes('geige') || 
+                        studentUser.photo_url.includes('sax')
+                      )
+                        ? studentUser.photo_url
+                        : getInstrumentAvatarUrl(studentUser?.resolved_instrument || studentUser?.instrument)
+                    } 
+                    alt="" 
+                    style={{ 
+                      width: '100%', 
+                      height: '100%', 
+                      objectFit: 'cover'
+                    }} 
+                  />
+                </div>
+
+                {/* Right Text & Info Column */}
                 <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1, zIndex: 2 }}>
                   {/* Live Clock Badge */}
                   <div style={{
@@ -4138,48 +4180,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       <span>Nächster Unterricht: Demnächst</span>
                     </div>
                   )}
-                </div>
-
-                {/* Right Instrument Avatar Sticker Container - Full Height */}
-                <div style={{
-                  position: 'absolute',
-                  top: 0,
-                  bottom: 0,
-                  right: 0,
-                  width: '160px',
-                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.1) 100%)',
-                  backdropFilter: 'blur(10px)',
-                  borderLeft: '1px solid rgba(255, 255, 255, 0.6)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 2
-                }}>
-                  <img 
-                    src={
-                      studentUser?.photo_url && (
-                        studentUser.photo_url.includes('avatar') || 
-                        studentUser.photo_url.includes('gitarre') || 
-                        studentUser.photo_url.includes('bass') || 
-                        studentUser.photo_url.includes('drum') || 
-                        studentUser.photo_url.includes('piano') || 
-                        studentUser.photo_url.includes('klavier') || 
-                        studentUser.photo_url.includes('vocal') || 
-                        studentUser.photo_url.includes('trompete') || 
-                        studentUser.photo_url.includes('cello') || 
-                        studentUser.photo_url.includes('geige') || 
-                        studentUser.photo_url.includes('sax')
-                      )
-                        ? studentUser.photo_url
-                        : getInstrumentAvatarUrl(studentUser?.resolved_instrument || studentUser?.instrument)
-                    } 
-                    alt="" 
-                    style={{ 
-                      width: '100%', 
-                      height: '100%', 
-                      objectFit: 'cover'
-                    }} 
-                  />
                 </div>
               </div>
 
