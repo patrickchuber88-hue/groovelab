@@ -4618,13 +4618,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               {/* ÜBE-ZIEL WIDGET (Crowdfunding-Stil) */}
               {classGoals.length > 0 && (
                 <div style={{
-                  background: 'rgba(255, 255, 255, 0.85)',
-                  backdropFilter: 'blur(20px) saturate(190%)',
-                  WebkitBackdropFilter: 'blur(20px) saturate(190%)',
+                  background: '#ffffff',
                   borderRadius: '24px',
                   padding: '24px',
-                  boxShadow: '0 10px 40px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.01), inset 0 0 0 1px rgba(255, 255, 255, 0.5)',
-                  border: '1px solid rgba(0, 0, 0, 0.04)',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
                   fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif"
                 }}>
                    {/* Header */}
