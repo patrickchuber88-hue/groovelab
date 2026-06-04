@@ -3842,6 +3842,20 @@ export function TeacherDashboard({
                               minWidth: 0,
                               flex: 1 
                             }}>
+                              {/* Live Clock Badge above Hey */}
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                marginBottom: '6px',
+                                flexShrink: 0
+                              }}>
+                                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }} />
+                                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
+                                  {currentTimeStr || '13:00'} UHR
+                                </span>
+                              </div>
+
                               <h3 style={{ 
                                 margin: 0, 
                                 fontSize: '30px', 
@@ -3855,7 +3869,6 @@ export function TeacherDashboard({
                               }}>
                                 {dynamicGreeting.greeting}, <span style={{ 
                                   color: '#007aff', 
-                                  fontSize: '1.25rem',
                                   fontWeight: 900,
                                   letterSpacing: '-0.01em',
                                   display: 'inline-flex',
@@ -3869,26 +3882,6 @@ export function TeacherDashboard({
                                 {dynamicGreeting.subtitle}
                               </p>
                             </div>
-                          </div>
-                          
-                          {/* Live Clock Badge */}
-                          <div style={{
-                            alignSelf: 'center',
-                            marginRight: '20px',
-                            background: '#ffffff',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '12px',
-                            padding: '6px 12px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.01)',
-                            flexShrink: 0
-                          }}>
-                            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }} />
-                            <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569', letterSpacing: '0.02em', fontFamily: 'monospace' }}>
-                              {currentTimeStr || '13:00'} UHR
-                            </span>
                           </div>
                         </div>
                       )}
