@@ -8,7 +8,7 @@ const config = {
   host: '178.105.10.2',
   port: 22,
   username: 'root',
-  password: 'LlYoQzfwy$v=',
+  privateKey: fs.readFileSync('/Users/patrickhuber/.ssh/id_ed25519'),
   readyTimeout: 10000
 };
 
