@@ -4633,9 +4633,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       flexShrink: 0
                     }}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 3C7.03 3 3 7.03 3 12C3 16.97 7.03 21 12 21C16.97 21 21 16.97 21 12V3H12ZM19 5V12C19 15.86 15.86 19 12 19C8.14 19 5 15.86 5 12C5 8.14 8.14 5 12 5H17.59L13.3 9.29C12.91 9.68 12.91 10.32 13.3 10.71C13.69 11.1 14.33 11.1 14.72 10.71L19 6.42V5Z" fill="#10b981"/>
-                      </svg>
+                      <Target size={18} color="#10b981" />
                     </div>
                     <h3 style={{
                       fontSize: '0.92rem',
