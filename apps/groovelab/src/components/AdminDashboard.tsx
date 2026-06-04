@@ -6433,7 +6433,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                       style={{
                                         background: isOwnBooking && !b.isPreview ? leftAccentColor : bg,
                                         border: b.isPreview ? `2.2px dashed ${leftAccentColor}` : `1px solid ${hasConflict ? '#ff9500' : (isOwnBooking ? 'rgba(255, 255, 255, 0.15)' : leftAccentColor + '25')}`,
-                                        borderLeft: b.isPreview ? `2.2px dashed ${leftAccentColor}` : `3px solid ${hasConflict ? '#ff9500' : (isOwnBooking ? 'rgba(255, 255, 255, 0.45)' : leftAccentColor)}`,
+                                        borderLeft: b.isPreview ? `2.2px dashed ${leftAccentColor}` : `3px solid ${hasConflict ? '#ff9500' : (isOwnBooking ? brandColor : leftAccentColor)}`,
                                         borderRadius: '8px',
                                         padding: '6px 8px',
                                         fontSize: '0.70rem',
