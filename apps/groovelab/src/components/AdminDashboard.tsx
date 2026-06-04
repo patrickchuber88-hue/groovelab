@@ -228,6 +228,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
   // Campus Bookings states
   const [selectedCampusRoomId, setSelectedCampusRoomId] = useState<string>(() => rooms[0]?.id || '');
+  const [favoriteRoomId, setFavoriteRoomId] = useState<string | null>(() => localStorage.getItem(`groovelab_favorite_room_id_${userId}`));
   const consolidateBookings = (bookings: any[]) => {
     const timeToMins = (t: string) => {
       if (!t) return 0;
@@ -1718,7 +1719,17 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         }
         
         const { data: roomsData } = await roomsQuery.order('sort_order', { ascending: true });
-        if (roomsData) setRooms(roomsData);
+        if (roomsData) {
+          setRooms(roomsData);
+          const favKey = `groovelab_favorite_room_id_${userId}`;
+          const favoriteRoomId = localStorage.getItem(favKey);
+          if (favoriteRoomId) {
+            const favRoom = roomsData.find(r => r.id === favoriteRoomId);
+            if (favRoom) {
+              setSelectedCampusRoomId(favRoom.id);
+            }
+          }
+        }
 
         const { data: schedulesData } = await supabase
           .from('schedules')
@@ -6030,16 +6041,47 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                         opacity: 1
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', width: '100%' }}>
                         <div style={{ 
                           fontWeight: 800, 
                           fontSize: '0.85rem', 
                           color: isSelected ? brandColor : '#1c1c1e',
                           lineHeight: 1.25,
-                          wordBreak: 'break-word'
+                          wordBreak: 'break-word',
+                          flex: 1
                         }}>
                           {room.name}
                         </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const favKey = `groovelab_favorite_room_id_${userId}`;
+                            if (favoriteRoomId === room.id) {
+                              localStorage.removeItem(favKey);
+                              setFavoriteRoomId(null);
+                            } else {
+                              localStorage.setItem(favKey, room.id);
+                              setFavoriteRoomId(room.id);
+                            }
+                          }}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '2px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginLeft: '4px',
+                            flexShrink: 0
+                          }}
+                        >
+                          <Star
+                            size={14}
+                            fill={favoriteRoomId === room.id ? "#fbbf24" : "none"}
+                            color={favoriteRoomId === room.id ? "#fbbf24" : "#8e8e93"}
+                          />
+                        </button>
                       </div>
                       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', marginTop: 'auto' }}>
                         {occupiedNow ? (

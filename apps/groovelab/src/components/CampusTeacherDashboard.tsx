@@ -17,7 +17,8 @@ import {
   Award,
   Zap,
   Box,
-  Lock
+  Lock,
+  Star
 } from 'lucide-react';
 
 interface CampusTeacherDashboardProps {
@@ -72,6 +73,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
   // Board 6: Räume Overview & Bookings
   const [allSchoolSchedules, setAllSchoolSchedules] = useState<any[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<any>(null);
+  const [favoriteRoomId, setFavoriteRoomId] = useState<string | null>(() => localStorage.getItem(`groovelab_favorite_room_id_${userId}`));
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const [bookingDay, setBookingDay] = useState<number | null>(null);
   const [bookingSlot, setBookingSlot] = useState<string>('');
@@ -241,6 +243,13 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
       .order('sort_order', { ascending: true });
     setRooms(rData || []);
     // By default, no room should be visible (selectedRoom starts as null)
+    const favoriteRoomId = localStorage.getItem(`groovelab_favorite_room_id_${userId}`);
+    if (favoriteRoomId && rData) {
+      const favRoom = rData.find((r: any) => r.id === favoriteRoomId);
+      if (favRoom) {
+        setSelectedRoom(favRoom);
+      }
+    }
 
     // 3. Fetch Availabilities
     const { data: aData } = await supabase
@@ -2063,6 +2072,28 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                                 </p>
                               </div>
                             </div>
+                            
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const favKey = `groovelab_favorite_room_id_${userId}`;
+                                if (favoriteRoomId === room.id) {
+                                  localStorage.removeItem(favKey);
+                                  setFavoriteRoomId(null);
+                                } else {
+                                  localStorage.setItem(favKey, room.id);
+                                  setFavoriteRoomId(room.id);
+                                }
+                              }}
+                              className="p-1.5 rounded-lg hover:bg-slate-800 transition duration-150"
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', cursor: 'pointer' }}
+                            >
+                              <Star
+                                size={16}
+                                fill={favoriteRoomId === room.id ? "#fbbf24" : "none"}
+                                color={favoriteRoomId === room.id ? "#fbbf24" : "#64748b"}
+                              />
+                            </button>
                           </div>
 
                           <div className="mt-4 flex items-center justify-between border-t border-slate-800/40 pt-3 text-[11px] font-semibold text-slate-400">
