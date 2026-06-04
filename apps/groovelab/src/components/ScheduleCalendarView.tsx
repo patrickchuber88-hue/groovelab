@@ -1155,7 +1155,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1, minWidth: 0 }}>
-          <span style={{ color: '#1c1c1e', fontSize: '0.94rem', fontWeight: 700, whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>
+          <span style={{ color: '#86868b', fontSize: '0.94rem', fontWeight: 700, whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>
             ({weekStart.toLocaleDateString('de-DE')} - {new Date(weekStart.getTime() + 6 * 86400000).toLocaleDateString('de-DE')})
           </span>
         </div>
