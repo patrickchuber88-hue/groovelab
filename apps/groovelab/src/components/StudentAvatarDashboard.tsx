@@ -1264,6 +1264,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   }, [activeTab, studentId]);
 
   // progress matrix state
+  const [studentMissionProgress, setStudentMissionProgress] = useState<any | null>(null);
+  const [studentPins, setStudentPins] = useState<any[]>([]);
+  const [pinInput, setPinInput] = useState('');
+  const [customAvatarFile, setCustomAvatarFile] = useState<File | null>(null);
+  const [isUploadingCustomAvatar, setIsUploadingCustomAvatar] = useState(false);
   const [progressItems, setProgressItems] = useState<any[]>([]);
   const [progressLoading, setProgressLoading] = useState(false);
   const [lehrwerke, setLehrwerke] = useState<any[]>([]);
@@ -1938,12 +1943,110 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         setBriefingLoading(false);
       }
 
+      try {
+        const { data: missionData } = await supabase
+          .from('student_missions')
+          .select('*, mission_templates(*)')
+          .eq('student_id', studentId)
+          .maybeSingle();
+
+        setStudentMissionProgress(missionData);
+
+        const { data: pinsData } = await supabase
+          .from('one_time_upload_pins')
+          .select('*')
+          .eq('student_id', studentId);
+        
+        setStudentPins(pinsData || []);
+      } catch (err) {
+        console.warn('Failed to load student missions progress:', err);
+      }
     } catch (err: any) {
       console.error('Error loading student avatar:', err);
       setError('Fehler beim Laden des Profils.');
       setBriefingLoading(false);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUploadAvatarWithPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customAvatarFile) {
+      alert('Bitte wähle zuerst ein Bild aus.');
+      return;
+    }
+    if (!pinInput.trim()) {
+      alert('Bitte gib die PIN ein.');
+      return;
+    }
+
+    setIsUploadingCustomAvatar(true);
+    try {
+      const { data: matchedPins, error: pinErr } = await supabase
+        .from('one_time_upload_pins')
+        .select('*')
+        .eq('student_id', studentId)
+        .eq('pin_code', pinInput.trim())
+        .eq('is_used', false);
+      
+      if (pinErr || !matchedPins || matchedPins.length === 0) {
+        alert('Ungültige oder bereits verwendete PIN!');
+        setIsUploadingCustomAvatar(false);
+        return;
+      }
+
+      const activePin = matchedPins[0];
+
+      const fileExt = customAvatarFile.name.split('.').pop();
+      const fileName = `${studentId}_avatar_${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      const { data: uploadData, error: uploadErr } = await supabase.storage
+        .from('groovelab-assets')
+        .upload(filePath, customAvatarFile);
+      
+      let finalPublicUrl = '';
+      if (uploadErr) {
+        console.warn('Storage upload failed, falling back to data URL:', uploadErr);
+        const reader = new FileReader();
+        finalPublicUrl = await new Promise((resolve) => {
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(customAvatarFile);
+        });
+      } else {
+        const { data: publicUrlData } = supabase.storage
+          .from('groovelab-assets')
+          .getPublicUrl(filePath);
+        finalPublicUrl = publicUrlData.publicUrl;
+      }
+
+      await supabase
+        .from('users')
+        .update({ photo_url: finalPublicUrl })
+        .eq('id', studentId);
+      
+      await supabase
+        .from('one_time_upload_pins')
+        .update({ is_used: true, used_at: new Date().toISOString() })
+        .eq('id', activePin.id);
+
+      if (studentMissionProgress && studentMissionProgress.current_level === 2) {
+        await supabase
+          .from('student_missions')
+          .update({ current_level: 3, unlocked_at: new Date().toISOString() })
+          .eq('student_id', studentId);
+      }
+
+      alert('Erfolgreich! Dein Bild wurde hochgeladen und dein Level wurde aktualisiert.');
+      setPinInput('');
+      setCustomAvatarFile(null);
+      fetchStudentAndAvatar();
+    } catch (err: any) {
+      console.error('Error during pin upload:', err);
+      alert('Fehler beim Upload: ' + err.message);
+    } finally {
+      setIsUploadingCustomAvatar(false);
     }
   };
 
@@ -4566,6 +4669,180 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Missions Board / Adventure Map */}
+          <div style={{
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            borderRadius: '24px',
+            padding: '24px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.02)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px',
+            marginTop: '20px'
+          }}>
+            <h3 style={{ margin: 0, fontWeight: 900, fontSize: '1.25rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              🗺️ Mein Abenteuer-Pfad (Schuljahr)
+            </h3>
+            
+            {/* Visual curved/horizontal node path */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', padding: '24px 10px', overflowX: 'auto', gap: '24px' }}>
+              <div style={{ position: 'absolute', left: '40px', right: '40px', top: '50%', height: '4px', background: '#cbd5e1', zIndex: 1, transform: 'translateY(-50%)' }} />
+              <div style={{
+                position: 'absolute',
+                left: '40px',
+                width: `${Math.min(100, Math.max(0, (( (studentMissionProgress?.current_level || 1) - 1) / 5) * 100))}%`,
+                top: '50%',
+                height: '4px',
+                background: '#16a34a',
+                zIndex: 2,
+                transform: 'translateY(-50%)',
+                transition: 'width 0.5s ease'
+              }} />
+              
+              {[1, 2, 3, 4, 5, 6].map(lvl => {
+                const sLvl = studentMissionProgress?.current_level || 1;
+                const isCompleted = sLvl > lvl;
+                const isCurrent = sLvl === lvl;
+                const isLocked = sLvl < lvl;
+                
+                return (
+                  <div key={lvl} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', zIndex: 3, position: 'relative', minWidth: '70px' }}>
+                    <div style={{
+                      width: '44px',
+                      height: '44px',
+                      borderRadius: '50%',
+                      background: isCompleted ? '#16a34a' : isCurrent ? '#ffffff' : '#cbd5e1',
+                      border: isCurrent ? '4px solid #16a34a' : '4px solid transparent',
+                      color: isCompleted ? '#ffffff' : isCurrent ? '#16a34a' : '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 900,
+                      fontSize: '1rem',
+                      boxShadow: isCurrent ? '0 0 15px rgba(22, 163, 74, 0.3)' : 'none',
+                      transition: 'all 0.3s'
+                    }}>
+                      {lvl}
+                    </div>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: isCurrent ? '#16a34a' : '#64748b', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      {lvl === 1 ? 'Start 1 Song' : lvl === 2 ? 'Upload PIN' : lvl === 3 ? '3 Songs' : `Level ${lvl}`}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Current Level Requirement details */}
+            <div style={{ background: '#f8fafc', padding: '18px', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e293b' }}>
+                Aktuelles Ziel: Stufe {studentMissionProgress?.current_level || 1}
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.5 }}>
+                {(studentMissionProgress?.current_level || 1) === 1 && (
+                  <div>
+                    🎯 <strong>Ziel:</strong> Schließe deinen ersten Song erfolgreich ab (1 Song).<br />
+                    Erledigt: {progressItems.filter((i: any) => i.is_stage_ready).length >= 1 ? '✅ Ja' : '❌ Noch kein Song abgeschlossen.'}
+                  </div>
+                )}
+                {(studentMissionProgress?.current_level || 1) === 2 && (
+                  <div>
+                    🎯 <strong>Ziel:</strong> Erreiche eine 7-Tage-Übestreak (große Flamme) + 15 Minuten Fokus-Üben am Stück.<br />
+                    Dein aktueller Streak: {avatar?.streak_flame || 0} von 7 Tagen.
+                  </div>
+                )}
+                {(studentMissionProgress?.current_level || 1) === 3 && (
+                  <div>
+                    🎯 <strong>Ziel:</strong> Schließe mindestens 3 Songs erfolgreich ab.<br />
+                    Erledigt: {progressItems.filter((i: any) => i.is_stage_ready).length} von 3 Songs.
+                  </div>
+                )}
+                {(studentMissionProgress?.current_level || 1) > 3 && (
+                  <div>
+                    🎯 <strong>Ziel:</strong> Folge deinem Lehrplan und schließe fortlaufend neue Songs ab!
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* PIN Code Verification Card (Level 2 specific upload unlock) */}
+            {(studentMissionProgress?.current_level || 1) >= 2 && (
+              <div style={{ border: '2px dashed #bbf7d0', background: '#f0fdf4', borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <h4 style={{ margin: '0 0 4px 0', fontWeight: 900, color: '#166534', fontSize: '1rem' }}>
+                    🔓 Custom Avatar / Instrument Upload freigeschaltet!
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '0.78rem', color: '#15803d', lineHeight: 1.4 }}>
+                    Trage deine einmalige PIN ein, die du von deinem Lehrer erhalten hast, um dein eigenes Profilbild/Instrumenten-Foto hochzuladen.
+                  </p>
+                </div>
+
+                {/* AI Prompt Assistant helper */}
+                <div style={{ background: '#ffffff', border: '1px solid #dcfce7', padding: '12px', borderRadius: '12px' }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                    💡 Prompt-Assistent für KI-Generatoren (z.B. Midjourney, DALL-E)
+                  </span>
+                  <div style={{ fontSize: '0.75rem', color: '#1e293b', fontStyle: 'italic', background: '#f8fafc', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                    <span id="promptText">"Ein cooler Musik-Hero im Comic-Stil mit einem {studentUser?.instrument || 'Gitarre'}, leuchtende Farben, Profilbild, quadratisch"</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const txt = document.getElementById('promptText')?.innerText || '';
+                        navigator.clipboard.writeText(txt);
+                        alert('Prompt kopiert!');
+                      }}
+                      style={{ background: '#e2e8f0', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer' }}
+                    >
+                      Kopieren
+                    </button>
+                  </div>
+                </div>
+
+                <form onSubmit={handleUploadAvatarWithPin} style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'flex-end' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: '160px' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#15803d' }}>6-stellige Einmal-PIN</label>
+                    <input
+                      type="text"
+                      placeholder="z.B. 123456"
+                      value={pinInput}
+                      onChange={e => setPinInput(e.target.value)}
+                      maxLength={8}
+                      style={{ padding: '8px 12px', borderRadius: '10px', border: '1.5px solid #a7f3d0', fontWeight: 700 }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1.5, minWidth: '200px' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#15803d' }}>Foto auswählen</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={e => setCustomAvatarFile(e.target.files?.[0] || null)}
+                      style={{ fontSize: '0.75rem', color: '#475569' }}
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isUploadingCustomAvatar}
+                    style={{
+                      background: '#16a34a',
+                      color: 'white',
+                      border: 'none',
+                      padding: '10px 18px',
+                      borderRadius: '12px',
+                      fontWeight: 800,
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 12px rgba(22, 163, 74, 0.2)'
+                    }}
+                  >
+                    {isUploadingCustomAvatar ? 'Wird hochgeladen...' : 'Bild hochladen'}
+                  </button>
+                </form>
+              </div>
+            )}
           </div>
         </div>
       )}
