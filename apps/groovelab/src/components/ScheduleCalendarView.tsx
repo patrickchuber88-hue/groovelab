@@ -762,7 +762,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
           if (!change.student_id || change.student_id === 'vacant') {
             continue;
           }
-          const { id, student, original_start_time, ...insertData } = change;
+          const { id, student, original_start_time, schedules, ...insertData } = change;
           insertData.original_date = insertData.original_date || change.date;
           
           if (!insertData.student_id) {
