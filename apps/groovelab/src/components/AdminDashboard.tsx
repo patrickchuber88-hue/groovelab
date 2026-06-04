@@ -2056,6 +2056,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         let ssq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
         if (activePlatform === 'campus') ssq = ssq.eq('is_campus_active', true);
         else ssq = ssq.eq('is_groovelab_active', true);
+        if (adminData.role === 'teacher') ssq = ssq.eq('teacher_id', adminData.id);
         const { data: studentsData } = await ssq.order('first_name');
         if (studentsData) setStudents(studentsData);
 
@@ -2069,7 +2070,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         
         const filteredSubs = (subData || []).filter((s: any) => {
           const u = Array.isArray(s.users) ? s.users[0] : s.users;
-          return u?.school_id === adminData.school_id;
+          const matchesSchool = u?.school_id === adminData.school_id;
+          const matchesTeacher = adminData.role !== 'teacher' || u?.teacher_id === adminData.id;
+          return matchesSchool && matchesTeacher;
         });
 
         const mappedSubs = filteredSubs.map((s: any) => ({
