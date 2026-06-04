@@ -8820,21 +8820,23 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                       transition: 'all 0.2s ease'
                     }}
                   >
-                    <div style={{
-                      position: 'absolute',
-                      top: '16px',
-                      right: '16px',
-                      background: isInLab ? '#d1fae5' : '#f1f5f9',
-                      color: isInLab ? '#065f46' : '#64748b',
-                      padding: '4px 10px',
-                      borderRadius: '8px',
-                      fontSize: '0.65rem',
-                      fontWeight: 900,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      {isInLab ? 'IM LAB' : 'HOME'}
-                    </div>
+                    {activePlatform !== 'campus' && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '16px',
+                        right: '16px',
+                        background: isInLab ? '#d1fae5' : '#f1f5f9',
+                        color: isInLab ? '#065f46' : '#64748b',
+                        padding: '4px 10px',
+                        borderRadius: '8px',
+                        fontSize: '0.65rem',
+                        fontWeight: 900,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
+                        {isInLab ? 'IM LAB' : 'HOME'}
+                      </div>
+                    )}
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <div style={{ width: '48px', height: '48px', borderRadius: '14px', overflow: 'hidden', border: '1.5px solid #f1f5f9' }}>
