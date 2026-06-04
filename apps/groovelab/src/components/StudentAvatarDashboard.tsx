@@ -4,9 +4,10 @@ import {
   Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, 
   ChevronRight, Coffee, Clock, Flame, BookOpen, Share2, Play, 
   Pause, RotateCcw, Volume2, Moon, QrCode, X, EyeOff, Zap, Music, Library, Calendar, Check, Target, MessageSquare, Send,
-  Pencil, User, Mail, Phone, MapPin, Activity, Camera, TrendingUp
+  Pencil, User, Mail, Phone, MapPin, Activity, Camera, TrendingUp, Users, Shield
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
+import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Tooltip } from 'recharts';
 
 const showMissionsFeature = false;
 
@@ -1387,6 +1388,18 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [totalFocusMinutes, setTotalFocusMinutes] = useState(0);
   const [classHighlights, setClassHighlights] = useState<any[]>([]);
   const [highlightsLoading, setHighlightsLoading] = useState(false);
+  const [myWeeklyFocus, setMyWeeklyFocus] = useState(0);
+  const [classWeeklyFocus, setClassWeeklyFocus] = useState(0);
+  const [classCount, setClassCount] = useState(0);
+  const [classMins, setClassMins] = useState(0);
+  const [otherClassMins, setOtherClassMins] = useState(0);
+
+  const formatMins = (mins: number) => {
+    if (mins < 60) return `${Math.round(mins)} Min.`;
+    const hrs = Math.floor(mins / 60);
+    const rem = Math.round(mins % 60);
+    return rem > 0 ? `${hrs} Std. ${rem} Min.` : `${hrs} Std.`;
+  };
 
   // DIGITAL DETOX TIMER STATE
   const [showDetox, setShowDetox] = useState(false);
@@ -1931,14 +1944,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     }
   };
 
-  const fetchClassHighlights = async (schoolId: string) => {
+  const fetchClassHighlights = async (schoolId: string, teacherId?: string | null) => {
     if (!schoolId) return;
     setHighlightsLoading(true);
     try {
       // 1. Fetch all students in this school
       const { data: schoolStudents } = await supabase
         .from('users')
-        .select('id, first_name, last_name')
+        .select('id, first_name, last_name, teacher_id')
         .eq('school_id', schoolId)
         .eq('role', 'student');
 
@@ -1947,32 +1960,53 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         return;
       }
 
+      // Filter classmates (same teacher)
+      const classmates = schoolStudents.filter(s => s.teacher_id === teacherId);
+      setClassCount(classmates.length);
+
       const studentIds = schoolStudents.map(s => s.id);
 
-      // 2. Fetch focus logs for this month for these students
+      // Get school reset date (opening_hours.campus_stats_reset_at or stats_reset_at)
+      let resetDate: Date | null = null;
+      try {
+        const { data: schoolData } = await supabase
+          .from('schools')
+          .select('opening_hours')
+          .eq('id', schoolId)
+          .single();
+        const oh = schoolData?.opening_hours;
+        const resetDateStr = oh?.campus_stats_reset_at || oh?.stats_reset_at;
+        if (resetDateStr) resetDate = new Date(resetDateStr);
+      } catch (err) {
+        console.warn('Could not load school reset date, using start of month:', err);
+      }
+
+      // 2. Fetch focus logs for this month/since reset date for these students
       const startOfCurrentMonth = new Date();
       startOfCurrentMonth.setDate(1);
       startOfCurrentMonth.setHours(0, 0, 0, 0);
+
+      const queryStartDate = resetDate && resetDate < startOfCurrentMonth ? resetDate : startOfCurrentMonth;
 
       const { data: focusLogs } = await supabase
         .from('fokus_logs')
         .select('user_id, duration_minutes, created_at')
         .in('user_id', studentIds)
-        .gte('created_at', startOfCurrentMonth.toISOString());
+        .gte('created_at', queryStartDate.toISOString());
 
       // 3. Fetch mastered song skills for this month for these students
       const { data: skills } = await supabase
         .from('user_song_skills')
         .select('user_id, progress_percent, instrument, is_stage_ready, last_practiced_at, songs(title)')
         .in('user_id', studentIds)
-        .gte('last_practiced_at', startOfCurrentMonth.toISOString());
+        .gte('last_practiced_at', queryStartDate.toISOString());
 
-      // 4. Compute highlights
+      // 4. Compute highlights for classmates ONLY
       const highlights: any[] = [];
       
-      schoolStudents.forEach((student: any) => {
-        const studentLogs = (focusLogs || []).filter(log => log.user_id === student.id);
-        const studentSkills = (skills || []).filter(sk => sk.user_id === student.id);
+      classmates.forEach((student: any) => {
+        const studentLogs = (focusLogs || []).filter(log => log.user_id === student.id && new Date(log.created_at) >= startOfCurrentMonth);
+        const studentSkills = (skills || []).filter(sk => sk.user_id === student.id && sk.last_practiced_at && new Date(sk.last_practiced_at) >= startOfCurrentMonth);
 
         const monthlyMins = studentLogs.reduce((sum: number, log: any) => sum + (log.duration_minutes || 0), 0);
 
@@ -2015,6 +2049,42 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           });
         });
       });
+
+      // 5. Calculate class total mins vs other school mins since resetDate (used for donut chart)
+      const filteredFocusLogs = (focusLogs || []).filter((log: any) => {
+        if (resetDate) {
+          return new Date(log.created_at) >= resetDate;
+        }
+        return new Date(log.created_at) >= startOfCurrentMonth;
+      });
+
+      let classMinsVal = 0;
+      let otherClassMinsVal = 0;
+      const classmateIdsSet = new Set(classmates.map(c => c.id));
+
+      filteredFocusLogs.forEach((log: any) => {
+        const mins = log.duration_minutes || 0;
+        if (classmateIdsSet.has(log.user_id)) {
+          classMinsVal += mins;
+        } else {
+          otherClassMinsVal += mins;
+        }
+      });
+
+      setClassMins(classMinsVal);
+      setOtherClassMins(otherClassMinsVal);
+
+      // 6. Calculate weekly focus minutes for classmates and current student (last 7 days)
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      
+      const weeklyLogs = (focusLogs || []).filter((log: any) => new Date(log.created_at) >= oneWeekAgo);
+      
+      const classWeeklySum = weeklyLogs.filter(log => classmateIdsSet.has(log.user_id)).reduce((sum, log) => sum + (log.duration_minutes || 0), 0);
+      const myWeeklySum = weeklyLogs.filter(log => log.user_id === studentId).reduce((sum, log) => sum + (log.duration_minutes || 0), 0);
+      
+      setClassWeeklyFocus(classWeeklySum);
+      setMyWeeklyFocus(myWeeklySum);
 
       setClassHighlights(highlights);
     } catch (err) {
@@ -2082,7 +2152,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       setTotalFocusMinutes(statsData?.total_focus_minutes || 0);
 
       if (user.school_id) {
-        fetchClassHighlights(user.school_id);
+        fetchClassHighlights(user.school_id, user.teacher_id);
       }
 
       // Fetch announcements matching student's school_id
@@ -3364,134 +3434,133 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       )}
 
       {activeTab === 'campus_cup' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <style>{`
-            @keyframes pulse-green {
-              0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); border-color: rgba(34, 197, 94, 0.8); }
-              70% { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); border-color: rgba(34, 197, 94, 0.8); }
-              100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); border-color: rgba(34, 197, 94, 0.8); }
-            }
-            .pulsing-own-school {
-              animation: pulse-green 2s infinite;
-              background-color: #f0fdf4 !important;
-              border: 2px solid #22c55e !important;
-            }
-          `}</style>
-
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
           {rankingLoading ? (
             <div style={{ padding: '60px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>
               Performance & Highlights werden geladen...
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }} className="animation-slide-up">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animation-slide-up">
               
-              {/* Top Header Card */}
-              <div className="glass-panel" style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(99, 102, 241, 0.15)', color: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Award size={24} />
-                </div>
-                <div>
-                  <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Performance & Highlights</h2>
-                  <p style={{ color: '#64748b', margin: '2px 0 0 0', fontWeight: 600, fontSize: '0.85rem' }}>Feiere deine persönlichen Lernfortschritte und sieh dir die Helden-Momente deiner Musikschule an.</p>
-                </div>
-              </div>
+              {/* Top Section: Header & Contribution */}
+              {(() => {
+                const brandColor = studentUser?.schools?.brand_color || '#16a34a';
+                const totalSchoolMins = classMins + otherClassMins;
+                const contributionPercent = totalSchoolMins > 0 
+                  ? Math.round((classMins / totalSchoolMins) * 100) 
+                  : 0;
 
-              {/* 4-column KPI Cards Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
-                {/* Card 1: Gesamtzeit (Blue-purple) */}
-                <div style={{
-                  position: 'relative', overflow: 'hidden',
-                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white',
-                  borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.3)',
-                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
-                  padding: '16px', boxSizing: 'border-box',
-                  border: '1px solid rgba(255, 255, 255, 0.1)'
-                }} className="hover-scale">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Gesamtzeit</span>
-                    <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
-                      <Clock size={14} color="white" />
+                const pieData = classMins === 0 && otherClassMins === 0 
+                  ? [
+                      { name: 'Unsere Klasse', value: 0.1, color: brandColor },
+                      { name: 'Restliche Schule', value: 0.9, color: '#e2e8f0' }
+                    ]
+                  : [
+                      { name: 'Unsere Klasse', value: classMins, color: brandColor },
+                      { name: 'Restliche Schule', value: otherClassMins, color: '#cbd5e1' }
+                    ];
+
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '32px', alignItems: 'stretch' }}>
+                    {/* Top Left: Header and summary cards */}
+                    <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+                        <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: `${brandColor}15`, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Award size={24} />
+                        </div>
+                        <div>
+                          <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Performance & Highlights</h2>
+                          <p style={{ color: '#64748b', margin: 0, fontWeight: 600, fontSize: '0.9rem' }}>Feiere die Lernfortschritte deiner Klasse und stärke die Motivation durch positives Feedback.</p>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                        {[
+                          { label: 'Deine Klasse', value: classCount, icon: Users, color: brandColor, bg: `${brandColor}08` },
+                          { label: 'Klassen-Übezeit (Gesamt)', value: formatMins(classMins), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
+                          { label: 'Klassen-Übezeit (Woche)', value: formatMins(classWeeklyFocus), icon: TrendingUp, color: '#10b981', bg: '#f0fdf4' },
+                          { label: 'Beitrag zur Schule', value: `${contributionPercent}%`, icon: Shield, color: '#6366f1', bg: '#f5f3ff' }
+                        ].map((stat, idx) => (
+                          <div key={idx} style={{ padding: '20px', background: stat.bg, borderRadius: '24px', border: `1px solid ${stat.color}15`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '120px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                              <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{stat.label}</span>
+                              <div style={{ padding: '6px', borderRadius: '8px', background: 'white', color: stat.color, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.02)' }}>
+                                <stat.icon size={16} />
+                              </div>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: '1.5rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', marginTop: '8px' }}>{stat.value}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Top Right: Donut Chart (Gemeinsamer Schul-Beitrag) */}
+                    <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
+                      <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', width: '100%', marginBottom: '4px', textAlign: 'left' }}>
+                        Gemeinsamer Schul-Beitrag
+                      </h3>
+                      <p style={{ fontSize: '0.75rem', color: '#64748b', width: '100%', margin: '0 0 16px 0', textAlign: 'left', fontWeight: 600 }}>
+                        Wie viel trägt deine Klasse bei?
+                      </p>
+
+                      <div style={{ width: '100%', height: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RechartsPieChart>
+                            <Pie
+                              data={pieData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={48}
+                              outerRadius={68}
+                              paddingAngle={3}
+                              dataKey="value"
+                            >
+                              {pieData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <Tooltip formatter={(value) => formatMins(Number(value))} />
+                          </RechartsPieChart>
+                        </ResponsiveContainer>
+                        
+                        <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                          <span style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', lineHeight: 1 }}>
+                            {contributionPercent}%
+                          </span>
+                          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '2px' }}>
+                            Anteil
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', marginTop: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: '#f8fafc', borderRadius: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: brandColor }} />
+                            <span style={{ fontSize: '0.72rem', fontWeight: 750, color: '#334155' }}>Unsere Klasse</span>
+                          </div>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>{formatMins(classMins)}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: '#f8fafc', borderRadius: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#cbd5e1' }} />
+                            <span style={{ fontSize: '0.72rem', fontWeight: 750, color: '#64748b' }}>Restliche Schule</span>
+                          </div>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>{formatMins(otherClassMins)}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                    <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{totalFocusMinutes}</span>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>Min.</span>
-                  </div>
-                </div>
+                );
+              })()}
 
-                {/* Card 2: Monatsfokus (Green) */}
-                <div style={{
-                  position: 'relative', overflow: 'hidden',
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white',
-                  borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.3)',
-                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
-                  padding: '16px', boxSizing: 'border-box',
-                  border: '1px solid rgba(255, 255, 255, 0.1)'
-                }} className="hover-scale">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Monatszeit</span>
-                    <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
-                      <TrendingUp size={14} color="white" />
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                    <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{monthlyFocusMinutes}</span>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>Min.</span>
-                  </div>
-                </div>
-
-                {/* Card 3: Meister-Songs (Yellow) */}
-                <div style={{
-                  position: 'relative', overflow: 'hidden',
-                  background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: 'white',
-                  borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(234, 179, 8, 0.35)',
-                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
-                  padding: '16px', boxSizing: 'border-box',
-                  border: '1px solid rgba(255, 255, 255, 0.1)'
-                }} className="hover-scale">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Songs</span>
-                    <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
-                      <Award size={14} color="white" />
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                    <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                      {wrappedData?.monthlyFlashback?.masteredSongsCount || 0}
-                    </span>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>/ 3</span>
-                  </div>
-                </div>
-
-                {/* Card 4: Streak (Red) */}
-                <div style={{
-                  position: 'relative', overflow: 'hidden',
-                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: 'white',
-                  borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.3)',
-                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
-                  padding: '16px', boxSizing: 'border-box',
-                  border: '1px solid rgba(255, 255, 255, 0.1)'
-                }} className="hover-scale">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Streak</span>
-                    <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
-                      <Flame size={14} color="white" fill="white" />
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                    <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                      {avatar?.streak_flame || 0}
-                    </span>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>Tage</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Grid Section: Left (Highlights) | Right (Campus-Cup global ranking) */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px', alignItems: 'start' }}>
+              {/* Grid Section: Left (Highlights) | Right (Goals) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '32px', alignItems: 'start' }}>
                 
                 {/* Left Column: Helden-Momente */}
-                <div className="glass-panel" style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0', minHeight: '350px', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
+                <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', minHeight: '350px', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
                   <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                     <span>✨</span> Helden-Momente
                   </h3>
@@ -3531,7 +3600,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           <div style={{ flex: 1 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '8px' }}>
                               <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a' }}>{hl.studentName}</span>
-                              <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#0b57d0', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                              <span style={{ fontSize: '0.65rem', fontWeight: 900, color: studentUser?.schools?.brand_color || '#16a34a', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                                 {hl.title}
                               </span>
                             </div>
@@ -3545,207 +3614,157 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   </div>
                 </div>
 
-                {/* Right Column: Campus-Cup Ranking */}
-                <div className="glass-panel" style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
-                  
-                  {/* Header */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid #f1f5f9', paddingBottom: '14px' }}>
-                    <div style={{ background: '#fef3c7', color: '#d97706', padding: '8px', borderRadius: '12px' }}>
-                      <Trophy size={18} />
-                    </div>
-                    <div>
-                      <h4 style={{ fontWeight: 800, fontSize: '1.1rem', color: '#1e293b', margin: 0 }}>Campus-Cup</h4>
-                      <p style={{ fontSize: '0.7rem', color: '#94a3b8', margin: '2px 0 0 0', fontWeight: 600 }}>Globales Ranking aller Musikschulen (RFI Index)</p>
-                    </div>
+                {/* Right Column: Übe-Ziele der Klasse */}
+                <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                      <span>🌱</span> Übe-Ziele der Klasse
+                    </h3>
                   </div>
 
-                  {rankingError ? (
-                    <div style={{
-                      background: '#fef2f2',
-                      border: '1.5px solid #fca5a5',
-                      padding: '24px',
-                      borderRadius: '24px',
-                      textAlign: 'center',
-                      color: '#991b1b',
-                      fontWeight: 700
-                    }}>
-                      {rankingError}
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
-                      
-                      {/* Render Top 3 */}
-                      {rankingData.slice(0, 3).map((item) => {
-                        const medal = item.rank === 1 ? '🥇' : item.rank === 2 ? '🥈' : item.rank === 3 ? '🥉' : `#${item.rank}`;
-                        return (
-                          <div
-                            key={item.name}
-                            className={item.isOwnSchool ? 'pulsing-own-school' : ''}
-                            style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              background: item.isOwnSchool ? '#f0fdf4' : '#f8fafc',
-                              border: item.isOwnSchool ? '2px solid #22c55e' : '1px solid #e2e8f0',
-                              padding: '12px 14px',
-                              borderRadius: '16px',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <span style={{ fontWeight: 900, fontSize: '1.1rem', color: '#64748b', width: '28px', textAlign: 'center' }}>{medal}</span>
-                              <span style={{ fontWeight: 800, fontSize: '0.8rem', color: '#1e293b' }}>
-                                {item.name} {item.isOwnSchool && <span style={{ fontSize: '0.6rem', background: '#dcfce7', color: '#15803d', padding: '2px 6px', borderRadius: '100px', marginLeft: '6px', fontWeight: 900 }}>EIGEN</span>}
-                              </span>
+                  {(() => {
+                    const brandColor = studentUser?.schools?.brand_color || '#16a34a';
+                    const targets = classGoals || [];
+                    const totalGoals = targets.length;
+                    const masteredGoals = targets.filter((target: any) => {
+                      const targetPercent = Math.round((classWeeklyFocus / target.minutes) * 100);
+                      return targetPercent >= 100;
+                    }).length;
+                    const highestPercent = targets.length > 0 
+                      ? Math.max(...targets.map((target: any) => Math.round((classWeeklyFocus / target.minutes) * 100)))
+                      : 0;
+
+                    return (
+                      <>
+                        {totalGoals > 0 && (
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '16px', marginBottom: '20px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                              <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Missionen</span>
+                              <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', marginTop: '2px' }}>{totalGoals}</span>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <span style={{ fontWeight: 900, fontSize: '0.85rem', color: '#0f172a' }}>{item.rfi}</span>
-                              <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>RFI</span>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', borderLeft: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0' }}>
+                              <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Geknackt</span>
+                              <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#10b981', marginTop: '2px' }}>{masteredGoals}</span>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                              <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Peak</span>
+                              <span style={{ fontSize: '1.05rem', fontWeight: 900, color: brandColor, marginTop: '2px' }}>{highestPercent}%</span>
                             </div>
                           </div>
-                        );
-                      })}
+                        )}
 
-                      {/* Sandwich Window rendering */}
-                      {(() => {
-                        const ownIndex = rankingData.findIndex(item => item.isOwnSchool);
-                        if (ownIndex === -1 || ownIndex < 3) return null;
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          {totalGoals === 0 ? (
+                            <p style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', margin: '20px 0', fontWeight: 600 }}>
+                              Keine aktiven Ziele angelegt.
+                            </p>
+                          ) : (
+                            targets.map((target: any) => {
+                              const targetPercent = Math.round((classWeeklyFocus / target.minutes) * 100);
+                              const isDeadlinePassed = target.deadline ? new Date(target.deadline) < new Date() : false;
+                              
+                              const maxPercentOnBar = 133;
+                              const visualWidth = Math.min(100, (targetPercent / maxPercentOnBar) * 100);
+                              const isAchieved = targetPercent >= 100;
 
-                        const predecessor = rankingData[ownIndex - 1];
-                        const ownSchool = rankingData[ownIndex];
-                        const successor = rankingData[ownIndex + 1];
-                        const diff = predecessor ? (predecessor.rfi - ownSchool.rfi).toFixed(1) : '0.0';
-
-                        return (
-                          <>
-                            {/* Divider */}
-                            <div style={{
-                              display: 'flex',
-                              justifyContent: 'center',
-                              color: '#94a3b8',
-                              fontWeight: 900,
-                              fontSize: '1.1rem',
-                              letterSpacing: '0.15em',
-                              padding: '4px 0'
-                            }}>
-                              •••
-                            </div>
-
-                            {/* Predecessor */}
-                            {predecessor && (
-                              <div
-                                key={predecessor.name}
-                                style={{
+                              return (
+                                <div key={target.id} style={{
+                                  position: 'relative',
                                   display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center',
-                                  background: '#f8fafc',
-                                  border: '1px solid #e2e8f0',
+                                  flexDirection: 'column',
+                                  background: '#10b981',
+                                  boxShadow: '0 6px 20px rgba(16, 185, 129, 0.12)',
+                                  borderRadius: '16px',
                                   padding: '12px 14px',
-                                  borderRadius: '16px'
-                                }}
-                              >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                  <span style={{ fontWeight: 900, fontSize: '0.85rem', color: '#64748b', width: '28px', textAlign: 'center' }}>#{predecessor.rank}</span>
-                                  <span style={{ fontWeight: 800, fontSize: '0.8rem', color: '#1e293b' }}>{predecessor.name}</span>
+                                  gap: '8px'
+                                }}>
+                                  {/* Row 1: Title, Deadline on left & Percentage on right */}
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
+                                      <span style={{
+                                        fontSize: '0.8rem',
+                                        fontWeight: 700,
+                                        color: '#ffffff',
+                                        letterSpacing: '-0.01em',
+                                        lineHeight: '1.25',
+                                        whiteSpace: 'normal',
+                                        wordBreak: 'break-word'
+                                      }}>
+                                        {target.title || 'Challenge'}
+                                      </span>
+                                      {target.deadline && (
+                                        <span style={{
+                                          fontSize: '0.62rem',
+                                          fontWeight: 500,
+                                          color: isDeadlinePassed ? '#ff8780' : 'rgba(255, 255, 255, 0.75)',
+                                          lineHeight: '1.2',
+                                          whiteSpace: 'normal'
+                                        }}>
+                                          bis {new Date(target.deadline).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                                          {isDeadlinePassed && ' (abgelaufen)'}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span style={{
+                                      fontSize: '1.1rem',
+                                      fontWeight: 800,
+                                      color: '#ffffff',
+                                      letterSpacing: '-0.02em',
+                                      fontFeatureSettings: '"tnum"',
+                                      flexShrink: 0,
+                                      alignSelf: 'flex-start'
+                                    }}>
+                                      {targetPercent}%
+                                    </span>
+                                  </div>
+
+                                  {/* Progress bar container */}
+                                  <div style={{ position: 'relative', height: '6px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: '99px' }}>
+                                    {/* Target marker (100% line) at 75% width */}
+                                    <div style={{
+                                      position: 'absolute',
+                                      left: '75%',
+                                      top: '-2px',
+                                      height: '10px',
+                                      width: '2px',
+                                      background: '#ffffff',
+                                      zIndex: 3,
+                                      borderRadius: '99px'
+                                    }} />
+
+                                    {/* Bar fill */}
+                                    <div style={{
+                                      width: `${visualWidth}%`,
+                                      height: '100%',
+                                      background: '#ffffff',
+                                      borderRadius: '99px',
+                                      transition: 'width 1.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                                      boxShadow: '0 0 6px rgba(255, 255, 255, 0.25)'
+                                    }} />
+                                  </div>
+
+                                  {/* Row 3: Current / Target & Status label */}
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', gap: '10px' }}>
+                                    <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontFeatureSettings: '"tnum"', fontWeight: 500, whiteSpace: 'normal' }}>
+                                      <span style={{ fontWeight: 700, color: '#ffffff' }}>{classWeeklyFocus}</span> / {target.minutes} Min.
+                                    </span>
+                                    <span style={{
+                                      fontWeight: 700,
+                                      color: isAchieved ? '#a7f3d0' : 'rgba(255, 255, 255, 0.8)',
+                                      whiteSpace: 'normal',
+                                      textAlign: 'right'
+                                    }}>
+                                      {isAchieved ? 'Erreicht 🎉' : `Noch ${Math.max(0, target.minutes - classWeeklyFocus)} Min.`}
+                                    </span>
+                                  </div>
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  <span style={{ fontWeight: 900, fontSize: '0.85rem', color: '#0f172a' }}>{predecessor.rfi}</span>
-                                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>RFI</span>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Own School (Pulsing Green) */}
-                            <div
-                              key={ownSchool.name}
-                              className="pulsing-own-school"
-                              style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                padding: '12px 14px',
-                                borderRadius: '16px'
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <span style={{ fontWeight: 900, fontSize: '0.85rem', color: '#15803d', width: '28px', textAlign: 'center' }}>#{ownSchool.rank}</span>
-                                <span style={{ fontWeight: 800, fontSize: '0.8rem', color: '#166534' }}>
-                                  {ownSchool.name} <span style={{ fontSize: '0.6rem', background: '#dcfce7', color: '#15803d', padding: '2px 6px', borderRadius: '100px', marginLeft: '6px', fontWeight: 900 }}>EIGEN</span>
-                                </span>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <span style={{ fontWeight: 900, fontSize: '0.85rem', color: '#15803d' }}>{ownSchool.rfi}</span>
-                                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#15803d', opacity: 0.7, textTransform: 'uppercase' }}>RFI</span>
-                              </div>
-                            </div>
-
-                            {/* Successor */}
-                            {successor && (
-                              <div
-                                key={successor.name}
-                                style={{
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center',
-                                  background: '#f8fafc',
-                                  border: '1px solid #e2e8f0',
-                                  padding: '12px 14px',
-                                  borderRadius: '16px'
-                                }}
-                              >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                  <span style={{ fontWeight: 900, fontSize: '0.85rem', color: '#64748b', width: '28px', textAlign: 'center' }}>#{successor.rank}</span>
-                                  <span style={{ fontWeight: 800, fontSize: '0.8rem', color: '#1e293b' }}>{successor.name}</span>
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  <span style={{ fontWeight: 900, fontSize: '0.85rem', color: '#0f172a' }}>{successor.rfi}</span>
-                                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>RFI</span>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Live Difference Calculator */}
-                            {predecessor && (
-                              <div style={{
-                                background: '#eff6ff',
-                                border: '1px solid #bfdbfe',
-                                padding: '10px 14px',
-                                borderRadius: '16px',
-                                color: '#1e40af',
-                                fontSize: '0.75rem',
-                                fontWeight: 750,
-                                textAlign: 'center',
-                                marginTop: '4px'
-                              }}>
-                                🚀 Noch <strong>+{diff} RFI</strong> bis Platz {predecessor.rank}!
-                              </div>
-                            )}
-                          </>
-                        );
-                      })()}
-
-                      {/* Achievement Note */}
-                      <div style={{
-                        background: '#f0fdf4',
-                        border: '1.5px solid #bbf7d0',
-                        padding: '10px 14px',
-                        borderRadius: '16px',
-                        color: '#15803d',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        boxShadow: '0 4px 12px rgba(22, 163, 74, 0.05)',
-                        marginTop: '4px'
-                      }}>
-                        <span style={{ fontSize: '1.1rem', fontWeight: 900 }}>✓</span>
-                        <span>Du hast diesen Monat <strong>{monthlyFocusMinutes} Min.</strong> zum Erfolg deiner Schule beigetragen!</span>
-                      </div>
-
-                    </div>
-                  )}
+                              );
+                            })
+                          )}
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
 
               </div>
