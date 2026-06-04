@@ -4010,29 +4010,32 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
               {/* Welcome Block */}
               <div style={{
-                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.5) 100%)',
+                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.65) 100%)',
                 backdropFilter: 'blur(20px) saturate(1.6)',
                 WebkitBackdropFilter: 'blur(20px) saturate(1.6)',
-                border: '1px solid rgba(255, 255, 255, 0.7)',
+                border: '1px solid rgba(255, 255, 255, 0.8)',
                 borderRadius: '24px',
                 display: 'flex',
                 alignItems: 'center',
-                boxShadow: '0 8px 32px rgba(15, 23, 42, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
+                boxShadow: '0 10px 40px rgba(15, 23, 42, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
                 width: '100%',
                 boxSizing: 'border-box',
                 overflow: 'hidden',
                 position: 'relative',
-                padding: '24px 28px'
+                padding: '24px 32px'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flex: 1, minWidth: 0 }}>
+                {/* Background decorative music note */}
+                <Music size={140} style={{ position: 'absolute', right: '-20px', bottom: '-30px', opacity: 0.03, color: '#007aff', pointerEvents: 'none' }} />
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '28px', flex: 1, minWidth: 0, position: 'relative', zIndex: 2 }}>
                   {/* Instrument Avatar on the left */}
                   <div style={{
-                    width: '80px',
-                    height: '80px',
-                    borderRadius: '20px',
-                    background: 'rgba(255, 255, 255, 0.9)',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.04)',
-                    border: '1.5px solid rgba(255, 255, 255, 0.8)',
+                    width: '84px',
+                    height: '84px',
+                    borderRadius: '50%',
+                    background: '#ffffff',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.04), 0 0 0 4px rgba(255, 255, 255, 0.8)',
+                    border: '1px solid rgba(0, 0, 0, 0.05)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -4058,8 +4061,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       } 
                       alt="" 
                       style={{ 
-                        width: '75%', 
-                        height: '75%', 
+                        width: '70%', 
+                        height: '70%', 
                         objectFit: 'contain'
                       }} 
                     />
@@ -4077,22 +4080,23 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       alignItems: 'center',
                       gap: '6px',
                       background: '#ffffff',
-                      border: '1px solid rgba(0, 0, 0, 0.05)',
+                      border: '1px solid rgba(0, 0, 0, 0.04)',
                       borderRadius: '100px',
-                      padding: '3px 8px',
+                      padding: '3px 10px',
                       alignSelf: 'flex-start',
                       marginBottom: '8px',
-                      flexShrink: 0
+                      flexShrink: 0,
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.01)'
                     }}>
-                      <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }} />
-                      <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
+                      <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }} />
+                      <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.05em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
                         {new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} UHR
                       </span>
                     </div>
 
                     <h3 style={{ 
                       margin: 0, 
-                      fontSize: '24px', 
+                      fontSize: '26px', 
                       fontWeight: 950, 
                       color: '#0f172a', 
                       fontFamily: "'Plus Jakarta Sans', sans-serif", 
@@ -4101,7 +4105,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       Hi, <span style={{ color: '#007aff', fontWeight: 900 }}>{studentUser?.first_name || 'Student'}</span>! 👋
                     </h3>
                     
-                    <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 650, lineHeight: 1.4 }}>
+                    <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#475569', fontWeight: 600, lineHeight: 1.45 }}>
                       Ein neuer Moment für Musik. Nimm dir heute ein paar Minuten für deine Übungsziele und sichere dir deine tägliche Serie!
                     </p>
 
@@ -4127,8 +4131,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         : nextOcc?.id;
     
                       return (
-                        <div style={{ marginTop: '12px', display: 'inline-flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.06)', color: '#10b981', padding: '5px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 800 }}>
+                        <div style={{ marginTop: '14px', display: 'inline-flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.06)', color: '#10b981', padding: '5px 12px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 800 }}>
                             <Calendar size={12} color="#10b981" />
                             <span>Nächster Unterricht: {hasToday ? `Heute, ${briefingData.todayLesson.time} Uhr` : (() => {
                               if(!nextOcc) return 'Demnächst';
