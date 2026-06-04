@@ -1557,11 +1557,30 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   }, [activeTab, activePlatform, bookingDate]);
 
   useEffect(() => {
-    if (forceTab) {
-      setActiveTab(forceTab);
-      localStorage.setItem(tabStorageKey, forceTab);
+    if (activeTab === 'rooms') {
+      const savedDate = localStorage.getItem('groovelab_selected_booking_date');
+      const savedRoomId = localStorage.getItem('groovelab_selected_booking_room_id');
+      const savedStartTime = localStorage.getItem('groovelab_selected_booking_start_time');
+      const savedEndTime = localStorage.getItem('groovelab_selected_booking_end_time');
+
+      if (savedDate) {
+        setBookingDate(savedDate);
+        localStorage.removeItem('groovelab_selected_booking_date');
+      }
+      if (savedRoomId) {
+        setSelectedCampusRoomId(savedRoomId);
+        localStorage.removeItem('groovelab_selected_booking_room_id');
+      }
+      if (savedStartTime) {
+        setBookingStartTime(savedStartTime);
+        localStorage.removeItem('groovelab_selected_booking_start_time');
+      }
+      if (savedEndTime) {
+        setBookingEndTime(savedEndTime);
+        localStorage.removeItem('groovelab_selected_booking_end_time');
+      }
     }
-  }, [forceTab]);
+  }, [activeTab]);
 
   const fetchData = async () => {
     let currentAdmin = admin;

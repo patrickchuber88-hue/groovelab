@@ -1457,6 +1457,18 @@ export function TeacherDashboard({
     };
   }, [userId, ticker]);
 
+  const handleBookingClick = (b: any) => {
+    if (b.date) localStorage.setItem('groovelab_selected_booking_date', b.date);
+    const rid = b.roomId || b.rooms?.id || '';
+    if (rid) localStorage.setItem('groovelab_selected_booking_room_id', rid);
+    if (b.startTime) localStorage.setItem('groovelab_selected_booking_start_time', b.startTime);
+    if (b.endTime) localStorage.setItem('groovelab_selected_booking_end_time', b.endTime);
+    
+    if (onTabChange) {
+      onTabChange('rooms');
+    }
+  };
+
   const [currentTimeStr, setCurrentTimeStr] = useState<string>(() => {
     const now = new Date();
     return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -4516,7 +4528,7 @@ export function TeacherDashboard({
                             const isCanceled = slot.status === 'canceled_by_student' || slot.status === 'teacher_sick' || slot.status === 'cancelled' || slot.status === 'canceled_by_teacher_sick';
                             const isRescheduledAway = slot.status === 'rescheduled_away';
                             const isFinished = currentTimeStr >= slotEnd;
-                            const isCurrentSlot = currentTimeStr >= slotStart && currentTimeStr < slotEnd;
+                            const isCurrentSlot = currentTimeStr >= slotStart && currentTimeStr < slotEnd && !isCanceled && !isRescheduledAway;
                             const isRescheduledPending = slot.status === 'rescheduled_pending' || slot.status === 'pending' || slot.status === 'pending_reschedule';
                             const isRescheduledConfirmed = slot.status === 'rescheduled_confirmed';
  
@@ -4772,7 +4784,7 @@ export function TeacherDashboard({
                                         padding: '4px 8px',
                                         borderRadius: '6px',
                                         border: isCurrentSlot && !isFinished && slot.student ? '1.5px solid #1a73e8' : 'none',
-                                        boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                                        boxShadow: isCurrentSlot && !isFinished && slot.student ? '0 1px 3px rgba(0,0,0,0.02)' : 'none',
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
@@ -5071,11 +5083,11 @@ export function TeacherDashboard({
                           </svg>
                         </span>
                         <h3 style={{ 
-                          fontSize: '1rem', fontWeight: 850, margin: 0,
+                          fontSize: '1rem', fontWeight: 855, margin: 0,
                           color: '#7f1d1d',
                           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
                         }}>
-                          Heute kra...
+                          Status & Abmeldung
                         </h3>
                       </div>
                       
@@ -5309,9 +5321,12 @@ export function TeacherDashboard({
                   {(() => {
                     if (adminFeedbackRequests.length === 0) {
                       return (
-                        <span style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>
-                          Keine aktuellen Mitteilungen oder Anfragen vorhanden.
-                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px 0', textAlign: 'center', opacity: 0.6 }}>
+                          <Bell size={24} color="#94a3b8" style={{ strokeWidth: 1.5 }} />
+                          <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
+                            Keine neuen Mitteilungen oder Anfragen vorhanden.
+                          </span>
+                        </div>
                       );
                     }
 
@@ -5319,7 +5334,7 @@ export function TeacherDashboard({
                       const openItems = adminFeedbackRequests.filter(r => !adminFeedbackResponses.find(res => res.request_id === r.id));
                       if (openItems.length === 0) {
                         return (
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '12px 0', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px 0', textAlign: 'center' }}>
                             <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Alle Anfragen beantwortet!</span>
                           </div>
                         );
@@ -5444,9 +5459,12 @@ export function TeacherDashboard({
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {campusFeedAnnouncements.length === 0 ? (
-                    <span style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>
-                      Keine aktuellen Campus-Mitteilungen vorhanden.
-                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px 0', textAlign: 'center', opacity: 0.6 }}>
+                      <Sparkles size={24} color="#94a3b8" style={{ strokeWidth: 1.5 }} />
+                      <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
+                        Keine aktuellen Campus-Mitteilungen vorhanden.
+                      </span>
+                    </div>
                   ) : (
                     campusFeedAnnouncements.slice(0, 5).map((item, idx, arr) => {
                       return (
@@ -5468,7 +5486,7 @@ export function TeacherDashboard({
                               textTransform: 'uppercase',
                               letterSpacing: '0.04em'
                             }}>
-                              {item.target_type === 'all' ? 'Alle' : item.target_type === 'teachers' ? 'Lehrer' : 'Mitteilung'}
+                              {item.target_type === 'all' ? 'Alle' : item.target_type === 'teachers' ? 'Lehrer' : item.target_type === 'students' ? 'Schüler' : 'Mitteilung'}
                             </span>
                             <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 650 }}>
                               {new Date(item.created_at).toLocaleDateString('de-DE')}
@@ -5503,9 +5521,12 @@ export function TeacherDashboard({
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {myBookings.length === 0 ? (
-                    <span style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>
-                      Keine Buchungen in den nächsten 2 Wochen.
-                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px 0', textAlign: 'center', opacity: 0.6 }}>
+                      <Calendar size={24} color="#94a3b8" style={{ strokeWidth: 1.5 }} />
+                      <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
+                        Keine Buchungen in den nächsten 2 Wochen.
+                      </span>
+                    </div>
                   ) : (
                     myBookings.map((b: any) => {
                       const dateObj = new Date(b.date);
@@ -5520,16 +5541,30 @@ export function TeacherDashboard({
                       const roomColor = isPendingReschedule ? '#007aff' : '#7c3aed';
 
                       return (
-                        <div key={b.id} style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '4px',
-                          padding: '10px 14px',
-                          background: bg,
-                          border: border,
-                          borderLeft: borderLeft,
-                          borderRadius: '12px'
-                        }}>
+                        <div 
+                          key={b.id} 
+                          onClick={() => handleBookingClick(b)}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px',
+                            padding: '12px 14px',
+                            background: bg,
+                            border: border,
+                            borderLeft: borderLeft,
+                            borderRadius: '16px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.01)'
+                          }}
+                          className="hover-scale"
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.04)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.01)';
+                          }}
+                        >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#0f172a' }}>
                               {dateFormatted} • {b.startTime} - {b.endTime}

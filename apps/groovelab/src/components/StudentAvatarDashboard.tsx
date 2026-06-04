@@ -178,6 +178,7 @@ interface MobileBriefingViewProps {
   handleAcknowledgeCancellation: (occId: string) => Promise<void>;
   getISOWeek: (date?: string | Date) => string;
   handleTabChangeLocal: (tab: string) => void;
+  campusFeedAnnouncements: any[];
 }
 
 function MobileBriefingView({
@@ -195,7 +196,8 @@ function MobileBriefingView({
   handleConfirmReschedule,
   handleAcknowledgeCancellation,
   getISOWeek,
-  handleTabChangeLocal
+  handleTabChangeLocal,
+  campusFeedAnnouncements
 }: MobileBriefingViewProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '4px' }}>
@@ -712,30 +714,64 @@ function MobileBriefingView({
       })()}
 
       {/* LIVE CAMPUS FEED MOBILE */}
-      <div style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px' }}>
-          <Sparkles size={16} color="#eab308" />
-          <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Live Campus</h3>
+      <div style={{ 
+        background: '#ffffff', 
+        borderRadius: '24px', 
+        padding: '24px', 
+        boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+          <Sparkles size={18} color="#eab308" />
+          <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Live Campus Feed</h3>
         </div>
-
+        
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-              <span style={{ background: '#fef08a', color: '#854d0e', fontSize: '0.58rem', fontWeight: 800, padding: '2px 6px', borderRadius: '100px' }}>AKTION</span>
-              <span style={{ fontSize: '0.62rem', color: '#94a3b8' }}>Heute</span>
+          {campusFeedAnnouncements.length === 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px 0', textAlign: 'center', opacity: 0.6 }}>
+              <Sparkles size={24} color="#94a3b8" style={{ strokeWidth: 1.5 }} />
+              <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
+                Keine aktuellen Campus-Mitteilungen vorhanden.
+              </span>
             </div>
-            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b', marginBottom: '2px' }}>🎸 Sommer Rock-Bandcamp</div>
-            <div style={{ fontSize: '0.75rem', color: '#475569', lineHeight: 1.3 }}>Melde dich an! Frist endet in 4 Tagen.</div>
-          </div>
-
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-              <span style={{ background: '#fee2e2', color: '#b91c1c', fontSize: '0.58rem', fontWeight: 800, padding: '2px 6px', borderRadius: '100px' }}>WICHTIG</span>
-              <span style={{ fontSize: '0.62rem', color: '#94a3b8' }}>Vor 2 Tagen</span>
-            </div>
-            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b', marginBottom: '2px' }}>🎹 Neue Digitalpianos im Studio 3</div>
-            <div style={{ fontSize: '0.75rem', color: '#475569', lineHeight: 1.3 }}>Ab sofort stehen Yamaha Masterpianos bereit!</div>
-          </div>
+          ) : (
+            campusFeedAnnouncements.slice(0, 5).map((item, idx, arr) => {
+              return (
+                <div key={item.id} style={{
+                  paddingBottom: idx === arr.length - 1 ? '0' : '16px',
+                  borderBottom: idx === arr.length - 1 ? 'none' : '1px solid #f1f5f9',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{
+                      fontSize: '9px',
+                      fontWeight: 800,
+                      color: '#475569',
+                      background: '#f1f5f9',
+                      padding: '2px 8px',
+                      borderRadius: '100px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em'
+                    }}>
+                      {item.target_type === 'all' ? 'Alle' : item.target_type === 'teachers' ? 'Lehrer' : item.target_type === 'students' ? 'Schüler' : 'Mitteilung'}
+                    </span>
+                    <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 650 }}>
+                      {new Date(item.created_at).toLocaleDateString('de-DE')}
+                    </span>
+                  </div>
+                  
+                  <h5 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>
+                    {item.title}
+                  </h5>
+                  
+                  <p style={{ fontSize: '0.78rem', color: '#475569', margin: 0, fontWeight: 500, lineHeight: 1.4 }}>
+                    {item.content}
+                  </p>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 
@@ -784,6 +820,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [appointmentChatData, setAppointmentChatData] = useState<{ teacherId: string; date: string; start_time: string; label: string; occurrenceId?: string } | null>(null);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [chatTypedMessage, setChatTypedMessage] = useState('');
+  const [campusFeedAnnouncements, setCampusFeedAnnouncements] = useState<any[]>([]);
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
 
   const fetchChat = async (teacherId: string, occurrenceId?: string) => {
@@ -1781,6 +1818,31 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         .eq('student_id', studentId)
         .maybeSingle();
       setMonthlyFocusMinutes(statsData?.monthly_focus_minutes || 0);
+
+      // Fetch announcements matching student's school_id
+      try {
+        const { data: annData, error: annErr } = await supabase
+          .from('campus_announcements')
+          .select('*, users(first_name, last_name, photo_url)')
+          .eq('school_id', user.school_id)
+          .order('created_at', { ascending: false });
+
+        if (!annErr && annData) {
+          const parsed = annData.map(ann => ({
+            id: ann.id,
+            title: ann.title,
+            content: ann.message,
+            target_type: ann.target_type || 'all',
+            created_at: ann.created_at,
+            user: ann.users
+          }));
+          setCampusFeedAnnouncements(parsed.filter(ann => ann.target_type === 'all' || ann.target_type === 'students'));
+        } else {
+          setCampusFeedAnnouncements([]);
+        }
+      } catch (aErr) {
+        console.error('Error fetching student announcements:', aErr);
+      }
 
       // 3. Fetch daily briefing
       try {
@@ -3530,6 +3592,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             handleAcknowledgeCancellation={handleAcknowledgeCancellation}
             getISOWeek={getISOWeek}
             handleTabChangeLocal={handleTabChangeLocal}
+            campusFeedAnnouncements={campusFeedAnnouncements}
           />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -4220,42 +4283,64 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               })()}
 
               {/* LIVE CAMPUS FEED */}
-              <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px' }}>
+              <div style={{ 
+                background: '#ffffff', 
+                borderRadius: '24px', 
+                padding: '24px', 
+                boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
                   <Sparkles size={18} color="#eab308" />
                   <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Live Campus Feed</h3>
                 </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  {/* Feed Item 1 */}
-                  <div style={{ position: 'relative' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ background: '#fef08a', color: '#854d0e', fontSize: '0.65rem', fontWeight: 800, padding: '4px 8px', borderRadius: '100px' }}>AKTION</span>
-                      <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Heute</span>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {campusFeedAnnouncements.length === 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px 0', textAlign: 'center', opacity: 0.6 }}>
+                      <Sparkles size={24} color="#94a3b8" style={{ strokeWidth: 1.5 }} />
+                      <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
+                        Keine aktuellen Campus-Mitteilungen vorhanden.
+                      </span>
                     </div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', marginBottom: '6px' }}>🎸 Sommer Rock-Bandcamp 2026</div>
-                    <div style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.5 }}>Melde dich jetzt für unser Band-Camp an! Frist endet in 4 Tagen.</div>
-                  </div>
-
-                  {/* Feed Item 2 */}
-                  <div style={{ position: 'relative' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ background: '#fee2e2', color: '#b91c1c', fontSize: '0.65rem', fontWeight: 800, padding: '4px 8px', borderRadius: '100px' }}>WICHTIG</span>
-                      <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Vor 2 Tagen</span>
-                    </div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', marginBottom: '6px' }}>🎹 Neue Digitalpianos im Studio 3</div>
-                    <div style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.5 }}>Ab sofort stehen euch 4 neue Yamaha Masterpianos zum Üben bereit!</div>
-                  </div>
-
-                  {/* Feed Item 3 */}
-                  <div style={{ position: 'relative' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ background: '#dcfce7', color: '#15803d', fontSize: '0.65rem', fontWeight: 800, padding: '4px 8px', borderRadius: '100px' }}>ERFOLG</span>
-                      <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Vor 3 Tagen</span>
-                    </div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', marginBottom: '6px' }}>🎉 Stuttgart knackt die 400</div>
-                    <div style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.5 }}>Über 400 aktive Musiker am Campus Stuttgart! Wir feiern euch.</div>
-                  </div>
+                  ) : (
+                    campusFeedAnnouncements.slice(0, 5).map((item, idx, arr) => {
+                      return (
+                        <div key={item.id} style={{
+                          paddingBottom: idx === arr.length - 1 ? '0' : '16px',
+                          borderBottom: idx === arr.length - 1 ? 'none' : '1px solid #f1f5f9',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '6px'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{
+                              fontSize: '9px',
+                              fontWeight: 800,
+                              color: '#475569',
+                              background: '#f1f5f9',
+                              padding: '2px 8px',
+                              borderRadius: '100px',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.04em'
+                            }}>
+                              {item.target_type === 'all' ? 'Alle' : item.target_type === 'teachers' ? 'Lehrer' : item.target_type === 'students' ? 'Schüler' : 'Mitteilung'}
+                            </span>
+                            <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 650 }}>
+                              {new Date(item.created_at).toLocaleDateString('de-DE')}
+                            </span>
+                          </div>
+                          
+                          <h5 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>
+                            {item.title}
+                          </h5>
+                          
+                          <p style={{ fontSize: '0.78rem', color: '#475569', margin: 0, fontWeight: 500, lineHeight: 1.4 }}>
+                            {item.content}
+                          </p>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
 
