@@ -4033,8 +4033,8 @@ export function TeacherDashboard({
                       {/* Card 1: Heutige Schüler (Blue) */}
                       <div style={{
                         position: 'relative', overflow: 'hidden',
-                        background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', color: 'white',
-                        borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.35)',
+                        background: 'linear-gradient(135deg, #0b57d0 0%, #3b82f6 100%)', color: 'white',
+                        borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(11, 87, 208, 0.25)',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
                         padding: '14px 16px', boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -4055,8 +4055,8 @@ export function TeacherDashboard({
                       {/* Card 2: Geburtstage Heute (Green) */}
                       <div style={{
                         position: 'relative', overflow: 'hidden',
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white',
-                        borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.35)',
+                        background: 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)', color: 'white',
+                        borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(22, 163, 74, 0.25)',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
                         padding: '14px 16px', boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -4075,17 +4075,17 @@ export function TeacherDashboard({
                       {/* Card 3: Tages-Pensum (Yellow) */}
                       <div style={{
                         position: 'relative', overflow: 'hidden',
-                        background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: 'white',
-                        borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(234, 179, 8, 0.4)',
+                        background: 'linear-gradient(135deg, #eab308 0%, #facc15 100%)', color: '#1f2937',
+                        borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(234, 179, 8, 0.3)',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
                         padding: '14px 16px', boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        border: '1px solid rgba(255, 255, 255, 0.12)'
+                        border: '1px solid rgba(0, 0, 0, 0.05)'
                       }} className="hover-scale">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                           <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Tages-Pensum</span>
-                          <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px' }}>
-                            <Clock size={13} color="white" />
+                          <div style={{ background: 'rgba(0,0,0,0.08)', padding: '5px', borderRadius: '9px' }}>
+                            <Clock size={13} color="#1f2937" />
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
@@ -4096,8 +4096,8 @@ export function TeacherDashboard({
                       {/* Card 4: Ausfälle Heute (Red) */}
                       <div style={{
                         position: 'relative', overflow: 'hidden',
-                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: 'white',
-                        borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.35)',
+                        background: 'linear-gradient(135deg, #ea580c 0%, #f97316 100%)', color: 'white',
+                        borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(234, 88, 12, 0.25)',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
                         padding: '14px 16px', boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
