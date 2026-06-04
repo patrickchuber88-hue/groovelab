@@ -4628,12 +4628,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   {/* Header */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' }}>
                     <div style={{
-                      width: '30px', height: '30px', borderRadius: '8px',
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      width: '38px', height: '38px', borderRadius: '50%',
+                      background: '#ffffff',
+                      border: '2px solid #10b981',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      flexShrink: 0, boxShadow: '0 3px 8px rgba(16,185,129,0.22)'
+                      flexShrink: 0, boxShadow: '0 2px 8px rgba(16,185,129,0.18)'
                     }}>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="#10b981" xmlns="http://www.w3.org/2000/svg">
                         <path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 0 0 8 20C19 20 22 3 22 3c-1 2-8 2-13 6 4-4 6.25-6 10-7C18.5 2 19 1 17 8z"/>
                       </svg>
                     </div>
