@@ -2186,6 +2186,15 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     else sessionsSq = sessionsSq.eq('users.is_groovelab_active', true);
     const { data: sessions } = await sessionsSq;
 
+    // Fetch focus logs filtered by active students
+    let focusLogsSq = supabase
+      .from('fokus_logs')
+      .select('user_id, duration_minutes, created_at, users!inner(school_id, is_campus_active, is_groovelab_active)')
+      .eq('users.school_id', schoolId);
+    if (activePlatform === 'campus') focusLogsSq = focusLogsSq.eq('users.is_campus_active', true);
+    else focusLogsSq = focusLogsSq.eq('users.is_groovelab_active', true);
+    const { data: focusLogs } = await focusLogsSq;
+
     // Fetch skills filtered by active students and active songs
     let skillsSq = supabase
       .from('user_song_skills')
@@ -2210,41 +2219,31 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     let labMins = 0;
     let homeMins = 0;
     
-    const filteredSessions = (sessions || []).filter((s: any) => {
-      const checkInDate = new Date(s.check_in_time);
-      
-      // 1. Filter by stats reset date
-      if (resetDate && checkInDate < resetDate) return false;
-      
-      // 2. Check if within opening hours (enforce active day and custom hours if at station)
-      if (s.station_id && openingHours) {
-        const dayConfig = openingHours[dayNames[checkInDate.getDay()]];
-        if (!dayConfig || !dayConfig.active) return false;
-        
-        const startStr = dayConfig.start || "08:00";
-        const endStr = dayConfig.end || "20:00";
-        const [startH, startM] = startStr.split(':').map(Number);
-        const [endH, endM] = endStr.split(':').map(Number);
-        
-        const sessionH = checkInDate.getHours();
-        const sessionM = checkInDate.getMinutes();
-        
-        const sessionTime = sessionH * 60 + sessionM;
-        const startTime = startH * 60 + startM;
-        const endTime = endH * 60 + endM;
-        
-        if (sessionTime < startTime || sessionTime > endTime) return false;
-      }
+    const filteredFocusLogs = (focusLogs || []).filter((log: any) => {
+      const logDate = new Date(log.created_at);
+      if (resetDate && logDate < resetDate) return false;
       return true;
     });
 
-    filteredSessions.forEach((s: any) => {
-      const start = new Date(s.check_in_time);
-      const end = new Date(s.check_out_time!);
-      const mins = Math.max(0, Math.floor((end.getTime() - start.getTime()) / 60000));
+    filteredFocusLogs.forEach((log: any) => {
+      const mins = log.duration_minutes || 0;
       totalMins += mins;
-      if (s.station_id) labMins += mins;
-      else homeMins += mins;
+
+      // Classify as lab mins if there was an active school station check-in around this focus log
+      const logTime = new Date(log.created_at).getTime();
+      const isAtStation = (sessions || []).some((s: any) => {
+        if (s.user_id !== log.user_id || !s.station_id) return false;
+        const start = new Date(s.check_in_time).getTime();
+        const end = s.check_out_time ? new Date(s.check_out_time).getTime() : Date.now();
+        // 15 minutes tolerance on either side
+        return logTime >= start - 900000 && logTime <= end + 900000;
+      });
+
+      if (isAtStation) {
+        labMins += mins;
+      } else {
+        homeMins += mins;
+      }
     });
 
     // Mastered challenges count per instrument
@@ -2322,12 +2321,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
     const days = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
     const weekdayData = days.map((day, idx) => {
-      const mins = filteredSessions.filter((s: any) => new Date(s.check_in_time).getDay() === idx)
-        .reduce((acc: number, s: any) => {
-          const start = new Date(s.check_in_time);
-          const end = new Date(s.check_out_time!);
-          return acc + Math.max(0, Math.floor((end.getTime() - start.getTime()) / 60000));
-        }, 0);
+      const mins = filteredFocusLogs
+        .filter((log: any) => new Date(log.created_at).getDay() === idx)
+        .reduce((acc: number, log: any) => acc + (log.duration_minutes || 0), 0);
       return { day, mins: Math.round(mins / 60) };
     });
 
@@ -2337,26 +2333,22 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     const myStudents = (schoolStudents || []).filter((s: any) => s.teacher_id === userId);
     const myStudentIds = new Set(myStudents.map((s: any) => s.id));
 
-    filteredSessions.forEach((s: any) => {
-      if (s.check_in_time && s.check_out_time) {
-        const start = new Date(s.check_in_time);
-        const end = new Date(s.check_out_time);
-        const mins = Math.max(0, Math.floor((end.getTime() - start.getTime()) / 60000));
-        if (myStudentIds.has(s.user_id)) {
-          myClassMins += mins;
-        } else {
-          otherClassMins += mins;
-        }
+    filteredFocusLogs.forEach((log: any) => {
+      const mins = log.duration_minutes || 0;
+      if (myStudentIds.has(log.user_id)) {
+        myClassMins += mins;
+      } else {
+        otherClassMins += mins;
       }
     });
 
-    // Map sessions & skills for highlights
-    const studentSessionsMap: Record<string, any[]> = {};
-    (sessions || []).forEach((s: any) => {
-      const uId = s.user_id;
+    // Map focus logs & skills for highlights
+    const studentFocusLogsMap: Record<string, any[]> = {};
+    (focusLogs || []).forEach((log: any) => {
+      const uId = log.user_id;
       if (uId) {
-        if (!studentSessionsMap[uId]) studentSessionsMap[uId] = [];
-        studentSessionsMap[uId].push(s);
+        if (!studentFocusLogsMap[uId]) studentFocusLogsMap[uId] = [];
+        studentFocusLogsMap[uId].push(log);
       }
     });
 
@@ -2373,28 +2365,21 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     let classWeeklyMins = 0;
     const highlights: any[] = [];
     myStudents.forEach((student: any) => {
-      const studentSessions = studentSessionsMap[student.id] || [];
+      const studentLogs = studentFocusLogsMap[student.id] || [];
       const studentSkills = studentSkillsMap[student.id] || [];
 
       // Calculate recent focus minutes (last 7 days)
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-      const recentMins = studentSessions
-        .filter((s: any) => new Date(s.check_in_time) >= oneWeekAgo)
-        .reduce((sum: number, s: any) => {
-          if (s.check_in_time && s.check_out_time) {
-            const start = new Date(s.check_in_time);
-            const end = new Date(s.check_out_time);
-            return sum + Math.max(0, Math.floor((end.getTime() - start.getTime()) / 60000));
-          }
-          return sum;
-        }, 0);
+      const recentMins = studentLogs
+        .filter((log: any) => new Date(log.created_at) >= oneWeekAgo)
+        .reduce((sum: number, log: any) => sum + (log.duration_minutes || 0), 0);
       classWeeklyMins += recentMins;
 
       // Streak
       const weeks = new Set();
-      studentSessions.forEach((s: any) => {
-        const d = new Date(s.check_in_time);
+      studentLogs.forEach((log: any) => {
+        const d = new Date(log.created_at);
         const year = d.getFullYear();
         const firstDayOfYear = new Date(year, 0, 1);
         const pastDaysOfYear = (d.getTime() - firstDayOfYear.getTime()) / 86400000;
