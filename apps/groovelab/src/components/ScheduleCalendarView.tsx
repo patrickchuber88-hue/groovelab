@@ -97,14 +97,16 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
         merged.push(change);
         
         const isRealStudent = o.student_id && o.student_id !== 'vacant';
-        const hasMoved = change.date !== o.date || change.start_time.substring(0, 5) !== o.start_time.substring(0, 5);
+        const changeStartTime = change.start_time || '';
+        const oStartTime = o.start_time || '';
+        const hasMoved = change.date !== o.date || changeStartTime.substring(0, 5) !== oStartTime.substring(0, 5);
         
         const isSlotReoccupied = Object.values(pendingChanges).some(ch => 
           ch.id !== o.id && 
           ch.student_id && 
           ch.student_id !== 'vacant' &&
           ch.date === o.date && 
-          ch.start_time.substring(0, 5) === o.start_time.substring(0, 5)
+          (ch.start_time || '').substring(0, 5) === oStartTime.substring(0, 5)
         );
 
         if (isRealStudent && hasMoved && !isSlotReoccupied) {
@@ -534,7 +536,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
             const formattedTime = student.assignedTime ? `${student.assignedTime}:00` : '00:00:00';
             if (student.isBreak) {
               // Only project the break if there is no active/non-cancelled appointment occupying this slot
-              const isOccupied = fetchedData.some(o => o.date === dateStr && o.start_time.substring(0, 5) === student.assignedTime.substring(0, 5) && o.status !== 'cancelled');
+              const isOccupied = fetchedData.some(o => o.date === dateStr && o.start_time && (o.start_time || '').substring(0, 5) === (student.assignedTime || '').substring(0, 5) && o.status !== 'cancelled');
               if (!isOccupied) {
                 projectedData.push({
                   id: `mock-${board.id}-${student.id}`,
@@ -562,12 +564,12 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
               const dbRecord = fetchedData.find(o => o.student_id === student.id);
               
               // If there is no DB record, OR if the DB record has been rescheduled/moved away from this template day/time
-              const isRescheduledAway = dbRecord && (dbRecord.date !== dateStr || dbRecord.start_time.substring(0, 5) !== formattedTime.substring(0, 5));
+              const isRescheduledAway = dbRecord && (dbRecord.date !== dateStr || (dbRecord.start_time || '').substring(0, 5) !== (formattedTime || '').substring(0, 5));
               
               if (!dbRecord || isRescheduledAway) {
                 // If the student was rescheduled away, project a vacant placeholder to anchor the original time slot
                 // only if the slot is not already occupied by another active reschedule/swap record.
-                const isSlotOccupied = fetchedData.some(o => o.date === dateStr && o.start_time.substring(0, 5) === formattedTime.substring(0, 5) && o.student_id && o.student_id !== 'vacant');
+                const isSlotOccupied = fetchedData.some(o => o.date === dateStr && (o.start_time || '').substring(0, 5) === (formattedTime || '').substring(0, 5) && o.student_id && o.student_id !== 'vacant');
                 
                 if (isRescheduledAway && !isSlotOccupied) {
                   projectedData.push({
