@@ -3922,93 +3922,77 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
           {/* TOP 4 KPIs ROW */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
             
             {/* KPI 1: XP */}
             <div style={{ 
-              background: 'linear-gradient(135deg, #0b57d0 0%, #3b82f6 100%)', 
-              borderRadius: '16px', 
-              color: 'white', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '12px', 
-              padding: '12px 16px', 
-              position: 'relative', 
-              overflow: 'hidden', 
-              boxShadow: '0 4px 15px rgba(11, 87, 208, 0.1)' 
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.18)', borderRadius: '10px', width: '32px', height: '32px', flexShrink: 0 }}>
-                <Star size={16} fill="currentColor" />
+              position: 'relative', overflow: 'hidden', background: '#007aff', color: 'white',
+              borderRadius: '14px', boxShadow: '0 4px 12px rgba(0, 122, 255, 0.06)',
+              display: 'flex', alignItems: 'center', minHeight: '48px',
+              transition: 'all 0.25s ease'
+            }} className="hover-scale">
+              <div style={{ padding: '8px 12px', position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
+                <div style={{ fontSize: '1.25rem', fontWeight: 900, lineHeight: 1, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  {currentXp || 0}
+                </div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, opacity: 0.9, whiteSpace: 'nowrap' }}>XP gesammelt</div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Urbanist', sans-serif" }}>{currentXp || 0} XP</span>
-                <span style={{ fontSize: '0.65rem', fontWeight: 750, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>XP gesammelt</span>
+              <div style={{ position: 'absolute', top: '50%', right: '12px', transform: 'translateY(-50%)', zIndex: 1, opacity: 0.15, pointerEvents: 'none' }}>
+                <Star size={18} color="white" fill="white" />
               </div>
             </div>
 
             {/* KPI 2: Songs */}
             <div style={{ 
-              background: 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)', 
-              borderRadius: '16px', 
-              color: 'white', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '12px', 
-              padding: '12px 16px', 
-              position: 'relative', 
-              overflow: 'hidden', 
-              boxShadow: '0 4px 15px rgba(22, 163, 74, 0.1)' 
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.18)', borderRadius: '10px', width: '32px', height: '32px', flexShrink: 0 }}>
-                <Award size={16} />
+              position: 'relative', overflow: 'hidden', background: '#34c759', color: 'white',
+              borderRadius: '14px', boxShadow: '0 4px 12px rgba(52, 199, 89, 0.06)',
+              display: 'flex', alignItems: 'center', minHeight: '48px',
+              transition: 'all 0.25s ease'
+            }} className="hover-scale">
+              <div style={{ padding: '8px 12px', position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
+                <div style={{ fontSize: '1.25rem', fontWeight: 900, lineHeight: 1, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  {wrappedData?.monthlyFlashback?.masteredSongsCount || 0} / 3
+                </div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, opacity: 0.9, whiteSpace: 'nowrap' }}>Songs verifiziert</div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Urbanist', sans-serif" }}>{wrappedData?.monthlyFlashback?.masteredSongsCount || 0} / 3</span>
-                <span style={{ fontSize: '0.65rem', fontWeight: 750, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>Songs verifiziert</span>
+              <div style={{ position: 'absolute', top: '50%', right: '12px', transform: 'translateY(-50%)', zIndex: 1, opacity: 0.18, pointerEvents: 'none' }}>
+                <Award size={18} color="white" />
               </div>
             </div>
 
             {/* KPI 3: Fokus */}
             <div style={{ 
-              background: 'linear-gradient(135deg, #eab308 0%, #facc15 100%)', 
-              borderRadius: '16px', 
-              color: '#1f2937', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '12px', 
-              padding: '12px 16px', 
-              position: 'relative', 
-              overflow: 'hidden', 
-              boxShadow: '0 4px 15px rgba(234, 179, 8, 0.1)' 
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.06)', borderRadius: '10px', width: '32px', height: '32px', flexShrink: 0 }}>
-                <Clock size={16} />
+              position: 'relative', overflow: 'hidden', background: '#ffcc00', color: '#1c1c1e',
+              borderRadius: '14px', boxShadow: '0 4px 12px rgba(255, 204, 0, 0.06)',
+              display: 'flex', alignItems: 'center', minHeight: '48px',
+              transition: 'all 0.25s ease'
+            }} className="hover-scale">
+              <div style={{ padding: '8px 12px', position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
+                <div style={{ fontSize: '1.25rem', fontWeight: 900, lineHeight: 1, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#1c1c1e' }}>
+                  {wrappedData?.monthlyFlashback?.focusMinutes || 0} Min
+                </div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, opacity: 0.9, color: '#1c1c1e', whiteSpace: 'nowrap' }}>Fokus-Übezeit</div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Urbanist', sans-serif" }}>{wrappedData?.monthlyFlashback?.focusMinutes || 0} Min</span>
-                <span style={{ fontSize: '0.65rem', fontWeight: 750, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>Fokus-Übezeit</span>
+              <div style={{ position: 'absolute', top: '50%', right: '12px', transform: 'translateY(-50%)', zIndex: 1, opacity: 0.22, pointerEvents: 'none' }}>
+                <Clock size={18} color="#1c1c1e" />
               </div>
             </div>
 
             {/* KPI 4: Streak */}
             <div style={{ 
-              background: 'linear-gradient(135deg, #ea580c 0%, #f97316 100%)', 
-              borderRadius: '16px', 
-              color: 'white', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '12px', 
-              padding: '12px 16px', 
-              position: 'relative', 
-              overflow: 'hidden', 
-              boxShadow: '0 4px 15px rgba(234, 88, 12, 0.1)' 
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.18)', borderRadius: '10px', width: '32px', height: '32px', flexShrink: 0 }}>
-                <Flame size={16} />
+              position: 'relative', overflow: 'hidden', background: '#ff3b30', color: 'white',
+              borderRadius: '14px', boxShadow: '0 4px 12px rgba(255, 59, 48, 0.06)',
+              display: 'flex', alignItems: 'center', minHeight: '48px',
+              transition: 'all 0.25s ease'
+            }} className="hover-scale">
+              <div style={{ padding: '8px 12px', position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
+                <div style={{ fontSize: '1.25rem', fontWeight: 900, lineHeight: 1, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  {avatar?.streak_flame || 0} Tage
+                </div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, opacity: 0.9, whiteSpace: 'nowrap' }}>Serie am Laufen</div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Urbanist', sans-serif" }}>{avatar?.streak_flame || 0} Tage</span>
-                <span style={{ fontSize: '0.65rem', fontWeight: 750, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>Serie am Laufen</span>
+              <div style={{ position: 'absolute', top: '50%', right: '12px', transform: 'translateY(-50%)', zIndex: 1, opacity: 0.18, pointerEvents: 'none' }}>
+                <Flame size={18} color="white" />
               </div>
             </div>
 
@@ -4021,100 +4005,172 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               
               {/* Welcome Block */}
-              <div style={{ background: '#ffffff', borderRadius: '24px', padding: '18px 24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', position: 'relative', overflow: 'hidden' }}>
-                <h2 style={{ fontSize: '28px', fontWeight: 900, margin: '0 0 10px 0', color: '#1e293b', fontFamily: "'Urbanist', sans-serif" }}>
-                  Briefing
-                </h2>
-                <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-                  <p style={{ fontSize: '0.9rem', color: '#475569', lineHeight: 1.5, margin: 0, flex: 1, fontWeight: 500 }}>
-                    Ein neuer Moment für Musik. Nimm dir heute ein paar Minuten für deine Übungsziele und sichere dir deine tägliche Serie!
-                  </p>
-                  <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Music size={30} color="#0b57d0" strokeWidth={1.5} />
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
+                backdropFilter: 'blur(24px) saturate(1.8)',
+                WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
+                border: '1px solid rgba(255, 255, 255, 0.5)',
+                borderRadius: '24px',
+                display: 'flex',
+                alignItems: 'stretch',
+                boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+                transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                width: '100%',
+                minHeight: '110px',
+                boxSizing: 'border-box',
+                overflow: 'hidden',
+                position: 'relative'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
+                  {/* Photo of the student on the left */}
+                  <div style={{
+                    width: '100px',
+                    height: '100%',
+                    flexShrink: 0,
+                    position: 'relative',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    borderRight: '1px solid rgba(0, 0, 0, 0.05)'
+                  }}>
+                    <img 
+                      src={studentUser?.photo_url || '/avatar_ghost.jpg'} 
+                      alt="" 
+                      style={{ 
+                        width: '100%', 
+                        height: '100%', 
+                        objectFit: 'cover'
+                      }} 
+                    />
+                  </div>
+                  
+                  <div style={{ 
+                    padding: '16px 24px', 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    justifyContent: 'center',
+                    minWidth: 0,
+                    flex: 1 
+                  }}>
+                    {/* Live Clock Badge */}
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: '#ffffff',
+                      border: '1px solid rgba(0, 0, 0, 0.06)',
+                      borderRadius: '100px',
+                      padding: '4px 10px',
+                      alignSelf: 'flex-start',
+                      marginBottom: '6px',
+                      flexShrink: 0
+                    }}>
+                      <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }} />
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#475569', letterSpacing: '0.04em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
+                        {new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} UHR
+                      </span>
+                    </div>
+
+                    <h3 style={{ 
+                      margin: 0, 
+                      fontSize: '26px', 
+                      fontWeight: 950, 
+                      color: '#0f172a', 
+                      fontFamily: "'Plus Jakarta Sans', sans-serif", 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '8px',
+                      lineHeight: 1.15
+                    }}>
+                      Hi, <span style={{ color: '#10b981', fontWeight: 900 }}>{studentUser?.first_name || 'Student'}</span>! 👋
+                    </h3>
+                    
+                    <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#475569', fontWeight: 600, lineHeight: 1.35 }}>
+                      Ein neuer Moment für Musik. Nimm dir heute ein paar Minuten für deine Übungsziele und sichere dir deine tägliche Serie!
+                    </p>
+
+                    {briefingData?.todayLesson || scheduleOccurrences?.length > 0 ? (() => {
+                      const nextOcc = scheduleOccurrences[0];
+                      const hasToday = !!briefingData?.todayLesson;
+                      
+                      const teacherId = hasToday ? briefingData.todayLesson.teacher_id : nextOcc?.teacher_id;
+                      const teacherName = hasToday ? briefingData.todayLesson.teacher : (nextOcc?.teacher ? `Herr/Frau ${nextOcc.teacher.last_name}` : 'Lehrkraft');
+                      const timeLabel = hasToday ? briefingData.todayLesson.time : nextOcc?.start_time?.substring(0, 5);
+                      
+                      const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+                      const todayStr = new Date().toISOString().split('T')[0];
+                      
+                      const targetDateStr = hasToday ? todayStr : nextOcc?.date;
+                      const targetDayOfWeek = targetDateStr ? DAYS_DE[new Date(targetDateStr).getDay()] : 'Termin';
+                      const formattedDate = targetDateStr ? new Date(targetDateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : '';
+                      const label = `${targetDayOfWeek} (${formattedDate}), ${timeLabel} Uhr`;
+    
+                      const todayOcc = (scheduleOccurrences || []).find(occ => occ.date === todayStr);
+                      const finalOccurId = hasToday 
+                        ? (todayOcc?.id || briefingData?.todayLesson?.id || `today-${teacherId}-${todayStr}`) 
+                        : nextOcc?.id;
+    
+                      return (
+                        <div style={{ marginTop: '12px', display: 'inline-flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.08)', color: '#10b981', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
+                            <Calendar size={13} color="#10b981" />
+                            <span>Nächster Unterricht: {hasToday ? `Heute, ${briefingData.todayLesson.time} Uhr` : (() => {
+                              if(!nextOcc) return 'Demnächst';
+                              const d = new Date(nextOcc.date);
+                              return `${d.toLocaleDateString('de-DE', {weekday: 'long', day: '2-digit', month: '2-digit'})} - ${nextOcc.start_time?.substring(0,5)} Uhr`;
+                            })()}</span>
+                          </div>
+    
+                          {teacherId && (
+                            <button 
+                              onClick={() => {
+                                setAppointmentChatData({
+                                  teacherId,
+                                  date: targetDateStr,
+                                  start_time: timeLabel,
+                                  label,
+                                  occurrenceId: finalOccurId
+                                });
+                                setShowAppointmentChat(true);
+                              }}
+                              title="Shoutbox öffnen"
+                              style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center',
+                                background: '#dbeafe', 
+                                color: '#1e40af', 
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '50%',
+                                border: 'none',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                flexShrink: 0
+                              }}
+                              onMouseOver={e => e.currentTarget.style.background = '#bfdbfe'}
+                              onMouseOut={e => e.currentTarget.style.background = '#dbeafe'}
+                            >
+                              <MessageSquare size={13} />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })() : (
+                      <div style={{ marginTop: '12px', display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.08)', color: '#10b981', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
+                        <Calendar size={13} color="#10b981" />
+                        <span>Nächster Unterricht: Demnächst</span>
+                      </div>
+                    )}
                   </div>
                 </div>
-                
-                {briefingData?.todayLesson || scheduleOccurrences?.length > 0 ? (() => {
-                  const nextOcc = scheduleOccurrences[0];
-                  const hasToday = !!briefingData?.todayLesson;
-                  
-                  const teacherId = hasToday ? briefingData.todayLesson.teacher_id : nextOcc?.teacher_id;
-                  const teacherName = hasToday ? briefingData.todayLesson.teacher : (nextOcc?.teacher ? `Herr/Frau ${nextOcc.teacher.last_name}` : 'Lehrkraft');
-                  const timeLabel = hasToday ? briefingData.todayLesson.time : nextOcc?.start_time?.substring(0, 5);
-                  
-                  const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-                  const todayStr = new Date().toISOString().split('T')[0];
-                  
-                  // Synchronize date and day name so the chat room labels match exactly
-                  const targetDateStr = hasToday ? todayStr : nextOcc?.date;
-                  const targetDayOfWeek = targetDateStr ? DAYS_DE[new Date(targetDateStr).getDay()] : 'Termin';
-                  const formattedDate = targetDateStr ? new Date(targetDateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : '';
-                  const label = `${targetDayOfWeek} (${formattedDate}), ${timeLabel} Uhr`;
-
-                  // Synchronize the occurrenceId so they point to the exact same database record
-                  const todayOcc = (scheduleOccurrences || []).find(occ => occ.date === todayStr);
-                  const finalOccurId = hasToday 
-                    ? (todayOcc?.id || briefingData?.todayLesson?.id || `today-${teacherId}-${todayStr}`) 
-                    : nextOcc?.id;
-
-                  return (
-                    <div style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#f5f3ff', color: '#7c3aed', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700 }}>
-                        <Calendar size={13} />
-                        <span>Nächster Unterricht: {hasToday ? `Heute, ${briefingData.todayLesson.time} Uhr` : (() => {
-                          if(!nextOcc) return 'Demnächst';
-                          const d = new Date(nextOcc.date);
-                          return `${d.toLocaleDateString('de-DE', {weekday: 'long', day: '2-digit', month: '2-digit'})} - ${nextOcc.start_time?.substring(0,5)} Uhr`;
-                        })()}</span>
-                      </div>
-
-                      {teacherId && (
-                        <button 
-                          onClick={() => {
-                            setAppointmentChatData({
-                              teacherId,
-                              date: targetDateStr,
-                              start_time: timeLabel,
-                              label,
-                              occurrenceId: finalOccurId
-                            });
-                            setShowAppointmentChat(true);
-                          }}
-                          title="Shoutbox öffnen"
-                          style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center',
-                            background: '#dbeafe', 
-                            color: '#1e40af', 
-                            width: '28px',
-                            height: '28px',
-                            borderRadius: '50%',
-                            border: 'none',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            flexShrink: 0
-                          }}
-                          onMouseOver={e => e.currentTarget.style.background = '#bfdbfe'}
-                          onMouseOut={e => e.currentTarget.style.background = '#dbeafe'}
-                        >
-                          <MessageSquare size={13} />
-                        </button>
-                      )}
-                    </div>
-                  );
-                })() : (
-                  <div style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#f5f3ff', color: '#7c3aed', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700 }}>
-                    <Calendar size={13} />
-                    <span>Nächster Unterricht: Demnächst</span>
-                  </div>
-                )}
               </div>
 
               {/* Hausaufgaben & Übesoll Row */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
                 {/* Hausaufgaben */}
-                <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', borderLeft: '6px solid #22c55e' }}>
+                <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', borderLeft: '4px solid #10b981' }}>
                   {(() => {
                     const currentWeekStr = getISOWeekRaw(new Date(), 1);
                     const prevWeekDate = new Date();
@@ -4425,10 +4481,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 </div>
 
                 {/* Übesoll */}
-                <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', borderLeft: '4px solid #fbbc05', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', flex: 1 }}>
-                    <div style={{ color: '#cbd5e1' }}>
-                      <Flame size={32} fill="currentColor" />
+                    <div style={{ background: 'rgba(251, 188, 5, 0.12)', color: '#eab308', width: '48px', height: '48px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Flame size={24} fill="currentColor" />
                     </div>
                     <div>
                       <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '4px' }}>TÄGLICHES ÜBESOLL (HEUTE)</div>
@@ -4445,10 +4501,15 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               </div>
 
               {/* Flame Tiers */}
-              <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+              <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', borderLeft: '4px solid #ea580c' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>🔥 Übe-Serie & Flammen</h3>
-                  <div style={{ background: '#ffedd5', color: '#ea580c', fontSize: '0.75rem', fontWeight: 800, padding: '4px 12px', borderRadius: '100px' }}>0 Tage</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ background: 'rgba(234, 88, 12, 0.08)', color: '#ea580c', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Flame size={18} fill="currentColor" />
+                    </div>
+                    <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Übe-Serie & Flammen</h3>
+                  </div>
+                  <div style={{ background: '#ffedd5', color: '#ea580c', fontSize: '0.75rem', fontWeight: 800, padding: '4px 12px', borderRadius: '100px' }}>{avatar?.streak_flame || 0} Tage</div>
                 </div>
                 <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '0 0 20px 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <span style={{ color: '#ef4444' }}>🔥 Helden-Feuer aktiv! Mindestzeit: 10 Min.</span>
