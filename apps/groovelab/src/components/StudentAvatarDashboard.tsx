@@ -4354,7 +4354,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       occ.status === 'scheduled' || occ.status === 'rescheduled_confirmed'
                     );
                     if (upcomingConfirmed.length > 0) {
-                      return upcomingConfirmed.slice(0, 3).map(occ => {
+                      return upcomingConfirmed.slice(0, 2).map(occ => {
                         const d = new Date(occ.date);
                         return (
                           <div key={occ.id} style={{ display: 'flex', gap: '16px', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
