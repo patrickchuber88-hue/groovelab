@@ -2163,7 +2163,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     }
   }, [admin?.school_id, rooms, setupRooms, stations, setupStations, kiosks]);
 
-  const fetchStats = async (schoolId: string) => {
+  const fetchStats = async (schoolId: string, customOpeningHours?: any) => {
     let studentSq = supabase.from('users').select('*', { count: 'exact', head: true }).eq('school_id', schoolId).eq('role', 'student');
     if (activePlatform === 'campus') studentSq = studentSq.eq('is_campus_active', true);
     else studentSq = studentSq.eq('is_groovelab_active', true);
@@ -2211,7 +2211,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     const { data: skills } = await skillsSq;
 
     // Get school opening hours & reset stats timestamp
-    const openingHours = admin?.schools?.opening_hours;
+    const openingHours = customOpeningHours || admin?.schools?.opening_hours;
     const resetDateStr = activePlatform === 'campus'
       ? (openingHours?.campus_stats_reset_at || openingHours?.stats_reset_at)
       : (openingHours?.groovelab_stats_reset_at || openingHours?.stats_reset_at);
@@ -2476,6 +2476,15 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
   const handleSaveTargets = async (updatedTargets: any[]) => {
     if (!admin?.school_id) return;
+
+    // 1. Update stats state immediately
+    if (stats) {
+      setStats({
+        ...stats,
+        weeklyTargets: updatedTargets
+      });
+    }
+
     const currentHours = admin?.schools?.opening_hours || {};
     const updatedHours = {
       ...currentHours,
@@ -2485,24 +2494,26 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       }
     };
 
-    const { error } = await supabase
+    // 2. Update admin state immediately
+    setAdmin({
+      ...admin,
+      schools: {
+        ...admin.schools,
+        opening_hours: updatedHours
+      }
+    });
+    setIsEditingTarget(false);
+
+    // 3. Save to DB in background without blocking UI
+    supabase
       .from('schools')
       .update({ opening_hours: updatedHours })
-      .eq('id', admin.school_id);
-
-    if (error) {
-      alert("Fehler beim Speichern: " + error.message);
-    } else {
-      setAdmin({
-        ...admin,
-        schools: {
-          ...admin.schools,
-          opening_hours: updatedHours
+      .eq('id', admin.school_id)
+      .then(({ error }) => {
+        if (error) {
+          alert("Fehler beim Speichern in der Datenbank: " + error.message);
         }
       });
-      setIsEditingTarget(false);
-      fetchStats(admin.school_id);
-    }
   };
 
   const handleAddGoal = async () => {
