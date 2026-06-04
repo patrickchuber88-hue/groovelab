@@ -582,19 +582,29 @@ function MobileBriefingView({
                   <div key={occ.id} style={{ display: 'flex', gap: '12px', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
                     <div style={{ width: '40px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center', flexShrink: 0 }}>
                       <div style={{ background: isCancelled ? '#ef4444' : (occ.status === 'rescheduled_confirmed' ? '#eab308' : '#10b981'), color: 'white', fontSize: '0.55rem', fontWeight: 800, padding: '2px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
-                      <div style={{ background: 'white', color: isCancelled ? '#94a3b8' : '#1e293b', fontSize: '1rem', fontWeight: 900, padding: '4px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
+                      <div style={{ position: 'relative', background: 'white', color: '#1e293b', fontSize: '1rem', fontWeight: 900, padding: '4px 0' }}>
+                        {d.toLocaleDateString('de-DE', {day: '2-digit'})}
+                        {isCancelled && (
+                          <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }} viewBox="0 0 100 100" preserveAspectRatio="none">
+                            <line x1="15" y1="15" x2="85" y2="85" stroke="#ef4444" strokeWidth="12" strokeLinecap="round" />
+                            <line x1="85" y1="15" x2="15" y2="85" stroke="#ef4444" strokeWidth="12" strokeLinecap="round" />
+                          </svg>
+                        )}
+                      </div>
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 800, color: isCancelled ? '#ef4444' : '#1e293b', textDecoration: isCancelled ? 'line-through' : 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>{d.toLocaleDateString('de-DE', {weekday: 'short'})}</span>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ color: '#1e293b', textDecoration: isCancelled ? 'line-through' : 'none', textDecorationColor: isCancelled ? '#ef4444' : undefined, textDecorationThickness: isCancelled ? '2px' : undefined }}>
+                          {d.toLocaleDateString('de-DE', {weekday: 'short'})}
+                        </span>
                         {occ.status === 'rescheduled_confirmed' && (
                           <span style={{ fontSize: '0.52rem', fontWeight: 900, background: '#fef08a', color: '#854d0e', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase' }}>Verschoben</span>
                         )}
                         {isCancelled && (
-                          <span style={{ fontSize: '0.52rem', fontWeight: 900, background: '#fee2e2', color: '#ef4444', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase' }}>Ausfall</span>
+                          <span style={{ fontSize: '0.52rem', fontWeight: 900, background: '#fee2e2', color: '#ef4444', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase', textDecoration: 'none', display: 'inline-block' }}>Ausfall</span>
                         )}
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748b', textDecoration: isCancelled ? 'line-through' : 'none', fontWeight: 600 }}>{occ.start_time?.substring(0,5)} Uhr</div>
+                      <div style={{ fontSize: '0.72rem', color: '#1e293b', textDecoration: isCancelled ? 'line-through' : 'none', textDecorationColor: isCancelled ? '#ef4444' : undefined, textDecorationThickness: isCancelled ? '2px' : undefined, fontWeight: 600 }}>{occ.start_time?.substring(0,5)} Uhr</div>
                     </div>
                     <button
                       onClick={() => {
@@ -4372,19 +4382,33 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           <div key={occ.id} style={{ display: 'flex', gap: '16px', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
                             <div style={{ width: '48px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
                               <div style={{ background: isCancelled ? '#ef4444' : (occ.status === 'rescheduled_confirmed' ? '#eab308' : '#10b981'), color: 'white', fontSize: '0.6rem', fontWeight: 800, padding: '4px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
-                              <div style={{ background: 'white', color: isCancelled ? '#94a3b8' : '#1e293b', fontSize: '1.2rem', fontWeight: 900, padding: '6px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
+                              <div style={{ position: 'relative', background: 'white', color: '#1e293b', fontSize: '1.2rem', fontWeight: 900, padding: '6px 0' }}>
+                                {d.toLocaleDateString('de-DE', {day: '2-digit'})}
+                                {isCancelled && (
+                                  <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }} viewBox="0 0 100 100" preserveAspectRatio="none">
+                                    <line x1="15" y1="15" x2="85" y2="85" stroke="#ef4444" strokeWidth="12" strokeLinecap="round" />
+                                    <line x1="85" y1="15" x2="15" y2="85" stroke="#ef4444" strokeWidth="12" strokeLinecap="round" />
+                                  </svg>
+                                )}
+                              </div>
                             </div>
                             <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: '0.9rem', fontWeight: 800, color: isCancelled ? '#ef4444' : '#1e293b', textDecoration: isCancelled ? 'line-through' : 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
+                              <div style={{ fontSize: '0.9rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ color: '#1e293b', textDecoration: isCancelled ? 'line-through' : 'none', textDecorationColor: isCancelled ? '#ef4444' : undefined, textDecorationThickness: isCancelled ? '2px' : undefined }}>
+                                  {d.toLocaleDateString('de-DE', {weekday: 'long'})}
+                                </span>
                                 {occ.status === 'rescheduled_confirmed' && (
                                   <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#fef08a', color: '#854d0e', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Verschoben</span>
                                 )}
                                 {isCancelled && (
-                                   <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#fee2e2', color: '#ef4444', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Ausfall</span>
+                                   <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#fee2e2', color: '#ef4444', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase', textDecoration: 'none', display: 'inline-block' }}>Ausfall</span>
                                  )}
                               </div>
-                              <div style={{ fontSize: '0.75rem', color: '#64748b', textDecoration: isCancelled ? 'line-through' : 'none', fontWeight: 600 }}>{occ.start_time?.substring(0,5)} <span style={{ color: isCancelled ? '#94a3b8' : '#22c55e' }}>Groovelab</span></div>
+                              <div style={{ fontSize: '0.75rem', color: '#1e293b', fontWeight: 600 }}>
+                                <span style={{ textDecoration: isCancelled ? 'line-through' : 'none', textDecorationColor: isCancelled ? '#ef4444' : undefined, textDecorationThickness: isCancelled ? '2px' : undefined }}>{occ.start_time?.substring(0,5)}</span>
+                                {' '}
+                                <span style={{ color: isCancelled ? '#1e293b' : '#22c55e', textDecoration: isCancelled ? 'line-through' : 'none', textDecorationColor: isCancelled ? '#ef4444' : undefined, textDecorationThickness: isCancelled ? '2px' : undefined }}>Groovelab</span>
+                              </div>
                             </div>
                             <button
                               onClick={() => {
