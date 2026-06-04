@@ -4017,6 +4017,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 borderRadius: '24px',
                 display: 'flex',
                 alignItems: 'center',
+                justifyContent: 'space-between',
                 boxShadow: '0 10px 40px rgba(15, 23, 42, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
                 width: '100%',
                 boxSizing: 'border-box',
@@ -4025,164 +4026,161 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 padding: '24px 32px'
               }}>
                 {/* Background decorative music note */}
-                <Music size={140} style={{ position: 'absolute', right: '-20px', bottom: '-30px', opacity: 0.03, color: '#007aff', pointerEvents: 'none' }} />
+                <Music size={140} style={{ position: 'absolute', left: '40%', bottom: '-30px', opacity: 0.02, color: '#007aff', pointerEvents: 'none' }} />
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '28px', flex: 1, minWidth: 0, position: 'relative', zIndex: 2 }}>
-                  {/* Instrument Avatar on the left */}
+                {/* Left Text & Info Column */}
+                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1, zIndex: 2 }}>
+                  {/* Live Clock Badge */}
                   <div style={{
-                    width: '84px',
-                    height: '84px',
-                    borderRadius: '50%',
-                    background: '#ffffff',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.04), 0 0 0 4px rgba(255, 255, 255, 0.8)',
-                    border: '1px solid rgba(0, 0, 0, 0.05)',
-                    display: 'flex',
+                    display: 'inline-flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
+                    gap: '6px',
+                    background: '#ffffff',
+                    border: '1px solid rgba(0, 0, 0, 0.04)',
+                    borderRadius: '100px',
+                    padding: '3px 10px',
+                    alignSelf: 'flex-start',
+                    marginBottom: '8px',
+                    flexShrink: 0,
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.01)'
                   }}>
-                    <img 
-                      src={
-                        studentUser?.photo_url && (
-                          studentUser.photo_url.includes('avatar') || 
-                          studentUser.photo_url.includes('gitarre') || 
-                          studentUser.photo_url.includes('bass') || 
-                          studentUser.photo_url.includes('drum') || 
-                          studentUser.photo_url.includes('piano') || 
-                          studentUser.photo_url.includes('klavier') || 
-                          studentUser.photo_url.includes('vocal') || 
-                          studentUser.photo_url.includes('trompete') || 
-                          studentUser.photo_url.includes('cello') || 
-                          studentUser.photo_url.includes('geige') || 
-                          studentUser.photo_url.includes('sax')
-                        )
-                          ? studentUser.photo_url
-                          : getInstrumentAvatarUrl(studentUser?.resolved_instrument || studentUser?.instrument)
-                      } 
-                      alt="" 
-                      style={{ 
-                        width: '70%', 
-                        height: '70%', 
-                        objectFit: 'contain'
-                      }} 
-                    />
+                    <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }} />
+                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.05em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
+                      {new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} UHR
+                    </span>
                   </div>
+
+                  <h3 style={{ 
+                    margin: 0, 
+                    fontSize: '26px', 
+                    fontWeight: 950, 
+                    color: '#0f172a', 
+                    fontFamily: "'Plus Jakarta Sans', sans-serif", 
+                    lineHeight: 1.15
+                  }}>
+                    Hi, <span style={{ color: '#007aff', fontWeight: 900 }}>{studentUser?.first_name || 'Student'}</span>! 👋
+                  </h3>
                   
-                  <div style={{ 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    minWidth: 0,
-                    flex: 1 
-                  }}>
-                    {/* Live Clock Badge */}
-                    <div style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      background: '#ffffff',
-                      border: '1px solid rgba(0, 0, 0, 0.04)',
-                      borderRadius: '100px',
-                      padding: '3px 10px',
-                      alignSelf: 'flex-start',
-                      marginBottom: '8px',
-                      flexShrink: 0,
-                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.01)'
-                    }}>
-                      <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }} />
-                      <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.05em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
-                        {new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} UHR
-                      </span>
-                    </div>
+                  <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#475569', fontWeight: 600, lineHeight: 1.45, maxWidth: '85%' }}>
+                    Ein neuer Moment für Musik. Nimm dir heute ein paar Minuten für deine Übungsziele und sichere dir deine tägliche Serie!
+                  </p>
 
-                    <h3 style={{ 
-                      margin: 0, 
-                      fontSize: '26px', 
-                      fontWeight: 950, 
-                      color: '#0f172a', 
-                      fontFamily: "'Plus Jakarta Sans', sans-serif", 
-                      lineHeight: 1.15
-                    }}>
-                      Hi, <span style={{ color: '#007aff', fontWeight: 900 }}>{studentUser?.first_name || 'Student'}</span>! 👋
-                    </h3>
+                  {briefingData?.todayLesson || scheduleOccurrences?.length > 0 ? (() => {
+                    const nextOcc = scheduleOccurrences[0];
+                    const hasToday = !!briefingData?.todayLesson;
                     
-                    <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#475569', fontWeight: 600, lineHeight: 1.45 }}>
-                      Ein neuer Moment für Musik. Nimm dir heute ein paar Minuten für deine Übungsziele und sichere dir deine tägliche Serie!
-                    </p>
-
-                    {briefingData?.todayLesson || scheduleOccurrences?.length > 0 ? (() => {
-                      const nextOcc = scheduleOccurrences[0];
-                      const hasToday = !!briefingData?.todayLesson;
-                      
-                      const teacherId = hasToday ? briefingData.todayLesson.teacher_id : nextOcc?.teacher_id;
-                      const teacherName = hasToday ? briefingData.todayLesson.teacher : (nextOcc?.teacher ? `Herr/Frau ${nextOcc.teacher.last_name}` : 'Lehrkraft');
-                      const timeLabel = hasToday ? briefingData.todayLesson.time : nextOcc?.start_time?.substring(0, 5);
-                      
-                      const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-                      const todayStr = new Date().toISOString().split('T')[0];
-                      
-                      const targetDateStr = hasToday ? todayStr : nextOcc?.date;
-                      const targetDayOfWeek = targetDateStr ? DAYS_DE[new Date(targetDateStr).getDay()] : 'Termin';
-                      const formattedDate = targetDateStr ? new Date(targetDateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : '';
-                      const label = `${targetDayOfWeek} (${formattedDate}), ${timeLabel} Uhr`;
-    
-                      const todayOcc = (scheduleOccurrences || []).find(occ => occ.date === todayStr);
-                      const finalOccurId = hasToday 
-                        ? (todayOcc?.id || briefingData?.todayLesson?.id || `today-${teacherId}-${todayStr}`) 
-                        : nextOcc?.id;
-    
-                      return (
-                        <div style={{ marginTop: '14px', display: 'inline-flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.06)', color: '#10b981', padding: '5px 12px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 800 }}>
-                            <Calendar size={12} color="#10b981" />
-                            <span>Nächster Unterricht: {hasToday ? `Heute, ${briefingData.todayLesson.time} Uhr` : (() => {
-                              if(!nextOcc) return 'Demnächst';
-                              const d = new Date(nextOcc.date);
-                              return `${d.toLocaleDateString('de-DE', {weekday: 'long', day: '2-digit', month: '2-digit'})} - ${nextOcc.start_time?.substring(0,5)} Uhr`;
-                            })()}</span>
-                          </div>
-    
-                          {teacherId && (
-                            <button 
-                              onClick={() => {
-                                setAppointmentChatData({
-                                  teacherId,
-                                  date: targetDateStr,
-                                  start_time: timeLabel,
-                                  label,
-                                  occurrenceId: finalOccurId
-                                });
-                                setShowAppointmentChat(true);
-                              }}
-                              title="Shoutbox öffnen"
-                              style={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'center',
-                                background: '#dbeafe', 
-                                color: '#1e40af', 
-                                width: '28px',
-                                height: '28px',
-                                borderRadius: '50%',
-                                border: 'none',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                flexShrink: 0
-                              }}
-                              onMouseOver={e => e.currentTarget.style.background = '#bfdbfe'}
-                              onMouseOut={e => e.currentTarget.style.background = '#dbeafe'}
-                            >
-                              <MessageSquare size={13} />
-                            </button>
-                          )}
+                    const teacherId = hasToday ? briefingData.todayLesson.teacher_id : nextOcc?.teacher_id;
+                    const teacherName = hasToday ? briefingData.todayLesson.teacher : (nextOcc?.teacher ? `Herr/Frau ${nextOcc.teacher.last_name}` : 'Lehrkraft');
+                    const timeLabel = hasToday ? briefingData.todayLesson.time : nextOcc?.start_time?.substring(0, 5);
+                    
+                    const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    
+                    const targetDateStr = hasToday ? todayStr : nextOcc?.date;
+                    const targetDayOfWeek = targetDateStr ? DAYS_DE[new Date(targetDateStr).getDay()] : 'Termin';
+                    const formattedDate = targetDateStr ? new Date(targetDateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : '';
+                    const label = `${targetDayOfWeek} (${formattedDate}), ${timeLabel} Uhr`;
+  
+                    const todayOcc = (scheduleOccurrences || []).find(occ => occ.date === todayStr);
+                    const finalOccurId = hasToday 
+                      ? (todayOcc?.id || briefingData?.todayLesson?.id || `today-${teacherId}-${todayStr}`) 
+                      : nextOcc?.id;
+  
+                    return (
+                      <div style={{ marginTop: '14px', display: 'inline-flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.06)', color: '#10b981', padding: '5px 12px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 800 }}>
+                          <Calendar size={12} color="#10b981" />
+                          <span>Nächster Unterricht: {hasToday ? `Heute, ${briefingData.todayLesson.time} Uhr` : (() => {
+                            if(!nextOcc) return 'Demnächst';
+                            const d = new Date(nextOcc.date);
+                            return `${d.toLocaleDateString('de-DE', {weekday: 'long', day: '2-digit', month: '2-digit'})} - ${nextOcc.start_time?.substring(0,5)} Uhr`;
+                          })()}</span>
                         </div>
-                      );
-                    })() : (
-                      <div style={{ marginTop: '12px', display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.06)', color: '#10b981', padding: '5px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 800 }}>
-                        <Calendar size={12} color="#10b981" />
-                        <span>Nächster Unterricht: Demnächst</span>
+  
+                        {teacherId && (
+                          <button 
+                            onClick={() => {
+                              setAppointmentChatData({
+                                teacherId,
+                                date: targetDateStr,
+                                start_time: timeLabel,
+                                label,
+                                occurrenceId: finalOccurId
+                              });
+                              setShowAppointmentChat(true);
+                            }}
+                            title="Shoutbox öffnen"
+                            style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center',
+                              background: '#dbeafe', 
+                              color: '#1e40af', 
+                              width: '28px',
+                              height: '28px',
+                              borderRadius: '50%',
+                              border: 'none',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              flexShrink: 0
+                            }}
+                            onMouseOver={e => e.currentTarget.style.background = '#bfdbfe'}
+                            onMouseOut={e => e.currentTarget.style.background = '#dbeafe'}
+                          >
+                            <MessageSquare size={13} />
+                          </button>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    );
+                  })() : (
+                    <div style={{ marginTop: '14px', display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.06)', color: '#10b981', padding: '5px 12px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 800 }}>
+                      <Calendar size={12} color="#10b981" />
+                      <span>Nächster Unterricht: Demnächst</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Instrument Avatar Sticker Container */}
+                <div style={{
+                  width: '110px',
+                  height: '110px',
+                  borderRadius: '24px',
+                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.15) 100%)',
+                  backdropFilter: 'blur(10px)',
+                  boxShadow: '0 12px 32px rgba(31, 38, 135, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+                  border: '1.5px solid rgba(255, 255, 255, 0.7)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  zIndex: 2,
+                  marginLeft: '20px'
+                }}>
+                  <img 
+                    src={
+                      studentUser?.photo_url && (
+                        studentUser.photo_url.includes('avatar') || 
+                        studentUser.photo_url.includes('gitarre') || 
+                        studentUser.photo_url.includes('bass') || 
+                        studentUser.photo_url.includes('drum') || 
+                        studentUser.photo_url.includes('piano') || 
+                        studentUser.photo_url.includes('klavier') || 
+                        studentUser.photo_url.includes('vocal') || 
+                        studentUser.photo_url.includes('trompete') || 
+                        studentUser.photo_url.includes('cello') || 
+                        studentUser.photo_url.includes('geige') || 
+                        studentUser.photo_url.includes('sax')
+                      )
+                        ? studentUser.photo_url
+                        : getInstrumentAvatarUrl(studentUser?.resolved_instrument || studentUser?.instrument)
+                    } 
+                    alt="" 
+                    style={{ 
+                      width: '80%', 
+                      height: '80%', 
+                      objectFit: 'contain'
+                    }} 
+                  />
                 </div>
               </div>
 
