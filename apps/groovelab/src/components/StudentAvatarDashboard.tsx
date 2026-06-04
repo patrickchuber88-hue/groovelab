@@ -4681,7 +4681,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 whiteSpace: 'normal',
                                 wordBreak: 'break-word'
                               }}>
-                                {goal.title || 'Wochenziel'}
+                                {goal.title || 'Challenge'}
                               </span>
                               {goal.deadline && (
                                 <span style={{
