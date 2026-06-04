@@ -316,6 +316,72 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     });
   };
 
+  const myRooms = React.useMemo(() => {
+    const roomIds = new Set<string>();
+    
+    // 1. Check weekly schedules
+    if (schedules && schedules.length > 0) {
+      schedules.forEach((s: any) => {
+        const isOwn = s.teacher_id === userId || (admin && s.teacher?.first_name && `${s.teacher.first_name} ${s.teacher.last_name}`.trim().toLowerCase() === `${admin.first_name || ''} ${admin.last_name || ''}`.trim().toLowerCase());
+        if (isOwn && s.room_id) {
+          roomIds.add(s.room_id);
+        }
+      });
+    }
+
+    // 2. Check manual bookings
+    if (campusBookings && campusBookings.length > 0) {
+      campusBookings.forEach((b: any) => {
+        const isOwn = b.teacherId === userId || (admin && b.teacherName && b.teacherName.trim().toLowerCase() === `${admin.first_name || ''} ${admin.last_name || ''}`.trim().toLowerCase());
+        if (isOwn && b.roomId) {
+          roomIds.add(b.roomId);
+        }
+      });
+    }
+
+    return rooms.filter((r: any) => roomIds.has(r.id));
+  }, [rooms, schedules, campusBookings, userId, admin]);
+
+  // Pre-select the room where the teacher teaches today
+  useEffect(() => {
+    if (!userId || !myRooms || myRooms.length === 0) return;
+    
+    const today = new Date();
+    const DAYS_MAP = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const todayDayName = DAYS_MAP[today.getDay()];
+    const todayDayIndex = today.getDay();
+    const todayDateStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+
+    // 1. Look for a room with a schedule today
+    const todaySchedule = schedules.find((s: any) => {
+      const isOwn = s.teacher_id === userId || (admin && s.teacher?.first_name && `${s.teacher.first_name} ${s.teacher.last_name}`.trim().toLowerCase() === `${admin.first_name || ''} ${admin.last_name || ''}`.trim().toLowerCase());
+      const matchesDay = s.day_of_week === todayDayName || String(s.day_of_week) === String(todayDayIndex);
+      return isOwn && matchesDay && s.room_id;
+    });
+
+    if (todaySchedule && todaySchedule.room_id) {
+      setSelectedCampusRoomId(todaySchedule.room_id);
+      return;
+    }
+
+    // 2. Look for a room with a manual booking today
+    const todayBooking = campusBookings.find((b: any) => {
+      const isOwn = b.teacherId === userId || (admin && b.teacherName && b.teacherName.trim().toLowerCase() === `${admin.first_name || ''} ${admin.last_name || ''}`.trim().toLowerCase());
+      return isOwn && b.date === todayDateStr && b.roomId;
+    });
+
+    if (todayBooking && todayBooking.roomId) {
+      setSelectedCampusRoomId(todayBooking.roomId);
+      return;
+    }
+
+    // 3. Fallback: select the first of the teacher's rooms if selectedCampusRoomId is empty or not in myRooms
+    const currentIsValid = myRooms.some((r: any) => r.id === selectedCampusRoomId);
+    if (!selectedCampusRoomId || !currentIsValid) {
+      setSelectedCampusRoomId(myRooms[0].id);
+    }
+  }, [myRooms, schedules, campusBookings, userId, admin, selectedCampusRoomId]);
+
 
   const [bookingDate, setBookingDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [bookingStartTime, setBookingStartTime] = useState<string>('08:00');
@@ -6137,8 +6203,43 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             >
               <div className="calendar-header-flex" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <div>
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#1c1c1e', margin: 0, letterSpacing: '-0.01em' }}>
-                    Wochenübersicht: {selectedRoom?.name || 'Wähle einen Raum'}
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#1c1c1e', margin: 0, letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span>Wochenübersicht: {selectedRoom?.name || 'Wähle einen Raum'}</span>
+                    {myRooms.length > 0 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginLeft: '6px' }}>
+                        {myRooms.map((r: any) => {
+                          const isSelected = selectedCampusRoomId === r.id;
+                           return (
+                             <button
+                               key={r.id}
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 setSelectedCampusRoomId(r.id);
+                               }}
+                               title={r.name}
+                               style={{
+                                 display: 'inline-flex',
+                                 alignItems: 'center',
+                                 gap: '3px',
+                                 padding: '3px 8px',
+                                 borderRadius: '6px',
+                                 fontSize: '0.62rem',
+                                 fontWeight: 900,
+                                 cursor: 'pointer',
+                                 transition: 'all 0.15s ease',
+                                 border: isSelected ? `1.5px solid ${brandColor}` : '1.5px solid #e5e5ea',
+                                 background: isSelected ? `${brandColor}12` : '#f8fafc',
+                                 color: isSelected ? brandColor : '#48484a',
+                                 boxShadow: isSelected ? `0 2px 6px ${brandColor}15` : 'none'
+                               }}
+                             >
+                               <span style={{ fontSize: '0.68rem', color: isSelected ? brandColor : '#8e8e93' }}>★</span>
+                               {r.name.length > 10 ? r.name.substring(0, 10) + '...' : r.name}
+                             </button>
+                           );
+                        })}
+                      </div>
+                    )}
                   </h3>
                   <p style={{ fontSize: '0.74rem', color: '#8e8e93', margin: '3px 0 0 0', fontWeight: 600 }}>
                     Angezeigt für die Woche der Buchungsauswahl ({new Date(bookingDate).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })})
