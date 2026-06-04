@@ -6341,7 +6341,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
 
                                 {slotBookings.map((b: any, bIdx: number) => {
-                                  const isOwnBooking = b.teacherId === userId;
+                                  const isOwnBooking = b.teacherId === userId || (admin && b.teacherName && b.teacherName.trim().toLowerCase() === `${admin.first_name || ''} ${admin.last_name || ''}`.trim().toLowerCase());
                                   const colWidth = 100 / slotBookings.length;
                                   const colLeft = bIdx * colWidth;
                                   const isSchedule = b.isSchedule;
