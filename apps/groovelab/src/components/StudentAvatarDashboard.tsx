@@ -4664,63 +4664,55 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           display: 'flex',
                           flexDirection: 'column',
                           background: '#10b981',
-                          boxShadow: '0 8px 24px rgba(16, 185, 129, 0.12)',
-                          borderRadius: '18px',
-                          padding: '14px 16px'
+                          boxShadow: '0 6px 20px rgba(16, 185, 129, 0.12)',
+                          borderRadius: '16px',
+                          padding: '12px 14px',
+                          gap: '8px'
                         }}>
-                          {/* Goal Title */}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
+                          {/* Row 1: Title, Deadline on left & Percentage on right */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0, flex: 1 }}>
+                              <span style={{
+                                fontSize: '0.8rem',
+                                fontWeight: 700,
+                                color: '#ffffff',
+                                letterSpacing: '-0.01em',
+                                lineHeight: '1.2',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                              }}>
+                                {goal.title || 'Wochenziel'}
+                              </span>
+                              {goal.deadline && (
+                                <span style={{
+                                  fontSize: '0.62rem',
+                                  fontWeight: 500,
+                                  color: isDeadlinePassed ? '#ff8780' : 'rgba(255, 255, 255, 0.75)',
+                                  lineHeight: '1',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
+                                }}>
+                                  bis {new Date(goal.deadline).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                                  {isDeadlinePassed && ' (abgelaufen)'}
+                                </span>
+                              )}
+                            </div>
                             <span style={{
-                              fontSize: '0.8rem',
-                              fontWeight: 600,
-                              color: '#ffffff',
-                              letterSpacing: '-0.01em'
-                            }}>
-                              {goal.title || 'Wochenziel'}
-                            </span>
-                            <span style={{
-                              fontSize: '0.7rem',
-                              fontWeight: 500,
-                              color: isAchieved ? '#a7f3d0' : 'rgba(255, 255, 255, 0.7)'
-                            }}>
-                              {isAchieved ? 'Erreicht 🎉' : `Noch ${Math.max(0, goal.minutes - classWeeklyMins)} Min.`}
-                            </span>
-                          </div>
-
-                          {/* Large Number Metrics display */}
-                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '10px' }}>
-                            <span style={{
-                              fontSize: '1.6rem',
-                              fontWeight: 300,
-                              color: '#ffffff',
-                              letterSpacing: '-0.04em',
-                              fontFeatureSettings: '"tnum"',
-                              lineHeight: '1'
-                            }}>
-                              {classWeeklyMins}
-                            </span>
-                            <span style={{
-                              fontSize: '0.8rem',
-                              fontWeight: 400,
-                              color: 'rgba(255, 255, 255, 0.7)',
-                              letterSpacing: '-0.01em'
-                            }}>
-                              von {goal.minutes} Min.
-                            </span>
-                            <span style={{
-                              marginLeft: 'auto',
-                              fontSize: '0.95rem',
-                              fontWeight: 600,
+                              fontSize: '1.1rem',
+                              fontWeight: 800,
                               color: '#ffffff',
                               letterSpacing: '-0.02em',
-                              fontFeatureSettings: '"tnum"'
+                              fontFeatureSettings: '"tnum"',
+                              flexShrink: 0
                             }}>
                               {pct}%
                             </span>
                           </div>
 
                           {/* Progress bar container */}
-                          <div style={{ position: 'relative', height: '6px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: '99px', marginBottom: '10px' }}>
+                          <div style={{ position: 'relative', height: '6px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: '99px' }}>
                             {/* Target marker (100% line) at 75% width */}
                             <div style={{
                               position: 'absolute',
@@ -4740,35 +4732,28 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               background: '#ffffff',
                               borderRadius: '99px',
                               transition: 'width 1.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                              boxShadow: '0 0 8px rgba(255, 255, 255, 0.3)'
+                              boxShadow: '0 0 6px rgba(255, 255, 255, 0.25)'
                             }} />
                           </div>
 
-                          {/* Footer with deadline */}
-                          {goal.deadline && (
-                            <div style={{
-                              fontSize: '0.62rem',
-                              fontWeight: 500,
-                              color: isDeadlinePassed ? '#ff8780' : 'rgba(255, 255, 255, 0.8)',
-                              letterSpacing: '-0.01em',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '5px',
-                              borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-                              paddingTop: '8px',
-                              marginTop: '2px'
+                          {/* Row 3: Current / Target & Status label */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', gap: '10px' }}>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontFeatureSettings: '"tnum"', fontWeight: 500, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                              <span style={{ fontWeight: 700, color: '#ffffff' }}>{classWeeklyMins}</span> / {goal.minutes} Min.
+                            </span>
+                            <span style={{
+                              fontWeight: 700,
+                              color: isAchieved ? '#a7f3d0' : 'rgba(255, 255, 255, 0.8)',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              textAlign: 'right',
+                              minWidth: 0,
+                              flex: 1
                             }}>
-                              <span style={{
-                                width: '4px',
-                                height: '4px',
-                                borderRadius: '50%',
-                                background: isDeadlinePassed ? '#ff8780' : '#ffffff',
-                                display: 'inline-block'
-                              }} />
-                              Bis {new Date(goal.deadline).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                              {isDeadlinePassed && ' (Abgelaufen)'}
-                            </div>
-                          )}
+                              {isAchieved ? 'Erreicht 🎉' : `Noch ${Math.max(0, goal.minutes - classWeeklyMins)} Min.`}
+                            </span>
+                          </div>
                         </div>
                       );
                     })}
