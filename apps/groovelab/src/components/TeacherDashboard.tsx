@@ -5968,7 +5968,15 @@ export function TeacherDashboard({
                                 </span>
                               </div>
                               <div style={{ fontSize: '0.72rem', color: subTextColor, fontWeight: 600, whiteSpace: 'normal', wordBreak: 'break-word', marginTop: '1px' }}>
-                                {b.startTime} Uhr • <strong>{b.roomName || b.rooms?.name || 'Raum'}</strong> {b.studentName ? ` • ${b.studentName}` : ''}
+                                {b.startTime} Uhr • <strong>{b.roomName || b.rooms?.name || 'Raum'}</strong> {(() => {
+                                  if (!b.studentName) return '';
+                                  if (b.studentName.includes('&')) {
+                                    const parts = b.studentName.split('&');
+                                    const firstNames = parts.map((part: string) => part.trim().split(' ')[0]);
+                                    return ` • ${firstNames.join(' & ')}`;
+                                  }
+                                  return ` • ${b.studentName}`;
+                                })()}
                               </div>
                             </div>
 
