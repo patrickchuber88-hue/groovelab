@@ -4619,52 +4619,53 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               {classGoals.length > 0 && (
                 <div style={{
                   background: '#ffffff',
-                  borderRadius: '20px',
-                  padding: '20px 22px',
-                  boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
-                  border: '1px solid #e8edf3',
-                  fontFamily: "'Inter', sans-serif"
+                  borderRadius: '24px',
+                  padding: '24px',
+                  boxShadow: '0 10px 40px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.01)',
+                  border: '1px solid rgba(0, 0, 0, 0.04)',
+                  fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Inter', sans-serif",
+                  transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}>
                   {/* Header */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
                     <div style={{
-                      width: '38px', height: '38px', borderRadius: '50%',
+                      width: '36px', height: '36px', borderRadius: '50%',
                       background: '#ffffff',
-                      border: '2px solid #10b981',
+                      border: '1px solid #e5e5ea',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      flexShrink: 0, boxShadow: '0 2px 8px rgba(16,185,129,0.18)'
+                      flexShrink: 0,
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
                     }}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="#10b981" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 0 0 8 20C19 20 22 3 22 3c-1 2-8 2-13 6 4-4 6.25-6 10-7C18.5 2 19 1 17 8z"/>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 0 0 8 20C19 20 22 3 22 3c-1 2-8 2-13 6 4-4 6.25-6 10-7C18.5 2 19 1 17 8z" fill="#34c759"/>
                       </svg>
                     </div>
-                    <div>
-                      <h3 style={{
-                        fontSize: '0.895rem',
-                        fontWeight: 700,
-                        color: '#0f172a',
-                        margin: 0,
-                        letterSpacing: '-0.02em',
-                        fontFamily: "'Inter', sans-serif"
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{
+                        fontSize: '0.62rem',
+                        fontWeight: 600,
+                        color: '#8e8e93',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.08em',
+                        lineHeight: '1.2'
                       }}>
                         Klassen-Übe-Ziel
-                      </h3>
-                      <p style={{
-                        fontSize: '0.6rem',
-                        fontWeight: 600,
-                        color: '#94a3b8',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.07em',
-                        margin: '2px 0 0 0',
-                        fontFamily: "'Inter', sans-serif"
+                      </span>
+                      <h3 style={{
+                        fontSize: '0.95rem',
+                        fontWeight: 700,
+                        color: '#1c1c1e',
+                        margin: '1px 0 0 0',
+                        letterSpacing: '-0.02em',
+                        lineHeight: '1.2'
                       }}>
                         Gemeinsam stärker
-                      </p>
+                      </h3>
                     </div>
                   </div>
 
                   {/* Goals */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     {classGoals.map((goal: any) => {
                       const pct = goal.minutes > 0 ? Math.round((classWeeklyMins / goal.minutes) * 100) : 0;
                       const isDeadlinePassed = goal.deadline ? new Date(goal.deadline) < new Date() : false;
@@ -4674,97 +4675,107 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                       return (
                         <div key={goal.id} style={{
-                          background: isAchieved ? '#f0fdf4' : '#f8fafc',
-                          borderRadius: '12px',
-                          padding: '14px 16px',
-                          border: isAchieved ? '1px solid #a7f3d0' : '1px solid #e8edf3'
+                          background: '#f5f5f7',
+                          borderRadius: '18px',
+                          padding: '20px',
+                          border: '1px solid rgba(0, 0, 0, 0.02)',
+                          position: 'relative'
                         }}>
-                          {/* Title row */}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                            <span style={{
-                              fontSize: '0.78rem',
-                              fontWeight: 600,
-                              color: '#1e293b',
-                              letterSpacing: '-0.01em',
-                              fontFamily: "'Inter', sans-serif"
-                            }}>
-                              {goal.title || 'Wochenziel'}
-                            </span>
-                            <span style={{
-                              fontSize: '0.72rem',
+                          {/* Top Row: Info & Large Status Percentage */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+                              <span style={{
+                                fontSize: '0.88rem',
+                                fontWeight: 600,
+                                color: '#1c1c1e',
+                                letterSpacing: '-0.015em',
+                                lineHeight: '1.3'
+                              }}>
+                                {goal.title || 'Wochenziel'}
+                              </span>
+                              <span style={{
+                                fontSize: '0.72rem',
+                                fontWeight: 500,
+                                color: '#8e8e93',
+                                letterSpacing: '-0.01em'
+                              }}>
+                                {isAchieved ? (
+                                  <span style={{ color: '#34c759', fontWeight: 600 }}>Ziel erreicht! 🎉</span>
+                                ) : (
+                                  <span>Noch <span style={{ fontWeight: 600, color: '#1c1c1e' }}>{Math.max(0, goal.minutes - classWeeklyMins)} Min.</span> verbleibend</span>
+                                )}
+                              </span>
+                            </div>
+
+                            {/* Apple style prominent percentage pill */}
+                            <div style={{
+                              background: isAchieved ? '#e2fbe8' : '#e5e5ea',
+                              color: isAchieved ? '#248a3d' : '#1c1c1e',
+                              padding: '4px 10px',
+                              borderRadius: '99px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
                               fontWeight: 700,
-                              color: isAchieved ? '#059669' : '#0b57d0',
-                              background: isAchieved ? 'rgba(16,185,129,0.1)' : 'rgba(11,87,208,0.07)',
-                              padding: '1px 7px',
-                              borderRadius: '5px',
+                              fontSize: '0.82rem',
                               letterSpacing: '-0.02em',
-                              fontFamily: "'Inter', sans-serif",
-                              fontFeatureSettings: '"tnum"'
+                              fontFeatureSettings: '"tnum"',
+                              flexShrink: 0
                             }}>
                               {pct}%
-                            </span>
+                            </div>
                           </div>
 
-                          {/* Deadline */}
-                          {goal.deadline && (
+                          {/* Progress bar with 100% marker at 75% width */}
+                          <div style={{ position: 'relative', height: '8px', background: '#d1d1d6', borderRadius: '99px', margin: '20px 0 16px 0' }}>
+                            {/* Target mark (100% line) */}
                             <div style={{
-                              fontSize: '0.62rem',
-                              fontWeight: 500,
-                              color: isDeadlinePassed ? '#ef4444' : '#94a3b8',
-                              marginBottom: '10px',
-                              letterSpacing: '0.01em',
-                              fontFamily: "'Inter', sans-serif"
-                            }}>
-                              bis {new Date(goal.deadline).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                              {isDeadlinePassed && <span style={{ marginLeft: '4px', color: '#ef4444' }}>· abgelaufen</span>}
-                            </div>
-                          )}
+                              position: 'absolute',
+                              left: '75%',
+                              top: '-2px',
+                              height: '12px',
+                              width: '2px',
+                              background: '#ffffff',
+                              zIndex: 3,
+                              borderRadius: '99px',
+                              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.15)'
+                            }} />
 
-                          {/* Progress bar */}
-                          <div style={{ position: 'relative', height: '7px', background: '#e2e8f0', borderRadius: '99px', overflow: 'hidden', marginBottom: '8px' }}>
+                            {/* Progress bar fill */}
                             <div style={{
                               width: `${visualWidth}%`,
                               height: '100%',
                               background: isAchieved
-                                ? 'linear-gradient(90deg, #34d399 0%, #059669 100%)'
-                                : 'linear-gradient(90deg, #3b82f6 0%, #10b981 100%)',
+                                ? 'linear-gradient(90deg, #34c759 0%, #30b0c7 100%)'
+                                : 'linear-gradient(90deg, #007aff 0%, #34c759 100%)',
                               borderRadius: '99px',
-                              transition: 'width 1.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                            }} />
-                            {/* Goal line at 75% = 100% mark */}
-                            <div style={{
-                              position: 'absolute', left: '75%', top: 0, bottom: 0,
-                              width: '1.5px', background: 'rgba(255,255,255,0.95)',
-                              zIndex: 2
+                              transition: 'width 1.2s cubic-bezier(0.16, 1, 0.3, 1)'
                             }} />
                           </div>
 
-                          {/* Minutes sub-label */}
+                          {/* Progress Numbers & Deadline Footer */}
                           <div style={{
                             display: 'flex',
                             justifyContent: 'space-between',
-                            alignItems: 'center'
+                            alignItems: 'center',
+                            fontSize: '0.68rem',
+                            fontWeight: 500,
+                            color: '#8e8e93',
+                            borderTop: '1px solid rgba(0, 0, 0, 0.04)',
+                            paddingTop: '12px',
+                            marginTop: '4px'
                           }}>
-                            <span style={{
-                              fontSize: '0.64rem',
-                              fontWeight: 500,
-                              color: '#64748b',
-                              fontFamily: "'Inter', sans-serif",
-                              letterSpacing: '0',
-                              fontFeatureSettings: '"tnum"'
-                            }}>
-                              <span style={{ fontWeight: 700, color: '#334155' }}>{classWeeklyMins}</span> / {goal.minutes} Min.
+                            <span style={{ fontFeatureSettings: '"tnum"' }}>
+                              <span style={{ fontWeight: 600, color: '#1c1c1e' }}>{classWeeklyMins}</span> / {goal.minutes} Min.
                             </span>
-                            {isAchieved && (
+
+                            {goal.deadline && (
                               <span style={{
-                                fontSize: '0.6rem',
-                                fontWeight: 700,
-                                color: '#059669',
-                                letterSpacing: '0.02em',
-                                fontFamily: "'Inter', sans-serif",
-                                textTransform: 'uppercase'
+                                color: isDeadlinePassed ? '#ff3b30' : '#8e8e93',
+                                fontWeight: isDeadlinePassed ? 600 : 500
                               }}>
-                                ✓ Ziel erreicht
+                                Bis {new Date(goal.deadline).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                {isDeadlinePassed && ' (Abgelaufen)'}
                               </span>
                             )}
                           </div>
