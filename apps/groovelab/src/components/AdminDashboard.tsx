@@ -233,7 +233,6 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [isEditingSongHeader, setIsEditingSongHeader] = useState(false);
   const [editSongTitle, setEditSongTitle] = useState('');
   const [editSongArtist, setEditSongArtist] = useState('');
-  const [copiedPraiseId, setCopiedPraiseId] = useState<string | null>(null);
   const [isEditingTarget, setIsEditingTarget] = useState(false);
   const [tempTarget, setTempTarget] = useState('300');
   const [editSongInstrumentation, setEditSongInstrumentation] = useState<Record<string, number>>({});
@@ -2198,7 +2197,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     // Fetch skills filtered by active students and active songs
     let skillsSq = supabase
       .from('user_song_skills')
-      .select('user_id, progress_percent, instrument, is_stage_ready, student:users!user_song_skills_user_id_fkey!inner(school_id, is_campus_active, is_groovelab_active), songs!inner(title, artist, is_campus_active, is_groovelab_active)')
+      .select('user_id, progress_percent, instrument, is_stage_ready, last_practiced_at, student:users!user_song_skills_user_id_fkey!inner(school_id, is_campus_active, is_groovelab_active), songs!inner(title, artist, is_campus_active, is_groovelab_active)')
       .eq('student.school_id', schoolId);
     if (activePlatform === 'campus') {
       skillsSq = skillsSq.eq('student.is_campus_active', true).eq('songs.is_campus_active', true);
@@ -2361,14 +2360,18 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       }
     });
 
-    // Calculate highlights (Helden-Momente)
+    // Calculate highlights (Helden-Momente) - Current Calendar Month
     let classWeeklyMins = 0;
     const highlights: any[] = [];
+    const startOfCurrentMonth = new Date();
+    startOfCurrentMonth.setDate(1);
+    startOfCurrentMonth.setHours(0, 0, 0, 0);
+
     myStudents.forEach((student: any) => {
       const studentLogs = studentFocusLogsMap[student.id] || [];
       const studentSkills = studentSkillsMap[student.id] || [];
 
-      // Calculate recent focus minutes (last 7 days)
+      // Calculate recent focus minutes (last 7 days - still needed for weekly class target calculation)
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
       const recentMins = studentLogs
@@ -2376,62 +2379,64 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         .reduce((sum: number, log: any) => sum + (log.duration_minutes || 0), 0);
       classWeeklyMins += recentMins;
 
-      // Streak
-      const weeks = new Set();
-      studentLogs.forEach((log: any) => {
+      // Filter focus logs for current month
+      const monthlyLogs = studentLogs.filter((log: any) => new Date(log.created_at) >= startOfCurrentMonth);
+      const monthlyMins = monthlyLogs.reduce((sum: number, log: any) => sum + (log.duration_minutes || 0), 0);
+
+      // Monthly Streak
+      const monthlyWeeks = new Set();
+      monthlyLogs.forEach((log: any) => {
         const d = new Date(log.created_at);
         const year = d.getFullYear();
         const firstDayOfYear = new Date(year, 0, 1);
         const pastDaysOfYear = (d.getTime() - firstDayOfYear.getTime()) / 86400000;
         const week = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
-        weeks.add(`${year}-${week}`);
+        monthlyWeeks.add(`${year}-${week}`);
       });
-      const streakCount = weeks.size;
+      const monthlyStreak = monthlyWeeks.size;
 
-      // Mastered songs count
-      const masteredSongs = studentSkills.filter((sk: any) => sk.progress_percent === 100 || sk.is_stage_ready);
-      const masteredCount = masteredSongs.length;
+      // Mastered songs this month
+      const masteredThisMonth = studentSkills.filter((sk: any) => {
+        const isMastered = sk.progress_percent === 100 || sk.is_stage_ready;
+        if (!isMastered) return false;
+        const date = sk.last_practiced_at ? new Date(sk.last_practiced_at) : null;
+        return date && date >= startOfCurrentMonth;
+      });
 
       // Add highlights
-      if (streakCount >= 3) {
+      if (monthlyStreak >= 2) {
         highlights.push({
           studentId: student.id,
           studentName: `${student.first_name} ${student.last_name}`,
           type: 'streak',
-          value: `${streakCount} Wochen`,
+          value: `${monthlyStreak} Wochen`,
           emoji: '🔥',
-          title: 'Konstanz-Meister',
-          text: `Hat in ${streakCount} verschiedenen Wochen im Groove Lab geübt!`,
-          praiseTemplate: `Hey ${student.first_name}, super Leistung! Du hast eine Übesträhne von ${streakCount} Wochen. Mach weiter so! 🎸`
+          title: 'Monats-Konstanz',
+          text: `Hat in ${monthlyStreak} verschiedenen Wochen diesen Monats geübt!`
         });
       }
-      if (recentMins >= 45) {
+      if (monthlyMins >= 120) {
         highlights.push({
           studentId: student.id,
           studentName: `${student.first_name} ${student.last_name}`,
           type: 'focus',
-          value: `${recentMins} Min.`,
+          value: `${monthlyMins} Min.`,
           emoji: '⚡',
-          title: 'Power-Übende(r)',
-          text: `Hat in den letzten 7 Tagen unglaubliche ${recentMins} Minuten trainiert!`,
-          praiseTemplate: `Hi ${student.first_name}, ich habe deine Übezeiten gesehen: ${recentMins} Minuten Fokus diese Woche! Richtig stark! 🎹`
+          title: 'Monats-Fokus',
+          text: `Hat diesen Monat bereits ${monthlyMins} Minuten trainiert!`
         });
       }
-      if (masteredCount > 0) {
-        const lastMastered = masteredSongs[masteredSongs.length - 1];
-        if (lastMastered) {
-          highlights.push({
-            studentId: student.id,
-            studentName: `${student.first_name} ${student.last_name}`,
-            type: 'song',
-            value: lastMastered.songs?.title || 'Song',
-            emoji: '🏆',
-            title: 'Bühnenreif',
-            text: `Hat den Song "${lastMastered.songs?.title || 'Song'}" komplett gemeistert!`,
-            praiseTemplate: `Hallo ${student.first_name}, herzlichen Glückwunsch! Du hast "${lastMastered.songs?.title || 'Song'}" bühnenreif gemeistert. Ich freue mich schon auf das nächste Vorspielen! 🎤`
-          });
-        }
-      }
+      masteredThisMonth.forEach((sk: any) => {
+        highlights.push({
+          studentId: student.id,
+          studentName: `${student.first_name} ${student.last_name}`,
+          type: 'song',
+          value: sk.songs?.title || 'Song',
+          emoji: '🏆',
+          title: 'Monats-Meilenstein',
+          text: `Hat diesen Monat den Song "${sk.songs?.title || 'Song'}" komplett gemeistert!`
+        });
+      });
     });
 
     const customWeeklyTarget = openingHours?.weekly_targets?.[userId] || 300;
@@ -8810,88 +8815,49 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 <span>✨</span> Helden-Momente
               </h3>
               <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0 0 28px 0', fontWeight: 600 }}>
-                Besondere Meilensteine und Fleiß-Highlights deiner Schüler aus dieser Woche.
+                Besondere Meilensteine und Fleiß-Highlights deiner Schüler aus dem aktuellen Monat.
               </p>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {(stats.highlights || []).length === 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: '24px', border: '1px dashed #cbd5e1' }}>
                     <span style={{ fontSize: '2.5rem', marginBottom: '16px' }}>🤫</span>
                     <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#475569', margin: '0 0 6px 0' }}>Ruhe vor dem Sturm</h4>
                     <p style={{ fontSize: '0.78rem', color: '#64748b', maxWidth: '300px', margin: 0, lineHeight: 1.4 }}>
-                      Sobald deine Schüler diese Woche fleißig üben oder Challenges meistern, erscheinen ihre Erfolge hier!
+                      Sobald deine Schüler diesen Monat fleißig üben oder Challenges meistern, erscheinen ihre Erfolge hier!
                     </p>
                   </div>
                 ) : (
                   (stats.highlights || []).map((hl: any, idx: number) => {
-                    const uniqueId = `${hl.studentId}-${hl.type}`;
-                    const isCopied = copiedPraiseId === uniqueId;
-
                     return (
                       <div 
                         key={idx} 
                         style={{ 
-                          padding: '20px', 
-                          background: 'white', 
-                          borderRadius: '20px', 
+                          padding: '14px 18px', 
+                          background: '#f8fafc', 
+                          borderRadius: '16px', 
                           border: '1px solid #e2e8f0', 
-                          boxShadow: '0 4px 12px rgba(15, 23, 42, 0.02)',
                           display: 'flex', 
-                          flexDirection: 'column', 
+                          alignItems: 'center',
                           gap: '14px',
                           transition: 'transform 0.2s, box-shadow 0.2s',
                           cursor: 'default'
                         }}
                         className="hover-scale"
                       >
-                        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                          <div style={{ fontSize: '1.75rem', width: '44px', height: '44px', borderRadius: '12px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            {hl.emoji}
+                        <span style={{ fontSize: '1.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          {hl.emoji}
+                        </span>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '8px' }}>
+                            <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a' }}>{hl.studentName}</span>
+                            <span style={{ fontSize: '0.65rem', fontWeight: 900, color: brandColor, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                              {hl.title}
+                            </span>
                           </div>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
-                              <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0f172a' }}>{hl.studentName}</span>
-                              <span style={{ fontSize: '0.7rem', fontWeight: 900, color: brandColor, background: `${brandColor}10`, padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
-                                {hl.title}
-                              </span>
-                            </div>
-                            <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '4px 0 0 0', lineHeight: 1.4, fontWeight: 550 }}>
-                              {hl.text}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Direct Praise Panel */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifySelf: 'stretch', gap: '12px', background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
-                          <span style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            "{hl.praiseTemplate}"
-                          </span>
-                          
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(hl.praiseTemplate);
-                              setCopiedPraiseId(uniqueId);
-                              setTimeout(() => setCopiedPraiseId(null), 1500);
-                            }}
-                            style={{
-                              background: isCopied ? '#10b981' : '#ffffff',
-                              border: `1px solid ${isCopied ? '#10b981' : '#cbd5e1'}`,
-                              color: isCopied ? 'white' : '#0f172a',
-                              padding: '6px 12px',
-                              borderRadius: '8px',
-                              fontSize: '0.75rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              transition: 'all 0.2s',
-                              boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
-                            }}
-                          >
-                            {isCopied ? <Check size={14} /> : null}
-                            <span>{isCopied ? 'Kopiert!' : 'Lob kopieren'}</span>
-                          </button>
+                          <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '3px 0 0 0', lineHeight: 1.3, fontWeight: 550 }}>
+                            {hl.text}
+                          </p>
                         </div>
                       </div>
                     );
