@@ -1228,7 +1228,8 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                         position: 'relative',
                         boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
                         transition: 'all 0.2s',
-                        userSelect: 'none'
+                        userSelect: 'none',
+                        visibility: isVacant ? 'hidden' : 'visible'
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2px' }}>
