@@ -700,18 +700,26 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
     e.preventDefault();
   };
 
-  const handleDropOnDay = (e: React.DragEvent, targetDateStr: string) => {
+  const handleDropOnDay = (e: React.DragEvent, targetDateStr: string, dayBaselineMinutes: number) => {
     e.preventDefault();
     const sourceId = e.dataTransfer.getData('text/plain');
     if (!sourceId) return;
 
+    const rect = e.currentTarget.getBoundingClientRect();
+    const relativeY = e.clientY - rect.top;
+    const droppedMinutes = dayBaselineMinutes + (relativeY / 2.5);
+    const snappedMinutes = Math.round(droppedMinutes / 15) * 15;
+    const hours = Math.floor(snappedMinutes / 60) % 24;
+    const mins = snappedMinutes % 60;
+    const targetStartTime = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:00`;
+
     const sourceOcc = occurrences.find(o => o.id === sourceId);
     if (sourceOcc) {
       const roomId = sourceOcc.schedules?.room_id || null;
-      const conflict = getRoomConflict(sourceId, targetDateStr, sourceOcc.start_time, sourceOcc.duration, roomId);
+      const conflict = getRoomConflict(sourceId, targetDateStr, targetStartTime, sourceOcc.duration, roomId);
       if (conflict) {
         const roomName = sourceOcc.schedules?.room?.name || 'diesem Raum';
-        const confirmMsg = `Warnung: Der Raum "${roomName}" ist an diesem Tag um ${sourceOcc.start_time.substring(0, 5)} Uhr bereits belegt durch:\n- ${conflict}\n\nMöchtest du den Termin trotzdem dorthin verschieben?`;
+        const confirmMsg = `Warnung: Der Raum "${roomName}" ist an diesem Tag um ${targetStartTime.substring(0, 5)} Uhr bereits belegt durch:\n- ${conflict}\n\nMöchtest du den Termin trotzdem dorthin verschieben?`;
         if (!confirm(confirmMsg)) {
           setDraggedId(null);
           return;
@@ -719,7 +727,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
       }
     }
 
-    updateOccurrence(sourceId, { date: targetDateStr, status: 'pending_reschedule' });
+    updateOccurrence(sourceId, { date: targetDateStr, start_time: targetStartTime, status: 'pending_reschedule' });
     setDraggedId(null);
   };
 
@@ -1310,8 +1318,6 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
           return (
             <div 
               key={offset} 
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDropOnDay(e, dateStr)}
               style={{ background: 'rgba(255, 255, 255, 0.4)', backdropFilter: 'blur(10px)', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.6)', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', minHeight: '400px' }}
             >
               <div style={{ textAlign: 'center', paddingBottom: '8px', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
@@ -1319,6 +1325,11 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                 <div style={{ fontSize: '1rem', fontWeight: 800, color: '#1d1d1f' }}>{dayDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}</div>
               </div>
 
+              <div
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDropOnDay(e, dateStr, dayBaselineMinutes)}
+                style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', minHeight: '320px' }}
+              >
               {loading ? (
                 <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8', fontSize: '0.75rem' }}>Lade...</div>
               ) : dayOccurrences.length === 0 ? (
@@ -1485,6 +1496,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                 );
               })
             })()}
+              </div>
             </div>
           );
         })}
