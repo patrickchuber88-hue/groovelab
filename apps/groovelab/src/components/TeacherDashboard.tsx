@@ -3811,7 +3811,7 @@ export function TeacherDashboard({
                           <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
                             {/* Full Height Avatar on the left */}
                             <div style={{
-                              width: '110px',
+                              width: '100px',
                               height: '100%',
                               flexShrink: 0,
                               position: 'relative',
@@ -3835,7 +3835,7 @@ export function TeacherDashboard({
                             </div>
                             
                             <div style={{ 
-                              padding: '16px 20px', 
+                              padding: '12px 20px', 
                               display: 'flex', 
                               flexDirection: 'column', 
                               justifyContent: 'center',
@@ -3844,14 +3844,20 @@ export function TeacherDashboard({
                             }}>
                               {/* Live Clock Badge above Hey */}
                               <div style={{
-                                display: 'flex',
+                                display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '6px',
+                                background: '#ffffff',
+                                border: '1px solid rgba(0, 0, 0, 0.06)',
+                                borderRadius: '100px',
+                                padding: '4px 10px',
+                                boxShadow: 'none',
+                                alignSelf: 'flex-start',
                                 marginBottom: '6px',
                                 flexShrink: 0
                               }}>
-                                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }} />
-                                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
+                                <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }} />
+                                <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#475569', letterSpacing: '0.04em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
                                   {currentTimeStr || '13:00'} UHR
                                 </span>
                               </div>
