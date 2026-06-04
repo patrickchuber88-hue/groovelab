@@ -235,6 +235,10 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [editSongArtist, setEditSongArtist] = useState('');
   const [isEditingTarget, setIsEditingTarget] = useState(false);
   const [tempTarget, setTempTarget] = useState('300');
+  const [newGoalTitle, setNewGoalTitle] = useState('Wochenziel');
+  const [newGoalMinutes, setNewGoalMinutes] = useState('300');
+  const [newGoalDeadline, setNewGoalDeadline] = useState('');
+  const [showAddGoalForm, setShowAddGoalForm] = useState(false);
   const [editSongInstrumentation, setEditSongInstrumentation] = useState<Record<string, number>>({});
   const [assignSongStudentInstrument, setAssignSongStudentInstrument] = useState<string>('E-Gitarre');
   const [selectedSongSkill, setSelectedSongSkill] = useState<any | null>(null);
@@ -2439,7 +2443,15 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       });
     });
 
-    const customWeeklyTarget = openingHours?.weekly_targets?.[userId] || 300;
+    const rawTargets = openingHours?.weekly_targets?.[userId];
+    let weeklyTargets: any[] = [];
+    if (Array.isArray(rawTargets)) {
+      weeklyTargets = rawTargets;
+    } else if (typeof rawTargets === 'number') {
+      weeklyTargets = [{ id: 'default', title: 'Wochenziel', minutes: rawTargets, deadline: '' }];
+    } else {
+      weeklyTargets = [{ id: 'default', title: 'Wochenziel', minutes: 300, deadline: '' }];
+    }
 
     setStats({
       studentCount,
@@ -2457,19 +2469,19 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       otherClassMins,
       myClassCount: myStudents.length,
       classWeeklyMins,
-      weeklyTarget: customWeeklyTarget,
+      weeklyTargets,
       highlights
     });
   };
 
-  const handleSaveTarget = async (minutesVal: number) => {
+  const handleSaveTargets = async (updatedTargets: any[]) => {
     if (!admin?.school_id) return;
     const currentHours = admin?.schools?.opening_hours || {};
     const updatedHours = {
       ...currentHours,
       weekly_targets: {
         ...(currentHours.weekly_targets || {}),
-        [userId]: minutesVal
+        [userId]: updatedTargets
       }
     };
 
@@ -2491,6 +2503,28 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       setIsEditingTarget(false);
       fetchStats(admin.school_id);
     }
+  };
+
+  const handleAddGoal = async () => {
+    const currentTargets = stats?.weeklyTargets || [];
+    const newGoal = {
+      id: Date.now().toString(),
+      title: newGoalTitle,
+      minutes: parseInt(newGoalMinutes, 10) || 300,
+      deadline: newGoalDeadline
+    };
+    const updated = [...currentTargets, newGoal];
+    await handleSaveTargets(updated);
+    setNewGoalTitle('Wochenziel');
+    setNewGoalMinutes('300');
+    setNewGoalDeadline('');
+    setShowAddGoalForm(false);
+  };
+
+  const handleDeleteGoal = async (goalId: string) => {
+    const currentTargets = stats?.weeklyTargets || [];
+    const updated = currentTargets.filter((g: any) => g.id !== goalId);
+    await handleSaveTargets(updated);
   };
 
   const handleAddStudent = async (e: React.FormEvent) => {
@@ -8791,88 +8825,128 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             {/* Right Column: Performance */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
               
-              {/* Weekly Class Target Card */}
+              {/* Weekly Class Targets Widget */}
               <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                   <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                    <span>🌱</span> Klassen-Wochenziel
+                    <span>🌱</span> Übe-Ziele der Klasse
                   </h3>
-                  {!isEditingTarget && (
-                    <button 
-                      onClick={() => {
-                        setTempTarget(weeklyTarget.toString());
-                        setIsEditingTarget(true);
-                      }}
-                      style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', padding: '4px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                      title="Ziel bearbeiten"
-                      className="hover-scale"
-                    >
-                      <Pencil size={16} />
-                    </button>
-                  )}
+                  <button 
+                    onClick={() => setShowAddGoalForm(!showAddGoalForm)}
+                    style={{ background: brandColor, color: 'white', border: 'none', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    className="hover-scale"
+                  >
+                    <span>{showAddGoalForm ? 'Abbrechen' : '+ Ziel'}</span>
+                  </button>
                 </div>
-                
-                {isEditingTarget ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', margin: '16px 0' }}>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <input
-                        type="number"
-                        min="1"
-                        value={tempTarget}
-                        onChange={(e) => setTempTarget(e.target.value)}
-                        style={{ padding: '8px 12px', borderRadius: '8px', border: `1px solid ${brandColor}`, width: '100px', fontSize: '0.9rem', fontWeight: 700 }}
+
+                {showAddGoalForm && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: '#f8fafc', padding: '20px', borderRadius: '20px', border: '1px solid #e2e8f0', marginBottom: '24px' }}>
+                    <h4 style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0f172a', margin: 0 }}>Neues Ziel erstellen</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Titel des Ziels</label>
+                      <input 
+                        type="text" 
+                        value={newGoalTitle} 
+                        onChange={(e) => setNewGoalTitle(e.target.value)} 
+                        placeholder="z.B. Wochenziel, Ferien-Challenge"
+                        style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600 }}
                       />
-                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>Minuten pro Woche</span>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button
-                        onClick={() => handleSaveTarget(parseInt(tempTarget, 10) || 300)}
-                        style={{ background: brandColor, color: 'white', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
-                      >
-                        Speichern
-                      </button>
-                      <button
-                        onClick={() => setIsEditingTarget(false)}
-                        style={{ background: '#f1f5f9', color: '#475569', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
-                      >
-                        Abbrechen
-                      </button>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Ziel (Minuten)</label>
+                        <input 
+                          type="number" 
+                          min="1"
+                          value={newGoalMinutes} 
+                          onChange={(e) => setNewGoalMinutes(e.target.value)} 
+                          style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 700 }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Deadline (optional)</label>
+                        <input 
+                          type="date" 
+                          value={newGoalDeadline} 
+                          onChange={(e) => setNewGoalDeadline(e.target.value)} 
+                          style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600 }}
+                        />
+                      </div>
                     </div>
+                    <button 
+                      onClick={handleAddGoal}
+                      style={{ background: brandColor, color: 'white', border: 'none', padding: '10px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', marginTop: '4px' }}
+                    >
+                      Ziel hinzufügen
+                    </button>
                   </div>
-                ) : (
-                  <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0 0 24px 0', fontWeight: 600 }}>
-                    Gemeinsam schaffen wir mehr! Euer kollektives Ziel von {weeklyTarget} Minuten pro Woche.
-                  </p>
                 )}
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 850, color: '#0f172a' }}>
-                    {formatMins(classWeeklyMins)} von {weeklyTarget} Min.
-                  </span>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 900, color: brandColor, background: `${brandColor}12`, padding: '2px 8px', borderRadius: '6px' }}>
-                    {targetPercent}%
-                  </span>
-                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {(stats?.weeklyTargets || []).length === 0 ? (
+                    <p style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', margin: '20px 0', fontWeight: 600 }}>
+                      Keine aktiven Ziele angelegt.
+                    </p>
+                  ) : (
+                    (stats.weeklyTargets || []).map((target: any) => {
+                      const targetPercent = Math.min(100, Math.round((classWeeklyMins / target.minutes) * 100));
+                      const isDeadlinePassed = target.deadline ? new Date(target.deadline) < new Date() : false;
 
-                <div style={{ width: '100%', height: '14px', background: '#f1f5f9', borderRadius: '7px', overflow: 'hidden', marginBottom: '16px' }}>
-                  <div 
-                    style={{ 
-                      width: `${targetPercent}%`, 
-                      height: '100%', 
-                      background: `linear-gradient(90deg, ${brandColor} 0%, #10b981 100%)`, 
-                      borderRadius: '7px', 
-                      transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)' 
-                    }} 
-                  />
-                </div>
+                      return (
+                        <div key={target.id} style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: '#f8fafc', padding: '20px', borderRadius: '20px', border: '1px solid #e2e8f0', position: 'relative' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div>
+                              <h4 style={{ fontSize: '0.88rem', fontWeight: 900, color: '#0f172a', margin: 0 }}>{target.title || 'Wochenziel'}</h4>
+                              {target.deadline && (
+                                <span style={{ fontSize: '0.7rem', fontWeight: 750, color: isDeadlinePassed ? '#ef4444' : '#64748b', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                                  ⏱️ Bis: {new Date(target.deadline).toLocaleDateString('de-DE')} {isDeadlinePassed && '(Abgelaufen)'}
+                                </span>
+                              )}
+                            </div>
+                            <button 
+                              onClick={() => handleDeleteGoal(target.id)}
+                              style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                              className="hover-scale"
+                              title="Ziel löschen"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
 
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', background: '#f0fdf4', padding: '12px 16px', borderRadius: '16px', border: '1px solid #dcfce7' }}>
-                  <span style={{ fontSize: '1.2rem' }}>🎉</span>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#14532d', lineHeight: 1.4 }}>
-                    {targetPercent >= 100 
-                      ? "Ziel erreicht! Eure Klasse rockt diese Woche!" 
-                      : `Noch ${weeklyTarget - classWeeklyMins} Minuten, um das Wochenziel als Klasse zu knacken!`}
-                  </span>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '4px' }}>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 850, color: '#334155' }}>
+                              {formatMins(classWeeklyMins)} von {target.minutes} Min.
+                            </span>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 900, color: brandColor, background: `${brandColor}12`, padding: '2px 6px', borderRadius: '4px' }}>
+                              {targetPercent}%
+                            </span>
+                          </div>
+
+                          <div style={{ width: '100%', height: '10px', background: '#e2e8f0', borderRadius: '5px', overflow: 'hidden' }}>
+                            <div 
+                              style={{ 
+                                width: `${targetPercent}%`, 
+                                height: '100%', 
+                                background: `linear-gradient(90deg, ${brandColor} 0%, #10b981 100%)`, 
+                                borderRadius: '5px', 
+                                transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)' 
+                              }} 
+                            />
+                          </div>
+
+                          {targetPercent >= 100 && (
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', background: '#f0fdf4', padding: '8px 12px', borderRadius: '12px', border: '1px solid #dcfce7', marginTop: '2px' }}>
+                              <span style={{ fontSize: '1rem' }}>🎉</span>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#14532d' }}>
+                                Ziel erreicht! Richtig stark!
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
 
