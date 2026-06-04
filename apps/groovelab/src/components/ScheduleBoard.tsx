@@ -227,13 +227,16 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
       if (activeBoardsDefinition && activeBoardsDefinition.length > 0) {
         try {
-          reconstructedBoards = activeBoardsDefinition.map(p => ({
-            id: p.id,
-            dayOfWeek: p.dayOfWeek,
-            startAnchor: p.startAnchor,
-            roomId: p.roomId,
-            students: p.students || []
-          }));
+          reconstructedBoards = activeBoardsDefinition.map(p => {
+            const daySched = schedData?.find((s: any) => s.day_of_week === p.dayOfWeek && s.room_id);
+            return {
+              id: p.id,
+              dayOfWeek: p.dayOfWeek,
+              startAnchor: p.startAnchor,
+              roomId: daySched ? daySched.room_id : p.roomId,
+              students: p.students || []
+            };
+          });
           
           const totalAssignedInDraft = reconstructedBoards.reduce((acc, b) => acc + b.students.length, 0);
 
