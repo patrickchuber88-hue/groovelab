@@ -1082,6 +1082,22 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
     }
   };
 
+  const timeToMinutes = (t: string) => {
+    if (!t) return 0;
+    const parts = t.split(':');
+    const h = parseInt(parts[0]) || 0;
+    const m = parseInt(parts[1]) || 0;
+    return h * 60 + m;
+  };
+
+  const nonCancelledOccurrences = occurrences.filter(o => o.status !== 'cancelled');
+  const weekMinMinutes = nonCancelledOccurrences.length > 0
+    ? nonCancelledOccurrences.reduce((min, o) => {
+        const mins = timeToMinutes(o.start_time);
+        return mins < min ? mins : min;
+      }, 24 * 60)
+    : 13 * 60;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
       
@@ -1242,6 +1258,55 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
             .sort((a, b) => a.start_time.localeCompare(b.start_time));
           const dayName = dayDate.toLocaleDateString('de-DE', { weekday: 'long' });
 
+          const nativeOccs = dayOccurrences.filter(o => {
+            const isBreak = !o.student_id;
+            const isCancelledBreak = isBreak && o.status === 'cancelled';
+            return !isCancelledBreak && (!o.original_date || o.original_date === dateStr);
+          });
+
+          const movedInOccs = dayOccurrences.filter(o => {
+            return o.original_date && o.original_date !== dateStr;
+          });
+
+          let dayBaselineMinutes = 13 * 60;
+          if (nativeOccs.length > 0) {
+            dayBaselineMinutes = timeToMinutes(nativeOccs[0].start_time);
+          } else if (movedInOccs.length > 0) {
+            const origStarts = movedInOccs.map(occ => {
+              const origDate = occ.original_date;
+              if (origDate) {
+                const parts = origDate.split('-');
+                const y = parseInt(parts[0], 10);
+                const m = parseInt(parts[1], 10) - 1;
+                const d = parseInt(parts[2], 10);
+                const origDateObj = new Date(y, m, d);
+                const origDayOfWeek = origDateObj.getDay() || 7;
+                
+                const board = boards.find(b => b.dayOfWeek === origDayOfWeek);
+                if (board && board.students && board.students.length > 0) {
+                  const times = board.students
+                    .map((s: any) => s.assignedTime)
+                    .filter(Boolean);
+                  if (times.length > 0) {
+                    times.sort();
+                    return timeToMinutes(times[0]);
+                  }
+                }
+
+                // Fallback to occurrences list
+                const origDayOccs = occurrences.filter(o => o.date === origDate && (!o.original_date || o.original_date === origDate));
+                const firstOrig = origDayOccs.sort((a, b) => a.start_time.localeCompare(b.start_time))[0];
+                if (firstOrig) {
+                  return timeToMinutes(firstOrig.start_time);
+                }
+              }
+              return timeToMinutes(occ.start_time);
+            });
+            dayBaselineMinutes = Math.min(...origStarts);
+          } else if (dayOccurrences.length > 0) {
+            dayBaselineMinutes = timeToMinutes(dayOccurrences[0].start_time);
+          }
+
           return (
             <div 
               key={offset} 
@@ -1258,8 +1323,9 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                 <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8', fontSize: '0.75rem' }}>Lade...</div>
               ) : dayOccurrences.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '20px', color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 500 }}>Keine Termine</div>
-              ) : (
-                dayOccurrences.map(occ => {
+              ) : (() => {
+                let lastEndTimeMinutes = dayBaselineMinutes;
+                return dayOccurrences.map(occ => {
                   const isBreak = !occ.student_id;
                   const isVacant = occ.student_id === 'vacant';
 
@@ -1295,10 +1361,20 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                     finalColors.text = '#713f12';
                   }
  
+                  const occStartMinutes = timeToMinutes(occ.start_time);
+                  const gapMinutes = occStartMinutes - lastEndTimeMinutes;
+                  const itemSpacerHeight = gapMinutes > 0 ? gapMinutes * 2.5 : 0;
+                  
+                  // Update lastEndTimeMinutes
+                  lastEndTimeMinutes = occStartMinutes + (occ.duration || 30);
+
                   return (
-                    <div 
-                      key={occ.id} 
-                      id={`occ-${occ.id}`}
+                    <React.Fragment key={occ.id}>
+                      {itemSpacerHeight > 0 && (
+                        <div style={{ height: `${itemSpacerHeight}px`, flexShrink: 0 }} />
+                      )}
+                      <div 
+                        id={`occ-${occ.id}`}
                       draggable={!isBreak && !isVacant}
                       onDragStart={(e) => handleDragStart(e, occ.id)}
                       onDragOver={handleDragOver}
@@ -1401,9 +1477,10 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                         )}
                       </div>
                     </div>
-                  );
-                })
-              )}
+                  </React.Fragment>
+                );
+              })
+            })()}
             </div>
           );
         })}
