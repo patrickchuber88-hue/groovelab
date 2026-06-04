@@ -2645,29 +2645,31 @@ function App() {
         return;
       }
 
-      if (isInitial) {
-        if (isStudent && isKioskMode) {
-          setActivePlatform('groovelab');
-          setActiveStudentTab('live');
-          localStorage.setItem('groovelab_active_platform', 'groovelab');
-          localStorage.setItem('groovelab_active_tab', 'live');
-        } else {
-          setActivePlatform('campus');
-          const defaultTab = isStudent ? 'briefing' : 'live';
-          setActiveStudentTab(defaultTab);
-          localStorage.setItem('groovelab_active_platform', 'campus');
-          localStorage.setItem('campus_active_tab', defaultTab);
-        }
+      // Determine what platform the user is allowed to access and what is default:
+      let allowedPlatform: 'campus' | 'groovelab' = 'campus';
+      if (userData.is_campus_active && !userData.is_groovelab_active) {
+        allowedPlatform = 'campus';
+      } else if (!userData.is_campus_active && userData.is_groovelab_active) {
+        allowedPlatform = 'groovelab';
+      } else {
+        // Both active or both inactive, default to campus on initial load, otherwise keep activePlatform/stored value
+        const storedPlat = localStorage.getItem('groovelab_active_platform') as 'campus' | 'groovelab' | null;
+        allowedPlatform = isInitial ? 'campus' : (storedPlat || 'campus');
       }
 
-      // If we are in initial load and home-mode, check if external vocalist, and adjust tab if needed (only for GrooveLab)
-      const currentPlatform = isInitial 
-        ? (localStorage.getItem('groovelab_active_platform') || (userData.is_campus_active ? 'campus' : 'groovelab')) 
-        : activePlatform;
-      if (isInitial && isStudent && locationMode === 'home' && currentPlatform !== 'campus') {
-        const startTab = userData.is_external_vocalist ? 'repertoire' : 'practice';
-        setActiveStudentTab(startTab);
-        localStorage.setItem('groovelab_active_tab', startTab);
+      if (isInitial) {
+        setActivePlatform(allowedPlatform);
+        localStorage.setItem('groovelab_active_platform', allowedPlatform);
+
+        if (allowedPlatform === 'campus') {
+          const defaultTab = isStudent ? 'briefing' : 'live';
+          setActiveStudentTab(defaultTab);
+          localStorage.setItem('campus_active_tab', defaultTab);
+        } else {
+          const defaultTab = isStudent && isKioskMode ? 'live' : (isStudent && locationMode === 'home' ? (userData.is_external_vocalist ? 'repertoire' : 'practice') : 'live');
+          setActiveStudentTab(defaultTab);
+          localStorage.setItem('groovelab_active_tab', defaultTab);
+        }
       }
 
       const schoolId = userData.school_id || (Array.isArray(userData.schools) ? userData.schools[0]?.id : userData.schools?.id);
