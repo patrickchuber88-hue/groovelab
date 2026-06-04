@@ -3934,7 +3934,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   position: 'relative', overflow: 'hidden',
                   background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white',
                   borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.3)',
-                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '90px',
+                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
                   padding: '16px', boxSizing: 'border-box',
                   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                   border: '1px solid rgba(255, 255, 255, 0.1)'
@@ -3958,7 +3958,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   position: 'relative', overflow: 'hidden',
                   background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white',
                   borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.3)',
-                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '90px',
+                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
                   padding: '16px', boxSizing: 'border-box',
                   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                   border: '1px solid rgba(255, 255, 255, 0.1)'
@@ -3982,7 +3982,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   position: 'relative', overflow: 'hidden',
                   background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: 'white',
                   borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(245, 158, 11, 0.3)',
-                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '90px',
+                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
                   padding: '16px', boxSizing: 'border-box',
                   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                   border: '1px solid rgba(255, 255, 255, 0.1)'
@@ -3999,7 +3999,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     </span>
                     <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>Min</span>
                   </div>
-                  <span style={{ fontSize: '0.6rem', fontWeight: 700, opacity: 0.7, marginTop: '2px' }}>Fokuszeit gesamt</span>
                 </div>
 
                 {/* KPI 4: Streak */}
@@ -4007,7 +4006,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   position: 'relative', overflow: 'hidden',
                   background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: 'white',
                   borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.3)',
-                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '90px',
+                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
                   padding: '16px', boxSizing: 'border-box',
                   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                   border: '1px solid rgba(255, 255, 255, 0.1)'
@@ -4024,7 +4023,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     </span>
                     <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>Tage</span>
                   </div>
-                  <span style={{ fontSize: '0.6rem', fontWeight: 700, opacity: 0.7, marginTop: '2px' }}>Tage in Folge geübt</span>
                 </div>
 
               </div>
