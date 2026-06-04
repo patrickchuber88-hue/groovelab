@@ -4183,385 +4183,431 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 </div>
               </div>
 
-              {/* Hausaufgaben & Übesoll Row */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                {/* Hausaufgaben */}
-                <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', borderLeft: '4px solid #10b981' }}>
-                  {(() => {
-                    const currentWeekStr = getISOWeekRaw(new Date(), 1);
-                    const prevWeekDate = new Date();
-                    prevWeekDate.setDate(prevWeekDate.getDate() - 7);
-                    const prevWeekStr = getISOWeekRaw(prevWeekDate, 1);
-
-                    const parseHomeworkNotes = (rawNotes: string): string[] => {
-                      if (!rawNotes || rawNotes.trim() === '') return [];
-                      try {
-                        if (rawNotes.startsWith('[') && rawNotes.endsWith(']')) {
-                          return JSON.parse(rawNotes);
-                        }
-                        return rawNotes.split('\n\n').filter(Boolean);
-                      } catch (e) {
-                        return [rawNotes];
-                      }
-                    };
-
-                    const currentWeekItems = progressItems.filter(item => 
-                      !item.topic_name.startsWith('Hausaufgabe KW ') && 
-                      (item.is_current_homework || (item.updated_at && getISOWeekRaw(item.updated_at, 1) === currentWeekStr))
-                    );
-
-                    const currentWeekNotesItem = progressItems.find(item => 
-                      item.topic_name.startsWith('Hausaufgabe KW ') && 
-                      (item.is_current_homework || (item.updated_at && getISOWeekRaw(item.updated_at, 1) === currentWeekStr))
-                    ) || progressItems.find(item => 
-                      item.is_current_homework && 
-                      item.homework_notes && 
-                      item.homework_notes.trim() !== ''
-                    );
-
-                    const currentWeekNotes = currentWeekNotesItem ? parseHomeworkNotes(currentWeekNotesItem.homework_notes) : [];
-
-                    const prevWeekItems = progressItems.filter(item => 
-                      !item.topic_name.startsWith('Hausaufgabe KW ') && 
-                      item.updated_at && 
-                      getISOWeekRaw(item.updated_at, 1) === prevWeekStr
-                    );
-
-                    const prevWeekNotesItem = progressItems.find(item => 
-                      item.topic_name.startsWith('Hausaufgabe KW ') && 
-                      item.updated_at && 
-                      getISOWeekRaw(item.updated_at, 1) === prevWeekStr
-                    );
-
-                    const prevWeekNotes = prevWeekNotesItem ? parseHomeworkNotes(prevWeekNotesItem.homework_notes) : [];
-
-                    const currentWeekNum = currentWeekStr.split('-W')[1] || '';
-                    const prevWeekNum = prevWeekStr.split('-W')[1] || '';
-
-                    const cleanTitle = (t: string) => t.replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
-
-                    const groupAndFormatItems = (rawItems: any[]) => {
-                      const groupedLehrwerke: Record<string, { pages: number[]; statuses: string[] }> = {};
-                      const otherItems: any[] = [];
-
-                      (rawItems || []).forEach(item => {
-                        const title = item.title || item.topic_name || '';
-                        if (title.includes(' - Seite ')) {
-                          const parts = title.split(' - Seite ');
-                          const bookTitle = cleanTitle(parts[0].trim());
-                          const pageNum = parseInt(parts[1], 10);
-                          
-                          if (!groupedLehrwerke[bookTitle]) {
-                            groupedLehrwerke[bookTitle] = { pages: [], statuses: [] };
-                          }
-                          if (!isNaN(pageNum) && !groupedLehrwerke[bookTitle].pages.includes(pageNum)) {
-                            groupedLehrwerke[bookTitle].pages.push(pageNum);
-                            groupedLehrwerke[bookTitle].statuses.push(item.status);
-                          }
-                        } else {
-                          otherItems.push(item);
-                        }
-                      });
-
-                      const formatPageNumbers = (pages: number[]): string => {
-                        if (pages.length === 0) return '';
-                        const sorted = [...pages].sort((a, b) => a - b);
-                        const ranges: string[] = [];
-                        let start = sorted[0];
-                        let end = start;
-                        
-                        for (let i = 1; i < sorted.length; i++) {
-                          if (sorted[i] === end + 1) {
-                            end = sorted[i];
-                          } else {
-                            if (start === end) {
-                              ranges.push(`${start}`);
-                            } else {
-                              ranges.push(`${start}-${end}`);
-                            }
-                            start = sorted[i];
-                            end = start;
-                          }
-                        }
-                        if (start === end) {
-                          ranges.push(`${start}`);
-                        } else {
-                          ranges.push(`${start}-${end}`);
-                        }
-                        
-                        if (ranges.length === 1) return `S. ${ranges[0]}`;
-                        const last = ranges.pop();
-                        return `S. ${ranges.join(', ')} & ${last}`;
-                      };
-
-                      const groupedItems = Object.entries(groupedLehrwerke).map(([bookTitle, info]) => {
-                        const formattedPages = formatPageNumbers(info.pages);
-                        const allDone = info.statuses.every(status => status === 'MASTERED' || status === 'THEORY_DONE');
-                        return {
-                          title: `${bookTitle}: ${formattedPages}`,
-                          status: allDone ? 'MASTERED' : 'IN_PROGRESS',
-                          isBook: true
-                        };
-                      });
-
-                      return [
-                        ...groupedItems,
-                        ...otherItems.map(item => ({
-                          title: cleanTitle(item.title || item.topic_name || ''),
-                          status: item.status,
-                          isBook: false
-                        }))
-                      ];
-                    };
-
-                    const formattedPrevWeekItems = groupAndFormatItems(prevWeekItems);
-                    const formattedCurrentWeekItems = groupAndFormatItems(currentWeekItems);
-
-                    return (
-                      <>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
-                          <div style={{ background: 'rgba(16, 185, 129, 0.08)', color: '#10b981', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Award size={18} />
-                          </div>
-                          <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            Aktuelle Hausaufgaben
-                          </h4>
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                          {/* Hausaufgaben der Vorwoche */}
-                          <div>
-                            <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
-                              Hausaufgaben der Vorwoche (KW {prevWeekNum || '?'})
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                              {((formattedPrevWeekItems && formattedPrevWeekItems.length > 0) || (prevWeekNotes && prevWeekNotes.length > 0)) ? (
-                                <>
-                                  {formattedPrevWeekItems && formattedPrevWeekItems.map((item: any, idx: number) => {
-                                    const isBook = item.isBook;
-                                    return (
-                                      <div key={`prev-item-${idx}`} style={{
-                                        background: '#f8fafc',
-                                        padding: '10px 12px',
-                                        borderRadius: '12px',
-                                        border: '1px solid rgba(0, 0, 0, 0.03)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        gap: '8px',
-                                        opacity: 0.85
-                                      }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                                          {isBook ? <BookOpen size={14} color="#64748b" /> : <Music size={14} color="#64748b" />}
-                                          <span style={{ fontWeight: 800, color: '#475569', fontSize: '0.8rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                            {item.title}
-                                          </span>
-                                        </div>
-                                        {(item.status === 'MASTERED' || item.status === 'THEORY_DONE') && (
-                                          <span style={{
-                                            background: 'rgba(16, 185, 129, 0.08)',
-                                            color: '#10b981',
-                                            fontSize: '0.64rem',
-                                            fontWeight: 800,
-                                            borderRadius: '100px',
-                                            padding: '2px 8px',
-                                            textTransform: 'uppercase',
-                                            flexShrink: 0
-                                          }}>
-                                            Erledigt
-                                          </span>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                  {prevWeekNotes && prevWeekNotes.map((note: string, idx: number) => (
-                                    <div key={`prev-note-${idx}`} style={{ 
-                                      fontSize: '0.75rem', 
-                                      color: '#64748b', 
-                                      fontWeight: 500, 
-                                      fontStyle: 'italic', 
-                                      borderLeft: '2.5px solid #cbd5e1', 
-                                      paddingLeft: '8px', 
-                                      margin: '2px 4px',
-                                      lineHeight: 1.3,
-                                      opacity: 0.85
-                                    }}>
-                                      {note}
-                                    </div>
-                                  ))}
-                                </>
-                              ) : (
-                                <div style={{ 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  justifyContent: 'center',
-                                  gap: '6px', 
-                                  padding: '14px 0', 
-                                  background: '#f8fafc',
-                                  borderRadius: '12px',
-                                  border: '1px dashed #e2e8f0',
-                                  fontSize: '0.74rem',
-                                  color: '#94a3b8',
-                                  fontWeight: 555
-                                }}>
-                                  <BookOpen size={14} />
-                                  <span>Keine Hausaufgaben erfasst.</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Hausaufgaben dieser Woche */}
-                          <div>
-                            <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
-                              Hausaufgaben dieser Woche (KW {currentWeekNum || '?'})
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                              {((formattedCurrentWeekItems && formattedCurrentWeekItems.length > 0) || (currentWeekNotes && currentWeekNotes.length > 0)) ? (
-                                <>
-                                  {formattedCurrentWeekItems && formattedCurrentWeekItems.map((item: any, idx: number) => {
-                                    const isBook = item.isBook;
-                                    return (
-                                      <div key={`curr-item-${idx}`} style={{
-                                        background: '#f8fafc',
-                                        padding: '10px 12px',
-                                        borderRadius: '12px',
-                                        border: '1px solid rgba(0, 0, 0, 0.03)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        gap: '8px'
-                                      }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                                          {isBook ? <BookOpen size={14} color="#64748b" /> : <Music size={14} color="#64748b" />}
-                                          <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.8rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                            {item.title}
-                                          </span>
-                                        </div>
-                                        {(item.status === 'MASTERED' || item.status === 'THEORY_DONE') && (
-                                          <span style={{
-                                            background: 'rgba(16, 185, 129, 0.08)',
-                                            color: '#10b981',
-                                            fontSize: '0.64rem',
-                                            fontWeight: 800,
-                                            borderRadius: '100px',
-                                            padding: '2px 8px',
-                                            textTransform: 'uppercase',
-                                            flexShrink: 0
-                                          }}>
-                                            Erledigt
-                                          </span>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                  {currentWeekNotes && currentWeekNotes.map((note: string, idx: number) => (
-                                    <div key={`curr-note-${idx}`} style={{ 
-                                      fontSize: '0.75rem', 
-                                      color: '#475569', 
-                                      fontWeight: 500, 
-                                      fontStyle: 'italic', 
-                                      borderLeft: '2.5px solid #10b981', 
-                                      paddingLeft: '8px', 
-                                      margin: '2px 4px',
-                                      lineHeight: 1.3
-                                    }}>
-                                      {note}
-                                    </div>
-                                  ))}
-                                </>
-                              ) : (
-                                <div style={{ 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  justifyContent: 'center',
-                                  gap: '6px', 
-                                  padding: '14px 0', 
-                                  background: '#f8fafc',
-                                  borderRadius: '12px',
-                                  border: '1px dashed #e2e8f0',
-                                  fontSize: '0.74rem',
-                                  color: '#94a3b8',
-                                  fontWeight: 550
-                                }}>
-                                  <BookOpen size={14} />
-                                  <span>Keine Hausaufgaben erfasst.</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </>
-                    );
-                  })()}
-                </div>
-
-                {/* Übesoll */}
-                <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', borderLeft: '4px solid #fbbc05', display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', flex: 1 }}>
-                    <div style={{ background: 'rgba(251, 188, 5, 0.12)', color: '#eab308', width: '48px', height: '48px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Flame size={24} fill="currentColor" />
+              {/* ÜBE-ZENTRALE (PRACTICE HUB) */}
+              <div style={{ 
+                background: '#ffffff', 
+                borderRadius: '24px', 
+                padding: '28px', 
+                boxShadow: '0 8px 32px rgba(15, 23, 42, 0.02)',
+                border: '1px solid rgba(0, 0, 0, 0.04)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '20px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+                  {/* Left Column: Practice trigger */}
+                  <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ background: 'rgba(251, 188, 5, 0.1)', color: '#eab308', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Zap size={16} fill="currentColor" />
+                      </div>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#64748b', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Daily Focus Target</span>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '4px' }}>TÄGLICHES ÜBESOLL (HEUTE)</div>
-                      <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', marginBottom: '8px' }}>Tägliche Übezeit noch offen</div>
-                      <div style={{ fontSize: '0.8rem', color: '#64748b', lineHeight: 1.4 }}>Starte jetzt deinen Fokus-Übemodus, um deine Flammen zu schützen! ⚡️</div>
+                      <h4 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                        Übezeit für heute offen
+                      </h4>
+                      <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: '#64748b', lineHeight: 1.45 }}>
+                        Starte jetzt deinen Fokus-Übemodus, um deine Flammen-Serie zu schützen und XP zu sammeln! ⚡️
+                      </p>
+                    </div>
+                    
+                    <button 
+                      onClick={() => setActiveTab('practice_board')}
+                      style={{ 
+                        background: 'linear-gradient(135deg, #007aff 0%, #0051b3 100%)', 
+                        color: 'white', 
+                        border: 'none', 
+                        borderRadius: '14px', 
+                        padding: '12px 20px', 
+                        fontWeight: 800, 
+                        fontSize: '0.85rem', 
+                        cursor: 'pointer', 
+                        display: 'inline-flex', 
+                        justifyContent: 'center', 
+                        alignItems: 'center', 
+                        gap: '8px', 
+                        boxShadow: '0 8px 20px rgba(0, 122, 255, 0.15)',
+                        transition: 'all 0.2s',
+                        alignSelf: 'flex-start',
+                        marginTop: '4px'
+                      }}
+                      onMouseOver={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+                      onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
+                    >
+                      🚀 Üben starten
+                    </button>
+                  </div>
+
+                  {/* Right Column: Flame Level Timeline */}
+                  <div style={{ flex: '1 1 280px', display: 'flex', flexDirection: 'column', gap: '12px', background: '#f8fafc', padding: '16px', borderRadius: '18px', border: '1px solid rgba(0,0,0,0.02)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e293b' }}>🔥 Level-Serie</span>
+                      <span style={{ background: '#ffedd5', color: '#ea580c', fontSize: '0.72rem', fontWeight: 900, padding: '3px 10px', borderRadius: '100px' }}>
+                        {avatar?.streak_flame || 0} Tage
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {/* Kleine Flamme */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#ffffff', padding: '8px 12px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.03)' }}>
+                        <div style={{ color: '#eab308' }}><Flame size={16} fill="currentColor" /></div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#854d0e' }}>Kleine Flamme</div>
+                          <div style={{ fontSize: '0.6rem', color: '#94a3b8' }}>Stufe 1 (3+ Tage) | 3 Min.</div>
+                        </div>
+                      </div>
+                      
+                      {/* Mittlere Flamme */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#ffffff', padding: '8px 12px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.03)' }}>
+                        <div style={{ color: '#f97316' }}><Flame size={16} fill="currentColor" /></div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#9a3412' }}>Mittlere Flamme</div>
+                          <div style={{ fontSize: '0.6rem', color: '#94a3b8' }}>Stufe 2 (6+ Tage) | 5 Min.</div>
+                        </div>
+                      </div>
+
+                      {/* Helden-Feuer */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#ffffff', padding: '8px 12px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.03)' }}>
+                        <div style={{ color: '#ef4444' }}><Flame size={16} fill="currentColor" /></div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#991b1b' }}>Helden-Feuer</div>
+                          <div style={{ fontSize: '0.6rem', color: '#94a3b8' }}>Stufe 3 (9+ Tage) | 10 Min.</div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <button 
-                    onClick={() => setActiveTab('practice_board')}
-                    style={{ background: '#4f46e5', color: 'white', border: 'none', borderRadius: '12px', padding: '12px', fontWeight: 800, fontSize: '0.9rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.2)' }}>
-                    🚀 Üben starten
-                  </button>
+                </div>
+
+                {/* Footer inputs (Test Controls) */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem', color: '#64748b', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                  <span>👍 Joker bereit</span>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.62rem', color: '#94a3b8' }}>Test:</span>
+                    <select style={{ border: '1px solid #e2e8f0', borderRadius: '4px', padding: '2px 4px', fontSize: '0.65rem', background: '#ffffff' }}><option>Tag 0</option></select>
+                    <select style={{ border: '1px solid #e2e8f0', borderRadius: '4px', padding: '2px 4px', fontSize: '0.65rem', background: '#ffffff' }}><option>0 Fehl</option></select>
+                    <button style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '2px 6px', fontSize: '0.65rem', fontWeight: 600, cursor: 'pointer' }}>Real Geübt</button>
+                  </div>
                 </div>
               </div>
 
-              {/* Flame Tiers */}
-              <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', borderLeft: '4px solid #ea580c' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ background: 'rgba(234, 88, 12, 0.08)', color: '#ea580c', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Flame size={18} fill="currentColor" />
-                    </div>
-                    <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Übe-Serie & Flammen</h3>
-                  </div>
-                  <div style={{ background: '#ffedd5', color: '#ea580c', fontSize: '0.75rem', fontWeight: 800, padding: '4px 12px', borderRadius: '100px' }}>{avatar?.streak_flame || 0} Tage</div>
-                </div>
-                <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '0 0 20px 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ color: '#ef4444' }}>🔥 Helden-Feuer aktiv! Mindestzeit: 10 Min.</span>
-                  <span style={{ color: '#eab308' }}>🔥 Serie aktiv! Täglich mindestens 10 Min. ⚡️</span>
-                </p>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '16px' }}>
-                  {/* Kleine Flamme */}
-                  <div style={{ background: '#fef08a', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', minHeight: '100px' }}>
-                    <div style={{ color: '#eab308' }}><Flame size={24} fill="currentColor" /></div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#854d0e' }}>Kleine Flamme</div>
-                    <div style={{ fontSize: '0.65rem', color: '#a16207' }}>Stufe 1 (Tag 3+) | 3 Min |</div>
-                  </div>
-                  {/* Mittlere Flamme */}
-                  <div style={{ background: '#ffedd5', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', minHeight: '100px' }}>
-                    <div style={{ color: '#f97316' }}><Flame size={24} fill="currentColor" /></div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#9a3412' }}>Mittlere Flamme</div>
-                    <div style={{ fontSize: '0.65rem', color: '#c2410c' }}>Stufe 2 (Tag 6+) | 5 Min |</div>
-                  </div>
-                  {/* Helden-Feuer */}
-                  <div style={{ background: '#fee2e2', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', minHeight: '100px' }}>
-                    <div style={{ color: '#ef4444' }}><Flame size={24} fill="currentColor" /></div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#991b1b' }}>Helden-Feuer</div>
-                    <div style={{ fontSize: '0.65rem', color: '#b91c1c' }}>Stufe 3 (Tag 9+) | 10 Min |</div>
-                  </div>
-                </div>
-                
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: '#64748b' }}>
-                  <span>👍 Joker bereit</span>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <span>Test:</span>
-                    <select style={{ border: '1px solid #e2e8f0', borderRadius: '4px', padding: '2px 8px', fontSize: '0.7rem' }}><option>Tag 0</option></select>
-                    <select style={{ border: '1px solid #e2e8f0', borderRadius: '4px', padding: '2px 8px', fontSize: '0.7rem' }}><option>0 Fehl</option></select>
-                    <button style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '2px 8px', fontSize: '0.7rem', fontWeight: 600 }}>Real Geübt</button>
-                  </div>
-                </div>
+              {/* QUEST LOG (HAUSAUFGABEN) */}
+              <div style={{ 
+                background: '#ffffff', 
+                borderRadius: '24px', 
+                padding: '28px', 
+                boxShadow: '0 8px 32px rgba(15, 23, 42, 0.02)',
+                border: '1px solid rgba(0, 0, 0, 0.04)'
+              }}>
+                {(() => {
+                  const currentWeekStr = getISOWeekRaw(new Date(), 1);
+                  const prevWeekDate = new Date();
+                  prevWeekDate.setDate(prevWeekDate.getDate() - 7);
+                  const prevWeekStr = getISOWeekRaw(prevWeekDate, 1);
+
+                  const parseHomeworkNotes = (rawNotes: string): string[] => {
+                    if (!rawNotes || rawNotes.trim() === '') return [];
+                    try {
+                      if (rawNotes.startsWith('[') && rawNotes.endsWith(']')) {
+                        return JSON.parse(rawNotes);
+                      }
+                      return rawNotes.split('\n\n').filter(Boolean);
+                    } catch (e) {
+                      return [rawNotes];
+                    }
+                  };
+
+                  const currentWeekItems = progressItems.filter(item => 
+                    !item.topic_name.startsWith('Hausaufgabe KW ') && 
+                    (item.is_current_homework || (item.updated_at && getISOWeekRaw(item.updated_at, 1) === currentWeekStr))
+                  );
+
+                  const currentWeekNotesItem = progressItems.find(item => 
+                    item.topic_name.startsWith('Hausaufgabe KW ') && 
+                    (item.is_current_homework || (item.updated_at && getISOWeekRaw(item.updated_at, 1) === currentWeekStr))
+                  ) || progressItems.find(item => 
+                    item.is_current_homework && 
+                    item.homework_notes && 
+                    item.homework_notes.trim() !== ''
+                  );
+
+                  const currentWeekNotes = currentWeekNotesItem ? parseHomeworkNotes(currentWeekNotesItem.homework_notes) : [];
+
+                  const prevWeekItems = progressItems.filter(item => 
+                    !item.topic_name.startsWith('Hausaufgabe KW ') && 
+                    item.updated_at && 
+                    getISOWeekRaw(item.updated_at, 1) === prevWeekStr
+                  );
+
+                  const prevWeekNotesItem = progressItems.find(item => 
+                    item.topic_name.startsWith('Hausaufgabe KW ') && 
+                    item.updated_at && 
+                    getISOWeekRaw(item.updated_at, 1) === prevWeekStr
+                  );
+
+                  const prevWeekNotes = prevWeekNotesItem ? parseHomeworkNotes(prevWeekNotesItem.homework_notes) : [];
+
+                  const currentWeekNum = currentWeekStr.split('-W')[1] || '';
+                  const prevWeekNum = prevWeekStr.split('-W')[1] || '';
+
+                  const cleanTitle = (t: string) => t.replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
+
+                  const groupAndFormatItems = (rawItems: any[]) => {
+                    const groupedLehrwerke: Record<string, { pages: number[]; statuses: string[] }> = {};
+                    const otherItems: any[] = [];
+
+                    (rawItems || []).forEach(item => {
+                      const title = item.title || item.topic_name || '';
+                      if (title.includes(' - Seite ')) {
+                        const parts = title.split(' - Seite ');
+                        const bookTitle = cleanTitle(parts[0].trim());
+                        const pageNum = parseInt(parts[1], 10);
+                        
+                        if (!groupedLehrwerke[bookTitle]) {
+                          groupedLehrwerke[bookTitle] = { pages: [], statuses: [] };
+                        }
+                        if (!isNaN(pageNum) && !groupedLehrwerke[bookTitle].pages.includes(pageNum)) {
+                          groupedLehrwerke[bookTitle].pages.push(pageNum);
+                          groupedLehrwerke[bookTitle].statuses.push(item.status);
+                        }
+                      } else {
+                        otherItems.push(item);
+                      }
+                    });
+
+                    const formatPageNumbers = (pages: number[]): string => {
+                      if (pages.length === 0) return '';
+                      const sorted = [...pages].sort((a, b) => a - b);
+                      const ranges: string[] = [];
+                      let start = sorted[0];
+                      let end = start;
+                      
+                      for (let i = 1; i < sorted.length; i++) {
+                        if (sorted[i] === end + 1) {
+                          end = sorted[i];
+                        } else {
+                          if (start === end) {
+                            ranges.push(`${start}`);
+                          } else {
+                            ranges.push(`${start}-${end}`);
+                          }
+                          start = sorted[i];
+                          end = start;
+                        }
+                      }
+                      if (start === end) {
+                        ranges.push(`${start}`);
+                      } else {
+                        ranges.push(`${start}-${end}`);
+                      }
+                      
+                      if (ranges.length === 1) return `S. ${ranges[0]}`;
+                      const last = ranges.pop();
+                      return `S. ${ranges.join(', ')} & ${last}`;
+                    };
+
+                    const groupedItems = Object.entries(groupedLehrwerke).map(([bookTitle, info]) => {
+                      const formattedPages = formatPageNumbers(info.pages);
+                      const allDone = info.statuses.every(status => status === 'MASTERED' || status === 'THEORY_DONE');
+                      return {
+                        title: `${bookTitle}: ${formattedPages}`,
+                        status: allDone ? 'MASTERED' : 'IN_PROGRESS',
+                        isBook: true
+                      };
+                    });
+
+                    return [
+                      ...groupedItems,
+                      ...otherItems.map(item => ({
+                        title: cleanTitle(item.title || item.topic_name || ''),
+                        status: item.status,
+                        isBook: false
+                      }))
+                    ];
+                  };
+
+                  const formattedPrevWeekItems = groupAndFormatItems(prevWeekItems);
+                  const formattedCurrentWeekItems = groupAndFormatItems(currentWeekItems);
+
+                  return (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px' }}>
+                        <div style={{ background: 'rgba(16, 185, 129, 0.08)', color: '#10b981', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <BookOpen size={18} />
+                        </div>
+                        <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                          Deine Quests für diese Woche
+                        </h4>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                        {/* Hausaufgaben der Vorwoche */}
+                        <div>
+                          <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
+                            Vorherige Quests (KW {prevWeekNum || '?'})
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {((formattedPrevWeekItems && formattedPrevWeekItems.length > 0) || (prevWeekNotes && prevWeekNotes.length > 0)) ? (
+                              <>
+                                {formattedPrevWeekItems && formattedPrevWeekItems.map((item: any, idx: number) => {
+                                  const isBook = item.isBook;
+                                  return (
+                                    <div key={`prev-item-${idx}`} style={{
+                                      background: '#ffffff',
+                                      padding: '12px 16px',
+                                      borderRadius: '14px',
+                                      border: '1px solid rgba(0, 0, 0, 0.03)',
+                                      boxShadow: '0 2px 10px rgba(0,0,0,0.01)',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      gap: '12px',
+                                      opacity: 0.75
+                                    }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
+                                        {isBook ? <BookOpen size={15} color="#94a3b8" /> : <Music size={15} color="#94a3b8" />}
+                                        <span style={{ fontWeight: 800, color: '#64748b', fontSize: '0.82rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                          {item.title}
+                                        </span>
+                                      </div>
+                                      {(item.status === 'MASTERED' || item.status === 'THEORY_DONE') && (
+                                        <span style={{
+                                          background: 'rgba(16, 185, 129, 0.06)',
+                                          color: '#10b981',
+                                          fontSize: '0.62rem',
+                                          fontWeight: 900,
+                                          borderRadius: '100px',
+                                          padding: '2px 8px',
+                                          textTransform: 'uppercase',
+                                          flexShrink: 0
+                                        }}>
+                                          Erledigt
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                                {prevWeekNotes && prevWeekNotes.map((note: string, idx: number) => (
+                                  <div key={`prev-note-${idx}`} style={{ 
+                                    fontSize: '0.78rem', 
+                                    color: '#64748b', 
+                                    fontWeight: 600, 
+                                    fontStyle: 'italic', 
+                                    borderLeft: '3px solid #cbd5e1', 
+                                    paddingLeft: '10px', 
+                                    margin: '4px 6px',
+                                    lineHeight: 1.4,
+                                    opacity: 0.75
+                                  }}>
+                                    {note}
+                                  </div>
+                                ))}
+                              </>
+                            ) : (
+                              <div style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center',
+                                gap: '6px', 
+                                padding: '16px 0', 
+                                background: '#f8fafc',
+                                borderRadius: '14px',
+                                border: '1px dashed #e2e8f0',
+                                fontSize: '0.78rem',
+                                color: '#cbd5e1',
+                                fontWeight: 650
+                              }}>
+                                <BookOpen size={14} />
+                                <span>Keine Aufgaben erfasst</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Hausaufgaben dieser Woche */}
+                        <div>
+                          <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
+                            Aktive Quests (KW {currentWeekNum || '?'})
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {((formattedCurrentWeekItems && formattedCurrentWeekItems.length > 0) || (currentWeekNotes && currentWeekNotes.length > 0)) ? (
+                              <>
+                                {formattedCurrentWeekItems && formattedCurrentWeekItems.map((item: any, idx: number) => {
+                                  const isBook = item.isBook;
+                                  return (
+                                    <div key={`curr-item-${idx}`} style={{
+                                      background: '#ffffff',
+                                      padding: '12px 16px',
+                                      borderRadius: '14px',
+                                      border: '1px solid rgba(0, 0, 0, 0.04)',
+                                      boxShadow: '0 4px 15px rgba(0,0,0,0.01)',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      gap: '12px'
+                                    }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
+                                        {isBook ? <BookOpen size={15} color="#007aff" /> : <Music size={15} color="#007aff" />}
+                                        <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.82rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                          {item.title}
+                                        </span>
+                                      </div>
+                                      {(item.status === 'MASTERED' || item.status === 'THEORY_DONE') && (
+                                        <span style={{
+                                          background: 'rgba(16, 185, 129, 0.08)',
+                                          color: '#10b981',
+                                          fontSize: '0.62rem',
+                                          fontWeight: 900,
+                                          borderRadius: '100px',
+                                          padding: '3px 10px',
+                                          textTransform: 'uppercase',
+                                          flexShrink: 0
+                                        }}>
+                                          Erledigt
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                                {currentWeekNotes && currentWeekNotes.map((note: string, idx: number) => (
+                                  <div key={`curr-note-${idx}`} style={{ 
+                                    fontSize: '0.8rem', 
+                                    color: '#475569', 
+                                    fontWeight: 650, 
+                                    fontStyle: 'italic', 
+                                    borderLeft: '3px solid #10b981', 
+                                    paddingLeft: '10px', 
+                                    margin: '4px 6px',
+                                    lineHeight: 1.4
+                                  }}>
+                                    {note}
+                                  </div>
+                                ))}
+                              </>
+                            ) : (
+                              <div style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center',
+                                gap: '6px', 
+                                padding: '16px 0', 
+                                background: '#f8fafc',
+                                borderRadius: '14px',
+                                border: '1px dashed #e2e8f0',
+                                fontSize: '0.78rem',
+                                color: '#cbd5e1',
+                                fontWeight: 650
+                              }}>
+                                <BookOpen size={14} />
+                                <span>Keine Aufgaben erfasst</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
             </div>
