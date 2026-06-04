@@ -328,6 +328,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [studentSearchTerm, setStudentSearchTerm] = useState<string>('');
   const [successAnimationRoomId, setSuccessAnimationRoomId] = useState<string | null>(null);
   const [selectedFloor, setSelectedFloor] = useState<string>('Alle');
+  const [roomSearchQuery, setRoomSearchQuery] = useState<string>('');
+  const [isRoomSearchDropdownOpen, setIsRoomSearchDropdownOpen] = useState<boolean>(false);
   const [showMyBookingsOnly, setShowMyBookingsOnly] = useState<boolean>(false);
   const [isDateFilterActive, setIsDateFilterActive] = useState<boolean>(false);
   const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
@@ -5146,6 +5148,13 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     // Filter rooms by floor AND availability (if date filter is active)
     const roomsToRender = (rooms.filter(room => {
       if (selectedFloor !== 'Alle' && room.floor !== selectedFloor) return false;
+      if (roomSearchQuery.trim()) {
+        const query = roomSearchQuery.toLowerCase();
+        const matchesName = room.name?.toLowerCase().includes(query);
+        const matchesFloor = room.floor?.toLowerCase().includes(query);
+        const matchesDesc = room.description?.toLowerCase().includes(query);
+        if (!matchesName && !matchesFloor && !matchesDesc) return false;
+      }
       return true;
     })).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
@@ -5672,6 +5681,120 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 </h2>
 
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {/* Smart Room Search Field */}
+                  <div style={{ position: 'relative' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', background: '#f2f2f7', borderRadius: '12px', padding: '6px 12px', gap: '6px', border: '1px solid rgba(0,0,0,0.01)', width: '200px', transition: 'all 0.2s' }}>
+                      <Search size={14} color="#8e8e93" />
+                      <input
+                        type="text"
+                        placeholder="Raum suchen..."
+                        value={roomSearchQuery}
+                        onChange={(e) => {
+                          setRoomSearchQuery(e.target.value);
+                          setIsRoomSearchDropdownOpen(true);
+                        }}
+                        onFocus={() => setIsRoomSearchDropdownOpen(true)}
+                        onBlur={() => {
+                          setTimeout(() => setIsRoomSearchDropdownOpen(false), 200);
+                        }}
+                        style={{
+                          border: 'none',
+                          background: 'transparent',
+                          outline: 'none',
+                          fontSize: '0.78rem',
+                          color: '#1c1c1e',
+                          fontWeight: 600,
+                          width: '100%',
+                          padding: 0
+                        }}
+                      />
+                      {roomSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRoomSearchQuery('');
+                            setIsRoomSearchDropdownOpen(false);
+                          }}
+                          style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
+                        >
+                          <X size={12} color="#8e8e93" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Autocomplete Dropdown List */}
+                    {isRoomSearchDropdownOpen && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        marginTop: '6px',
+                        background: '#ffffff',
+                        border: '1px solid rgba(0, 0, 0, 0.08)',
+                        borderRadius: '12px',
+                        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08)',
+                        zIndex: 1000,
+                        maxHeight: '200px',
+                        overflowY: 'auto',
+                        padding: '6px'
+                      }}>
+                        {rooms
+                          .filter(r => {
+                            const query = roomSearchQuery.toLowerCase().trim();
+                            if (!query) return true;
+                            return (
+                              r.name?.toLowerCase().includes(query) ||
+                              r.floor?.toLowerCase().includes(query) ||
+                              r.description?.toLowerCase().includes(query)
+                            );
+                          })
+                          .map(r => (
+                            <div
+                              key={r.id}
+                              onClick={() => {
+                                setRoomSearchQuery(r.name);
+                                setSelectedFloor('Alle');
+                                setSelectedCampusRoomId(r.id);
+                                setIsRoomSearchDropdownOpen(false);
+                              }}
+                              style={{
+                                padding: '6px 10px',
+                                borderRadius: '8px',
+                                fontSize: '0.74rem',
+                                color: '#1c1c1e',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                transition: 'background 0.15s'
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.background = '#f2f2f7'; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                            >
+                              <span>{r.name}</span>
+                              <span style={{ fontSize: '0.62rem', color: '#8e8e93', textTransform: 'uppercase', alignSelf: 'center' }}>
+                                {r.floor === 'Allgemein' ? 'Standard' : r.floor}
+                              </span>
+                            </div>
+                          ))}
+                        {rooms.filter(r => {
+                          const query = roomSearchQuery.toLowerCase().trim();
+                          if (!query) return true;
+                          return (
+                            r.name?.toLowerCase().includes(query) ||
+                            r.floor?.toLowerCase().includes(query) ||
+                            r.description?.toLowerCase().includes(query)
+                          );
+                        }).length === 0 && (
+                          <div style={{ padding: '8px 10px', fontSize: '0.74rem', color: '#8e8e93', textAlign: 'center' }}>
+                            Keine Räume gefunden
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   {/* Segmented Control for Floor filter */}
                   <div style={{ 
                     background: '#f2f2f7', 
