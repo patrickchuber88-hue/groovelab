@@ -8630,98 +8630,167 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
       return (
         <div style={{ marginTop: '0px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
-          {/* Top Header Card */}
-          <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: `${brandColor}15`, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Award size={24} />
+          {/* Top Section: Header & Contribution */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '32px', alignItems: 'stretch' }}>
+            {/* Top Left: Header and summary cards */}
+            <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: `${brandColor}15`, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Award size={24} />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Performance & Highlights</h2>
+                  <p style={{ color: '#64748b', margin: 0, fontWeight: 600, fontSize: '0.9rem' }}>Feiere die Lernfortschritte deiner Klasse und stärke die Motivation durch positives Feedback.</p>
+                </div>
               </div>
-              <div>
-                <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Performance & Highlights</h2>
-                <p style={{ color: '#64748b', margin: 0, fontWeight: 600, fontSize: '0.9rem' }}>Feiere die Lernfortschritte deiner Klasse und stärke die Motivation durch positives Feedback.</p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                {[
+                  { label: 'Deine Schüler', value: stats.myClassCount || 0, icon: Users, color: brandColor, bg: `${brandColor}08` },
+                  { label: 'Klassen-Übezeit (Gesamt)', value: formatMins(myClassMins), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
+                  { label: 'Klassen-Übezeit (Woche)', value: formatMins(classWeeklyMins), icon: TrendingUp, color: '#10b981', bg: '#f0fdf4' },
+                  { label: 'Beitrag zur Schule', value: `${contributionPercent}%`, icon: Shield, color: '#6366f1', bg: '#f5f3ff' }
+                ].map((stat, idx) => (
+                  <div key={idx} style={{ padding: '20px', background: stat.bg, borderRadius: '24px', border: `1px solid ${stat.color}15`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '120px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{stat.label}</span>
+                      <div style={{ padding: '6px', borderRadius: '8px', background: 'white', color: stat.color, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.02)' }}>
+                        <stat.icon size={16} />
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '1.5rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', marginTop: '8px' }}>{stat.value}</div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
-              {[
-                { label: 'Deine Schüler', value: stats.myClassCount || 0, icon: Users, color: brandColor, bg: `${brandColor}08` },
-                { label: 'Klassen-Übezeit (Gesamt)', value: formatMins(myClassMins), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
-                { label: 'Klassen-Übezeit (Woche)', value: formatMins(classWeeklyMins), icon: TrendingUp, color: '#10b981', bg: '#f0fdf4' },
-                { label: 'Beitrag zur Schule', value: `${contributionPercent}%`, icon: Shield, color: '#6366f1', bg: '#f5f3ff' }
-              ].map((stat, idx) => (
-                <div key={idx} style={{ padding: '24px', background: stat.bg, borderRadius: '24px', border: `1px solid ${stat.color}15`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '130px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{stat.label}</span>
-                    <div style={{ padding: '8px', borderRadius: '10px', background: 'white', color: stat.color, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.02)' }}>
-                      <stat.icon size={18} />
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '1.75rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', marginTop: '12px' }}>{stat.value}</div>
-                  </div>
+            {/* Top Right: Donut Chart (Gemeinsamer Schul-Beitrag) */}
+            <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', width: '100%', marginBottom: '4px', textAlign: 'left' }}>
+                Gemeinsamer Schul-Beitrag
+              </h3>
+              <p style={{ fontSize: '0.75rem', color: '#64748b', width: '100%', margin: '0 0 16px 0', textAlign: 'left', fontWeight: 600 }}>
+                Wie viel trägt deine Klasse bei?
+              </p>
+
+              <div style={{ width: '100%', height: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <RechartsPieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={48}
+                      outerRadius={68}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => formatMins(Number(value))} />
+                  </RechartsPieChart>
+                </ResponsiveContainer>
+                
+                <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', lineHeight: 1 }}>
+                    {contributionPercent}%
+                  </span>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '2px' }}>
+                    Anteil
+                  </span>
                 </div>
-              ))}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', marginTop: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: '#f8fafc', borderRadius: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: brandColor }} />
+                    <span style={{ fontSize: '0.72rem', fontWeight: 750, color: '#334155' }}>Unsere Klasse</span>
+                  </div>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>{formatMins(myClassMins)}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: '#f8fafc', borderRadius: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#cbd5e1' }} />
+                    <span style={{ fontSize: '0.72rem', fontWeight: 750, color: '#64748b' }}>Restliche Schule</span>
+                  </div>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>{formatMins(otherClassMins)}</span>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Grid Layout: Left (Contribution & Goal) | Right (Highlights Feed) */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '32px', alignItems: 'start' }}>
-            {/* Left Column */}
+          {/* Grid Layout: Left (Highlights) | Right (Goal) */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '32px', alignItems: 'start' }}>
+            {/* Left Column: Helden-Momente Feed */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
               
-              {/* Contribution Pie Chart */}
-              <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', width: '100%', marginBottom: '8px', textAlign: 'left' }}>
-                  Gemeinsamer Schul-Beitrag
+              {/* Helden-Momente Feed */}
+              <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', minHeight: '350px' }}>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>✨</span> Helden-Momente
                 </h3>
-                <p style={{ fontSize: '0.8rem', color: '#64748b', width: '100%', margin: '0 0 24px 0', textAlign: 'left', fontWeight: 600 }}>
-                  Wie viel trägt deine Klasse zum gesamten Übe-Erfolg der Musikschule bei?
+                <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0 0 28px 0', fontWeight: 600 }}>
+                  Besondere Meilensteine und Fleiß-Highlights deiner Schüler aus dem aktuellen Monat.
                 </p>
 
-                <div style={{ width: '100%', height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RechartsPieChart>
-                      <Pie
-                        data={pieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={65}
-                        outerRadius={90}
-                        paddingAngle={3}
-                        dataKey="value"
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value) => formatMins(Number(value))} />
-                    </RechartsPieChart>
-                  </ResponsiveContainer>
-                  
-                  {/* Center Text inside Donut */}
-                  <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ fontSize: '1.75rem', fontWeight: 950, color: '#0f172a', lineHeight: 1 }}>
-                      {contributionPercent}%
-                    </span>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '4px' }}>
-                      Klassen-Anteil
-                    </span>
-                  </div>
-                </div>
-
-                {/* Legend */}
-                <div style={{ display: 'flex', gap: '24px', marginTop: '16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '12px', height: '12px', borderRadius: '4px', background: brandColor }} />
-                    <span style={{ fontSize: '0.78rem', fontWeight: 750, color: '#334155' }}>Unsere Klasse ({formatMins(myClassMins)})</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '12px', height: '12px', borderRadius: '4px', background: '#cbd5e1' }} />
-                    <span style={{ fontSize: '0.78rem', fontWeight: 750, color: '#64748b' }}>Restliche Schule ({formatMins(otherClassMins)})</span>
-                  </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {(stats.highlights || []).length === 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: '24px', border: '1px dashed #cbd5e1' }}>
+                      <span style={{ fontSize: '2.5rem', marginBottom: '16px' }}>🤫</span>
+                      <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#475569', margin: '0 0 6px 0' }}>Ruhe vor dem Sturm</h4>
+                      <p style={{ fontSize: '0.78rem', color: '#64748b', maxWidth: '300px', margin: 0, lineHeight: 1.4 }}>
+                        Sobald deine Schüler diesen Monat fleißig üben oder Challenges meistern, erscheinen ihre Erfolge hier!
+                      </p>
+                    </div>
+                  ) : (
+                    (stats.highlights || []).map((hl: any, idx: number) => {
+                      return (
+                        <div 
+                          key={idx} 
+                          style={{ 
+                            padding: '14px 18px', 
+                            background: '#f8fafc', 
+                            borderRadius: '16px', 
+                            border: '1px solid #e2e8f0', 
+                            display: 'flex', 
+                            alignItems: 'center',
+                            gap: '14px',
+                            transition: 'transform 0.2s, box-shadow 0.2s',
+                            cursor: 'default'
+                          }}
+                          className="hover-scale"
+                        >
+                          <span style={{ fontSize: '1.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            {hl.emoji}
+                          </span>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '8px' }}>
+                              <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a' }}>{hl.studentName}</span>
+                              <span style={{ fontSize: '0.65rem', fontWeight: 900, color: brandColor, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                                {hl.title}
+                              </span>
+                            </div>
+                            <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '3px 0 0 0', lineHeight: 1.3, fontWeight: 550 }}>
+                              {hl.text}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
 
+            </div>
+
+            {/* Right Column: Performance */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+              
               {/* Weekly Class Target Card */}
               <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
@@ -8807,63 +8876,6 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 </div>
               </div>
 
-            </div>
-
-            {/* Right Column: Helden-Momente Feed */}
-            <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', minHeight: '500px' }}>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>✨</span> Helden-Momente
-              </h3>
-              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0 0 28px 0', fontWeight: 600 }}>
-                Besondere Meilensteine und Fleiß-Highlights deiner Schüler aus dem aktuellen Monat.
-              </p>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {(stats.highlights || []).length === 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: '24px', border: '1px dashed #cbd5e1' }}>
-                    <span style={{ fontSize: '2.5rem', marginBottom: '16px' }}>🤫</span>
-                    <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#475569', margin: '0 0 6px 0' }}>Ruhe vor dem Sturm</h4>
-                    <p style={{ fontSize: '0.78rem', color: '#64748b', maxWidth: '300px', margin: 0, lineHeight: 1.4 }}>
-                      Sobald deine Schüler diesen Monat fleißig üben oder Challenges meistern, erscheinen ihre Erfolge hier!
-                    </p>
-                  </div>
-                ) : (
-                  (stats.highlights || []).map((hl: any, idx: number) => {
-                    return (
-                      <div 
-                        key={idx} 
-                        style={{ 
-                          padding: '14px 18px', 
-                          background: '#f8fafc', 
-                          borderRadius: '16px', 
-                          border: '1px solid #e2e8f0', 
-                          display: 'flex', 
-                          alignItems: 'center',
-                          gap: '14px',
-                          transition: 'transform 0.2s, box-shadow 0.2s',
-                          cursor: 'default'
-                        }}
-                        className="hover-scale"
-                      >
-                        <span style={{ fontSize: '1.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          {hl.emoji}
-                        </span>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '8px' }}>
-                            <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a' }}>{hl.studentName}</span>
-                            <span style={{ fontSize: '0.65rem', fontWeight: 900, color: brandColor, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                              {hl.title}
-                            </span>
-                          </div>
-                          <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '3px 0 0 0', lineHeight: 1.3, fontWeight: 550 }}>
-                            {hl.text}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
             </div>
           </div>
         </div>
