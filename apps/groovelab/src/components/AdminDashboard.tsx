@@ -235,7 +235,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [editSongArtist, setEditSongArtist] = useState('');
   const [isEditingTarget, setIsEditingTarget] = useState(false);
   const [tempTarget, setTempTarget] = useState('300');
-  const [newGoalTitle, setNewGoalTitle] = useState('Wochenziel');
+  const [newGoalTitle, setNewGoalTitle] = useState('Klassen-Rockstar-Challenge');
   const [newGoalMinutes, setNewGoalMinutes] = useState('300');
   const [newGoalDeadline, setNewGoalDeadline] = useState('');
   const [showAddGoalForm, setShowAddGoalForm] = useState(false);
@@ -2526,7 +2526,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     };
     const updated = [...currentTargets, newGoal];
     await handleSaveTargets(updated);
-    setNewGoalTitle('Wochenziel');
+    setNewGoalTitle('Klassen-Rockstar-Challenge');
     setNewGoalMinutes('300');
     setNewGoalDeadline('');
     setShowAddGoalForm(false);
