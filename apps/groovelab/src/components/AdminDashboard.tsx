@@ -6436,7 +6436,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                         borderLeft: b.isPreview ? `2.2px dashed ${leftAccentColor}` : `3px solid ${hasConflict ? '#ff9500' : (isOwnBooking ? 'rgba(255, 255, 255, 0.45)' : leftAccentColor)}`,
                                         borderRadius: '8px',
                                         padding: '6px 8px',
-                                        fontSize: '0.64rem',
+                                        fontSize: '0.70rem',
                                         fontWeight: 800,
                                         color: isOwnBooking && !b.isPreview ? '#ffffff' : textColor,
                                         position: 'absolute',
@@ -6524,7 +6524,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                         </div>
                                       )}
 
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.58rem', opacity: 0.8, marginBottom: '2px', fontWeight: 800 }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.64rem', opacity: 0.8, marginBottom: '2px', fontWeight: 800 }}>
                                         <span style={{ display: 'flex', alignItems: 'center' }}>
                                           {isSchedule && <GraduationCap size={10} style={{ marginRight: '3px' }} />}
                                           {b.startTime} - {b.endTime}{b.isPreview && ' (Vorschau)'}
@@ -6532,7 +6532,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                       </div>
                                       {hasConflict && (
                                         <div style={{
-                                          fontSize: '0.52rem',
+                                          fontSize: '0.64rem',
                                           fontWeight: 900,
                                           textTransform: 'uppercase',
                                           color: '#ff9500',
@@ -6552,7 +6552,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                         </div>
                                       )}
                                       {durationHrs >= 1.0 && b.purpose && b.purpose.trim().toLowerCase() !== 'eigennutzung' && (
-                                        <div style={{ fontSize: '0.58rem', opacity: 0.8, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        <div style={{ fontSize: '0.64rem', opacity: 0.8, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                           {b.isPreview ? 'Vorschau' : b.purpose}
                                         </div>
                                       )}
