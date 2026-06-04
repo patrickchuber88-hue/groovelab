@@ -1357,6 +1357,7 @@ export function TeacherDashboard({
 
   const [briefingData, setBriefingData] = useState<any>(null);
   const [briefingLoading, setBriefingLoading] = useState(true);
+  const [myBookings, setMyBookings] = useState<any[]>([]);
 
 
 
@@ -1414,6 +1415,47 @@ export function TeacherDashboard({
       window.removeEventListener('select-appointment-date', handleSelectDate);
     };
   }, []);
+
+  useEffect(() => {
+    const loadMyBookings = () => {
+      try {
+        const stored = localStorage.getItem('groovelab_campus_bookings');
+        if (stored) {
+          const allBookings = JSON.parse(stored);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          const twoWeeksLater = new Date(today);
+          twoWeeksLater.setDate(today.getDate() + 14);
+
+          const filtered = allBookings.filter((b: any) => {
+            if (b.teacherId !== userId) return false;
+            if (!b.date) return false;
+            const bDate = new Date(b.date);
+            bDate.setHours(0, 0, 0, 0);
+            return bDate >= today && bDate <= twoWeeksLater;
+          });
+
+          // Sort by date then start time
+          filtered.sort((a: any, b: any) => {
+            const dateDiff = a.date.localeCompare(b.date);
+            if (dateDiff !== 0) return dateDiff;
+            return a.startTime.localeCompare(b.startTime);
+          });
+
+          setMyBookings(filtered);
+        }
+      } catch (err) {
+        console.error('Failed to load my bookings:', err);
+      }
+    };
+
+    loadMyBookings();
+    window.addEventListener('storage', loadMyBookings);
+    return () => {
+      window.removeEventListener('storage', loadMyBookings);
+    };
+  }, [userId, ticker]);
 
   const [currentTimeStr, setCurrentTimeStr] = useState<string>(() => {
     const now = new Date();
@@ -1769,10 +1811,12 @@ export function TeacherDashboard({
               const isAnalogStickerUser = !student?.is_app_user || avatar?.avatar_style === 'Standard_Silhouette';
               const formattedTime = occ.start_time ? occ.start_time.substring(0, 5) : '00:00';
               const occStudentId = occ.student?.id || occ.student_id;
-
               if (occ.original_date === todayStr && occ.date !== todayStr) {
-                // Rescheduled AWAY from today -> remove from today's timeline
-                timeline = timeline.filter((t: any) => t.student?.id !== occStudentId);
+                // Rescheduled AWAY from today -> mark as rescheduled_away
+                const existingIdx = timeline.findIndex((t: any) => t.student?.id === occStudentId);
+                if (existingIdx !== -1) {
+                  timeline[existingIdx].status = 'rescheduled_away';
+                }
               } else if (occ.date === todayStr) {
                 // Rescheduled TO today or updated today -> update or insert into today's timeline
                 const existingIdx = timeline.findIndex((t: any) => t.student?.id === occStudentId);
@@ -1897,7 +1941,11 @@ export function TeacherDashboard({
               rescheduledReminders = rescheduledUpcoming.map((occ: any) => {
                 const dateObj = new Date(occ.date);
                 const weekdayStr = dateObj.toLocaleDateString('de-DE', { weekday: 'long' });
-                const dateFormatted = dateObj.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+                const weekdayShort = dateObj.toLocaleDateString('de-DE', { weekday: 'short' }).replace('.', '');
+                const day = String(dateObj.getDate()).padStart(2, '0');
+                const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                const dateFormatted = `${day}.${month}`;
+                const yearShort = dateObj.getFullYear().toString().substring(2);
                 const timeFormatted = occ.start_time ? occ.start_time.substring(0, 5) : '';
                 const originalDateObj = occ.original_date ? new Date(occ.original_date) : null;
                 const originalWeekdayStr = originalDateObj ? originalDateObj.toLocaleDateString('de-DE', { weekday: 'long' }) : 'seinem regulären Termin';
@@ -1907,7 +1955,9 @@ export function TeacherDashboard({
                   studentName: `${occ.student?.first_name || ''} ${occ.student?.last_name || ''}`.trim(),
                   originalWeekday: originalWeekdayStr,
                   weekday: weekdayStr,
+                  weekdayShort,
                   dateStr: dateFormatted,
+                  yearShort,
                   time: timeFormatted
                 };
               });
@@ -3786,44 +3836,6 @@ export function TeacherDashboard({
                               <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
                                 {dynamicGreeting.subtitle}
                               </p>
-                              {briefingData?.rescheduledReminders && briefingData.rescheduledReminders.length > 0 && (
-                                <div style={{ 
-                                  marginTop: '10px', 
-                                  display: 'flex', 
-                                  flexDirection: 'column', 
-                                  gap: '6px',
-                                  width: 'fit-content'
-                                }}>
-                                  {briefingData.rescheduledReminders.map((rem: any) => (
-                                    <div key={rem.id} style={{ 
-                                      display: 'flex', 
-                                      alignItems: 'center', 
-                                      gap: '10px', 
-                                      background: 'rgba(0, 122, 255, 0.03)', 
-                                      border: '1px solid rgba(0, 122, 255, 0.06)', 
-                                      borderLeft: '3px solid #007aff',
-                                      borderRadius: '8px', 
-                                      padding: '5px 12px',
-                                      fontSize: '0.74rem', 
-                                      color: '#475569',
-                                      fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-                                    }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#007aff', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: '0.62rem', flexShrink: 0 }}>
-                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.9 }}>
-                                          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                                          <line x1="16" y1="2" x2="16" y2="6" />
-                                          <line x1="8" y1="2" x2="8" y2="6" />
-                                          <line x1="3" y1="10" x2="21" y2="10" />
-                                        </svg>
-                                        <span>Verschiebung:</span>
-                                      </div>
-                                      <span style={{ color: '#334155', fontWeight: 500 }}>
-                                        <strong>{rem.studentName}</strong> wurde von {rem.originalWeekday === 'seinem regulären Termin' ? 'seinem regulären Termin' : rem.originalWeekday} auf <strong style={{ color: '#007aff', fontWeight: 700 }}>{rem.weekday}, {rem.dateStr}. um {rem.time} Uhr</strong> verschoben.
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
                             </div>
                           </div>
                           
@@ -3847,12 +3859,54 @@ export function TeacherDashboard({
                         </div>
                       )}
 
-                      {/* Schüler Notizen (former Prep Mirror) */}
+                      {/* Independent Widget for Rescheduled Appointments / Terminänderungen */}
+                      {!teacher?.sick_until && briefingData?.rescheduledReminders && briefingData.rescheduledReminders.length > 0 && (
+                        <div className="google-card" style={{
+                          width: '100%',
+                          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
+                          backdropFilter: 'blur(24px) saturate(1.8)',
+                          WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
+                          border: '1px solid rgba(255, 255, 255, 0.5)',
+                          borderRadius: '24px',
+                          padding: '16px 20px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '12px',
+                          boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+                          boxSizing: 'border-box'
+                        }}>
+                          <h3 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            <AlertCircle size={16} color="#007aff" style={{ flexShrink: 0 }} /> Terminänderungen:
+                          </h3>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {briefingData.rescheduledReminders.map((rem: any) => (
+                              <div key={rem.id} style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                background: 'rgba(0, 122, 255, 0.03)',
+                                border: '1px solid rgba(0, 122, 255, 0.06)',
+                                borderLeft: '3px solid #007aff',
+                                borderRadius: '12px',
+                                padding: '8px 12px',
+                                fontSize: '0.74rem',
+                                color: '#475569',
+                                fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+                              }}>
+                                <span style={{ color: '#334155', fontWeight: 500 }}>
+                                  <strong>{rem.studentName}</strong> wurde auf <strong style={{ color: '#007aff', fontWeight: 700 }}>{rem.weekdayShort}. {rem.dateStr}.{rem.yearShort}, {rem.time} Uhr</strong> verschoben.
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       {!teacher?.sick_until && (
                         <div className="google-card" style={{ 
                           width: '100%', 
                           borderLeft: widgetState === 'VORBEREITUNG' 
-                            ? '4px solid #007aff' 
+                            ? '4px solid #fbbc05' 
                             : widgetState === 'ACTIVE' 
                             ? '4px solid #10b981' 
                             : widgetState === 'WEEKEND' 
@@ -3865,95 +3919,141 @@ export function TeacherDashboard({
                           {(() => {
                             if (widgetState === 'VORBEREITUNG') {
                               const activeLessonsCount = briefingData?.timeline 
-                                ? briefingData.timeline.filter((s: any) => s.student && s.status !== 'canceled_by_student' && s.status !== 'teacher_sick' && s.status !== 'cancelled' && s.status !== 'canceled_by_teacher_sick').length 
+                                ? briefingData.timeline.filter((s: any) => s.student && s.status !== 'canceled_by_student' && s.status !== 'teacher_sick' && s.status !== 'cancelled' && s.status !== 'canceled_by_teacher_sick' && s.status !== 'rescheduled_away').length 
                                 : 0;
-                              const cancellations = briefingData?.timeline 
-                                ? briefingData.timeline.filter((s: any) => s.student && (s.status === 'canceled_by_student' || s.status === 'teacher_sick' || s.status === 'cancelled' || s.status === 'canceled_by_teacher_sick')) 
+                              const dailyChanges = briefingData?.timeline 
+                                ? briefingData.timeline.filter((s: any) => s.student && (
+                                    s.status === 'canceled_by_student' || 
+                                    s.status === 'teacher_sick' || 
+                                    s.status === 'cancelled' || 
+                                    s.status === 'canceled_by_teacher_sick' ||
+                                    s.status === 'rescheduled_away'
+                                  )) 
                                 : [];
 
                               return (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    <div style={{ background: '#e8f0fe', color: '#1a73e8', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <div style={{ background: 'rgba(251, 188, 5, 0.12)', color: '#b45309', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                       <Calendar size={18} />
                                     </div>
-                                    <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#1e293b' }}>
+                                    <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>
                                       Vorbereitung
                                     </h4>
                                   </div>
 
                                   <div style={{
-                                    background: 'linear-gradient(135deg, #e8f0fe 0%, #d2e3fc 100%)',
-                                    border: '1.5px solid #aecbfa',
+                                    background: 'linear-gradient(135deg, rgba(251, 188, 5, 0.08) 0%, rgba(251, 188, 5, 0.03) 100%)',
+                                    border: '1.5px solid rgba(251, 188, 5, 0.25)',
                                     borderRadius: '16px',
-                                    padding: '16px',
-                                    color: '#185abc',
-                                    boxShadow: '0 4px 12px rgba(26, 115, 232, 0.06)',
+                                    padding: '14px 16px',
+                                    color: '#b45309',
+                                    boxShadow: '0 4px 12px rgba(251, 188, 5, 0.02)',
                                     fontSize: '0.88rem',
-                                    fontWeight: 700
+                                    fontWeight: 700,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '10px'
                                   }}>
-                                    Heute stehen <strong style={{ fontSize: '0.98rem', fontWeight: 900 }}>{activeLessonsCount} Termine</strong> auf dem Fahrplan.
+                                    <Activity size={16} color="#f59e0b" style={{ flexShrink: 0 }} />
+                                    <span>Heute stehen <strong style={{ fontSize: '0.98rem', fontWeight: 900, color: '#78350f' }}>{activeLessonsCount} Termine</strong> auf dem Fahrplan.</span>
                                   </div>
 
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                                       Änderungen & Ausfälle heute:
                                     </span>
-                                    {cancellations.length > 0 ? (
+                                    {dailyChanges.length > 0 ? (
                                       <div style={{
-                                        background: '#fef2f2',
-                                        border: '1.5px solid #fca5a5',
-                                        borderRadius: '12px',
-                                        padding: '12px 14px',
+                                        background: 'rgba(15, 23, 42, 0.02)',
+                                        border: '1px solid rgba(15, 23, 42, 0.06)',
+                                        borderRadius: '16px',
+                                        padding: '6px',
                                         display: 'flex',
                                         flexDirection: 'column',
-                                        gap: '8px'
+                                        gap: '6px'
                                       }}>
-                                        {cancellations.map((slot: any, idx: number) => (
-                                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#991b1b', fontWeight: 700 }}>
-                                            <AlertCircle size={14} color="#dc2626" />
-                                            <span>
-                                              <strong>{slot.student?.name}</strong> ({slot.timeSlot} Uhr) – Ausfall
-                                            </span>
-                                          </div>
-                                        ))}
+                                        {dailyChanges.map((slot: any, idx: number) => {
+                                          const isCanceled = slot.status !== 'rescheduled_away';
+                                          const badgeBg = isCanceled ? 'rgba(239, 68, 68, 0.08)' : 'rgba(251, 188, 5, 0.12)';
+                                          const badgeTextColor = isCanceled ? '#ef4444' : '#b45309';
+                                          const badgeText = isCanceled ? 'Ausfall' : 'Verschoben';
+                                          const itemBorderLeft = isCanceled ? '3px solid #ef4444' : '3px solid #fbbc05';
+                                          
+                                          return (
+                                            <div key={idx} style={{
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'space-between',
+                                              background: '#ffffff',
+                                              border: '1px solid rgba(0,0,0,0.03)',
+                                              borderLeft: itemBorderLeft,
+                                              borderRadius: '10px',
+                                              padding: '8px 12px',
+                                              fontSize: '0.78rem'
+                                            }}>
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                                                <span style={{ fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                  {slot.student?.name}
+                                                </span>
+                                                <span style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 500 }}>
+                                                  ({slot.timeSlot || slot.start_time?.substring(0, 5)} Uhr)
+                                                </span>
+                                              </div>
+                                              <span style={{
+                                                fontSize: '0.62rem',
+                                                fontWeight: 800,
+                                                color: badgeTextColor,
+                                                background: badgeBg,
+                                                padding: '2px 8px',
+                                                borderRadius: '6px',
+                                                textTransform: 'uppercase',
+                                                letterSpacing: '0.02em',
+                                                flexShrink: 0
+                                              }}>
+                                                {badgeText}
+                                              </span>
+                                            </div>
+                                          );
+                                        })}
                                       </div>
                                     ) : (
                                       <div style={{
-                                        background: '#f0fdf4',
-                                        border: '1.5px solid #bbf7d0',
-                                        borderRadius: '12px',
+                                        background: 'rgba(16, 185, 129, 0.05)',
+                                        border: '1px solid rgba(16, 185, 129, 0.12)',
+                                        borderRadius: '16px',
                                         padding: '12px 14px',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: '8px',
-                                        fontSize: '0.8rem',
-                                        color: '#15803d',
-                                        fontWeight: 700
+                                        gap: '10px',
+                                        fontSize: '0.78rem',
+                                        color: '#065f46',
+                                        fontWeight: 600
                                       }}>
-                                        <CheckCircle size={14} color="#16a34a" />
-                                        <span>Keine Änderungen – alles läuft wie geplant.</span>
+                                        <CheckCircle size={15} color="#10b981" style={{ flexShrink: 0 }} />
+                                        <span>Alles läuft nach Plan. Keine heutigen Ausfälle.</span>
                                       </div>
                                     )}
                                   </div>
 
                                   {firstSlotStartStr && (
                                     <div style={{ 
-                                      borderTop: '1px solid #f1f5f9', 
+                                      borderTop: '1px solid rgba(15, 23, 42, 0.05)', 
                                       paddingTop: '14px',
                                       display: 'flex',
                                       flexDirection: 'column',
-                                      gap: '4px',
-                                      fontSize: '0.78rem',
+                                      gap: '6px',
+                                      fontSize: '0.74rem',
                                       color: '#64748b',
-                                      fontWeight: 600,
+                                      fontWeight: 550,
                                       textAlign: 'center'
                                     }}>
-                                      <div>
-                                        Erster Unterricht beginnt um <strong style={{ color: '#0f172a' }}>{firstSlotStartStr} Uhr</strong>.
+                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#334155' }}>
+                                        <Clock size={13} color="#64748b" />
+                                        <span>Erster Unterricht beginnt um <strong style={{ color: '#0f172a', fontWeight: 700 }}>{firstSlotStartStr} Uhr</strong>.</span>
                                       </div>
-                                      <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
-                                        Das Schüler Notiz Widget aktiviert sich automatisch um {prepCutoffTimeStr} Uhr (15 Min. vorher).
+                                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 400 }}>
+                                        Das Schüler-Notizwidget aktiviert sich automatisch um {prepCutoffTimeStr} Uhr (15 Min. vorher).
                                       </div>
                                     </div>
                                   )}
@@ -4362,7 +4462,8 @@ export function TeacherDashboard({
                             })();
  
                             const isBreak = !slot.student;
-                            const isCanceled = slot.status === 'canceled_by_student' || slot.status === 'teacher_sick' || slot.status === 'cancelled';
+                            const isCanceled = slot.status === 'canceled_by_student' || slot.status === 'teacher_sick' || slot.status === 'cancelled' || slot.status === 'canceled_by_teacher_sick';
+                            const isRescheduledAway = slot.status === 'rescheduled_away';
                             const isFinished = currentTimeStr >= slotEnd;
                             const isCurrentSlot = currentTimeStr >= slotStart && currentTimeStr < slotEnd;
                             const isRescheduledPending = slot.status === 'rescheduled_pending' || slot.status === 'pending' || slot.status === 'pending_reschedule';
@@ -4389,18 +4490,18 @@ export function TeacherDashboard({
                                   boxSizing: 'border-box'
                                 }} />
                               );
-                            } else if (isCanceled) {
+                            } else if (isCanceled || isRescheduledAway) {
                               slotBg = '#ffffff';
-                              slotBorder = '1.5px dashed rgba(239, 68, 68, 0.3)';
-                              slotBorderLeft = '5px solid #ef4444';
-                              titleColor = '#ef4444';
+                              slotBorder = '1.5px solid #e2e8f0';
+                              slotBorderLeft = '5px solid #8e8e93';
+                              titleColor = '#8e8e93';
                               dotComponent = (
                                 <div style={{
                                   width: '12px',
                                   height: '12px',
                                   borderRadius: '50%',
-                                  border: '3px solid #ef4444',
-                                  background: isFinished ? '#ef4444' : '#ffffff',
+                                  border: '3px solid #8e8e93',
+                                  background: '#ffffff',
                                   boxSizing: 'border-box'
                                 }} />
                               );
@@ -4599,93 +4700,160 @@ export function TeacherDashboard({
                                    }}
                                    className="hover-scale google-timeline-card"
                                  >
-                                   {/* Uhrzeit (inside card, pure black, borderless, white bg) */}
-                                   <div style={{
-                                     fontSize: '0.8rem',
-                                     fontWeight: 900,
-                                     color: isCurrentSlot && !isFinished && slot.student ? '#1a73e8' : '#0f172a',
-                                     fontFamily: "'Plus Jakarta Sans', sans-serif",
-                                     whiteSpace: 'nowrap',
-                                     flexShrink: 0,
-                                     background: '#ffffff',
-                                     padding: '4px 8px',
-                                     borderRadius: '6px',
-                                     border: isCurrentSlot && !isFinished && slot.student ? '1.5px solid #1a73e8' : 'none',
-                                     boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-                                     display: 'inline-flex',
-                                     alignItems: 'center',
-                                     justifyContent: 'center',
-                                     gap: '4px'
-                                   }}>
-                                     {isCurrentSlot && !isFinished && slot.student && (
-                                       <span className="pulse" style={{
-                                         width: '6px',
-                                         height: '6px',
-                                         borderRadius: '50%',
-                                         background: '#1a73e8',
-                                         display: 'inline-block'
-                                       }} />
-                                     )}
-                                     {slot.timeSlot} Uhr
-                                   </div>
- 
-                                   {/* Vertical separator */}
-                                   <div style={{ width: '1.5px', height: '18px', background: '#e2e8f0', flexShrink: 0 }} />
- 
-                                   <div style={{ display: 'flex', alignItems: 'center', minWidth: 0, flex: 1 }}>
-                                     <div style={{ minWidth: 0, flex: 1 }}>
-                                       <div style={{ fontWeight: 800, color: titleColor, display: 'flex', alignItems: 'center', fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                         {slot.student ? (
-                                           <div style={{ display: 'flex', alignItems: 'center', width: '100%', minWidth: 0 }}>
-                                             <span style={{ 
-                                               fontWeight: 900, 
-                                               color: isFinished ? '#15803d' : '#0f172a', 
-                                               fontSize: '0.9rem', 
-                                               width: '140px', 
-                                               flexShrink: 0, 
-                                               overflow: 'hidden', 
-                                               textOverflow: 'ellipsis', 
-                                               whiteSpace: 'nowrap' 
-                                             }}>
-                                               {slot.student.name}
-                                             </span>
-                                             
-                                             <span style={{ color: '#94a3b8', margin: '0 8px', fontWeight: 400, flexShrink: 0 }}>•</span>
-                                             
-                                             <span style={{ 
-                                               color: '#64748b', 
-                                               fontWeight: 500, 
-                                               fontSize: '0.78rem', 
-                                               width: '80px', 
-                                               flexShrink: 0, 
-                                               overflow: 'hidden', 
-                                               textOverflow: 'ellipsis', 
-                                               whiteSpace: 'nowrap' 
-                                             }}>
-                                               {slot.instrument || 'Musiker'}
-                                             </span>
-                                             
-                                             <span style={{ color: '#94a3b8', margin: '0 8px', fontWeight: 400, flexShrink: 0 }}>•</span>
-                                             
-                                             <span style={{ 
-                                               color: '#64748b', 
-                                               fontWeight: 500, 
-                                               fontSize: '0.78rem', 
-                                               flex: 1, 
-                                               minWidth: 0, 
-                                               overflow: 'hidden', 
-                                               textOverflow: 'ellipsis', 
-                                               whiteSpace: 'nowrap' 
-                                             }}>
-                                               {slot.room || 'Groovelab'}
-                                             </span>
-                                           </div>
-                                         ) : (
-                                           <span style={{ fontWeight: 700, color: '#78350f', fontSize: '0.85rem' }}>☕️ Pause ({slot.duration || 30} Min.)</span>
-                                         )}
-                                       </div>
-                                     </div>
-                                   </div>
+                                    {/* Left part: Time, Separator, and Name/Pause grouped for a single line strike-through */}
+                                    <div style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '12px',
+                                      position: 'relative',
+                                      minWidth: 0,
+                                      flexShrink: 0
+                                    }}>
+                                      {/* Uhrzeit (inside card, pure black, borderless, white bg) */}
+                                      <div style={{
+                                        fontSize: '0.8rem',
+                                        fontWeight: 900,
+                                        color: isCurrentSlot && !isFinished && slot.student ? '#1a73e8' : '#0f172a',
+                                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                        whiteSpace: 'nowrap',
+                                        flexShrink: 0,
+                                        background: '#ffffff',
+                                        padding: '4px 8px',
+                                        borderRadius: '6px',
+                                        border: isCurrentSlot && !isFinished && slot.student ? '1.5px solid #1a73e8' : 'none',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '4px'
+                                      }}>
+                                        {isCurrentSlot && !isFinished && slot.student && (
+                                          <span className="pulse" style={{
+                                            width: '6px',
+                                            height: '6px',
+                                            borderRadius: '50%',
+                                            background: '#1a73e8',
+                                            display: 'inline-block'
+                                          }} />
+                                        )}
+                                        {slot.timeSlot} Uhr
+                                      </div>
+
+                                      {/* Vertical separator */}
+                                      <div style={{ width: '1.5px', height: '18px', background: '#e2e8f0', flexShrink: 0 }} />
+
+                                      {/* Name or Pause text */}
+                                      {slot.student ? (
+                                        <span style={{ 
+                                          fontWeight: 900, 
+                                          color: (isCanceled || isRescheduledAway) ? '#8e8e93' : (isFinished ? '#15803d' : '#0f172a'), 
+                                          fontSize: '0.9rem', 
+                                          width: (isCanceled || isRescheduledAway) ? 'auto' : '140px',
+                                          maxWidth: (isCanceled || isRescheduledAway) ? '120px' : '140px',
+                                          flexShrink: (isCanceled || isRescheduledAway) ? 1 : 0, 
+                                          overflow: 'hidden', 
+                                          textOverflow: 'ellipsis', 
+                                          whiteSpace: 'nowrap'
+                                        }}>
+                                          {slot.student.name}
+                                        </span>
+                                      ) : (
+                                        <span style={{ fontWeight: 700, color: '#78350f', fontSize: '0.85rem' }}>☕️ Pause ({slot.duration || 30} Min.)</span>
+                                      )}
+
+                                      {/* Single continuous absolute strike-through line */}
+                                      {slot.student && (isRescheduledAway || isCanceled) && (
+                                        <div style={{
+                                          position: 'absolute',
+                                          left: '-6px',
+                                          right: '-10px',
+                                          height: '2px',
+                                          background: isRescheduledAway ? '#fbbc05' : '#ef4444',
+                                          top: '50%',
+                                          transform: 'translateY(-50%)',
+                                          pointerEvents: 'none',
+                                          zIndex: 10
+                                        }} />
+                                      )}
+                                    </div>
+
+                                    {/* Right part: Metadata / Status badges */}
+                                    <div style={{ display: 'flex', alignItems: 'center', minWidth: 0, flex: 1 }}>
+                                      {slot.student && (
+                                        <div style={{ display: 'flex', alignItems: 'center', width: '100%', minWidth: 0 }}>
+                                          {isCanceled || isRescheduledAway ? (
+                                            <>
+                                              {isRescheduledAway ? (() => {
+                                                const matchRem = briefingData.rescheduledReminders?.find((r: any) => r.studentName === slot.student?.name);
+                                                return (
+                                                  <span style={{ 
+                                                    color: '#b45309', 
+                                                    fontWeight: 700, 
+                                                    fontSize: '0.72rem', 
+                                                    background: 'rgba(251, 188, 5, 0.12)', 
+                                                    padding: '2px 8px', 
+                                                    borderRadius: '6px', 
+                                                    marginLeft: 'auto',
+                                                    fontFamily: 'Inter',
+                                                    letterSpacing: '0.01em',
+                                                    flexShrink: 0
+                                                  }}>
+                                                    {matchRem ? `Termin: ${matchRem.weekdayShort}. ${matchRem.dateStr}.${matchRem.yearShort}, ${matchRem.time.replace(':', '.')} Uhr` : 'Termin verschoben'}
+                                                  </span>
+                                                );
+                                              })() : (
+                                                <span style={{ 
+                                                  color: '#ef4444', 
+                                                  fontWeight: 700, 
+                                                  fontSize: '0.72rem', 
+                                                  background: 'rgba(239, 68, 68, 0.08)', 
+                                                  padding: '2px 8px', 
+                                                  borderRadius: '6px', 
+                                                  marginLeft: 'auto',
+                                                  fontFamily: 'Inter',
+                                                  letterSpacing: '0.01em',
+                                                  flexShrink: 0
+                                                }}>
+                                                  Heute abgesagt
+                                                </span>
+                                              )}
+                                            </>
+                                          ) : (
+                                            <>
+                                              <span style={{ color: '#94a3b8', margin: '0 8px', fontWeight: 400, flexShrink: 0 }}>•</span>
+                                              
+                                              <span style={{ 
+                                                color: '#64748b', 
+                                                fontWeight: 500, 
+                                                fontSize: '0.78rem', 
+                                                width: '80px', 
+                                                flexShrink: 0, 
+                                                overflow: 'hidden', 
+                                                textOverflow: 'ellipsis', 
+                                                whiteSpace: 'nowrap' 
+                                              }}>
+                                                {slot.instrument || 'Musiker'}
+                                              </span>
+                                              
+                                              <span style={{ color: '#94a3b8', margin: '0 8px', fontWeight: 400, flexShrink: 0 }}>•</span>
+                                              
+                                              <span style={{ 
+                                                color: '#64748b', 
+                                                fontWeight: 500, 
+                                                fontSize: '0.78rem', 
+                                                flex: 1, 
+                                                minWidth: 0, 
+                                                overflow: 'hidden', 
+                                                textOverflow: 'ellipsis', 
+                                                whiteSpace: 'nowrap' 
+                                              }}>
+                                                {slot.room || 'Groovelab'}
+                                              </span>
+                                            </>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
  
                                   {/* Unbestätigt Badge (on the right) */}
                                   {isRescheduledPending && (
@@ -5263,6 +5431,74 @@ export function TeacherDashboard({
                           <p style={{ fontSize: '0.78rem', color: '#475569', margin: 0, fontWeight: 500, lineHeight: 1.4 }}>
                             {item.content}
                           </p>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* MEINE BUCHUNGEN WIDGET */}
+              <div style={{ 
+                background: '#ffffff', 
+                borderRadius: '24px', 
+                padding: '24px', 
+                boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                  <Calendar size={18} color="#8b5cf6" />
+                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Meine Buchungen</h3>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {myBookings.length === 0 ? (
+                    <span style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>
+                      Keine Buchungen in den nächsten 2 Wochen.
+                    </span>
+                  ) : (
+                    myBookings.map((b: any) => {
+                      const dateObj = new Date(b.date);
+                      const dateFormatted = dateObj.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+                      const isPendingReschedule = b.status === 'pending_reschedule' || b.status === 'pending';
+                      
+                      const bg = isPendingReschedule ? 'rgba(0, 122, 255, 0.04)' : 'rgba(139, 92, 246, 0.06)';
+                      const border = isPendingReschedule ? '1px dashed rgba(0, 122, 255, 0.25)' : '1px solid rgba(139, 92, 246, 0.18)';
+                      const borderLeft = isPendingReschedule ? '4px solid #007aff' : '4px solid #8b5cf6';
+                      const badgeBg = isPendingReschedule ? 'rgba(0, 122, 255, 0.08)' : 'rgba(139, 92, 246, 0.12)';
+                      const badgeText = isPendingReschedule ? '#007aff' : '#7c3aed';
+                      const roomColor = isPendingReschedule ? '#007aff' : '#7c3aed';
+
+                      return (
+                        <div key={b.id} style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px',
+                          padding: '10px 14px',
+                          background: bg,
+                          border: border,
+                          borderLeft: borderLeft,
+                          borderRadius: '12px'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#0f172a' }}>
+                              {dateFormatted} • {b.startTime} - {b.endTime}
+                            </span>
+                            <span style={{ 
+                              fontSize: '0.62rem', 
+                              fontWeight: 800, 
+                              color: badgeText,
+                              background: badgeBg,
+                              padding: '2px 6px',
+                              borderRadius: '6px',
+                              textTransform: 'uppercase'
+                            }}>
+                              {isPendingReschedule ? 'Reserviert' : 'Gebucht'}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem', color: '#475569', fontWeight: 550 }}>
+                            <span>{b.purpose || 'Raumbuchung'}</span>
+                            <span style={{ color: roomColor, fontWeight: 700 }}>{b.roomName || b.rooms?.name || 'Raum'}</span>
+                          </div>
                         </div>
                       );
                     })

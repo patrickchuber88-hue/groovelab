@@ -286,8 +286,11 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
         const occStudentId = occ.student?.id || occ.student_id;
 
         if (occ.original_date === todayStr && occ.date !== todayStr) {
-          // Rescheduled AWAY from today -> remove from today's timeline
-          timeline = timeline.filter((t: any) => t.student?.id !== occStudentId);
+          // Rescheduled AWAY from today -> mark as rescheduled_away
+          const existingIdx = timeline.findIndex((t: any) => t.student?.id === occStudentId);
+          if (existingIdx !== -1) {
+            timeline[existingIdx].status = 'rescheduled_away';
+          }
         } else if (occ.date === todayStr) {
           // Rescheduled TO today or updated today -> update or insert into today's timeline
           const existingIdx = timeline.findIndex((t: any) => t.student?.id === occStudentId);
@@ -423,7 +426,11 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
         rescheduledReminders = rescheduledUpcoming.map((occ: any) => {
           const dateObj = new Date(occ.date);
           const weekdayStr = dateObj.toLocaleDateString('de-DE', { weekday: 'long' });
-          const dateFormatted = dateObj.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+          const weekdayShort = dateObj.toLocaleDateString('de-DE', { weekday: 'short' }).replace('.', '');
+          const day = String(dateObj.getDate()).padStart(2, '0');
+          const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+          const dateFormatted = `${day}.${month}`;
+          const yearShort = dateObj.getFullYear().toString().substring(2);
           const timeFormatted = occ.start_time ? occ.start_time.substring(0, 5) : '';
           const originalDateObj = occ.original_date ? new Date(occ.original_date) : null;
           const originalWeekdayStr = originalDateObj ? originalDateObj.toLocaleDateString('de-DE', { weekday: 'long' }) : 'seinem regulären Termin';
@@ -433,7 +440,9 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
             studentName: `${occ.student?.first_name || ''} ${occ.student?.last_name || ''}`.trim(),
             originalWeekday: originalWeekdayStr,
             weekday: weekdayStr,
+            weekdayShort,
             dateStr: dateFormatted,
+            yearShort,
             time: timeFormatted
           };
         });
