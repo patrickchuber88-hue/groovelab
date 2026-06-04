@@ -4670,17 +4670,16 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           gap: '8px'
                         }}>
                           {/* Row 1: Title, Deadline on left & Percentage on right */}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0, flex: 1 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
                               <span style={{
                                 fontSize: '0.8rem',
                                 fontWeight: 700,
                                 color: '#ffffff',
                                 letterSpacing: '-0.01em',
-                                lineHeight: '1.2',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis'
+                                lineHeight: '1.25',
+                                whiteSpace: 'normal',
+                                wordBreak: 'break-word'
                               }}>
                                 {goal.title || 'Wochenziel'}
                               </span>
@@ -4689,10 +4688,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   fontSize: '0.62rem',
                                   fontWeight: 500,
                                   color: isDeadlinePassed ? '#ff8780' : 'rgba(255, 255, 255, 0.75)',
-                                  lineHeight: '1',
-                                  whiteSpace: 'nowrap',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis'
+                                  lineHeight: '1.2',
+                                  whiteSpace: 'normal'
                                 }}>
                                   bis {new Date(goal.deadline).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
                                   {isDeadlinePassed && ' (abgelaufen)'}
@@ -4705,7 +4702,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               color: '#ffffff',
                               letterSpacing: '-0.02em',
                               fontFeatureSettings: '"tnum"',
-                              flexShrink: 0
+                              flexShrink: 0,
+                              alignSelf: 'flex-start'
                             }}>
                               {pct}%
                             </span>
@@ -4738,18 +4736,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                           {/* Row 3: Current / Target & Status label */}
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', gap: '10px' }}>
-                            <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontFeatureSettings: '"tnum"', fontWeight: 500, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontFeatureSettings: '"tnum"', fontWeight: 500, whiteSpace: 'normal' }}>
                               <span style={{ fontWeight: 700, color: '#ffffff' }}>{classWeeklyMins}</span> / {goal.minutes} Min.
                             </span>
                             <span style={{
                               fontWeight: 700,
                               color: isAchieved ? '#a7f3d0' : 'rgba(255, 255, 255, 0.8)',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              textAlign: 'right',
-                              minWidth: 0,
-                              flex: 1
+                              whiteSpace: 'normal',
+                              textAlign: 'right'
                             }}>
                               {isAchieved ? 'Erreicht 🎉' : `Noch ${Math.max(0, goal.minutes - classWeeklyMins)} Min.`}
                             </span>
