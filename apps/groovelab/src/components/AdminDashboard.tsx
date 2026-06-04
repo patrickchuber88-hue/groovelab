@@ -320,6 +320,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [bookingStartTime, setBookingStartTime] = useState<string>('08:00');
   const [bookingEndTime, setBookingEndTime] = useState<string>('09:00');
   const [bookingPurpose, setBookingPurpose] = useState<string>('');
+  const [bookingType, setBookingType] = useState<'solo' | 'lesson'>('solo');
+  const [bookingStudentId, setBookingStudentId] = useState<string>('');
+  const [studentSearchTerm, setStudentSearchTerm] = useState<string>('');
   const [successAnimationRoomId, setSuccessAnimationRoomId] = useState<string | null>(null);
   const [selectedFloor, setSelectedFloor] = useState<string>('Alle');
   const [showMyBookingsOnly, setShowMyBookingsOnly] = useState<boolean>(false);
@@ -4613,6 +4616,16 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
   const renderCampusRoomsTab = () => {
     const isEditing = !!(selectedBooking && (!selectedBooking.isSchedule || selectedBooking.teacherId === userId));
+    
+    const handleQuickDuration = (mins: number) => {
+      const [sh, sm] = bookingStartTime.split(':').map(Number);
+      const total = sh * 60 + sm + mins;
+      const eh = Math.floor(total / 60) % 24;
+      const em = total % 60;
+      setBookingEndTime(`${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`);
+      setIsDateFilterActive(true);
+    };
+
     // Helper to extract unique floors for this school's rooms
     const uniqueFloors = Array.from(new Set(rooms.map(r => r.floor || 'Allgemein'))).sort((a, b) => {
       const order = ['ug', 'eg', 'og', 'allgemein'];
@@ -4969,7 +4982,57 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         return schedStartMin < userEndMin && schedEndMin > userStartMin;
       });
 
-      return hasBooking || hasSchedule;
+      const hasDynamic = scheduleOccurrences.some((occ: any) => {
+        const rId = occ.schedules?.room_id || null;
+        if (rId !== roomId) return false;
+        if (occ.date !== bookingDate) return false;
+
+        if (occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick') {
+          return false;
+        }
+
+        const templateTime = occ.schedules?.time_slot || '';
+        const templateDay = occ.schedules?.day_of_week || 0;
+
+        const occDate = new Date(occ.date);
+        const rawDay = occDate.getDay();
+        const actualDayOfWeek = rawDay === 0 ? 7 : rawDay;
+
+        const hasTimeMoved = templateTime && occ.start_time.substring(0, 5) !== templateTime.substring(0, 5);
+        const hasDayMoved = templateDay && actualDayOfWeek !== templateDay;
+        
+        const hasFallbackDateMoved = occ.original_date && occ.date !== occ.original_date;
+        const hasFallbackTimeMoved = occ.original_start_time && occ.start_time.substring(0, 5) !== occ.original_start_time.substring(0, 5);
+
+        const hasMoved = occ.schedules 
+          ? (hasTimeMoved || hasDayMoved)
+          : (hasFallbackDateMoved || hasFallbackTimeMoved);
+
+        if (!hasMoved) return false;
+
+        const durationMin = occ.duration || 45;
+
+        // User booking range in minutes
+        const [uShStr, uSmStr] = bookingStartTime.split(':');
+        const uSh = parseInt(uShStr) || 0;
+        const uSm = parseInt(uSmStr) || 0;
+        const userStartMin = uSh * 60 + uSm;
+
+        const [uEhStr, uEmStr] = bookingEndTime.split(':');
+        const uEh = parseInt(uEhStr) || 0;
+        const uEm = parseInt(uEmStr) || 0;
+        const userEndMin = uEh * 60 + uEm;
+
+        const [shStr, smStr] = occ.start_time.split(':');
+        const sh = parseInt(shStr) || 0;
+        const sm = parseInt(smStr) || 0;
+        const occStartMin = sh * 60 + sm;
+        const occEndMin = occStartMin + durationMin;
+
+        return occStartMin < userEndMin && occEndMin > userStartMin;
+      });
+
+      return hasBooking || hasSchedule || hasDynamic;
     };
 
     // Check if room is occupied *right now* (Ist-Zustand)
@@ -5033,6 +5096,10 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
     const handleAddBooking = (roomId: string) => {
       const roomName = rooms.find(r => r.id === roomId)?.name || 'Raum';
+      const studentObj = students.find(s => s.id === bookingStudentId);
+      const studentName = studentObj ? `Unterricht: ${studentObj.first_name} ${studentObj.last_name}` : 'Unterricht';
+      const finalPurpose = bookingType === 'lesson' ? studentName : (bookingPurpose || 'Eigennutzung');
+
       const newBooking = {
         id: 'cb_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
         roomId,
@@ -5040,7 +5107,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         date: bookingDate,
         startTime: bookingStartTime,
         endTime: bookingEndTime,
-        purpose: bookingPurpose || 'Unterricht',
+        purpose: finalPurpose,
         teacherId: userId,
         teacherName: admin ? `${admin.first_name} ${admin.last_name}` : 'Lehrer'
       };
@@ -5049,10 +5116,19 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       setIsDateFilterActive(false);
       setSuccessAnimationRoomId(roomId);
       setTimeout(() => setSuccessAnimationRoomId(null), 1000);
+      
+      // Clear inputs
+      setBookingPurpose('');
+      setBookingStudentId('');
+      setStudentSearchTerm('');
     };
 
     const handleUpdateBooking = () => {
       if (!selectedBooking) return;
+
+      const studentObj = students.find(s => s.id === bookingStudentId);
+      const studentName = studentObj ? `Unterricht: ${studentObj.first_name} ${studentObj.last_name}` : 'Unterricht';
+      const finalPurpose = bookingType === 'lesson' ? studentName : (bookingPurpose || 'Eigennutzung');
 
       if (selectedBooking.isSchedule) {
         // Schedule blocks are recurring – create a manual booking override for this specific date
@@ -5064,7 +5140,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           date: bookingDate,
           startTime: bookingStartTime,
           endTime: bookingEndTime,
-          purpose: bookingPurpose || 'Unterricht',
+          purpose: finalPurpose,
           teacherId: userId,
           teacherName: admin ? `${admin.first_name} ${admin.last_name}` : 'Lehrer'
         };
@@ -5077,7 +5153,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               date: bookingDate,
               startTime: bookingStartTime,
               endTime: bookingEndTime,
-              purpose: bookingPurpose || 'Unterricht'
+              purpose: finalPurpose
             };
           }
           return b;
@@ -5086,6 +5162,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
       setSelectedBooking(null);
       setBookingPurpose('');
+      setBookingStudentId('');
+      setStudentSearchTerm('');
       setIsDateFilterActive(false);
     };
 
@@ -5621,7 +5699,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   WebkitOverflowScrolling: 'touch'
                 }}
               >
-                {roomsToRender.filter(room => !(isDateFilterActive && isRoomOccupied(room.id))).map((room) => {
+                {roomsToRender.map((room) => {
                   const isSelected = selectedCampusRoomId === room.id;
                   const occupiedNow = isRoomOccupiedNow(room.id);
                   return (
@@ -6252,6 +6330,171 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   <span style={{ color: brandColor }}>⚡</span> Raum buchen
                 </h3>
 
+                {/* Segmented Control for Eigennutzung vs Unterricht */}
+                <div style={{ display: 'flex', background: '#f2f2f7', borderRadius: '12px', padding: '2px', marginTop: '2px' }}>
+                  <button
+                    onClick={() => setBookingType('solo')}
+                    style={{
+                      flex: 1,
+                      background: bookingType === 'solo' ? 'white' : 'transparent',
+                      border: 'none',
+                      borderRadius: '10px',
+                      padding: '8px 12px',
+                      fontSize: '0.75rem',
+                      fontWeight: bookingType === 'solo' ? 800 : 600,
+                      color: bookingType === 'solo' ? '#1c1c1e' : '#8e8e93',
+                      cursor: 'pointer',
+                      boxShadow: bookingType === 'solo' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    Eigennutzung
+                  </button>
+                  <button
+                    onClick={() => setBookingType('lesson')}
+                    style={{
+                      flex: 1,
+                      background: bookingType === 'lesson' ? 'white' : 'transparent',
+                      border: 'none',
+                      borderRadius: '10px',
+                      padding: '8px 12px',
+                      fontSize: '0.75rem',
+                      fontWeight: bookingType === 'lesson' ? 800 : 600,
+                      color: bookingType === 'lesson' ? '#1c1c1e' : '#8e8e93',
+                      cursor: 'pointer',
+                      boxShadow: bookingType === 'lesson' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    Unterricht
+                  </button>
+                </div>
+
+                {/* Smart Room Selector */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Raum</label>
+                  <select
+                    value={selectedCampusRoomId || ''}
+                    onChange={(e) => {
+                      setSelectedCampusRoomId(e.target.value);
+                    }}
+                    className="premium-input"
+                    style={{ background: '#ffffff', color: '#1c1c1e' }}
+                  >
+                    {rooms.map((r: any) => (
+                      <option key={r.id} value={r.id}>{r.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Student Autocomplete Search */}
+                {bookingType === 'lesson' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', position: 'relative' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Schüler</label>
+                    {bookingStudentId ? (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        background: '#f2f2f7',
+                        padding: '8px 12px',
+                        borderRadius: '10px',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        color: '#1c1c1e'
+                      }}>
+                        <span>
+                          {(() => {
+                            const s = students.find(x => x.id === bookingStudentId);
+                            return s ? `${s.first_name} ${s.last_name}` : 'Unbekannter Schüler';
+                          })()}
+                        </span>
+                        <button
+                          onClick={() => {
+                            setBookingStudentId('');
+                            setStudentSearchTerm('');
+                          }}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#ff3b30',
+                            cursor: 'pointer',
+                            fontSize: '0.9rem',
+                            fontWeight: 800,
+                            padding: '0 4px'
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <input
+                          placeholder="Schüler suchen..."
+                          value={studentSearchTerm}
+                          onChange={(e) => setStudentSearchTerm(e.target.value)}
+                          className="premium-input"
+                          style={{ background: '#ffffff', color: '#1c1c1e' }}
+                        />
+                        {studentSearchTerm && (
+                          <div style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            right: 0,
+                            background: 'white',
+                            border: '1px solid #e5e5ea',
+                            borderRadius: '12px',
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
+                            zIndex: 100,
+                            maxHeight: '150px',
+                            overflowY: 'auto',
+                            marginTop: '4px'
+                          }}>
+                            {students
+                              .filter((s: any) =>
+                                `${s.first_name} ${s.last_name}`
+                                  .toLowerCase()
+                                  .includes(studentSearchTerm.toLowerCase())
+                              )
+                              .slice(0, 5)
+                              .map((s: any) => (
+                                <div
+                                  key={s.id}
+                                  onClick={() => {
+                                    setBookingStudentId(s.id);
+                                    setStudentSearchTerm('');
+                                  }}
+                                  style={{
+                                    padding: '8px 12px',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 700,
+                                    color: '#1c1c1e',
+                                    cursor: 'pointer',
+                                    borderBottom: '1px solid #f2f2f7'
+                                  }}
+                                  onMouseEnter={(e) => { e.currentTarget.style.background = '#f2f2f7'; }}
+                                  onMouseLeave={(e) => { e.currentTarget.style.background = 'white'; }}
+                                >
+                                  {s.first_name} {s.last_name}
+                                </div>
+                              ))}
+                            {students.filter((s: any) =>
+                              `${s.first_name} ${s.last_name}`
+                                .toLowerCase()
+                                .includes(studentSearchTerm.toLowerCase())
+                            ).length === 0 && (
+                              <div style={{ padding: '8px 12px', fontSize: '0.75rem', color: '#8e8e93', fontStyle: 'italic' }}>
+                                Keine Schüler gefunden
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Datum</label>
                   <input
@@ -6327,19 +6570,82 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Verwendungszweck</label>
-                  <input
-                    placeholder="z.B. Klavierunterricht"
-                    value={bookingPurpose}
-                    onChange={(e) => setBookingPurpose(e.target.value)}
-                    className="premium-input"
-                  />
+                {/* Duration Quick Buttons */}
+                <div style={{ display: 'flex', gap: '8px', marginTop: '-6px' }}>
+                  <button
+                    onClick={() => handleQuickDuration(30)}
+                    style={{
+                      flex: 1,
+                      background: 'transparent',
+                      border: '1px solid #e5e5ea',
+                      borderRadius: '8px',
+                      padding: '6px 8px',
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      color: '#8e8e93',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = brandColor; e.currentTarget.style.color = brandColor; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e5e5ea'; e.currentTarget.style.color = '#8e8e93'; }}
+                  >
+                    30 Min.
+                  </button>
+                  <button
+                    onClick={() => handleQuickDuration(45)}
+                    style={{
+                      flex: 1,
+                      background: 'transparent',
+                      border: '1px solid #e5e5ea',
+                      borderRadius: '8px',
+                      padding: '6px 8px',
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      color: '#8e8e93',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = brandColor; e.currentTarget.style.color = brandColor; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e5e5ea'; e.currentTarget.style.color = '#8e8e93'; }}
+                  >
+                    45 Min.
+                  </button>
                 </div>
+
+                {bookingType === 'solo' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Verwendungszweck</label>
+                    <input
+                      placeholder="z.B. Klavierübung"
+                      value={bookingPurpose}
+                      onChange={(e) => setBookingPurpose(e.target.value)}
+                      className="premium-input"
+                    />
+                  </div>
+                )}
+
+                {/* Overlap Warning Badge */}
+                {selectedRoom && isRoomOccupied(selectedRoom.id) && (
+                  <div style={{
+                    background: '#fff9e6',
+                    border: '1px solid #ffeeba',
+                    borderRadius: '12px',
+                    padding: '8px 12px',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    color: '#b45309',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    lineHeight: '1.25'
+                  }}>
+                    <span>⚠️ Raum im Zeitraum bereits belegt. Parallele Buchung wird erlaubt.</span>
+                  </div>
+                )}
 
                 <button
                   onClick={() => selectedRoom && (isEditing ? handleUpdateBooking() : handleAddBooking(selectedRoom.id))}
-                  disabled={!selectedRoom || isRoomOccupied(selectedRoom.id)}
+                  disabled={!selectedRoom}
                   style={{
                     background: brandColor,
                     color: 'white',
@@ -6348,8 +6654,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     padding: '12px 14px',
                     fontSize: '0.85rem',
                     fontWeight: 800,
-                    cursor: (!selectedRoom || isRoomOccupied(selectedRoom.id)) ? 'not-allowed' : 'pointer',
-                    opacity: (!selectedRoom || isRoomOccupied(selectedRoom.id)) ? 0.45 : 1,
+                    cursor: (!selectedRoom) ? 'not-allowed' : 'pointer',
+                    opacity: (!selectedRoom) ? 0.45 : 1,
                     transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                     marginTop: '6px',
                     display: 'flex',
@@ -6360,13 +6666,13 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
                   }}
                   onMouseEnter={(e) => {
-                    if (selectedRoom && !isRoomOccupied(selectedRoom.id)) {
+                    if (selectedRoom) {
                       e.currentTarget.style.opacity = '0.9';
                       e.currentTarget.style.transform = 'translateY(-1px)';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (selectedRoom && !isRoomOccupied(selectedRoom.id)) {
+                    if (selectedRoom) {
                       e.currentTarget.style.opacity = '1';
                       e.currentTarget.style.transform = 'none';
                     }
@@ -6374,11 +6680,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 >
                   {!selectedRoom 
                     ? 'Wähle einen Raum' 
-                    : isRoomOccupied(selectedRoom.id) 
-                      ? 'Raum belegt' 
-                      : isEditing 
-                        ? (selectedBooking?.isSchedule ? 'Als Einzeltermin übernehmen' : 'Änderung speichern')
-                        : `${selectedRoom.name} buchen`}
+                    : isEditing 
+                      ? (selectedBooking?.isSchedule ? 'Als Einzeltermin übernehmen' : 'Änderung speichern')
+                      : `${selectedRoom.name} buchen`}
 
                 </button>
 

@@ -2143,7 +2143,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                                               )}
                                               <div className="relative z-10">
                                                 <p className="text-[10px] font-black uppercase tracking-wider opacity-75">
-                                                  {booking.status === 'pending_reschedule' ? 'Reservierung' : (booking.student ? 'Unterricht' : 'Eigenübung')}
+                                                  {booking.status === 'pending_reschedule' ? 'Reservierung' : (booking.student ? 'Unterricht' : 'Eigennutzung')}
                                                 </p>
                                                 <p className="text-[11px] font-bold truncate mt-0.5">
                                                   {booking.student 
@@ -2229,7 +2229,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                         : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
                     }`}
                   >
-                    Eigenübung
+                    Eigennutzung
                   </button>
                   <button
                     type="button"
