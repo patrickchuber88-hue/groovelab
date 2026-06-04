@@ -5010,7 +5010,7 @@ export function TeacherDashboard({
                             const isBreak = !slot.student;
                             const isCanceled = slot.status === 'canceled_by_student' || slot.status === 'teacher_sick' || slot.status === 'cancelled' || slot.status === 'canceled_by_teacher_sick';
                             const isRescheduledAway = slot.status === 'rescheduled_away';
-                            const isFinished = currentTimeStr >= slotEnd;
+                            const isFinished = currentTimeStr >= slotEnd && !isCanceled && !isRescheduledAway;
                             const isCurrentSlot = currentTimeStr >= slotStart && currentTimeStr < slotEnd && !isCanceled && !isRescheduledAway;
                             const isRescheduledPending = slot.status === 'rescheduled_pending' || slot.status === 'pending' || slot.status === 'pending_reschedule';
                             const isRescheduledConfirmed = slot.status === 'rescheduled_confirmed';
@@ -5216,6 +5216,7 @@ export function TeacherDashboard({
                                  {/* Slot card on the right containing Uhrzeit inside */}
                                  <div 
                                    onClick={() => {
+                                     if (isCanceled || isRescheduledAway) return;
                                      if (slot.student) {
                                        setDocStudent({
                                          id: slot.student.id,
@@ -5239,7 +5240,7 @@ export function TeacherDashboard({
                                      borderRadius: '12px',
                                      border: slotBorder,
                                      borderLeft: slotBorderLeft,
-                                     cursor: slot.student ? 'pointer' : 'default',
+                                     cursor: (slot.student && !isCanceled && !isRescheduledAway) ? 'pointer' : 'default',
                                      transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                                      boxShadow: (idx === prepIndex) ? (isRescheduledPending ? '0 6px 18px rgba(234, 179, 8, 0.08)' : '0 6px 18px rgba(59, 130, 246, 0.06)') : '0 1.5px 4px rgba(0, 0, 0, 0.01)',
                                      minWidth: 0,
