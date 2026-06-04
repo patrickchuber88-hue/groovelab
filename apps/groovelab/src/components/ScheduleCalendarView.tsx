@@ -1189,9 +1189,9 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
           {Object.keys(pendingChanges).length > 0 && (
             <button 
               onClick={savePendingChanges}
-              style={{ background: '#0071e3', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 4px rgba(0,113,227,0.3)' }}
-              onMouseOver={e => e.currentTarget.style.background = '#0077ED'}
-              onMouseOut={e => e.currentTarget.style.background = '#0071e3'}
+              style={{ background: '#16a34a', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 4px rgba(22, 163, 74, 0.3)' }}
+              onMouseOver={e => e.currentTarget.style.background = '#15803d'}
+              onMouseOut={e => e.currentTarget.style.background = '#16a34a'}
             >
               Änderungen speichern ({Object.keys(pendingChanges).length})
             </button>
