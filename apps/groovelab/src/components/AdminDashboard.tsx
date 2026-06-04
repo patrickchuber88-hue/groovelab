@@ -5857,10 +5857,10 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                       title={`${b.purpose} (${b.startTime} - ${b.endTime}) - ${b.teacherName}`}
                                       style={{
                                         background: bg,
-                                        border: 'none',
-                                        // Straight on the left accent edge, rounded on the right edge
-                                        borderRadius: '0 8px 8px 0',
-                                        padding: '4px 6px 4px 10px',
+                                        border: `1px solid ${leftAccentColor}25`,
+                                        borderLeft: `3px solid ${leftAccentColor}`,
+                                        borderRadius: '8px',
+                                        padding: '6px 8px',
                                         fontSize: '0.64rem',
                                         fontWeight: 800,
                                         color: textColor,
@@ -5878,7 +5878,6 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                         cursor: isOwnBooking ? 'grab' : 'pointer'
                                       }}
                                     >
-                                      <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '5px', background: leftAccentColor }} />
                                       
                                       {/* Resize Handles */}
                                       {isOwnBooking && !isSchedule && (
