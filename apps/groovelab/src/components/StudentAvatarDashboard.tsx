@@ -570,8 +570,9 @@ function MobileBriefingView({
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {(() => {
+            const todayStr = new Date().toLocaleDateString('sv-SE');
             const upcomingConfirmed = (scheduleOccurrences || []).filter(occ => 
-              occ.status === 'scheduled' || occ.status === 'rescheduled_confirmed'
+              (occ.status === 'scheduled' || occ.status === 'rescheduled_confirmed') && occ.date > todayStr
             );
             if (upcomingConfirmed.length > 0) {
               return upcomingConfirmed.slice(0, 2).map(occ => {
@@ -4350,8 +4351,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {(() => {
+                    const todayStr = new Date().toLocaleDateString('sv-SE');
                     const upcomingConfirmed = (scheduleOccurrences || []).filter(occ => 
-                      occ.status === 'scheduled' || occ.status === 'rescheduled_confirmed'
+                      (occ.status === 'scheduled' || occ.status === 'rescheduled_confirmed') && occ.date > todayStr
                     );
                     if (upcomingConfirmed.length > 0) {
                       return upcomingConfirmed.slice(0, 2).map(occ => {
