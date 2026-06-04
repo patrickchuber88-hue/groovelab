@@ -5011,7 +5011,7 @@ export function TeacherDashboard({
                             const isCanceled = slot.status === 'canceled_by_student' || slot.status === 'teacher_sick' || slot.status === 'cancelled' || slot.status === 'canceled_by_teacher_sick';
                             const isRescheduledAway = slot.status === 'rescheduled_away';
                             const isFinished = currentTimeStr >= slotEnd && !isCanceled && !isRescheduledAway;
-                            const isCurrentSlot = currentTimeStr >= slotStart && currentTimeStr < slotEnd && !isCanceled && !isRescheduledAway;
+                            const isCurrentSlot = currentTimeStr >= slotStart && currentTimeStr < slotEnd;
                             const isRescheduledPending = slot.status === 'rescheduled_pending' || slot.status === 'pending' || slot.status === 'pending_reschedule';
                             const isRescheduledConfirmed = slot.status === 'rescheduled_confirmed';
                             const isBirthday = slot.student && isStudentBirthdayToday(slot.student);
@@ -5027,7 +5027,27 @@ export function TeacherDashboard({
                               slotBorder = '1.5px dashed rgba(245, 158, 11, 0.25)';
                               slotBorderLeft = '5px solid #f59e0b';
                               titleColor = '#b45309';
-                              dotComponent = (
+                              dotComponent = isCurrentSlot ? (
+                                <div style={{
+                                  width: '20px',
+                                  height: '20px',
+                                  borderRadius: '50%',
+                                  border: '3px solid #f59e0b',
+                                  background: '#ffffff',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  boxSizing: 'border-box',
+                                  animation: 'pulse 1.5s infinite'
+                                }}>
+                                  <div style={{
+                                    width: '8px',
+                                    height: '8px',
+                                    borderRadius: '50%',
+                                    background: '#f59e0b'
+                                  }} />
+                                </div>
+                              ) : (
                                 <div style={{
                                   width: '12px',
                                   height: '12px',
@@ -5042,7 +5062,27 @@ export function TeacherDashboard({
                               slotBorder = '1.5px solid #e2e8f0';
                               slotBorderLeft = '5px solid #8e8e93';
                               titleColor = '#8e8e93';
-                              dotComponent = (
+                              dotComponent = isCurrentSlot ? (
+                                <div style={{
+                                  width: '20px',
+                                  height: '20px',
+                                  borderRadius: '50%',
+                                  border: '3px solid #8e8e93',
+                                  background: '#ffffff',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  boxSizing: 'border-box',
+                                  animation: 'pulse 1.5s infinite'
+                                }}>
+                                  <div style={{
+                                    width: '8px',
+                                    height: '8px',
+                                    borderRadius: '50%',
+                                    background: '#8e8e93'
+                                  }} />
+                                </div>
+                              ) : (
                                 <div style={{
                                   width: '12px',
                                   height: '12px',
