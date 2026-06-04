@@ -1117,7 +1117,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                   const isBreak = !occ.student_id;
                   const isVacant = occ.student_id === 'vacant';
 
-                  if (isVacant || (isBreak && occ.status === 'cancelled')) {
+                  if ((isBreak && occ.status === 'cancelled')) {
                     return null;
                   }
 
@@ -1131,7 +1131,9 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                     ? { bg: 'rgba(254, 243, 199, 0.5)', border: '#f59e0b', text: '#b45309' } 
                     : isSick 
                       ? { bg: 'rgba(254, 226, 226, 0.45)', border: '#ef4444', text: '#991b1b' }
-                      : getStatusColor(occ.status);
+                      : isVacant
+                        ? { bg: 'rgba(16, 185, 129, 0.02)', border: '#10b981', text: '#047857' }
+                        : getStatusColor(occ.status);
                   let finalColors = { ...colors };
                   let cardBackground = '';
  
