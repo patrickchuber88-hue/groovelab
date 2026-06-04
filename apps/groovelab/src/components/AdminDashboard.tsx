@@ -5883,8 +5883,10 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
 
 
-                                {slotBookings.map((b: any) => {
+                                {slotBookings.map((b: any, bIdx: number) => {
                                   const isOwnBooking = !b.isSchedule || b.teacherId === userId;
+                                  const colWidth = 100 / slotBookings.length;
+                                  const colLeft = bIdx * colWidth;
                                   const isSchedule = b.isSchedule;
                                   
                                   // Apple Calendar Color Schemes
@@ -5969,8 +5971,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                         color: textColor,
                                         position: 'absolute',
                                         top: `calc(${(sm / 60) * 100}% + 4px)`,
-                                        left: '4px',
-                                        right: '4px',
+                                        left: `calc(${colLeft}% + 4px)`,
+                                        width: `calc(${colWidth}% - 8px)`,
                                         height: `calc(${durationHrs * 100}% - 8px)`,
                                         zIndex: 5,
                                         display: 'flex',

@@ -2113,53 +2113,59 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                             <tr key={slot} className="border-b border-slate-900/40 hover:bg-slate-900/10">
                               <td className="p-4 font-mono text-xs font-bold text-slate-500 bg-slate-950/30">{slot}</td>
                               {weekDays.map(day => {
-                                const booking = allSchoolSchedules.find(
+                                const slotBookings = allSchoolSchedules.filter(
                                   s => s.room_id === selectedRoom.id && s.day_of_week === day && s.time_slot === slot
                                 );
-                                const isCurrentTeacherBooking = booking && booking.teacher_id === userId;
 
                                 return (
                                   <td key={`${day}-${slot}`} className="p-2 min-w-[130px] relative">
-                                    {booking ? (
-                                      <div className={`p-2.5 rounded-xl border flex flex-col justify-between h-full min-h-[72px] transition duration-200 relative overflow-hidden ${
-                                        booking.status === 'pending_reschedule'
-                                          ? 'bg-amber-950/20 border-amber-500/30 text-amber-200'
-                                          : isCurrentTeacherBooking
-                                            ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-200'
-                                            : 'bg-red-950/25 border-red-900/30 text-red-200'
-                                      }`}>
-                                        {booking.status === 'pending_reschedule' && (
-                                          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-3xl font-black opacity-20 select-none pointer-events-none text-amber-400 font-sans">
-                                            R
-                                          </div>
-                                        )}
-                                        {!booking.is_dynamic_reschedule && booking.status !== 'pending_reschedule' && (
-                                          <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 opacity-30 select-none pointer-events-none flex items-center justify-center">
-                                            <Lock size={11} />
-                                          </div>
-                                        )}
-                                        <div className="relative z-10">
-                                          <p className="text-[10px] font-black uppercase tracking-wider opacity-75">
-                                            {booking.status === 'pending_reschedule' ? 'Reservierung' : (booking.student ? 'Unterricht' : 'Eigenübung')}
-                                          </p>
-                                          <p className="text-[11px] font-bold truncate mt-0.5">
-                                            {booking.student 
-                                              ? `${booking.student.first_name} ${booking.student.last_name[0]}.` 
-                                              : 'Freie Buchung'}
-                                          </p>
-                                          <p className="text-[9px] opacity-60 font-semibold mt-1">
-                                            Coach: {booking.teacher ? `${booking.teacher.first_name} ${booking.teacher.last_name[0]}.` : 'Unbekannt'}
-                                          </p>
-                                        </div>
+                                    {slotBookings.length > 0 ? (
+                                      <div className="flex flex-col md:flex-row gap-1.5 items-stretch w-full h-full">
+                                        {slotBookings.map(booking => {
+                                          const isCurrentTeacherBooking = booking && booking.teacher_id === userId;
+                                          return (
+                                            <div key={booking.id} className={`flex-1 p-2.5 rounded-xl border flex flex-col justify-between h-full min-h-[72px] transition duration-200 relative overflow-hidden ${
+                                              booking.status === 'pending_reschedule'
+                                                ? 'bg-amber-950/20 border-amber-500/30 text-amber-200'
+                                                : isCurrentTeacherBooking
+                                                  ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-200'
+                                                  : 'bg-red-950/25 border-red-900/30 text-red-200'
+                                            }`}>
+                                              {booking.status === 'pending_reschedule' && (
+                                                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-3xl font-black opacity-20 select-none pointer-events-none text-amber-400 font-sans">
+                                                  R
+                                                </div>
+                                              )}
+                                              {!booking.is_dynamic_reschedule && booking.status !== 'pending_reschedule' && (
+                                                <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 opacity-30 select-none pointer-events-none flex items-center justify-center">
+                                                  <Lock size={11} />
+                                                </div>
+                                              )}
+                                              <div className="relative z-10">
+                                                <p className="text-[10px] font-black uppercase tracking-wider opacity-75">
+                                                  {booking.status === 'pending_reschedule' ? 'Reservierung' : (booking.student ? 'Unterricht' : 'Eigenübung')}
+                                                </p>
+                                                <p className="text-[11px] font-bold truncate mt-0.5">
+                                                  {booking.student 
+                                                    ? `${booking.student.first_name} ${booking.student.last_name[0]}.` 
+                                                    : 'Freie Buchung'}
+                                                </p>
+                                                <p className="text-[9px] opacity-60 font-semibold mt-1">
+                                                  Coach: {booking.teacher ? `${booking.teacher.first_name} ${booking.teacher.last_name[0]}.` : 'Unbekannt'}
+                                                </p>
+                                              </div>
 
-                                        {isCurrentTeacherBooking && (
-                                          <button
-                                            onClick={() => handleCancelRoomBooking(booking.id)}
-                                            className="mt-2 text-[9px] font-black uppercase tracking-widest text-red-400 hover:text-red-300 transition duration-150 self-start bg-red-950/40 border border-red-900/40 px-2 py-0.5 rounded"
-                                          >
-                                            Stornieren
-                                          </button>
-                                        )}
+                                              {isCurrentTeacherBooking && (
+                                                <button
+                                                  onClick={() => handleCancelRoomBooking(booking.id)}
+                                                  className="mt-2 text-[9px] font-black uppercase tracking-widest text-red-400 hover:text-red-300 transition duration-150 self-start bg-red-950/40 border border-red-900/40 px-2 py-0.5 rounded"
+                                                >
+                                                  Stornieren
+                                                </button>
+                                              )}
+                                            </div>
+                                          );
+                                        })}
                                       </div>
                                     ) : (
                                       <button
