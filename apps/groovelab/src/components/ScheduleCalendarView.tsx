@@ -98,7 +98,16 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
         
         const isRealStudent = o.student_id && o.student_id !== 'vacant';
         const hasMoved = change.date !== o.date || change.start_time.substring(0, 5) !== o.start_time.substring(0, 5);
-        if (isRealStudent && hasMoved) {
+        
+        const isSlotReoccupied = Object.values(pendingChanges).some(ch => 
+          ch.id !== o.id && 
+          ch.student_id && 
+          ch.student_id !== 'vacant' &&
+          ch.date === o.date && 
+          ch.start_time.substring(0, 5) === o.start_time.substring(0, 5)
+        );
+
+        if (isRealStudent && hasMoved && !isSlotReoccupied) {
           merged.push({
             id: `vacant-temp-${o.id}`,
             student_id: 'vacant',
