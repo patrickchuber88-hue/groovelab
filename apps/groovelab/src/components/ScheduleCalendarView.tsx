@@ -1363,7 +1363,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
  
                   const occStartMinutes = timeToMinutes(occ.start_time);
                   const gapMinutes = occStartMinutes - lastEndTimeMinutes;
-                  const itemSpacerHeight = gapMinutes > 0 ? gapMinutes * 2.5 : 0;
+                  const itemSpacerHeight = gapMinutes > 0 ? (gapMinutes * 2.5 - 8) : 0;
                   
                   // Update lastEndTimeMinutes
                   lastEndTimeMinutes = occStartMinutes + (occ.duration || 30);
@@ -1409,14 +1409,18 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                               ? '4px solid #f59e0b' 
                               : `3px solid ${finalColors.border}`,
                         borderRadius: '8px', 
-                        padding: '8px',
+                        padding: (occ.duration || 30) < 30 ? '2px 8px' : '8px',
                         cursor: isSick ? 'pointer' : isVacant ? 'pointer' : isBreak ? 'default' : 'grab',
                         opacity: draggedId === occ.id ? 0.5 : 1,
                         position: 'relative',
                         boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
                         transition: 'all 0.2s',
                         userSelect: 'none',
-                        visibility: isVacant ? 'hidden' : 'visible'
+                        visibility: isVacant ? 'hidden' : 'visible',
+                        height: `${(occ.duration || 30) * 2.5 - 8}px`,
+                        flexShrink: 0,
+                        boxSizing: 'border-box',
+                        overflow: 'hidden'
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2px' }}>
