@@ -333,79 +333,106 @@ function MobileBriefingView({
       </div>
 
       {/* ÜBE-ZIELE DER KLASSE (CROWDFUNDING STYLE) */}
-      {weeklyTargets.length > 0 && (
-        <div style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-            <Target size={16} color={brandColor} />
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Übe-Ziele der Klasse</h3>
-          </div>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {weeklyTargets.map((target: any) => {
-              const targetPercent = Math.round((classWeeklyMins / target.minutes) * 100);
-              const isDeadlinePassed = target.deadline ? new Date(target.deadline) < new Date() : false;
-              
-              // Crowdfunding scale: 100% goal is marked at 75% width
-              const maxPercentOnBar = 133;
-              const visualWidth = Math.min(100, (targetPercent / maxPercentOnBar) * 100);
+      {weeklyTargets.length > 0 && (() => {
+        const totalGoals = weeklyTargets.length;
+        const masteredGoals = weeklyTargets.filter((target: any) => {
+          const targetPercent = Math.round((classWeeklyMins / target.minutes) * 100);
+          return targetPercent >= 100;
+        }).length;
+        const highestPercent = weeklyTargets.length > 0 
+          ? Math.max(...weeklyTargets.map((target: any) => Math.round((classWeeklyMins / target.minutes) * 100)))
+          : 0;
 
-              return (
-                <div key={target.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>{target.title || 'Wochenziel'}</span>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b' }}>
-                      {Math.round(classWeeklyMins)} / {target.minutes} Min.
-                    </span>
-                  </div>
-                  
-                  {/* Progress Track */}
-                  <div style={{ position: 'relative', width: '100%', height: '14px', background: '#f1f5f9', borderRadius: '7px', overflow: 'hidden' }}>
-                    <div 
-                      style={{ 
-                        width: `${visualWidth}%`, 
-                        height: '100%', 
-                        background: targetPercent >= 100 
-                          ? `linear-gradient(90deg, ${brandColor} 0%, #10b981 75%, #059669 100%)`
-                          : `linear-gradient(90deg, ${brandColor} 0%, #10b981 100%)`,
-                        borderRadius: '7px', 
-                        transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)' 
-                      }} 
-                    />
-                    {/* Goal line */}
-                    <div style={{ position: 'absolute', left: '75%', top: 0, bottom: 0, width: '2px', background: '#ffffff', opacity: 0.8, zIndex: 2 }} />
-                  </div>
-                  
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    {target.deadline ? (
-                      <span style={{ fontSize: '0.64rem', fontWeight: 700, color: isDeadlinePassed ? '#ef4444' : '#64748b' }}>
-                        ⏱️ Bis: {new Date(target.deadline).toLocaleDateString('de-DE')}
+        return (
+          <div style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+              <Target size={16} color={brandColor} />
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Übe-Ziele der Klasse</h3>
+            </div>
+            
+            {/* KPI Row */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', background: '#f8fafc', padding: '10px', borderRadius: '14px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Missionen</span>
+                <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1e293b', marginTop: '1px' }}>{totalGoals}</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', borderLeft: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0' }}>
+                <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Geknackt</span>
+                <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#10b981', marginTop: '1px' }}>{masteredGoals}</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Peak</span>
+                <span style={{ fontSize: '0.95rem', fontWeight: 900, color: brandColor, marginTop: '1px' }}>{highestPercent}%</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {weeklyTargets.map((target: any) => {
+                const targetPercent = Math.round((classWeeklyMins / target.minutes) * 100);
+                const isDeadlinePassed = target.deadline ? new Date(target.deadline) < new Date() : false;
+                
+                // Crowdfunding scale: 100% goal is marked at 75% width
+                const maxPercentOnBar = 133;
+                const visualWidth = Math.min(100, (targetPercent / maxPercentOnBar) * 100);
+
+                return (
+                  <div key={target.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>{target.title || 'Wochenziel'}</span>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b' }}>
+                        {Math.round(classWeeklyMins)} / {target.minutes} Min.
                       </span>
-                    ) : (
-                      <span />
-                    )}
-                    <span style={{ 
-                      fontSize: '0.7rem', 
-                      fontWeight: 900, 
-                      color: targetPercent >= 100 ? '#10b981' : brandColor, 
-                      background: targetPercent >= 100 ? '#dcfce7' : `${brandColor}12`, 
-                      padding: '1px 5px', 
-                      borderRadius: '4px' 
-                    }}>
-                      {targetPercent}% {targetPercent >= 100 && '🚀'}
-                    </span>
-                  </div>
-
-                  {targetPercent >= 100 && (
-                    <div style={{ fontSize: '0.65rem', fontWeight: 750, color: '#15803d', display: 'flex', alignItems: 'center', gap: '3px', background: '#f0fdf4', padding: '4px 8px', borderRadius: '6px', border: '1px solid #dcfce7' }}>
-                      <span>🎉 Ziel erreicht & übererfüllt!</span>
                     </div>
-                  )}
-                </div>
-              );
-            })}
+                    
+                    {/* Progress Track */}
+                    <div style={{ position: 'relative', width: '100%', height: '14px', background: '#f1f5f9', borderRadius: '7px', overflow: 'hidden' }}>
+                      <div 
+                        style={{ 
+                          width: `${visualWidth}%`, 
+                          height: '100%', 
+                          background: targetPercent >= 100 
+                            ? `linear-gradient(90deg, ${brandColor} 0%, #10b981 75%, #059669 100%)`
+                            : `linear-gradient(90deg, ${brandColor} 0%, #10b981 100%)`,
+                          borderRadius: '7px', 
+                          transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)' 
+                        }} 
+                      />
+                      {/* Goal line */}
+                      <div style={{ position: 'absolute', left: '75%', top: 0, bottom: 0, width: '2px', background: '#ffffff', opacity: 0.8, zIndex: 2 }} />
+                    </div>
+                    
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      {target.deadline ? (
+                        <span style={{ fontSize: '0.64rem', fontWeight: 700, color: isDeadlinePassed ? '#ef4444' : '#64748b' }}>
+                          ⏱️ Bis: {new Date(target.deadline).toLocaleDateString('de-DE')}
+                        </span>
+                      ) : (
+                        <span />
+                      )}
+                      <span style={{ 
+                        fontSize: '0.7rem', 
+                        fontWeight: 900, 
+                        color: targetPercent >= 100 ? '#10b981' : brandColor, 
+                        background: targetPercent >= 100 ? '#dcfce7' : `${brandColor}12`, 
+                        padding: '1px 5px', 
+                        borderRadius: '4px' 
+                      }}>
+                        {targetPercent}% {targetPercent >= 100 && '🚀'}
+                      </span>
+                    </div>
+
+                    {targetPercent >= 100 && (
+                      <div style={{ fontSize: '0.65rem', fontWeight: 750, color: '#15803d', display: 'flex', alignItems: 'center', gap: '3px', background: '#f0fdf4', padding: '4px 8px', borderRadius: '6px', border: '1px solid #dcfce7' }}>
+                        <span>🎉 Ziel erreicht & übererfüllt!</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* HAUSAUFGABEN FITBIT STYLE */}
       <div style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', borderLeft: '6px solid #22c55e' }}>
@@ -4398,16 +4425,42 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               
               {/* Übe-Ziele der Klasse (Crowdfunding Style) */}
-              {weeklyTargets.length > 0 && (
-                <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                    <Target size={18} color={brandColor} />
-                    <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Übe-Ziele der Klasse
-                    </h3>
-                  </div>
+              {weeklyTargets.length > 0 && (() => {
+                const totalGoals = weeklyTargets.length;
+                const masteredGoals = weeklyTargets.filter((target: any) => {
+                  const targetPercent = Math.round((classWeeklyMins / target.minutes) * 100);
+                  return targetPercent >= 100;
+                }).length;
+                const highestPercent = weeklyTargets.length > 0 
+                  ? Math.max(...weeklyTargets.map((target: any) => Math.round((classWeeklyMins / target.minutes) * 100)))
+                  : 0;
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                return (
+                  <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                      <Target size={18} color={brandColor} />
+                      <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        Übe-Ziele der Klasse
+                      </h3>
+                    </div>
+
+                    {/* KPI Row */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '16px', marginBottom: '20px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                        <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Missionen</span>
+                        <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', marginTop: '2px' }}>{totalGoals}</span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', borderLeft: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0' }}>
+                        <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Geknackt</span>
+                        <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#10b981', marginTop: '2px' }}>{masteredGoals}</span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                        <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Klassen-Peak</span>
+                        <span style={{ fontSize: '1.05rem', fontWeight: 900, color: brandColor, marginTop: '2px' }}>{highestPercent}%</span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                     {weeklyTargets.map((target: any) => {
                       const targetPercent = Math.round((classWeeklyMins / target.minutes) * 100);
                       const isDeadlinePassed = target.deadline ? new Date(target.deadline) < new Date() : false;
@@ -4486,7 +4539,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     })}
                   </div>
                 </div>
-              )}
+              );})()}
               
               {/* Nächste Termine */}
               <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
