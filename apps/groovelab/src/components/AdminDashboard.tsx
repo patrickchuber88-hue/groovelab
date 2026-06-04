@@ -2192,7 +2192,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
     // Get school opening hours & reset stats timestamp
     const openingHours = admin?.schools?.opening_hours;
-    const resetDateStr = openingHours?.stats_reset_at;
+    const resetDateStr = activePlatform === 'campus'
+      ? (openingHours?.campus_stats_reset_at || openingHours?.stats_reset_at)
+      : (openingHours?.groovelab_stats_reset_at || openingHours?.stats_reset_at);
     const resetDate = resetDateStr ? new Date(resetDateStr) : null;
     const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
@@ -8668,6 +8670,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         onUpdate={() => fetchData()}
         onCleanupPlanning={handleCleanupPlanning}
         onResetPlanning={handleResetAllPlanning}
+        activePlatform={activePlatform}
       />
     </div>
   );
@@ -13596,7 +13599,8 @@ function DeviceSetupScreen({
   kiosks,
   onUpdate,
   onCleanupPlanning,
-  onResetPlanning
+  onResetPlanning,
+  activePlatform = 'groovelab'
 }: { 
   rooms: any[], 
   stations: any[], 
@@ -13608,7 +13612,8 @@ function DeviceSetupScreen({
   kiosks: any[],
   onUpdate: () => void,
   onCleanupPlanning: () => void,
-  onResetPlanning: () => void
+  onResetPlanning: () => void,
+  activePlatform?: 'campus' | 'groovelab'
 }) {
   const [activeSubTab, setActiveSubTab] = useState<'academy' | 'device' | 'maintenance'>('academy');
   const [selectedRoomId, setSelectedRoomId] = useState(() => rooms[0]?.id || '');
@@ -14491,7 +14496,7 @@ function DeviceSetupScreen({
                     setIsSaving(true);
                     const updatedHours = {
                       ...hours,
-                      stats_reset_at: new Date().toISOString()
+                      [activePlatform === 'campus' ? 'campus_stats_reset_at' : 'groovelab_stats_reset_at']: new Date().toISOString()
                     };
                     const { error } = await supabase
                       .from('schools')
