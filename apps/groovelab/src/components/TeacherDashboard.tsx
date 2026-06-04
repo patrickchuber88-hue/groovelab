@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
@@ -1518,7 +1518,7 @@ export function TeacherDashboard({
             )
           `)
           .eq('teacher_id', userId)
-          .in('status', ['pending_reschedule', 'rescheduled_confirmed']);
+          .in('status', ['pending_reschedule', 'rescheduled_confirmed', 'cancelled']);
 
         const mappedOccurs = (occurs || []).map((occ: any) => {
           const startTimeStr = occ.start_time.substring(0, 5);
@@ -5869,66 +5869,149 @@ export function TeacherDashboard({
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {myBookings.map((b: any) => {
                       const dateObj = new Date(b.date);
-                      const dateFormatted = dateObj.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
-                      const isPendingReschedule = b.status === 'pending_reschedule' || b.status === 'pending';
-                      
-                      const isRescheduled = b.status === 'pending_reschedule';
-                      const bg = 'rgba(139, 92, 246, 0.06)';
-                      const border = isRescheduled || isPendingReschedule ? '1px dashed rgba(139, 92, 246, 0.25)' : '1px solid rgba(139, 92, 246, 0.18)';
-                      const borderLeft = '4px solid #8b5cf6';
-                      const badgeBg = 'rgba(139, 92, 246, 0.12)';
-                      const badgeText = '#7c3aed';
-                      const roomColor = '#7c3aed';
+                      const isCancelled = b.status === 'cancelled';
+                      const isRescheduled = b.status === 'pending_reschedule' || b.status === 'rescheduled_confirmed';
+                      const isPending = b.status === 'pending';
+
+                      // Determine colors and labels based on status
+                      let cardBg = 'rgba(16, 185, 129, 0.06)'; // default scheduled
+                      let dateHeaderBg = '#10b981';
+                      let dateHeaderTextColor = '#ffffff';
+                      let label = 'Gebucht';
+                      let labelBg = '#000000';
+                      let labelTextColor = '#ffffff';
+                      let textColor = '#1e293b';
+                      let subTextColor = '#64748b';
+                      let commentButtonBg = 'rgba(16, 185, 129, 0.08)';
+                      let commentButtonColor = '#10b981';
+
+                      if (isCancelled) {
+                        cardBg = 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)';
+                        dateHeaderBg = '#ef4444';
+                        dateHeaderTextColor = '#ffffff';
+                        label = 'Ausfall';
+                        labelBg = '#000000';
+                        labelTextColor = '#ffffff';
+                        textColor = '#ffffff';
+                        subTextColor = 'rgba(255, 255, 255, 0.9)';
+                        commentButtonBg = 'rgba(255, 255, 255, 0.2)';
+                        commentButtonColor = '#ffffff';
+                      } else if (isRescheduled) {
+                        cardBg = 'linear-gradient(135deg, #fef08a 0%, #eab308 100%)';
+                        dateHeaderBg = '#eab308';
+                        dateHeaderTextColor = '#ffffff';
+                        label = 'Verschoben';
+                        labelBg = '#000000';
+                        labelTextColor = '#ffffff';
+                        textColor = '#78350f';
+                        subTextColor = 'rgba(120, 53, 15, 0.95)';
+                        commentButtonBg = 'rgba(120, 53, 15, 0.12)';
+                        commentButtonColor = '#78350f';
+                      } else if (isPending) {
+                        cardBg = 'rgba(139, 92, 246, 0.06)';
+                        dateHeaderBg = '#8b5cf6';
+                        dateHeaderTextColor = '#ffffff';
+                        label = 'Reserviert';
+                        labelBg = 'rgba(139, 92, 246, 0.12)';
+                        labelTextColor = '#7c3aed';
+                        textColor = '#0f172a';
+                        subTextColor = '#475569';
+                        commentButtonBg = 'rgba(139, 92, 246, 0.08)';
+                        commentButtonColor = '#8b5cf6';
+                      }
 
                       return (
-                        <div 
-                          key={b.id} 
-                          onClick={() => handleBookingClick(b)}
-                          style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '4px',
-                            padding: '12px 14px',
-                            background: bg,
-                            border: border,
-                            borderLeft: borderLeft,
-                            borderRadius: '16px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.01)'
-                          }}
-                          className="hover-scale"
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.04)';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.01)';
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#0f172a' }}>
-                              {dateFormatted} • {b.startTime} - {b.endTime}
-                            </span>
-                            <span style={{ 
-                              fontSize: '0.62rem', 
-                              fontWeight: 800, 
-                              color: badgeText,
-                              background: badgeBg,
-                              padding: '2px 6px',
-                              borderRadius: '6px',
-                              textTransform: 'uppercase'
-                            }}>
-                              {b.status === 'pending_reschedule' ? 'Verschoben' : (isPendingReschedule ? 'Reserviert' : 'Gebucht')}
-                            </span>
+                        <div key={b.id} style={{ display: 'flex', gap: '16px', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
+                          {/* Calendar date card */}
+                          <div style={{ width: '48px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center', flexShrink: 0 }}>
+                            <div style={{ background: dateHeaderBg, color: dateHeaderTextColor, fontSize: '0.6rem', fontWeight: 800, padding: '4px 0', textTransform: 'uppercase' }}>
+                              {dateObj.toLocaleDateString('de-DE', { month: 'short' })}
+                            </div>
+                            <div style={{ background: 'white', color: '#1e293b', fontSize: '1.2rem', fontWeight: 900, padding: '6px 0' }}>
+                              {dateObj.toLocaleDateString('de-DE', { day: '2-digit' })}
+                            </div>
                           </div>
-                          <div style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 550, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{ color: roomColor, fontWeight: 700 }}>
-                              {b.roomName || b.rooms?.name || 'Raum'}
-                            </span>
-                            {b.purpose && b.purpose.toLowerCase() !== 'unterricht' && (
-                              <span style={{ fontWeight: 500, opacity: 0.85 }}>
-                                {` (${b.purpose.replace(/^Unterricht:\s*/i, '')})`}
-                              </span>
+
+                          {/* Event details block */}
+                          <div 
+                            onClick={() => handleBookingClick(b)}
+                            style={{ 
+                              flex: 1, 
+                              background: cardBg,
+                              borderRadius: '12px',
+                              padding: '10px 14px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '12px',
+                              cursor: 'pointer',
+                              boxShadow: isCancelled || isRescheduled ? '0 4px 10px rgba(0, 0, 0, 0.1)' : 'none',
+                              transition: 'all 0.2s ease',
+                              minWidth: 0,
+                              boxSizing: 'border-box'
+                            }}
+                            className="hover-scale"
+                          >
+                            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <div style={{ fontSize: '0.9rem', fontWeight: 800, color: textColor, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'nowrap', width: '100%', minWidth: 0 }}>
+                                <span style={{ whiteSpace: 'nowrap' }}>{dateObj.toLocaleDateString('de-DE', { weekday: 'short' })}</span>
+                                <span style={{ 
+                                  fontSize: '0.58rem', 
+                                  fontWeight: 900, 
+                                  background: labelBg, 
+                                  color: labelTextColor, 
+                                  padding: '2px 7px', 
+                                  borderRadius: '6px', 
+                                  textTransform: 'uppercase',
+                                  whiteSpace: 'nowrap'
+                                }}>
+                                  {label}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '0.72rem', color: subTextColor, fontWeight: 600, whiteSpace: 'normal', wordBreak: 'break-word', marginTop: '1px' }}>
+                                {b.startTime} Uhr • <strong>{b.roomName || b.rooms?.name || 'Raum'}</strong> {b.studentName ? ` • ${b.studentName}` : ''}
+                              </div>
+                            </div>
+
+                            {/* Shoutbox chat button - integrated inside the colored card */}
+                            {b.isSchedule && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (b.teacherId) {
+                                    const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+                                    const dayLabel = DAYS_DE[dateObj.getDay()];
+                                    const formattedDate = dateObj.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+                                    const chatLabel = `${dayLabel} (${formattedDate}), ${b.startTime} Uhr (${label})`;
+                                    
+                                    if ((window as any).openShoutbox) {
+                                      (window as any).openShoutbox({
+                                        teacherId: b.teacherId,
+                                        date: b.date,
+                                        start_time: b.startTime,
+                                        label: chatLabel,
+                                        occurrenceId: b.id
+                                      });
+                                    }
+                                  }
+                                }}
+                                title="Shoutbox öffnen"
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  background: commentButtonBg,
+                                  color: commentButtonColor,
+                                  width: '32px',
+                                  height: '32px',
+                                  borderRadius: '50%',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s',
+                                  flexShrink: 0
+                                }}
+                              >
+                                <MessageSquare size={14} />
+                              </button>
                             )}
                           </div>
                         </div>
