@@ -6341,7 +6341,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
 
                                 {slotBookings.map((b: any, bIdx: number) => {
-                                  const isOwnBooking = !b.isSchedule || b.teacherId === userId;
+                                  const isOwnBooking = b.teacherId === userId;
                                   const colWidth = 100 / slotBookings.length;
                                   const colLeft = bIdx * colWidth;
                                   const isSchedule = b.isSchedule;
@@ -6377,7 +6377,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                       textColor = '#946600';
                                       leftAccentColor = '#ffcc00';
                                     }
-                                  } else if (isOwnBooking) {
+                                  } else {
                                     bg = 'rgba(175, 82, 222, 0.12)';
                                     textColor = '#6d28d9';
                                     leftAccentColor = '#af52de';
