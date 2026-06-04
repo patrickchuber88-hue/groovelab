@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, ChevronLeft, ChevronRight, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap } from 'lucide-react';
+import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, ChevronLeft, ChevronRight, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock } from 'lucide-react';
 import { 
   ResponsiveContainer,
   BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell,
@@ -185,6 +185,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [teachers, setTeachers] = useState<any[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<any[]>([]);
+  const [scheduleOccurrences, setScheduleOccurrences] = useState<any[]>([]);
   const [stations, setStations] = useState<any[]>([]);
   const [songs, setSongs] = useState<any[]>([]);
   const [allBands, setAllBands] = useState<any[]>([]);
@@ -1545,7 +1546,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
 
   useEffect(() => {
     fetchData();
-  }, [activeTab, activePlatform]);
+  }, [activeTab, activePlatform, bookingDate]);
 
   useEffect(() => {
     if (forceTab) {
@@ -1697,6 +1698,25 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           .select('*, teacher:users!schedules_teacher_id_fkey(first_name, last_name)')
           .eq('school_id', adminData.school_id);
         setSchedules(schedulesData || []);
+
+        const d = new Date(bookingDate);
+        const day = d.getDay();
+        const diff = d.getDate() - (day === 0 ? 6 : day - 1);
+        const monday = new Date(d.setDate(diff));
+        monday.setHours(0,0,0,0);
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        sunday.setHours(23,59,59,999);
+
+        const startDateStr = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
+        const endDateStr = `${sunday.getFullYear()}-${String(sunday.getMonth() + 1).padStart(2, '0')}-${String(sunday.getDate()).padStart(2, '0')}`;
+
+        const { data: occursData } = await supabase
+          .from('schedule_occurrences')
+          .select('*, student:users!schedule_occurrences_student_id_fkey(*), teacher:users!schedule_occurrences_teacher_id_fkey(*), schedules!schedule_occurrences_schedule_id_fkey(*)')
+          .or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},date.lte.${endDateStr})`);
+
+        setScheduleOccurrences(occursData || []);
 
         let { data: stationsData } = await supabase
           .from('stations')
@@ -4818,7 +4838,86 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         };
       });
 
-      return [...manualForSlot, ...mappedSchedules];
+      // 3. Dynamic rescheduled occurrences
+      const targetDate = new Date(mondayOfSelectedWeek);
+      targetDate.setDate(mondayOfSelectedWeek.getDate() + dayIdx);
+      const targetDateStr = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`;
+
+      const dynamicForSlot = scheduleOccurrences.filter((occ: any) => {
+        const roomId = occ.schedules?.room_id || null;
+        if (roomId !== selectedRoom.id) return false;
+        if (occ.date !== targetDateStr) return false;
+
+        if (occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick') {
+          return false;
+        }
+
+        const templateTime = occ.schedules?.time_slot || '';
+        const templateDay = occ.schedules?.day_of_week || 0;
+
+        const occDate = new Date(occ.date);
+        const rawDay = occDate.getDay();
+        const actualDayOfWeek = rawDay === 0 ? 7 : rawDay;
+
+        const hasTimeMoved = templateTime && occ.start_time.substring(0, 5) !== templateTime.substring(0, 5);
+        const hasDayMoved = templateDay && actualDayOfWeek !== templateDay;
+        
+        const hasFallbackDateMoved = occ.original_date && occ.date !== occ.original_date;
+        const hasFallbackTimeMoved = occ.original_start_time && occ.start_time.substring(0, 5) !== occ.original_start_time.substring(0, 5);
+
+        const hasMoved = occ.schedules 
+          ? (hasTimeMoved || hasDayMoved)
+          : (hasFallbackDateMoved || hasFallbackTimeMoved);
+
+        if (!hasMoved) return false;
+
+        const durationMin = occ.duration || 45;
+        const slotHour = parseInt(hourStr.split(':')[0]);
+        const slotStartMin = slotHour * 60;
+        const slotEndMin = (slotHour + 1) * 60;
+
+        const [shStr, smStr] = occ.start_time.split(':');
+        const sh = parseInt(shStr) || 0;
+        const sm = parseInt(smStr) || 0;
+        const occStartMin = sh * 60 + sm;
+        const occEndMin = occStartMin + durationMin;
+
+        return occStartMin < slotEndMin && occEndMin > slotStartMin;
+      });
+
+      const mappedDynamics = dynamicForSlot.map((occ: any) => {
+        const startTimeStr = occ.start_time.substring(0, 5);
+        const durationMin = occ.duration || 45;
+
+        const [shStr, smStr] = startTimeStr.split(':');
+        const sh = parseInt(shStr) || 0;
+        const sm = parseInt(smStr) || 0;
+        const totalMin = sh * 60 + sm + durationMin;
+        const eh = Math.floor(totalMin / 60) % 24;
+        const em = totalMin % 60;
+        const endTimeStr = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
+
+        const teacherName = occ.teacher 
+          ? `${occ.teacher.first_name} ${occ.teacher.last_name}` 
+          : 'Lehrer';
+
+        return {
+          id: occ.id,
+          roomId: occ.schedules?.room_id,
+          roomName: selectedRoom.name,
+          date: occ.date,
+          startTime: startTimeStr,
+          endTime: endTimeStr,
+          purpose: occ.student ? `Unterricht: ${occ.student.first_name} ${occ.student.last_name}` : 'Unterricht',
+          teacherId: occ.teacher_id,
+          teacherName: teacherName,
+          isSchedule: true,
+          isApproved: occ.status === 'rescheduled_confirmed',
+          status: occ.status
+        };
+      });
+
+      return [...manualForSlot, ...mappedSchedules, ...mappedDynamics];
     };
 
     // Check if room is occupied during selected time slot
@@ -5793,7 +5892,11 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                   let textColor = '#48484a';
                                   let leftAccentColor = '#8e8e93';
 
-                                  if (isSchedule) {
+                                  if (b.status === 'pending_reschedule') {
+                                    bg = 'rgba(255, 204, 0, 0.15)';
+                                    textColor = '#946600';
+                                    leftAccentColor = '#ffcc00';
+                                  } else if (isSchedule) {
                                     if (b.isApproved) {
                                       bg = 'rgba(52, 199, 89, 0.12)';
                                       textColor = '#1e7a44';
@@ -5913,6 +6016,40 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                                             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                                           />
                                         </>
+                                      )}
+
+                                      {b.status === 'pending_reschedule' && (
+                                        <div style={{
+                                          position: 'absolute',
+                                          right: '8px',
+                                          top: '50%',
+                                          transform: 'translateY(-50%)',
+                                          fontSize: '1.3rem',
+                                          fontWeight: 950,
+                                          opacity: 0.25,
+                                          userSelect: 'none',
+                                          pointerEvents: 'none',
+                                          fontFamily: 'Urbanist, sans-serif'
+                                        }}>
+                                          R
+                                        </div>
+                                      )}
+
+                                      {isSchedule && b.status !== 'pending_reschedule' && (
+                                        <div style={{
+                                          position: 'absolute',
+                                          bottom: '4px',
+                                          left: '50%',
+                                          transform: 'translateX(-50%)',
+                                          opacity: 0.35,
+                                          pointerEvents: 'none',
+                                          userSelect: 'none',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center'
+                                        }}>
+                                          <Lock size={11} />
+                                        </div>
                                       )}
 
                                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.58rem', opacity: 0.8, marginBottom: '2px', fontWeight: 800 }}>

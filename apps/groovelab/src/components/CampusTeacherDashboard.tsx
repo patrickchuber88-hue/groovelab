@@ -16,7 +16,8 @@ import {
   BookOpen,
   Award,
   Zap,
-  Box
+  Box,
+  Lock
 } from 'lucide-react';
 
 interface CampusTeacherDashboardProps {
@@ -332,13 +333,24 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
           return;
         }
 
-        const hasMoved = (occ.original_date && occ.date !== occ.original_date) || 
-                          (occ.original_start_time && occ.start_time.substring(0, 5) !== occ.original_start_time.substring(0, 5));
+        const templateTime = occ.schedules?.time_slot || '';
+        const templateDay = occ.schedules?.day_of_week || 0;
+
+        const occDate = new Date(occ.date);
+        const rawDay = occDate.getDay();
+        const dayOfWeek = rawDay === 0 ? 7 : rawDay;
+
+        const hasTimeMoved = templateTime && occ.start_time.substring(0, 5) !== templateTime.substring(0, 5);
+        const hasDayMoved = templateDay && dayOfWeek !== templateDay;
+        
+        const hasFallbackDateMoved = occ.original_date && occ.date !== occ.original_date;
+        const hasFallbackTimeMoved = occ.original_start_time && occ.start_time.substring(0, 5) !== occ.original_start_time.substring(0, 5);
+
+        const hasMoved = occ.schedules 
+          ? (hasTimeMoved || hasDayMoved)
+          : (hasFallbackDateMoved || hasFallbackTimeMoved);
 
         if (hasMoved) {
-          const occDate = new Date(occ.date);
-          const rawDay = occDate.getDay();
-          const dayOfWeek = rawDay === 0 ? 7 : rawDay;
           const roomId = occ.schedules?.room_id || null;
           if (!roomId) return;
 
@@ -2109,14 +2121,26 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                                 return (
                                   <td key={`${day}-${slot}`} className="p-2 min-w-[130px] relative">
                                     {booking ? (
-                                      <div className={`p-2.5 rounded-xl border flex flex-col justify-between h-full min-h-[72px] transition duration-200 ${
-                                        isCurrentTeacherBooking
-                                          ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-200'
-                                          : 'bg-red-950/25 border-red-900/30 text-red-200'
+                                      <div className={`p-2.5 rounded-xl border flex flex-col justify-between h-full min-h-[72px] transition duration-200 relative overflow-hidden ${
+                                        booking.status === 'pending_reschedule'
+                                          ? 'bg-amber-950/20 border-amber-500/30 text-amber-200'
+                                          : isCurrentTeacherBooking
+                                            ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-200'
+                                            : 'bg-red-950/25 border-red-900/30 text-red-200'
                                       }`}>
-                                        <div>
+                                        {booking.status === 'pending_reschedule' && (
+                                          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-3xl font-black opacity-20 select-none pointer-events-none text-amber-400 font-sans">
+                                            R
+                                          </div>
+                                        )}
+                                        {!booking.is_dynamic_reschedule && booking.status !== 'pending_reschedule' && (
+                                          <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 opacity-30 select-none pointer-events-none flex items-center justify-center">
+                                            <Lock size={11} />
+                                          </div>
+                                        )}
+                                        <div className="relative z-10">
                                           <p className="text-[10px] font-black uppercase tracking-wider opacity-75">
-                                            {booking.student ? 'Unterricht' : 'Eigenübung'}
+                                            {booking.status === 'pending_reschedule' ? 'Reservierung' : (booking.student ? 'Unterricht' : 'Eigenübung')}
                                           </p>
                                           <p className="text-[11px] font-bold truncate mt-0.5">
                                             {booking.student 
