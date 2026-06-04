@@ -292,7 +292,73 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
         status: exception ? exception.status : s.status
       };
     });
-    setAllSchoolSchedules(mappedAllSchedData);
+
+    // Check which teachers have approved (freigegeben) schedules
+    const approvedTeachers = new Set<string>();
+    const teacherGroups = new Map<string, any[]>();
+    (allSchedData || []).forEach(s => {
+      if (s.teacher_id) {
+        if (!teacherGroups.has(s.teacher_id)) {
+          teacherGroups.set(s.teacher_id, []);
+        }
+        teacherGroups.get(s.teacher_id)!.push(s);
+      }
+    });
+
+    teacherGroups.forEach((schedules, tId) => {
+      const nonBreakSchedules = schedules.filter(s => s.student_id !== null);
+      if (nonBreakSchedules.length > 0 && nonBreakSchedules.every(s => s.status === 'approved')) {
+        approvedTeachers.add(tId);
+      }
+    });
+
+    // Fetch dynamic schedule occurrences for current week
+    const startDateStr = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const endDateStr = `${sunday.getFullYear()}-${String(sunday.getMonth() + 1).padStart(2, '0')}-${String(sunday.getDate()).padStart(2, '0')}`;
+
+    const { data: allOccurs } = await supabase
+      .from('schedule_occurrences')
+      .select('*, student:users!schedule_occurrences_student_id_fkey(*), teacher:users!schedule_occurrences_teacher_id_fkey(*), schedules!schedule_occurrences_schedule_id_fkey(*)')
+      .or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},date.lte.${endDateStr})`);
+
+    const staticBookings = mappedAllSchedData;
+
+    const dynamicBookings: any[] = [];
+    (allOccurs || []).forEach(occ => {
+      if (occ.teacher_id && approvedTeachers.has(occ.teacher_id)) {
+        if (occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick') {
+          return;
+        }
+
+        const hasMoved = (occ.original_date && occ.date !== occ.original_date) || 
+                          (occ.original_start_time && occ.start_time.substring(0, 5) !== occ.original_start_time.substring(0, 5));
+
+        if (hasMoved) {
+          const occDate = new Date(occ.date);
+          const rawDay = occDate.getDay();
+          const dayOfWeek = rawDay === 0 ? 7 : rawDay;
+          const roomId = occ.schedules?.room_id || null;
+          if (!roomId) return;
+
+          dynamicBookings.push({
+            id: occ.id,
+            room_id: roomId,
+            day_of_week: dayOfWeek,
+            time_slot: occ.start_time.substring(0, 5),
+            student_id: occ.student_id,
+            teacher_id: occ.teacher_id,
+            student: occ.student,
+            teacher: occ.teacher,
+            status: occ.status,
+            is_dynamic_reschedule: true
+          });
+        }
+      }
+    });
+
+    setAllSchoolSchedules([...staticBookings, ...dynamicBookings]);
 
     await fetchNotifications(teacherId);
   };
@@ -1069,12 +1135,41 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
     if (!window.confirm('Möchtest du diese Raumbuchung wirklich stornieren?')) return;
 
     try {
-      const { error } = await supabase
-        .from('schedules')
-        .delete()
-        .eq('id', bookingId);
+      const isDynamic = allSchoolSchedules.find(s => s.id === bookingId)?.is_dynamic_reschedule;
 
-      if (error) throw error;
+      if (isDynamic) {
+        // Reset the occurrence back to its original time/date
+        const { data: occ } = await supabase
+          .from('schedule_occurrences')
+          .select('original_date, original_start_time')
+          .eq('id', bookingId)
+          .single();
+
+        if (occ && occ.original_date && occ.original_start_time) {
+          const { error } = await supabase
+            .from('schedule_occurrences')
+            .update({
+              date: occ.original_date,
+              start_time: occ.original_start_time,
+              status: 'scheduled'
+            })
+            .eq('id', bookingId);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from('schedule_occurrences')
+            .delete()
+            .eq('id', bookingId);
+          if (error) throw error;
+        }
+      } else {
+        const { error } = await supabase
+          .from('schedules')
+          .delete()
+          .eq('id', bookingId);
+
+        if (error) throw error;
+      }
 
       alert('Buchung erfolgreich storniert! ✅');
       await refreshAllData(teacher.school_id, userId);

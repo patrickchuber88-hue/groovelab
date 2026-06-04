@@ -225,6 +225,47 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
       console.error('Error sending quick chat message:', err);
     }
   };
+  const getRoomConflict = (
+    occId: string,
+    targetDate: string,
+    targetStartTime: string,
+    duration: number,
+    roomId: string | null,
+    excludeTargetId?: string
+  ): string | null => {
+    if (!roomId) return null;
+
+    const parseTimeToMinutes = (t: string): number => {
+      const parts = t.split(':').map(Number);
+      return (parts[0] || 0) * 60 + (parts[1] || 0);
+    };
+
+    const targetStart = parseTimeToMinutes(targetStartTime);
+    const targetEnd = targetStart + duration;
+
+    const conflictingOcc = occurrences.find(occ => {
+      if (occ.id === occId || occ.id.includes(occId) || occId.includes(occ.id)) return false;
+      if (excludeTargetId && (occ.id === excludeTargetId || occ.id.includes(excludeTargetId) || excludeTargetId.includes(occ.id))) return false;
+      if (occ.status === 'cancelled') return false;
+      if (!occ.student_id || occ.student_id === 'vacant') return false;
+
+      const occRoomId = occ.schedules?.room_id;
+      if (occRoomId !== roomId) return false;
+      if (occ.date !== targetDate) return false;
+
+      const occStart = parseTimeToMinutes(occ.start_time);
+      const occEnd = occStart + occ.duration;
+
+      return targetStart < occEnd && targetEnd > occStart;
+    });
+
+    if (conflictingOcc) {
+      const studentName = `${conflictingOcc.student?.first_name || ''} ${conflictingOcc.student?.last_name || ''}`.trim() || 'Anderer Schüler';
+      return `${studentName} (${conflictingOcc.start_time.substring(0, 5)} - ${conflictingOcc.duration} min)`;
+    }
+    return null;
+  };
+
   // Helper für Mutations
   const updateOccurrence = (id: string, updates: Partial<ScheduleOccurrence>) => {
     if (id.startsWith('vacant-')) return;
@@ -663,6 +704,21 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
     e.preventDefault();
     const sourceId = e.dataTransfer.getData('text/plain');
     if (!sourceId) return;
+
+    const sourceOcc = occurrences.find(o => o.id === sourceId);
+    if (sourceOcc) {
+      const roomId = sourceOcc.schedules?.room_id || null;
+      const conflict = getRoomConflict(sourceId, targetDateStr, sourceOcc.start_time, sourceOcc.duration, roomId);
+      if (conflict) {
+        const roomName = sourceOcc.schedules?.room?.name || 'diesem Raum';
+        const confirmMsg = `Warnung: Der Raum "${roomName}" ist an diesem Tag um ${sourceOcc.start_time.substring(0, 5)} Uhr bereits belegt durch:\n- ${conflict}\n\nMöchtest du den Termin trotzdem dorthin verschieben?`;
+        if (!confirm(confirmMsg)) {
+          setDraggedId(null);
+          return;
+        }
+      }
+    }
+
     updateOccurrence(sourceId, { date: targetDateStr, status: 'pending_reschedule' });
     setDraggedId(null);
   };
@@ -683,6 +739,18 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
 
     if (isSourceBreak || isTargetBreak) {
       if (isTargetBreak && !isSourceBreak) {
+        // Room conflict check for source student moving to break slot's position
+        const sourceRoomId = sourceOcc.schedules?.room_id || null;
+        const conflict = getRoomConflict(sourceId, targetOcc.date, targetOcc.start_time, sourceOcc.duration, sourceRoomId, targetId);
+        if (conflict) {
+          const roomName = sourceOcc.schedules?.room?.name || 'diesem Raum';
+          const confirmMsg = `Warnung: Der Raum "${roomName}" ist an diesem Tag um ${targetOcc.start_time.substring(0, 5)} Uhr bereits belegt durch:\n- ${conflict}\n\nMöchtest du den Termin trotzdem dorthin verschieben?`;
+          if (!confirm(confirmMsg)) {
+            setDraggedId(null);
+            return;
+          }
+        }
+
         const confirmMsg = `Möchtest du ${sourceOcc.student?.first_name || 'den Schüler'} auf die Position der Pause (${targetOcc.start_time.substring(0, 5)} Uhr) verschieben? \n\nHinweis: Dadurch werden alle nachfolgenden Unterrichtsstunden dieses Tages automatisch lückenlos nach hinten verschoben (Sliding-Modus).`;
         if (confirm(confirmMsg)) {
           // 1. Move source student to target break position (e.g. 16:00)
@@ -743,6 +811,18 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
       const cancelledOcc = isSourceCancelled ? sourceOcc : targetOcc;
       const normalOcc = isSourceCancelled ? targetOcc : sourceOcc;
 
+      // Check conflict for the normal occurrence moving to the cancelled occurrence's time
+      const normalRoomId = normalOcc.schedules?.room_id || null;
+      const conflict = getRoomConflict(normalOcc.id, cancelledOcc.date, cancelledOcc.start_time, normalOcc.duration, normalRoomId, cancelledOcc.id);
+      if (conflict) {
+        const roomName = normalOcc.schedules?.room?.name || 'diesem Raum';
+        const confirmMsg = `Warnung: Der Raum "${roomName}" ist an diesem Tag um ${cancelledOcc.start_time.substring(0, 5)} Uhr bereits belegt durch:\n- ${conflict}\n\nMöchtest du den Termin trotzdem verschieben?`;
+        if (!confirm(confirmMsg)) {
+          setDraggedId(null);
+          return;
+        }
+      }
+
       setSwapConfirmState({
         sourceId: normalOcc.id,
         targetId: cancelledOcc.id,
@@ -755,6 +835,31 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
       });
       setDraggedId(null);
       return;
+    }
+
+    // Standard swap check conflicts for both
+    const sourceRoomId = sourceOcc.schedules?.room_id || null;
+    const targetRoomId = targetOcc.schedules?.room_id || null;
+
+    const sourceConflict = getRoomConflict(sourceId, targetOcc.date, targetOcc.start_time, sourceOcc.duration, sourceRoomId, targetId);
+    const targetConflict = getRoomConflict(targetId, sourceOcc.date, sourceOcc.start_time, targetOcc.duration, targetRoomId, sourceId);
+
+    if (sourceConflict || targetConflict) {
+      let conflictsText = '';
+      if (sourceConflict) {
+        const roomName = sourceOcc.schedules?.room?.name || 'Raum';
+        conflictsText += `\n- Für ${sourceOcc.student?.first_name || 'Schüler'} in Raum "${roomName}": belegt durch ${sourceConflict}`;
+      }
+      if (targetConflict) {
+        const roomName = targetOcc.schedules?.room?.name || 'Raum';
+        conflictsText += `\n- Für ${targetOcc.student?.first_name || 'Schüler'} in Raum "${roomName}": belegt durch ${targetConflict}`;
+      }
+
+      const confirmMsg = `Warnung: Beim Tauschen gibt es Raumbelegungs-Konflikte:${conflictsText}\n\nMöchtest du die Termine trotzdem tauschen?`;
+      if (!confirm(confirmMsg)) {
+        setDraggedId(null);
+        return;
+      }
     }
 
     updateOccurrence(sourceId, { date: targetOcc.date, start_time: targetOcc.start_time, status: 'pending_reschedule' });
@@ -771,6 +876,19 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
       const changed = occ.date !== editOccState.date || occ.start_time !== editOccState.start_time;
       if (changed) {
         const formattedTime = editOccState.start_time.length === 5 ? `${editOccState.start_time}:00` : editOccState.start_time;
+        
+        // Check room conflict
+        const roomId = occ.schedules?.room_id || null;
+        const conflict = getRoomConflict(editOccState.id, editOccState.date, formattedTime, occ.duration, roomId);
+        if (conflict) {
+          const roomName = occ.schedules?.room?.name || 'diesem Raum';
+          const confirmMsg = `Warnung: Der Raum "${roomName}" ist an diesem Tag um ${formattedTime.substring(0, 5)} Uhr bereits belegt durch:\n- ${conflict}\n\nMöchtest du den Termin trotzdem verschieben?`;
+          if (!confirm(confirmMsg)) {
+            // Keep the modal open so the user can change the time
+            return;
+          }
+        }
+
         updateOccurrence(editOccState.id, { date: editOccState.date, start_time: formattedTime, status: 'pending_reschedule' });
       }
     }
