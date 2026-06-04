@@ -4030,88 +4030,88 @@ export function TeacherDashboard({
                   {!teacher?.sick_until && (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
 
-                      {/* Card 1: Heutige Schüler (Blue) */}
+                      {/* Card 1: Heutige Schüler (Blue-purple matching Level XP) */}
                       <div style={{
                         position: 'relative', overflow: 'hidden',
-                        background: 'linear-gradient(135deg, #0b57d0 0%, #3b82f6 100%)', color: 'white',
-                        borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(11, 87, 208, 0.25)',
+                        background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white',
+                        borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.3)',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
-                        padding: '14px 16px', boxSizing: 'border-box',
+                        padding: '16px', boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        border: '1px solid rgba(255, 255, 255, 0.12)'
+                        border: '1px solid rgba(255, 255, 255, 0.1)'
                       }} className="hover-scale">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Schüler Heute</span>
-                          <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px' }}>
-                            <Users size={13} color="white" />
+                          <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Schüler Heute</span>
+                          <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
+                            <Users size={14} color="white" />
                           </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
                           <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{activeLessonsCount}</span>
-                          <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Std.</span>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>Std.</span>
                         </div>
                       </div>
 
-                      {/* Card 2: Geburtstage Heute (Green) */}
+                      {/* Card 2: Geburtstage Heute (Green matching Songs) */}
                       <div style={{
                         position: 'relative', overflow: 'hidden',
-                        background: 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)', color: 'white',
-                        borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(22, 163, 74, 0.25)',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white',
+                        borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.3)',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
-                        padding: '14px 16px', boxSizing: 'border-box',
+                        padding: '16px', boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        border: '1px solid rgba(255, 255, 255, 0.12)'
+                        border: '1px solid rgba(255, 255, 255, 0.1)'
                       }} className="hover-scale">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Geburtstage</span>
-                          <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', fontSize: '0.8rem' }}>🎂</div>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Geburtstage</span>
+                          <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px', fontSize: '0.8rem' }}>🎂</div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
                           <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{birthdaysCount}</span>
-                          <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Heute</span>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>Heute</span>
                         </div>
                       </div>
 
-                      {/* Card 3: Tages-Pensum (Yellow) */}
+                      {/* Card 3: Tages-Pensum (Yellow matching Übeminuten) */}
                       <div style={{
                         position: 'relative', overflow: 'hidden',
-                        background: 'linear-gradient(135deg, #eab308 0%, #facc15 100%)', color: '#1f2937',
-                        borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(234, 179, 8, 0.3)',
+                        background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: 'white',
+                        borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(234, 179, 8, 0.35)',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
-                        padding: '14px 16px', boxSizing: 'border-box',
+                        padding: '16px', boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        border: '1px solid rgba(0, 0, 0, 0.05)'
+                        border: '1px solid rgba(255, 255, 255, 0.1)'
                       }} className="hover-scale">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Tages-Pensum</span>
-                          <div style={{ background: 'rgba(0,0,0,0.08)', padding: '5px', borderRadius: '9px' }}>
-                            <Clock size={13} color="#1f2937" />
+                          <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Tages-Pensum</span>
+                          <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
+                            <Clock size={14} color="white" />
                           </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
                           <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{workloadHoursStr}</span>
                         </div>
                       </div>
 
-                      {/* Card 4: Ausfälle Heute (Red) */}
+                      {/* Card 4: Ausfälle Heute (Red matching Tagesserie) */}
                       <div style={{
                         position: 'relative', overflow: 'hidden',
-                        background: 'linear-gradient(135deg, #ea580c 0%, #f97316 100%)', color: 'white',
-                        borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(234, 88, 12, 0.25)',
+                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: 'white',
+                        borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.3)',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
-                        padding: '14px 16px', boxSizing: 'border-box',
+                        padding: '16px', boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        border: '1px solid rgba(255, 255, 255, 0.12)'
+                        border: '1px solid rgba(255, 255, 255, 0.1)'
                       }} className="hover-scale">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ausfälle</span>
-                          <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px' }}>
-                            <AlertCircle size={13} color="white" />
+                          <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ausfälle</span>
+                          <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
+                            <AlertCircle size={14} color="white" />
                           </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
                           <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{cancellationsCount}</span>
-                          <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Heute</span>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>Heute</span>
                         </div>
                       </div>
 
