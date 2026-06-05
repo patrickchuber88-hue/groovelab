@@ -744,7 +744,8 @@ export function TeacherDashboard({
   activePlatform = 'groovelab'
 }: TeacherDashboardProps) {
   const [teacher, setTeacher] = useState<any>(null);
-  const isUserCheckedIn = locationMode === 'lab' && !!session && !!session.station_id;
+  const isTeacher = teacher?.role?.toLowerCase() === 'teacher' || teacher?.role?.toLowerCase() === 'admin';
+  const isUserCheckedIn = locationMode === 'lab' && !!session && (!!session.station_id || isTeacher);
   const [showKioskView, setShowKioskView] = useState(false);
   const [checkingInStatus, setCheckingInStatus] = useState<'idle' | 'locating' | 'verifying' | 'success' | 'error'>('idle');
   const [geoErrorMsg, setGeoErrorMsg] = useState<string>('');
@@ -898,8 +899,42 @@ export function TeacherDashboard({
         }
 
         if (isWithinAnyRoom) {
-          setCheckingInStatus('success');
-          setShowKioskView(true);
+          if (isTeacher) {
+            setCheckingInStatus('verifying');
+            const now = new Date().toISOString();
+            try {
+              // 1. Terminate existing sessions in DB
+              await supabase.from('sessions').update({ check_out_time: now }).eq('user_id', userId).is('check_out_time', null);
+              
+              // 2. Insert direct stationless session
+              const { data: sessData, error: sessErr } = await supabase
+                .from('sessions')
+                .insert({
+                  user_id: userId,
+                  station_id: null,
+                  gps_verified: true,
+                  check_in_time: now
+                })
+                .select('*, stations(name)')
+                .single();
+
+              if (sessErr) {
+                console.error('[Teacher Check-in] Error:', sessErr);
+                alert('Fehler beim Einchecken: ' + sessErr.message);
+                setCheckingInStatus('error');
+              } else {
+                console.log('[Teacher Check-in] Success:', sessData.id);
+                setCheckingInStatus('success');
+                if (onSessionChange) onSessionChange(sessData);
+              }
+            } catch (e: any) {
+              console.error('[Teacher Check-in] Unexpected Error:', e);
+              setCheckingInStatus('error');
+            }
+          } else {
+            setCheckingInStatus('success');
+            setShowKioskView(true);
+          }
         } else {
           setCheckingInStatus('error');
           setGeoErrorMsg('Du befindest dich anscheinend nicht vor Ort in der Musikschule.');
