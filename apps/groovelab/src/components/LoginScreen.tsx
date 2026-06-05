@@ -2754,7 +2754,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                           height: '72px',
                           borderRadius: '16px',
                           border: isSelected
-                            ? '1px solid #27272a'
+                            ? '1px solid #ffffff'
                             : `2px solid ${stationColor}`,
                           background: isSelected 
                             ? `linear-gradient(180deg, ${stationColor} 0%, color-mix(in srgb, ${stationColor} 96%, #000000 4%) 100%)`
