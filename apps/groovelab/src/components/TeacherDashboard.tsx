@@ -2820,7 +2820,7 @@ export function TeacherDashboard({
           Promise.resolve(supabase.from('rooms').select('*').eq('school_id', tData.school_id).eq('is_groovelab_active', true).order('sort_order', { ascending: true })).catch(e => ({ data: [], error: e })),
           Promise.resolve(supabase.from('user_availability').select('*')).catch(e => ({ data: [], error: e })),
           Promise.resolve(supabase.from('sessions').select('*, users!inner(*), stations(*)').is('check_out_time', null)).catch(e => ({ data: [], error: e })),
-          Promise.resolve(supabase.from('users').select('*').in('role', ['teacher', 'admin']).eq('school_id', tData.school_id)).catch(e => ({ data: [], error: e })),
+          Promise.resolve(supabase.from('users').select('*').in('role', ['teacher', 'admin', 'Teacher', 'Admin', 'TEACHER', 'ADMIN']).eq('school_id', tData.school_id)).catch(e => ({ data: [], error: e })),
           Promise.resolve(supabase.from('user_song_skills').select('*, users!user_id(*), songs(*)').eq('is_pending_approval', true)).catch(e => ({ data: [], error: e })),
           Promise.resolve(supabase.from('bands').select('*, band_members(*, users(*)), coach:users!coach_id(id, first_name, last_name, photo_url), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))').eq('school_id', tData.school_id).order('name')).catch(e => ({ data: [], error: e })),
           Promise.resolve(studentQuery.order('first_name')).catch(e => ({ data: [], error: e })),
@@ -2889,11 +2889,18 @@ export function TeacherDashboard({
         
         const activeCoaches = (allCoaches || []).filter(c => {
           if (c.is_observer) return false; // Hospitanten are never shown in Live Lab
-          if (c.id === userId) {
-            return !hidePresence && !isHomeMode;
-          }
+          if (c.id === userId) return false; // Handled separately below to guarantee inclusion
           return trulyActive.some(s => s.user_id === c.id);
         });
+
+        // Defensively guarantee the logged-in teacher is included when they are active in the lab
+        const isCurrentTeacher = tData?.role?.toLowerCase() === 'teacher' || tData?.role?.toLowerCase() === 'admin';
+        if (isCurrentTeacher && !hidePresence && !isHomeMode) {
+          if (!activeCoaches.some(c => c.id === userId)) {
+            activeCoaches.unshift(tData);
+          }
+        }
+
         setCoaches(activeCoaches.map(c => ({ id: c.id, users: c, session: trulyActive.find(s => s.user_id === c.id) })));
 
         // 5. Challenges
