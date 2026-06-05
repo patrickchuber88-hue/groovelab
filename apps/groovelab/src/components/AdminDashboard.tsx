@@ -8688,7 +8688,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       return (
         <div style={{ marginTop: '0px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
           {/* Top Section: Header & Contribution */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '32px', alignItems: 'stretch' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2.2fr 1.2fr', gap: '32px', alignItems: 'stretch' }}>
             {/* Top Left: Header and summary cards */}
             <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
