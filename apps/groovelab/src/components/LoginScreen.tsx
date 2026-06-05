@@ -1506,13 +1506,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         if (isGroovelabScreen) {
           await finalizeLogin(user, effectiveStationId, isWithinAnyRoom, false);
         } else {
-          if (isWithinAnyRoom) {
-            setPendingTeacherUser({ user, isWithinAnyRoom: true });
-            setShowTeacherChoiceModal(true);
-            setLoading(false);
-          } else {
-            await finalizeLogin(user, effectiveStationId, false, true);
-          }
+          // Campus Login strictly bypasses GrooveLab presence check-in
+          await finalizeLogin(user, effectiveStationId, false, true);
         }
         return;
       }
@@ -1751,16 +1746,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         if (isGroovelabScreen) {
           await finalizeLogin(user, effectiveStationId, isWithinAnyRoom, false);
         } else {
-          if (isWithinAnyRoom) {
-            // Only show choice modal if within geofence (i.e. groovelab is "open" / accessible)
-            setPendingTeacherUser({ user, isWithinAnyRoom: true });
-            setShowTeacherChoiceModal(true);
-            setLoading(false);
-          } else {
-            // Directly set to Home mode (hidePresence = true, isWithinAnyRoom = false) without asking
-            console.log('[Login] Teacher outside geofence. Directing to Home mode without prompt.');
-            await finalizeLogin(user, effectiveStationId, false, true);
-          }
+          // Campus Login strictly bypasses GrooveLab presence check-in
+          await finalizeLogin(user, effectiveStationId, false, true);
         }
         return;
       }
@@ -3585,11 +3572,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                       const isGroovelabScreen = !!(effectiveStationId || isGroovelabKiosk);
                       if (isGroovelabScreen) {
                         await finalizeLogin(user, effectiveStationId, pinVerificationIsWithinRoom, false);
-                      } else if (pinVerificationIsWithinRoom) {
-                        setPendingTeacherUser({ user, isWithinAnyRoom: true });
-                        setShowTeacherChoiceModal(true);
-                        setLoading(false);
                       } else {
+                        // Campus Login strictly bypasses GrooveLab presence check-in
                         await finalizeLogin(user, effectiveStationId, false, true);
                       }
                     }
@@ -3700,11 +3684,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                       const isGroovelabScreen = !!(effectiveStationId || isGroovelabKiosk);
                       if (isGroovelabScreen) {
                         await finalizeLogin(user, effectiveStationId, pinVerificationIsWithinRoom, false);
-                      } else if (pinVerificationIsWithinRoom) {
-                        setPendingTeacherUser({ user, isWithinAnyRoom: true });
-                        setShowTeacherChoiceModal(true);
-                        setLoading(false);
                       } else {
+                        // Campus Login strictly bypasses GrooveLab presence check-in
                         await finalizeLogin(user, effectiveStationId, false, true);
                       }
                     }

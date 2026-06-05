@@ -5327,28 +5327,7 @@ function App() {
   }
 
   if (loading || !user) {
-    return (
-      <div style={{ position: 'fixed', inset: 0, background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-         {/* Minimal loading indicator instead of full splash */}
-         <div className="animate-spin" style={{ width: '24px', height: '24px', border: '2px solid #e2e8f0', borderTopColor: '#eab308', borderRadius: '50%' }}></div>
-         
-         {import.meta.env.DEV && (
-            <button
-              onClick={async () => {
-                const { data } = await supabase.from('users').select('*').eq('role', 'admin').limit(1).single();
-                if (data) {
-                  await handleLogin(data.id, true);
-                  setUser(data);
-                  setLoading(false);
-                }
-              }}
-              style={{ position: 'absolute', bottom: '20px', opacity: 0.3, fontSize: '10px' }}
-            >
-              🔓 BYPASS
-            </button>
-          )}
-      </div>
-    );
+    return null;
   }
 
   // 2.5 MASTER ADMIN PORTAL BYPASS
