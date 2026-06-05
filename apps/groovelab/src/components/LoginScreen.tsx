@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, RotateCw } from 'lucide-react';
+import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw } from 'lucide-react';
 import { getDistanceFromLatLonInM } from '../utils/geo';
 import jsQR from 'jsqr';
 
@@ -1092,13 +1092,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     async function fetchKioskData() {
       try {
         setLoadingKioskData(true);
-        const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
-        let roomsQuery = supabase.from('rooms').select('*').eq('school_id', schoolData.id);
-        if (activePlatform === 'campus') {
-          roomsQuery = roomsQuery.eq('is_campus_active', true);
-        } else {
-          roomsQuery = roomsQuery.eq('is_groovelab_active', true);
-        }
+        // The Kiosk Activator is always for GrooveLab Kiosks, so we fetch groovelab-active rooms
+        let roomsQuery = supabase.from('rooms').select('*').eq('school_id', schoolData.id).eq('is_groovelab_active', true);
         const [roomsRes, stationsRes, sessionsRes] = await Promise.all([
           roomsQuery.order('sort_order', { ascending: true }),
           supabase.from('stations').select('*').order('name'),
@@ -1892,8 +1887,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       position: 'fixed',
       inset: 0,
       background: isGroovelabKiosk 
-        ? 'radial-gradient(circle at 50% -20%, #facc15 0%, #9f5c10 100%)' 
-        : 'radial-gradient(circle at 50% -20%, #13978c 0%, #086c52 100%)', // Premium campus green gradient background / GrooveLab yellow KPI gradient
+        ? 'linear-gradient(180deg, #facc15 0%, #facc15 25%, #eab308 55%, #ca8a04 80%, #9f5c10 100%)' 
+        : 'linear-gradient(180deg, #12b853 0%, #12b853 25%, #0fa147 55%, #0c7c35 80%, #095a26 100%)', // Premium campus green gradient background / GrooveLab yellow KPI gradient
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -2153,7 +2148,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             onMouseOver={(e) => { e.currentTarget.style.background = '#e2e8f0'; }}
             onMouseOut={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
           >
-            <Key size={16} color="#0f766e" />
+            <KeyRound size={16} color="#0f766e" />
             Passwort Anmeldung
           </button>
         </div>
