@@ -2359,7 +2359,7 @@ function App() {
         try {
           const { data, error } = await supabase
             .from('bands')
-            .select('*, songs(*), band_members(*, users!user_id(*)), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready)))), coach:users!bands_coach_id_fkey(first_name, last_name, photo_url)')
+            .select('*, songs(*), band_members(*, users!user_id(*)), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))), coach:users!bands_coach_id_fkey(first_name, last_name, photo_url)')
             .eq('id', urlBandId)
             .single();
             
@@ -2636,7 +2636,7 @@ function App() {
         supabase.from('users').select('*, schools(*)').eq('id', userId).maybeSingle(),
         supabase.from('sessions').select('*, stations(name)').eq('user_id', userId).is('check_out_time', null).order('check_in_time', { ascending: false }).limit(1).maybeSingle(),
         supabase.from('sessions').select('check_in_time, check_out_time').eq('user_id', userId),
-        supabase.from('band_members').select('id, instrument, confetti_seen, bands(id, name, school_id, song_id, status, photo_url, songs(*), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready)))))').eq('user_id', userId)
+        supabase.from('band_members').select('id, instrument, confetti_seen, bands(id, name, school_id, song_id, status, photo_url, songs(*), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url)))))').eq('user_id', userId)
       ]).catch(err => {
         console.error('[Dashboard] Critical Fetch Error Stage 1:', err);
         return [ {error: err}, {error: err}, {error: err}, {error: err} ] as any;
@@ -2735,18 +2735,18 @@ function App() {
           )
         `).eq('school_id', schoolId).eq('is_campus_active', false),
         supabase.from('band_members').select('user_id, bands!inner(id, status, song_id, school_id, band_songs(song_id, status))').eq('bands.school_id', schoolId),
-        supabase.from('bands').select('*, band_members(*, profiles:users(id, first_name, photo_url)), band_songs(*, band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))').eq('school_id', schoolId).in('status', ['forming', 'active']),
+        supabase.from('bands').select('*, band_members(*, profiles:users(id, first_name, photo_url)), band_songs(*, band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))))').eq('school_id', schoolId).in('status', ['forming', 'active']),
         supabase.from('songs').select('*').eq('school_id', schoolId).eq('is_campus_active', false).order('level').order('artist'),
         bandIds.length > 0
           ? supabase.from('bands').select(`
               *,
               songs (*),
               band_members (*, users(*)),
-              band_songs (*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready)))),
+              band_songs (*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))),
               coach:users!coach_id (first_name, last_name, photo_url)
             `).in('id', bandIds)
           : Promise.resolve({ data: [], error: null }),
-        supabase.from('bands').select('*, songs(title, artist, instrumentation), band_members(*, users!user_id(*)), band_songs(*, songs(id, title, artist, instrumentation), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready)))), coach:users!coach_id (first_name, last_name, photo_url)').eq('school_id', schoolId).order('name', { ascending: true }),
+        supabase.from('bands').select('*, songs(title, artist, instrumentation), band_members(*, users!user_id(*)), band_songs(*, songs(id, title, artist, instrumentation), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))), coach:users!coach_id (first_name, last_name, photo_url)').eq('school_id', schoolId).order('name', { ascending: true }),
         supabase.from('users').select('*').eq('school_id', schoolId).in('role', ['teacher', 'admin']).order('first_name'),
         supabase.from('sessions').select('user_id, station_id, users!inner(role, school_id, last_seen)').is('check_out_time', null).eq('users.school_id', schoolId)
       ]).catch(err => {
@@ -2989,7 +2989,7 @@ function App() {
 
       // --- BAND PROJECT AUTO-FILLING (Optimized: ONLY runs on initial full load to save heavy redundant DB operations!) ---
       const formingBands = formingBandsRes.data || [];
-      if (isInitial && formingBands.length > 0) {
+      if (isInitial && !isStudent && formingBands.length > 0) {
         // Run auto-fill asynchronously to not block the main dashboard load
         (async () => {
           let currentMemberships = await supabase.from('band_members').select('user_id, bands(id, song_id)').then(r => r.data || []);

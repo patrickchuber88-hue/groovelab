@@ -1252,16 +1252,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       }
 
       // 2. Session Management (Only for Academy/Lab sessions)
-      // 2. Global Cleanup: Always terminate any existing active sessions for THIS USER
-      await supabase.from('sessions').update({ check_out_time: now }).eq('user_id', user.id).is('check_out_time', null);
-
+      // 2. Global Cleanup & Station Cleanup in parallel
+      await Promise.all([
+        supabase.from('sessions').update({ check_out_time: now }).eq('user_id', user.id).is('check_out_time', null),
+        (!isHome && finalStationId && !isTeacher)
+          ? supabase.from('sessions').update({ check_out_time: now }).eq('station_id', finalStationId).is('check_out_time', null)
+          : Promise.resolve()
+      ]);
       if (!isHome) {
-        // 3. Station Cleanup: If using a station, ensure it's free.
-        // We only terminate other sessions if the station is NOT the teacher iPad (i.e. user is not a teacher).
-        if (finalStationId && !isTeacher) {
-          await supabase.from('sessions').update({ check_out_time: now }).eq('station_id', finalStationId).is('check_out_time', null);
-        }
-        
         const { data: sess, error: sessErr } = await supabase
           .from('sessions')
           .insert({

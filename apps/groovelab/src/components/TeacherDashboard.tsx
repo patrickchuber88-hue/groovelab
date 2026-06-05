@@ -933,14 +933,14 @@ export function TeacherDashboard({
     const now = new Date().toISOString();
 
     try {
-      // 1. Global Cleanup: Always terminate any existing active sessions for THIS USER
-      await supabase.from('sessions').update({ check_out_time: now }).eq('user_id', userId).is('check_out_time', null);
-
-      // 2. Station Cleanup: If another student is logged in here, terminate their session
       const isTeacher = teacher?.role?.toLowerCase() === 'teacher' || teacher?.role?.toLowerCase() === 'admin';
-      if (!isTeacher) {
-        await supabase.from('sessions').update({ check_out_time: now }).eq('station_id', station.id).is('check_out_time', null);
-      }
+      // 1. Global Cleanup & 2. Station Cleanup in parallel
+      await Promise.all([
+        supabase.from('sessions').update({ check_out_time: now }).eq('user_id', userId).is('check_out_time', null),
+        (!isTeacher)
+          ? supabase.from('sessions').update({ check_out_time: now }).eq('station_id', station.id).is('check_out_time', null)
+          : Promise.resolve()
+      ]);
 
       // 3. Insert new session
       const { data: sessData, error: sessErr } = await supabase
