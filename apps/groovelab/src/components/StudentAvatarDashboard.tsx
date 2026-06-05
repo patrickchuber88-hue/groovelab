@@ -4229,6 +4229,44 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     }
                     const statusText = textParts.join(' - ');
 
+                    if (hasMastered) {
+                      return (
+                        <div 
+                          key={idx}
+                          style={{ 
+                            background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', 
+                            border: '1px solid #047857', 
+                            borderRadius: '16px', 
+                            padding: '12px 14px',
+                            display: 'flex',
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: '12px',
+                            boxShadow: '0 4px 12px rgba(4, 120, 87, 0.12)'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ffffff', whiteSpace: 'nowrap' }}>
+                              {group.date}
+                            </span>
+                            {statusText && (
+                              <span style={{ fontSize: '0.74rem', fontWeight: 650, color: '#d1fae5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                - {statusText}
+                              </span>
+                            )}
+                          </div>
+                          
+                          <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
+                            <Flame size={iconSize} fill="#ffffff" color="#ffffff" />
+                            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ffffff' }}>
+                              {group.flameLevel}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }
+
                     return (
                       <div 
                         key={idx}
