@@ -4445,7 +4445,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               })()}
 
               {/* Grid Section: Goals | Highlights | Annual Stats */}
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.2fr 1.2fr', gap: '32px', alignItems: 'start' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.2fr 1.2fr', gap: '32px', alignItems: 'stretch' }}>
                 
                 {/* Column 1: Übe-Ziele der Klasse */}
                 <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
