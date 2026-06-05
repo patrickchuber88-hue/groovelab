@@ -1515,20 +1515,24 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const getGroupedLogs = () => {
     const groups: Record<string, { date: string, focusSeconds: number, extraSeconds: number, flameLevel: string, isPlaceholder?: boolean }> = {};
     
-    // Initialize today as a placeholder
+    // Initialize placeholders for the last 7 days
     const now = new Date();
-    const todayDd = String(now.getDate()).padStart(2, '0');
-    const todayMm = String(now.getMonth() + 1).padStart(2, '0');
-    const todayYy = String(now.getFullYear()).substring(2);
-    const todayDateStr = `${todayDd}.${todayMm}.${todayYy}`;
-    
-    groups[todayDateStr] = {
-      date: todayDateStr,
-      focusSeconds: 0,
-      extraSeconds: 0,
-      flameLevel: getFlameLevelName(avatar?.streak_flame || 0),
-      isPlaceholder: true
-    };
+    for (let i = 0; i < 7; i++) {
+      const d = new Date();
+      d.setDate(now.getDate() - i);
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yy = String(d.getFullYear()).substring(2);
+      const dateStr = `${dd}.${mm}.${yy}`;
+      
+      groups[dateStr] = {
+        date: dateStr,
+        focusSeconds: 0,
+        extraSeconds: 0,
+        flameLevel: getFlameLevelName(avatar?.streak_flame || 0),
+        isPlaceholder: true
+      };
+    }
 
     fokusLogs.forEach(log => {
       if (!log.created_at) return;
@@ -3862,62 +3866,141 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   }
 
                   return grouped.map((group, idx) => {
+                    const now = new Date();
+                    const todayDd = String(now.getDate()).padStart(2, '0');
+                    const todayMm = String(now.getMonth() + 1).padStart(2, '0');
+                    const todayYy = String(now.getFullYear()).substring(2);
+                    const todayDateStr = `${todayDd}.${todayMm}.${todayYy}`;
+
+                    const isToday = group.date === todayDateStr;
+                    
+                    const getTargetSeconds = (flame: string) => {
+                      if (flame === 'Helden-Feuer') return 10 * 60;
+                      if (flame === 'Mittlere Flamme') return 5 * 60;
+                      return 3 * 60;
+                    };
+                    
+                    const getFlameIconSize = (flame: string) => {
+                      if (flame === 'Helden-Feuer') return 18;
+                      if (flame === 'Mittlere Flamme') return 15;
+                      return 12;
+                    };
+                    
+                    const targetSecs = getTargetSeconds(group.flameLevel);
+                    const iconSize = getFlameIconSize(group.flameLevel);
+                    const hasMastered = group.focusSeconds >= targetSecs && !group.isPlaceholder;
+                    
+                    let borderLeftColor = '#e2e8f0';
+                    if (hasMastered) {
+                      borderLeftColor = '#10b981'; // Green (Mastered)
+                    } else if (isToday) {
+                      borderLeftColor = '#eab308'; // Yellow (Active)
+                    } else {
+                      borderLeftColor = '#ef4444'; // Red (Not practiced / target not reached)
+                    }
+
                     if (group.isPlaceholder) {
-                      return (
-                        <div 
-                          key={idx}
-                          style={{ 
-                            background: 'linear-gradient(135deg, rgba(251, 146, 60, 0.05) 0%, rgba(251, 146, 60, 0.01) 100%)', 
-                            border: '1px dashed rgba(234, 88, 12, 0.35)', 
-                            borderRadius: '16px', 
-                            padding: '12px 14px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '6px',
-                            borderLeft: '4px solid #ea580c',
-                            boxShadow: '0 2px 8px rgba(234, 88, 12, 0.01)'
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '4px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span style={{ fontSize: '0.78rem', fontWeight: 850, color: '#ea580c', fontFamily: 'monospace' }}>
+                      if (isToday) {
+                        return (
+                          <div 
+                            key={idx}
+                            style={{ 
+                              background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.05) 0%, rgba(234, 179, 8, 0.01) 100%)', 
+                              border: '1px dashed rgba(234, 179, 8, 0.35)', 
+                              borderRadius: '16px', 
+                              padding: '12px 14px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '6px',
+                              borderLeft: `4px solid ${borderLeftColor}`,
+                              boxShadow: '0 2px 8px rgba(234, 179, 8, 0.01)'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '4px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 850, color: '#ca8a04', fontFamily: 'monospace' }}>
+                                  {group.date}
+                                </span>
+                                <span style={{ 
+                                  fontSize: '0.58rem', 
+                                  fontWeight: 900, 
+                                  background: 'rgba(234, 179, 8, 0.08)', 
+                                  color: '#ca8a04', 
+                                  padding: '1px 6px', 
+                                  borderRadius: '100px', 
+                                  letterSpacing: '0.04em', 
+                                  textTransform: 'uppercase' 
+                                }}>
+                                  Aktiv
+                                </span>
+                              </div>
+                              {timeUntilMidnight && (
+                                <div style={{ 
+                                  fontSize: '0.68rem', 
+                                  fontWeight: 800, 
+                                  color: '#a16207', 
+                                  background: '#fef9c3',
+                                  padding: '2px 6px',
+                                  borderRadius: '6px',
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  gap: '3px', 
+                                  fontFamily: 'monospace' 
+                                }}>
+                                  <span>⏳ Noch {timeUntilMidnight}</span>
+                                </div>
+                              )}
+                            </div>
+                            <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#4b5563', lineHeight: '1.4' }}>
+                              Sichere dir deinen Übe-Streak! Mach heute Musik zu deiner Pause. 🎵
+                            </div>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div 
+                            key={idx}
+                            style={{ 
+                              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.03) 0%, rgba(239, 68, 68, 0.01) 100%)', 
+                              border: '1px dashed rgba(239, 68, 68, 0.25)', 
+                              borderRadius: '16px', 
+                              padding: '12px 14px',
+                              display: 'flex',
+                              flexDirection: 'row',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              gap: '12px',
+                              borderLeft: `4px solid ${borderLeftColor}`,
+                              boxShadow: '0 2px 8px rgba(239, 68, 68, 0.01)'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
+                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ef4444', fontFamily: 'monospace' }}>
                                 {group.date}
                               </span>
                               <span style={{ 
                                 fontSize: '0.58rem', 
                                 fontWeight: 900, 
-                                background: 'rgba(234, 88, 12, 0.08)', 
-                                color: '#ea580c', 
+                                background: 'rgba(239, 68, 68, 0.08)', 
+                                color: '#ef4444', 
                                 padding: '1px 6px', 
                                 borderRadius: '100px', 
                                 letterSpacing: '0.04em', 
                                 textTransform: 'uppercase' 
                               }}>
-                                Aktiv
+                                Nicht geübt
                               </span>
                             </div>
-                            {timeUntilMidnight && (
-                              <div style={{ 
-                                fontSize: '0.68rem', 
-                                fontWeight: 800, 
-                                color: '#d97706', 
-                                background: '#fef3c7',
-                                padding: '2px 6px',
-                                borderRadius: '6px',
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                gap: '3px', 
-                                fontFamily: 'monospace' 
-                              }}>
-                                <span>⏳ Noch {timeUntilMidnight}</span>
-                              </div>
-                            )}
+                            
+                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
+                              <Flame size={iconSize} fill="#ef4444" color="#ef4444" />
+                              <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ef4444' }}>
+                                Kleine Flamme
+                              </span>
+                            </div>
                           </div>
-                          <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#4b5563', lineHeight: '1.4' }}>
-                            Sichere dir deinen Übe-Streak! Mach heute Musik zu deiner Pause. 🎵
-                          </div>
-                        </div>
-                      );
+                        );
+                      }
                     }
 
                     const focusMins = Math.round(group.focusSeconds / 60);
@@ -3946,7 +4029,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           justifyContent: 'space-between',
                           alignItems: 'center',
                           gap: '12px',
-                          borderLeft: `4px solid ${group.focusSeconds > 0 ? '#ea580c' : '#10b981'}`
+                          borderLeft: `4px solid ${borderLeftColor}`
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
@@ -3961,8 +4044,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         </div>
                         
                         <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
-                          <Flame size={12} fill="#ea580c" color="#ea580c" />
-                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ea580c' }}>
+                          <Flame size={iconSize} fill={hasMastered ? '#10b981' : isToday ? '#eab308' : '#ef4444'} color={hasMastered ? '#10b981' : isToday ? '#eab308' : '#ef4444'} />
+                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: hasMastered ? '#10b981' : isToday ? '#eab308' : '#ef4444' }}>
                             {group.flameLevel}
                           </span>
                         </div>
