@@ -873,6 +873,15 @@ export function TeacherDashboard({
     }
   };
 
+  // Defensively ensure that if viewMode === 'admin', showKioskView is always false and triggers direct check-in instead
+  useEffect(() => {
+    if (viewMode === 'admin' && showKioskView) {
+      console.log('[DEBUG-Teacher] showKioskView was set to true for admin/teacher, auto-closing and performing direct checkin.');
+      setShowKioskView(false);
+      performDirectTeacherCheckin();
+    }
+  }, [viewMode, showKioskView]);
+
   const handleGeofenceCheck = () => {
     // 1. Bypass check on localhost
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
