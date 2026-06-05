@@ -1741,6 +1741,10 @@ export function TeacherDashboard({
     return widgetState === 'ACTIVE';
   }, [widgetState]);
 
+  const isFreeDay = useMemo(() => {
+    return !isWeekend && (!briefingData?.timeline || briefingData.timeline.length === 0);
+  }, [isWeekend, briefingData?.timeline]);
+
   // Stable daily choices (hellos, subtitles) based on date-based seed
   const dailyBriefingStableChoices = useMemo(() => {
     const todayStr = new Date().toISOString().split('T')[0];
@@ -4138,6 +4142,7 @@ export function TeacherDashboard({
                           transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                           width: '100%',
                           minHeight: '130px',
+                          flex: isFreeDay ? 1 : '0 1 auto',
                           boxSizing: 'border-box',
                           overflow: 'hidden'
                         }}>
@@ -4164,7 +4169,7 @@ export function TeacherDashboard({
                                   height: '100%', 
                                   objectFit: 'cover'
                                 }} 
-                              />
+                                              />
                             </div>
                             
                             <div style={{ 
@@ -4194,7 +4199,7 @@ export function TeacherDashboard({
                                   {currentTimeStr || '13:00'} UHR
                                 </span>
                               </div>
-
+ 
                               <h3 style={{ 
                                 margin: 0, 
                                 fontSize: '30px', 
@@ -4218,16 +4223,16 @@ export function TeacherDashboard({
                                 </span>
                               </h3>
                               <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: 1.25 }}>
-                                {dynamicGreeting.subtitle}
+                                {isFreeDay ? 'Heute hast du frei! Genieße deinen freien Tag. ✨' : dynamicGreeting.subtitle}
                               </p>
                             </div>
                           </div>
                         </div>
                       )}
-
-
-
-                      {!teacher?.sick_until && (
+ 
+ 
+ 
+                      {!teacher?.sick_until && !isFreeDay && (
                         <div className="google-card" style={{ 
                           width: '100%', 
                           flex: 1,
@@ -4260,53 +4265,79 @@ export function TeacherDashboard({
                                 : [];
 
                               return (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    <div style={{ background: 'rgba(251, 188, 5, 0.12)', color: '#b45309', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                      <Calendar size={18} />
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', fontFamily: "'Inter', sans-serif" }}>
+                                  {/* Title section with Apple style icon container */}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                                    <div style={{ 
+                                      background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)', 
+                                      border: '1px solid rgba(217, 119, 6, 0.2)',
+                                      color: '#d97706', 
+                                      width: '40px', 
+                                      height: '40px', 
+                                      borderRadius: '12px', 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'center',
+                                      boxShadow: '0 2px 8px rgba(217, 119, 6, 0.08)'
+                                    }}>
+                                      <Calendar size={20} />
                                     </div>
-                                    <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>
-                                      Vorbereitung
-                                    </h4>
+                                    <div>
+                                      <h4 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#1d1d1f', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
+                                        Vorbereitung
+                                      </h4>
+                                      <div style={{ fontSize: '0.72rem', color: '#86868b', fontWeight: 500, marginTop: '1px' }}>Fahrplan & Änderungen</div>
+                                    </div>
                                   </div>
 
+                                  {/* Sleek Appointment Card */}
                                   <div style={{
-                                    background: 'linear-gradient(135deg, rgba(0, 122, 255, 0.06) 0%, rgba(0, 122, 255, 0.02) 100%)',
-                                    border: '1.5px solid rgba(0, 122, 255, 0.18)',
+                                    background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                                    border: '1px solid #e2e8f0',
                                     borderRadius: '16px',
-                                    padding: '14px 16px',
-                                    color: '#007aff',
-                                    boxShadow: '0 4px 12px rgba(0, 122, 255, 0.02)',
-                                    fontSize: '0.88rem',
-                                    fontWeight: 700,
+                                    padding: '16px',
+                                    color: '#1d1d1f',
+                                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '10px'
+                                    gap: '14px'
                                   }}>
-                                    <Activity size={16} color="#007aff" style={{ flexShrink: 0 }} />
-                                    <span>Heute stehen <strong style={{ fontSize: '0.98rem', fontWeight: 900, color: '#0051ba' }}>{activeLessonsCount} Termine</strong> auf dem Fahrplan.</span>
+                                    <div style={{ 
+                                      background: 'rgba(0, 122, 255, 0.08)', 
+                                      width: '36px', 
+                                      height: '36px', 
+                                      borderRadius: '10px', 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'center',
+                                      flexShrink: 0
+                                    }}>
+                                      <Activity size={18} color="#007aff" />
+                                    </div>
+                                    <div>
+                                      <div style={{ fontSize: '0.78rem', color: '#86868b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Unterrichte heute</div>
+                                      <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1d1d1f' }}>
+                                        Heute stehen <strong style={{ color: '#007aff', fontWeight: 800 }}>{activeLessonsCount} Termine</strong> auf dem Fahrplan.
+                                      </span>
+                                    </div>
                                   </div>
 
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                                      Änderungen & Ausfälle heute:
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.06em', paddingLeft: '4px' }}>
+                                      Änderungen & Ausfälle heute
                                     </span>
                                     {dailyChanges.length > 0 ? (
                                       <div style={{
-                                        background: 'rgba(15, 23, 42, 0.02)',
-                                        border: '1px solid rgba(15, 23, 42, 0.06)',
-                                        borderRadius: '16px',
-                                        padding: '6px',
                                         display: 'flex',
                                         flexDirection: 'column',
-                                        gap: '6px'
+                                        gap: '8px'
                                       }}>
                                         {dailyChanges.map((slot: any, idx: number) => {
                                           const isCanceled = slot.status !== 'rescheduled_away';
-                                          const badgeBg = isCanceled ? 'rgba(239, 68, 68, 0.08)' : 'rgba(251, 188, 5, 0.12)';
-                                          const badgeTextColor = isCanceled ? '#ef4444' : '#b45309';
+                                          const badgeBg = isCanceled ? 'rgba(255, 59, 48, 0.08)' : 'rgba(255, 149, 0, 0.08)';
+                                          const badgeTextColor = isCanceled ? '#ff3b30' : '#ff9500';
                                           const badgeText = isCanceled ? 'Ausfall' : 'Verschoben';
-                                          const itemBorderLeft = isCanceled ? '3px solid #ef4444' : '3px solid #fbbc05';
+                                          const itemBorderLeft = isCanceled ? '3px solid #ff3b30' : '3px solid #ff9500';
                                           const matchRem = !isCanceled 
                                             ? briefingData.rescheduledReminders?.find((r: any) => r.studentName === slot.student?.name)
                                             : null;
@@ -4317,42 +4348,43 @@ export function TeacherDashboard({
                                               alignItems: 'center',
                                               justifyContent: 'space-between',
                                               background: '#ffffff',
-                                              border: '1px solid rgba(0,0,0,0.03)',
+                                              border: '1px solid rgba(0,0,0,0.04)',
                                               borderLeft: itemBorderLeft,
-                                              borderRadius: '10px',
-                                              padding: '8px 12px',
-                                              fontSize: '0.78rem'
+                                              borderRadius: '12px',
+                                              padding: '10px 14px',
+                                              fontSize: '0.82rem',
+                                              boxShadow: '0 2px 6px rgba(0,0,0,0.01)'
                                             }}>
                                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-                                                <span style={{ fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                <span style={{ fontWeight: 750, color: '#1d1d1f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                   {slot.student?.name}
                                                 </span>
-                                                <span style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 500 }}>
+                                                <span style={{ color: '#86868b', fontSize: '0.75rem', fontWeight: 500 }}>
                                                   ({slot.timeSlot || slot.start_time?.substring(0, 5)} Uhr)
                                                 </span>
                                                 {!isCanceled && matchRem && (
                                                   <span style={{ 
-                                                    color: '#b45309', 
-                                                    fontSize: '0.72rem', 
+                                                    color: '#ff9500', 
+                                                    fontSize: '0.75rem', 
                                                     fontWeight: 700, 
                                                     marginLeft: '8px',
                                                     display: 'inline-flex',
                                                     alignItems: 'center',
                                                     gap: '4px'
                                                   }}>
-                                                    ➔ {matchRem.weekdayShort}. {matchRem.dateStr}., {matchRem.time.replace(':', '.')} Uhr
+                                                    ➔ {matchRem.weekdayShort}. {matchRem.dateStr}.
                                                   </span>
                                                 )}
                                               </div>
                                               <span style={{
-                                                fontSize: '0.62rem',
+                                                fontSize: '0.66rem',
                                                 fontWeight: 800,
                                                 color: badgeTextColor,
                                                 background: badgeBg,
-                                                padding: '2px 8px',
+                                                padding: '3px 8px',
                                                 borderRadius: '6px',
                                                 textTransform: 'uppercase',
-                                                letterSpacing: '0.02em',
+                                                letterSpacing: '0.03em',
                                                 flexShrink: 0
                                               }}>
                                                 {badgeText}
@@ -4363,18 +4395,29 @@ export function TeacherDashboard({
                                       </div>
                                     ) : (
                                       <div style={{
-                                        background: 'rgba(16, 185, 129, 0.05)',
-                                        border: '1px solid rgba(16, 185, 129, 0.12)',
+                                        background: 'rgba(52, 199, 89, 0.05)',
+                                        border: '1px solid rgba(52, 199, 89, 0.15)',
                                         borderRadius: '16px',
-                                        padding: '12px 14px',
+                                        padding: '12px 16px',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: '10px',
-                                        fontSize: '0.78rem',
-                                        color: '#065f46',
+                                        gap: '12px',
+                                        fontSize: '0.82rem',
+                                        color: '#1d271f',
                                         fontWeight: 600
                                       }}>
-                                        <CheckCircle size={15} color="#10b981" style={{ flexShrink: 0 }} />
+                                        <div style={{
+                                          background: 'rgba(52, 199, 89, 0.12)',
+                                          width: '26px',
+                                          height: '26px',
+                                          borderRadius: '50%',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          flexShrink: 0
+                                        }}>
+                                          <CheckCircle size={15} color="#34c759" />
+                                        </div>
                                         <span>Alles läuft nach Plan. Keine heutigen Ausfälle.</span>
                                       </div>
                                     )}
@@ -4388,18 +4431,14 @@ export function TeacherDashboard({
                                       if (otherReschedules.length === 0) return null;
                                       
                                       return (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '10px' }}>
-                                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                                            Weitere Änderungen diese Woche:
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+                                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.06em', paddingLeft: '4px' }}>
+                                            Weitere Änderungen diese Woche
                                           </span>
                                           <div style={{
-                                            background: 'rgba(0, 122, 255, 0.02)',
-                                            border: '1px solid rgba(0, 122, 255, 0.05)',
-                                            borderRadius: '16px',
-                                            padding: '6px',
                                             display: 'flex',
                                             flexDirection: 'column',
-                                            gap: '6px'
+                                            gap: '8px'
                                           }}>
                                             {otherReschedules.map((rem: any) => (
                                               <div key={rem.id} style={{
@@ -4407,24 +4446,25 @@ export function TeacherDashboard({
                                                 alignItems: 'center',
                                                 justifyContent: 'space-between',
                                                 background: '#ffffff',
-                                                border: '1px solid rgba(0,0,0,0.03)',
+                                                border: '1px solid rgba(0,0,0,0.04)',
                                                 borderLeft: '3px solid #007aff',
-                                                borderRadius: '10px',
-                                                padding: '8px 12px',
-                                                fontSize: '0.78rem'
+                                                borderRadius: '12px',
+                                                padding: '10px 14px',
+                                                fontSize: '0.82rem',
+                                                boxShadow: '0 2px 6px rgba(0,0,0,0.01)'
                                               }}>
-                                                <span style={{ fontWeight: 800, color: '#0f172a' }}>
+                                                <span style={{ fontWeight: 750, color: '#1d1d1f' }}>
                                                   {rem.studentName}
                                                 </span>
                                                 <span style={{ 
-                                                  fontSize: '0.72rem', 
+                                                  fontSize: '0.74rem', 
                                                   fontWeight: 700, 
                                                   color: '#007aff',
-                                                  background: 'rgba(0, 122, 255, 0.06)',
-                                                  padding: '2px 8px',
+                                                  background: 'rgba(0, 122, 255, 0.08)',
+                                                  padding: '3px 8px',
                                                   borderRadius: '6px'
                                                 }}>
-                                                  {rem.weekdayShort}. {rem.dateStr}.{rem.yearShort}, {rem.time.replace(':', '.')} Uhr
+                                                  {rem.weekdayShort}. {rem.dateStr}., {rem.time.replace(':', '.')} Uhr
                                                 </span>
                                               </div>
                                             ))}
@@ -4436,21 +4476,31 @@ export function TeacherDashboard({
 
                                   {firstSlotStartStr && (
                                     <div style={{ 
-                                      borderTop: '1px solid rgba(15, 23, 42, 0.05)', 
-                                      paddingTop: '14px',
+                                      background: '#f8fafc',
+                                      border: '1px solid #e2e8f0',
+                                      borderRadius: '16px',
+                                      padding: '16px',
                                       display: 'flex',
                                       flexDirection: 'column',
-                                      gap: '6px',
-                                      fontSize: '0.74rem',
-                                      color: '#64748b',
-                                      fontWeight: 550,
-                                      textAlign: 'center'
+                                      gap: '8px',
+                                      marginTop: '8px'
                                     }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#334155' }}>
-                                        <Clock size={13} color="#64748b" />
-                                        <span>Erster Unterricht beginnt um <strong style={{ color: '#0f172a', fontWeight: 700 }}>{firstSlotStartStr} Uhr</strong>.</span>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1d1d1f', fontSize: '0.82rem', fontWeight: 600 }}>
+                                        <div style={{
+                                          background: 'rgba(0, 122, 255, 0.08)',
+                                          width: '24px',
+                                          height: '24px',
+                                          borderRadius: '50%',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          flexShrink: 0
+                                        }}>
+                                          <Clock size={14} color="#007aff" />
+                                        </div>
+                                        <span>Erster Unterricht beginnt um <strong style={{ color: '#007aff', fontWeight: 800 }}>{firstSlotStartStr} Uhr</strong>.</span>
                                       </div>
-                                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 400 }}>
+                                      <div style={{ fontSize: '0.72rem', color: '#86868b', fontWeight: 500, paddingLeft: '32px', lineHeight: 1.4 }}>
                                         Das Schüler-Notizwidget aktiviert sich automatisch um {prepCutoffTimeStr} Uhr (15 Min. vorher).
                                       </div>
                                     </div>
@@ -5968,16 +6018,20 @@ export function TeacherDashboard({
                                 </span>
                               </div>
                               <div style={{ fontSize: '0.72rem', color: subTextColor, fontWeight: 600, whiteSpace: 'normal', wordBreak: 'break-word', marginTop: '1px' }}>
-                                {b.startTime} Uhr • <strong>{b.roomName || b.rooms?.name || 'Raum'}</strong> {(() => {
-                                  if (!b.studentName) return '';
-                                  if (b.studentName.includes('&')) {
-                                    const parts = b.studentName.split('&');
-                                    const firstNames = parts.map((part: string) => part.trim().split(' ')[0]);
-                                    return ` • ${firstNames.join(' & ')}`;
-                                  }
-                                  return ` • ${b.studentName}`;
-                                })()}
+                                {b.startTime} Uhr • <strong>{b.roomName || b.rooms?.name || 'Raum'}</strong>
                               </div>
+                              {b.studentName && (
+                                <div style={{ fontSize: '0.72rem', color: subTextColor, fontWeight: 800, marginTop: '2px' }}>
+                                  {(() => {
+                                    if (b.studentName.includes('&')) {
+                                      const parts = b.studentName.split('&');
+                                      const firstNames = parts.map((part: string) => part.trim().split(' ')[0]);
+                                      return firstNames.join(' & ');
+                                    }
+                                    return b.studentName;
+                                  })()}
+                                </div>
+                              )}
                             </div>
 
                             {/* Shoutbox chat button - integrated inside the colored card */}

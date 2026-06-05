@@ -3808,341 +3808,408 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             </div>
           ) : (
             <div style={{
-              background: '#ffffff',
-              border: '1px solid #e2e8f0',
-              borderRadius: '24px',
-              padding: '24px',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.02)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '20px'
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : '1fr 300px',
+              gap: '24px',
+              alignItems: 'start'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '14px', flexWrap: 'wrap', gap: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              
+              {/* LEFT COLUMN: SONGS & LEHRWERKE LIST */}
+              <div style={{
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '24px',
+                padding: '24px',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.02)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '24px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid #f1f5f9', paddingBottom: '14px' }}>
                   <div style={{ background: '#e0f2fe', color: '#0369a1', padding: '8px', borderRadius: '12px' }}>
-                    <Music size={18} />
+                    <Library size={18} />
                   </div>
                   <div>
-                    <h4 style={{ fontWeight: 800, fontSize: '28px', color: '#1e293b', margin: 0 }}>Mediathek</h4>
-                    <p style={{ fontSize: '0.7rem', color: '#94a3b8', margin: '2px 0 0 0', fontWeight: 600 }}>Deine Meilensteine & Hausaufgaben</p>
+                    <h4 style={{ fontWeight: 800, fontSize: '24px', color: '#1e293b', margin: 0 }}>Mediathek</h4>
+                    <p style={{ fontSize: '0.72rem', color: '#94a3b8', margin: '2px 0 0 0', fontWeight: 600 }}>Deine Meilensteine & Hausaufgaben</p>
                   </div>
                 </div>
 
-                {/* Tab Selector */}
-                <div style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '14px', gap: '4px' }}>
-                  <button 
-                    type="button"
-                    onClick={() => setMediathekTab('songs')}
-                    style={{
-                      padding: '8px 16px',
-                      borderRadius: '10px',
-                      border: 'none',
-                      background: mediathekTab === 'songs' ? 'white' : 'transparent',
-                      color: mediathekTab === 'songs' ? '#1e293b' : '#64748b',
-                      fontWeight: 900,
-                      fontSize: '0.78rem',
-                      cursor: 'pointer',
-                      boxShadow: mediathekTab === 'songs' ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
-                      transition: 'all 0.15s ease',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    <Music size={14} color={mediathekTab === 'songs' ? '#1e293b' : '#64748b'} />
-                    Songs & Projekte
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => setMediathekTab('lehrwerke')}
-                    style={{
-                      padding: '8px 16px',
-                      borderRadius: '10px',
-                      border: 'none',
-                      background: mediathekTab === 'lehrwerke' ? 'white' : 'transparent',
-                      color: mediathekTab === 'lehrwerke' ? '#1e293b' : '#64748b',
-                      fontWeight: 900,
-                      fontSize: '0.78rem',
-                      cursor: 'pointer',
-                      boxShadow: mediathekTab === 'lehrwerke' ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
-                      transition: 'all 0.15s ease',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    <Library size={14} color={mediathekTab === 'lehrwerke' ? '#1e293b' : '#64748b'} />
-                    Lehrwerke
-                  </button>
-                </div>
-              </div>
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', 
+                  gap: '24px', 
+                  alignItems: 'start' 
+                }}>
+                  {/* Left Column: Songs & Projekte */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <h5 style={{ fontSize: '0.8rem', fontWeight: 900, color: '#0ea5e9', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Music size={14} /> Songs & Projekte
+                    </h5>
 
-              {mediathekTab === 'songs' ? (
-                /* SONGS TAB */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  {/* Pinned current homework "Aktuelle Mission" */}
-                  {progressItems.some(item => item.is_current_homework && !item.topic_name.includes(' - Seite ')) && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        🎯 Aktuelle Mission
-                      </span>
-                      {progressItems.filter(item => item.is_current_homework && !item.topic_name.includes(' - Seite ')).map(item => {
-                        let statusColor = '#eab308';
-                        let statusBg = '#fffbeb';
-                        let statusText = 'In Arbeit';
+                    {/* Pinned current homework "Aktuelle Mission" */}
+                    {progressItems.some(item => item.is_current_homework && !item.topic_name.includes(' - Seite ')) && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          🎯 Aktuelle Mission
+                        </span>
+                        {progressItems.filter(item => item.is_current_homework && !item.topic_name.includes(' - Seite ')).map(item => {
+                          let statusColor = '#eab308';
+                          let statusBg = '#fffbeb';
+                          let statusText = 'In Arbeit';
 
-                        if (item.status === 'THEORY_DONE') {
-                          statusColor = '#a855f7';
-                          statusBg = '#f3e8ff';
-                          statusText = 'Theorie gelesen';
-                        } else if (item.status === 'MASTERED') {
-                          statusColor = '#10b981';
-                          statusBg = '#d1fae5';
-                          statusText = 'Meisterwerk!';
-                        }
-
-                        return (
-                          <div 
-                            key={item.id} 
-                            style={{
-                              background: '#f0fdfa',
-                              borderRadius: '20px',
-                              border: '2px solid #06b6d4',
-                              padding: '20px',
-                              boxShadow: '0 0 15px rgba(6, 182, 212, 0.15)',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '12px'
-                            }}
-                            className="animate-pulse"
-                          >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontWeight: 900, fontSize: '1.05rem', color: '#0f172a' }}>
-                                {item.topic_name}
-                              </span>
-                              <span style={{
-                                background: statusBg,
-                                color: statusColor,
-                                padding: '4px 10px',
-                                borderRadius: '8px',
-                                fontSize: '0.7rem',
-                                fontWeight: 900,
-                                textTransform: 'uppercase'
-                              }}>
-                                {statusText}
-                              </span>
-                            </div>
-                            {item.teacher_notes && (
-                              <div style={{ background: 'white', padding: '12px 16px', borderRadius: '12px', border: '1px solid #ccfbf1', fontSize: '0.82rem', color: '#0f172a', fontWeight: 600, fontStyle: 'italic' }}>
-                                Notiz: {item.teacher_notes}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Complete grid of song tiles */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Deine Meilensteine
-                    </span>
-                    {progressItems.filter(item => !item.topic_name.includes(' - Seite ')).length === 0 ? (
-                      <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem', fontStyle: 'italic' }}>
-                        Noch keine Songs am Board.
-                      </div>
-                    ) : (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
-                        {progressItems.filter(item => !item.topic_name.includes(' - Seite ')).map(item => {
-                          let tileBg = 'white';
-                          let tileBorder = '1px solid #e2e8f0';
-                          let badgeBg = '#f1f5f9';
-                          let badgeColor = '#475569';
-                          let badgeText = 'In Arbeit';
-
-                          if (item.status === 'IN_PROGRESS') {
-                            tileBg = '#fffbeb';
-                            tileBorder = '1.5px solid #fef08a';
-                            badgeBg = '#fef9c3';
-                            badgeColor = '#854d0e';
-                          } else if (item.status === 'THEORY_DONE') {
-                            tileBg = '#faf5ff';
-                            tileBorder = '1.5px solid #e9d5ff';
-                            badgeBg = '#f3e8ff';
-                            badgeColor = '#6b21a8';
-                            badgeText = 'Theorie gelesen';
+                          if (item.status === 'THEORY_DONE') {
+                            statusColor = '#a855f7';
+                            statusBg = '#f3e8ff';
+                            statusText = 'Theorie gelesen';
                           } else if (item.status === 'MASTERED') {
-                            tileBg = '#f0fdf4';
-                            tileBorder = '1.5px solid #a7f3d0';
-                            badgeBg = '#d1fae5';
-                            badgeColor = '#065f46';
-                            badgeText = 'Meisterwerk!';
+                            statusColor = '#10b981';
+                            statusBg = '#d1fae5';
+                            statusText = 'Meisterwerk!';
                           }
 
                           return (
                             <div 
                               key={item.id} 
                               style={{
-                                background: tileBg,
-                                border: item.is_current_homework ? '2px solid #06b6d4' : tileBorder,
+                                background: '#f0fdfa',
                                 borderRadius: '20px',
+                                border: '2px solid #06b6d4',
                                 padding: '16px',
+                                boxShadow: '0 0 15px rgba(6, 182, 212, 0.15)',
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '10px',
-                                boxShadow: item.is_current_homework ? '0 0 10px rgba(6, 182, 212, 0.1)' : 'none',
-                                position: 'relative'
+                                gap: '8px'
                               }}
-                              className={item.is_current_homework ? 'animate-pulse' : 'hover-scale'}
+                              className="animate-pulse"
                             >
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                                <span style={{ fontWeight: 800, fontSize: '0.88rem', color: '#1e293b' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontWeight: 900, fontSize: '0.92rem', color: '#0f172a' }}>
                                   {item.topic_name}
                                 </span>
                                 <span style={{
-                                  background: badgeBg,
-                                  color: badgeColor,
-                                  padding: '2px 6px',
-                                  borderRadius: '6px',
-                                  fontSize: '0.62rem',
+                                  background: statusBg,
+                                  color: statusColor,
+                                  padding: '4px 8px',
+                                  borderRadius: '8px',
+                                  fontSize: '0.65rem',
                                   fontWeight: 900,
-                                  textTransform: 'uppercase',
-                                  whiteSpace: 'nowrap'
+                                  textTransform: 'uppercase'
                                 }}>
-                                  {badgeText}
+                                  {statusText}
                                 </span>
                               </div>
                               {item.teacher_notes && (
-                                <p style={{ fontSize: '0.78rem', color: '#475569', margin: 0, fontWeight: 550, lineHeight: 1.3 }}>
-                                  {item.teacher_notes}
-                                </p>
+                                <div style={{ background: 'white', padding: '10px 14px', borderRadius: '12px', border: '1px solid #ccfbf1', fontSize: '0.78rem', color: '#0f172a', fontWeight: 600, fontStyle: 'italic' }}>
+                                  Notiz: {item.teacher_notes}
+                                </div>
                               )}
                             </div>
                           );
                         })}
                       </div>
                     )}
-                  </div>
-                </div>
-              ) : (
-                /* LEHRWERKE TAB */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Deine Schulbücher & Lehrwerke
-                    </span>
-                    {(() => {
-                      // Extract book titles from progressItems page tasks
-                      const progressBookTitles = new Set<string>();
-                      progressItems.forEach(item => {
-                        if (item.topic_name.includes(' - Seite ')) {
-                          const title = item.topic_name.split(' - Seite ')[0].trim();
-                          progressBookTitles.add(title);
-                        }
-                      });
 
-                      const assignedBookIds = localProgress.filter((p: any) => p.studentId === studentId).map((p: any) => p.lehrwerkId);
-                      const assignedLehrwerke = lehrwerke.filter(book => {
-                        const isExplicitlyAssigned = assignedBookIds.includes(book.id);
-                        const isReferencedInProgress = Array.from(progressBookTitles).some(t => t.toLowerCase() === book.title.toLowerCase());
-                        return isExplicitlyAssigned || isReferencedInProgress;
-                      });
+                    {/* Complete grid of song tiles */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        Deine Meilensteine
+                      </span>
+                      {progressItems.filter(item => !item.topic_name.includes(' - Seite ')).length === 0 ? (
+                        <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem', fontStyle: 'italic' }}>
+                          Noch keine Songs am Board.
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {progressItems.filter(item => !item.topic_name.includes(' - Seite ')).map(item => {
+                            let tileBg = 'white';
+                            let tileBorder = '1px solid #e2e8f0';
+                            let badgeBg = '#f1f5f9';
+                            let badgeColor = '#475569';
+                            let badgeText = 'In Arbeit';
 
-                      const missingBooks = Array.from(progressBookTitles).filter(title => 
-                        !lehrwerke.some(book => book.title.toLowerCase() === title.toLowerCase())
-                      );
-                      const fallbackBooks = missingBooks.map((title, idx) => ({
-                        id: `fallback-${idx}`,
-                        title: title,
-                        author: 'GrooveLab Campus',
-                        totalPages: 50
-                      }));
-
-                      const allStudentBooks = [...assignedLehrwerke, ...fallbackBooks];
-
-                      if (allStudentBooks.length === 0) {
-                        return (
-                          <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem', fontStyle: 'italic' }}>
-                            Keine Lehrwerke zugewiesen.
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
-                          {allStudentBooks.map(book => {
-                            const gradient = getLehrwerkColor(book.title, lehrwerke);
-                            const assignment = localProgress.find((p: any) => p.studentId === studentId && p.lehrwerkId === book.id);
-                            
-                            let masteredCount = 0;
-                            if (assignment && assignment.pageStates) {
-                              masteredCount = Object.values(assignment.pageStates).filter((s: any) => s.status === 'mastered').length;
-                            } else {
-                              masteredCount = progressItems.filter(item => 
-                                item.topic_name.toLowerCase().startsWith(`${book.title.toLowerCase()} - seite `) && 
-                                item.status === 'MASTERED'
-                              ).length;
+                            if (item.status === 'IN_PROGRESS') {
+                              tileBg = '#fffbeb';
+                              tileBorder = '1.5px solid #fef08a';
+                              badgeBg = '#fef9c3';
+                              badgeColor = '#854d0e';
+                            } else if (item.status === 'THEORY_DONE') {
+                              tileBg = '#faf5ff';
+                              tileBorder = '1.5px solid #e9d5ff';
+                              badgeBg = '#f3e8ff';
+                              badgeColor = '#6b21a8';
+                              badgeText = 'Theorie gelesen';
+                            } else if (item.status === 'MASTERED') {
+                              tileBg = '#f0fdf4';
+                              tileBorder = '1.5px solid #a7f3d0';
+                              badgeBg = '#d1fae5';
+                              badgeColor = '#065f46';
+                              badgeText = 'Meisterwerk!';
                             }
 
                             return (
                               <div 
-                                key={book.id}
-                                onClick={() => setSelectedLehrwerkForDetail(book)}
-                                style={{ 
-                                  padding: '20px', 
-                                  background: 'white', 
-                                  display: 'flex', 
-                                  gap: '16px', 
-                                  alignItems: 'center', 
-                                  borderRadius: '24px', 
-                                  border: '1px solid #e2e8f0', 
-                                  boxShadow: '0 10px 25px -5px rgba(0,0,0,0.02)',
-                                  position: 'relative',
-                                  cursor: 'pointer',
-                                  transition: 'all 0.2s ease'
+                                key={item.id} 
+                                style={{
+                                  background: tileBg,
+                                  border: item.is_current_homework ? '2px solid #06b6d4' : tileBorder,
+                                  borderRadius: '16px',
+                                  padding: '14px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '8px',
+                                  boxShadow: item.is_current_homework ? '0 0 10px rgba(6, 182, 212, 0.1)' : 'none',
+                                  position: 'relative'
                                 }}
-                                className="hover-scale"
+                                className={item.is_current_homework ? 'animate-pulse' : 'hover-scale'}
                               >
-                                {(() => {
-                                  return (
-                                    <div style={{ 
-                                      width: '64px', 
-                                      height: '84px', 
-                                      background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`, 
-                                      borderRadius: '8px', 
-                                      display: 'flex', 
-                                      alignItems: 'center', 
-                                      justifyContent: 'center', 
-                                      color: gradient.text, 
-                                      boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                                      flexShrink: 0
-                                    }}>
-                                      <BookOpen size={24} color={gradient.text} />
-                                    </div>
-                                  );
-                                })()}
-                                <div style={{ flex: 1 }}>
-                                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>{book.title}</h4>
-                                  {book.author && <p style={{ margin: '0 0 4px 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>von {book.author}</p>}
-                                  
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', color: '#475569', fontWeight: 700, marginTop: '8px', marginBottom: '4px' }}>
-                                    <span style={{ color: '#94a3b8' }}>📖 {book.totalPages || 50} Seiten</span>
-                                    <span>{masteredCount} / {book.totalPages || 50} S. geschafft</span>
-                                  </div>
-                                  <div style={{ width: '100%', height: '6px', borderRadius: '3px', background: '#e2e8f0', overflow: 'hidden' }}>
-                                    <div style={{ width: `${Math.min(100, (masteredCount / (book.totalPages || 50)) * 100)}%`, height: '100%', background: gradient.text, borderRadius: '3px', transition: 'width 0.3s ease' }} />
-                                  </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                                  <span style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b' }}>
+                                    {item.topic_name}
+                                  </span>
+                                  <span style={{
+                                    background: badgeBg,
+                                    color: badgeColor,
+                                    padding: '2px 6px',
+                                    borderRadius: '6px',
+                                    fontSize: '0.6rem',
+                                    fontWeight: 900,
+                                    textTransform: 'uppercase',
+                                    whiteSpace: 'nowrap'
+                                  }}>
+                                    {badgeText}
+                                  </span>
                                 </div>
+                                {item.teacher_notes && (
+                                  <p style={{ fontSize: '0.75rem', color: '#475569', margin: 0, fontWeight: 550, lineHeight: 1.3 }}>
+                                    {item.teacher_notes}
+                                  </p>
+                                )}
                               </div>
                             );
                           })}
                         </div>
-                      );
-                    })()}
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Column: Lehrwerke */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <h5 style={{ fontSize: '0.8rem', fontWeight: 900, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <BookOpen size={14} /> Lehrwerke
+                    </h5>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        Deine Schulbücher & Lehrwerke
+                      </span>
+                      {(() => {
+                        const assignedBookIds = localProgress.filter((p: any) => p.studentId === studentId).map((p: any) => p.lehrwerkId);
+                        const assignedLehrwerke = lehrwerke.filter(book => assignedBookIds.includes(book.id));
+
+                        if (assignedLehrwerke.length === 0) {
+                          return (
+                            <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem', fontStyle: 'italic' }}>
+                              Keine Lehrwerke zugewiesen.
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {assignedLehrwerke.map(book => {
+                              const gradient = getLehrwerkColor(book.title, lehrwerke);
+                              const assignment = localProgress.find((p: any) => p.studentId === studentId && p.lehrwerkId === book.id);
+                              
+                              let masteredCount = 0;
+                              if (assignment && assignment.pageStates) {
+                                masteredCount = Object.values(assignment.pageStates).filter((s: any) => s.status === 'mastered').length;
+                              }
+
+                              return (
+                                <div 
+                                  key={book.id}
+                                  onClick={() => setSelectedLehrwerkForDetail(book)}
+                                  style={{ 
+                                    padding: '14px 16px', 
+                                    background: 'white', 
+                                    display: 'flex', 
+                                    gap: '12px', 
+                                    alignItems: 'center', 
+                                    borderRadius: '20px', 
+                                    border: '1px solid #e2e8f0', 
+                                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.02)',
+                                    position: 'relative',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease'
+                                  }}
+                                  className="hover-scale"
+                                >
+                                  <div style={{ 
+                                    width: '44px', 
+                                    height: '58px', 
+                                    background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`, 
+                                    borderRadius: '6px', 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center', 
+                                    color: gradient.text, 
+                                    boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                                    flexShrink: 0
+                                  }}>
+                                    <BookOpen size={18} color={gradient.text} />
+                                  </div>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <h4 style={{ margin: '0 0 2px 0', fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{book.title}</h4>
+                                    {book.author && <p style={{ margin: '0 0 4px 0', fontSize: '0.72rem', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>von {book.author}</p>}
+                                    
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.65rem', color: '#475569', fontWeight: 700, marginTop: '6px', marginBottom: '2px' }}>
+                                      <span style={{ color: '#94a3b8' }}>📖 {book.totalPages || 50} Seiten</span>
+                                      <span>{masteredCount} / {book.totalPages || 50} S.</span>
+                                    </div>
+                                    <div style={{ width: '100%', height: '4px', borderRadius: '2px', background: '#e2e8f0', overflow: 'hidden' }}>
+                                      <div style={{ width: `${Math.min(100, (masteredCount / (book.totalPages || 50)) * 100)}%`, height: '100%', background: gradient.text, borderRadius: '2px', transition: 'width 0.3s ease' }} />
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
+                    </div>
                   </div>
                 </div>
-              )}
+              </div>
+
+              {/* RIGHT COLUMN: MEINE ERFOLGE WIDGET */}
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.45) 100%)',
+                backdropFilter: 'blur(24px) saturate(1.8)',
+                WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
+                border: '1px solid rgba(255, 255, 255, 0.5)',
+                borderRadius: '24px',
+                padding: '24px',
+                boxShadow: '0 10px 30px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '20px'
+              }}>
+                <div>
+                  <h4 style={{ fontSize: '1.05rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontWeight: 900 }}>
+                    <div style={{ background: '#fef3c7', padding: '6px', borderRadius: '10px', display: 'flex', alignItems: 'center' }}>
+                      <Trophy size={16} color="#d97706" fill="#d97706" />
+                    </div>
+                    <span>Meine Erfolge</span>
+                  </h4>
+                  <p style={{ color: '#64748b', fontSize: '0.72rem', margin: '4px 0 0 0', fontWeight: 600 }}>
+                    Deine gesammelten Meilensteine
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {/* XP */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#ffffff', padding: '12px 14px', borderRadius: '16px', border: '1px solid rgba(0,0,0,0.03)' }}>
+                    <div style={{ color: '#6366f1', display: 'flex', alignItems: 'center' }}>
+                      <Star size={18} fill="currentColor" />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b' }}>
+                        {currentXp || 0} XP
+                      </div>
+                      <div style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 600 }}>
+                        Gesamte XP Punkte
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mastered Songs */}
+                  {(() => {
+                    const masteredCount = progressItems.filter(item => !item.topic_name.includes(' - Seite ') && item.status === 'MASTERED').length;
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#ffffff', padding: '12px 14px', borderRadius: '16px', border: '1px solid rgba(0,0,0,0.03)' }}>
+                        <div style={{ color: '#10b981', display: 'flex', alignItems: 'center' }}>
+                          <Award size={18} />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b' }}>
+                            {masteredCount} {masteredCount === 1 ? 'Song' : 'Songs'}
+                          </div>
+                          <div style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 600 }}>
+                            Meisterwerke abgeschlossen
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Book Pages */}
+                  {(() => {
+                    const studentAssignments = localProgress.filter((p: any) => p.studentId === studentId);
+                    let totalMasteredPages = 0;
+                    studentAssignments.forEach((assignment: any) => {
+                      if (assignment.pageStates) {
+                        totalMasteredPages += Object.values(assignment.pageStates).filter((s: any) => s.status === 'mastered').length;
+                      }
+                    });
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#ffffff', padding: '12px 14px', borderRadius: '16px', border: '1px solid rgba(0,0,0,0.03)' }}>
+                        <div style={{ color: '#3b82f6', display: 'flex', alignItems: 'center' }}>
+                          <BookOpen size={18} />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b' }}>
+                            {totalMasteredPages} {totalMasteredPages === 1 ? 'Seite' : 'Seiten'}
+                          </div>
+                          <div style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 600 }}>
+                            In Lehrwerken gemeistert
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Practice Minutes */}
+                  {(() => {
+                    const minutes = wrappedData?.monthlyFlashback?.focusMinutes || totalFocusMinutes || 0;
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#ffffff', padding: '12px 14px', borderRadius: '16px', border: '1px solid rgba(0,0,0,0.03)' }}>
+                        <div style={{ color: '#eab308', display: 'flex', alignItems: 'center' }}>
+                          <Clock size={18} />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b' }}>
+                            {minutes} Min.
+                          </div>
+                          <div style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 600 }}>
+                            Effektive Fokus-Übezeit
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Streak */}
+                  {(() => {
+                    const streak = avatar?.streak_flame || 0;
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#ffffff', padding: '12px 14px', borderRadius: '16px', border: '1px solid rgba(0,0,0,0.03)' }}>
+                        <div style={{ color: '#ef4444', display: 'flex', alignItems: 'center' }}>
+                          <Flame size={18} fill="currentColor" />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b' }}>
+                            {streak} {streak === 1 ? 'Tag' : 'Tage'}
+                          </div>
+                          <div style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 600 }}>
+                            Aktuelle Übeserie
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
 
             </div>
           )}
