@@ -168,12 +168,22 @@ const STUDENT_AVATARS = [
   { id: 'avatar_vocals', url: '/avatars/gesang_avatar.png', label: 'Vocals' }
 ];
 
-const getStationColor = (name: string | null | undefined) => {
+const getStationColor = (name: string | null | undefined, dbColor?: string | null) => {
   if (!name) return '#64748b';
+  
+  const isStandardIpad = /^ipad\s*\d+/i.test(name);
+  if (dbColor && dbColor !== '#e5e7eb' && dbColor !== '#e2e8f0' && dbColor !== '#cbd5e1') {
+    if (isStandardIpad && dbColor === '#64748b') {
+      // Fall through to number-based standard color
+    } else {
+      return dbColor;
+    }
+  }
+
   if (name.toLowerCase().includes('lehrer')) return '#22c55e'; // Green
-  const match = name.match(/\d+/);
-  if (!match) return '#64748b';
-  const num = parseInt(match[0]);
+  const matches = name.match(/\d+/g);
+  if (!matches) return '#64748b';
+  const num = parseInt(matches[matches.length - 1]);
   if (num === 1 || num === 2) return '#ef4444'; // Red
   if (num === 3 || num === 4) return '#a855f7'; // Purple
   if (num === 5 || num === 6) return '#3b82f6'; // Blue
@@ -1261,7 +1271,11 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       setRoomWidth(customizingRoom.room_width || 10.0);
       setRoomHeight(customizingRoom.room_height || 8.0);
       setActiveEditStationId(null);
+    }
+  }, [customizingRoom?.id]);
 
+  useEffect(() => {
+    if (customizingRoom) {
       // Check if Lehrer iPad exists for this room
       const roomStations = stations.filter(s => s.room_id === customizingRoom.id);
       const hasLehrer = roomStations.some(s => {
@@ -7797,7 +7811,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     .map(station => (
                       <div key={station.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #f1f5f9', transition: 'all 0.2s' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 700, color: '#475569' }}>
-                          <Tablet size={16} color={getStationColor(station.name)} /> {station.name}
+                          <Tablet size={16} color={getStationColor(station.name, station.color)} /> {station.name}
                         </div>
                         {station.name.toLowerCase() !== 'lehrer ipad' && (
                           <button onClick={() => handleDeleteStation(station.id)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }} onMouseEnter={e => e.currentTarget.style.color = '#ef4444'} onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}>
@@ -10747,9 +10761,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   const isTeacher = sName.toLowerCase().includes('lehrer') || sName.toLowerCase().includes('teacher');
                   
                   // Color codes: custom station color with name-based fallback
-                  const instColor = station.color && station.color !== '#e5e7eb' && station.color !== '#e2e8f0'
-                    ? station.color
-                    : getStationColor(sName);
+                  const instColor = getStationColor(sName, station.color);
 
                   const posLeft = station.pos_x !== null && station.pos_x !== undefined ? station.pos_x : 50;
                   const posTop = station.pos_y !== null && station.pos_y !== undefined ? station.pos_y : 50;
@@ -14547,8 +14559,6 @@ function DeviceSetupScreen({
           transform: isCurrentDevice ? 'none' : 'translateY(0px)',
           userSelect: 'none'
         }}
-        
-        
       >
         {isCurrentDevice && (
           <div style={{
@@ -14579,8 +14589,8 @@ function DeviceSetupScreen({
                width: '32px',
                height: '32px',
                borderRadius: '10px',
-               background: isCurrentDevice ? `${brandColor}15` : `${station.color && station.color !== '#e5e7eb' && station.color !== '#e2e8f0' ? station.color : getStationColor(station.name)}15`,
-               color: isCurrentDevice ? brandColor : (station.color && station.color !== '#e5e7eb' && station.color !== '#e2e8f0' ? station.color : getStationColor(station.name)),
+               background: isCurrentDevice ? `${brandColor}15` : `${getStationColor(station.name, station.color)}15`,
+               color: isCurrentDevice ? brandColor : getStationColor(station.name, station.color),
                display: 'flex',
                alignItems: 'center',
                justifyContent: 'center',

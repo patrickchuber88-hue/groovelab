@@ -179,6 +179,14 @@ const adjustPositions = (stations: any[], containerWidth: number = 364) => {
 
   const containerHeight = containerWidth / 1.4;
   
+  // Safe margin is button radius (72px * 1.08 / 2 = 38.88px) + box shadow glow (4px) + margin rule (2px) = 44.88px.
+  // We round this up to 45px to guarantee at least 2px of empty space to the container borders.
+  const safeMarginPx = 45;
+  const safeMinX = Math.min(45, (safeMarginPx / containerWidth) * 100);
+  const safeMaxX = Math.max(55, 100 - safeMinX);
+  const safeMinY = Math.min(45, (safeMarginPx / containerHeight) * 100);
+  const safeMaxY = Math.max(55, 100 - safeMinY);
+  
   // Minimum gap of 4px: Button width/height is 72px, so minimum center-to-center is 72px + 4px = 76px.
   const minXDistPx = 76;
   const minYDistPx = 76;
@@ -243,16 +251,23 @@ const adjustPositions = (stations: any[], containerWidth: number = 364) => {
             items[j].y -= pushY;
           }
           
-          // Clamp individual positions to keep them inside the safe area (12% to 88% for X, 15% to 85% for Y)
-          items[i].x = Math.max(12, Math.min(88, items[i].x));
-          items[j].x = Math.max(12, Math.min(88, items[j].x));
-          items[i].y = Math.max(15, Math.min(85, items[i].y));
-          items[j].y = Math.max(15, Math.min(85, items[j].y));
+          // Clamp individual positions to keep them inside the safe area during force adjustment
+          items[i].x = Math.max(safeMinX, Math.min(safeMaxX, items[i].x));
+          items[j].x = Math.max(safeMinX, Math.min(safeMaxX, items[j].x));
+          items[i].y = Math.max(safeMinY, Math.min(safeMaxY, items[i].y));
+          items[j].y = Math.max(safeMinY, Math.min(safeMaxY, items[j].y));
         }
       }
     }
     if (!moved) break;
   }
+
+  // Ensure ALL items strictly adhere to the minimum edge distance, even if they had no collisions
+  items.forEach(item => {
+    item.x = Math.max(safeMinX, Math.min(safeMaxX, item.x));
+    item.y = Math.max(safeMinY, Math.min(safeMaxY, item.y));
+  });
+
   return items;
 };
 
@@ -2756,7 +2771,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                           gap: '2px',
                           textAlign: 'center',
                           boxShadow: isSelected 
-                            ? `0 0 0 4px ${stationColor}40, 0 8px 20px rgba(0, 0, 0, 0.15)`
+                            ? `0 0 25px ${stationColor}60, 0 8px 30px ${stationColor}30, 0 4px 12px rgba(0, 0, 0, 0.12)`
                             : '0 4px 10px rgba(0, 0, 0, 0.05)',
                           outline: 'none',
                           zIndex: isSelected ? 10 : 1,

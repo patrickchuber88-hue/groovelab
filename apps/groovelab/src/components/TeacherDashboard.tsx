@@ -295,13 +295,23 @@ const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, 
   );
 }, (prev, next) => prev.src === next.src);
 
-const getStationColor = (name: string | null | undefined) => {
+const getStationColor = (name: string | null | undefined, dbColor?: string | null) => {
   if (!name) return '#64748b';
+  
+  const isStandardIpad = /^ipad\s*\d+/i.test(name);
+  if (dbColor && dbColor !== '#e5e7eb' && dbColor !== '#e2e8f0' && dbColor !== '#cbd5e1') {
+    if (isStandardIpad && dbColor === '#64748b') {
+      // Fall through to number-based standard color
+    } else {
+      return dbColor;
+    }
+  }
+
   const lowerName = name.toLowerCase();
   if (lowerName.includes('lehrer') || lowerName.includes('teacher')) return '#22c55e'; // Green
-  const match = name.match(/\d+/);
-  if (!match) return '#64748b';
-  const num = parseInt(match[0]);
+  const matches = name.match(/\d+/g);
+  if (!matches) return '#64748b';
+  const num = parseInt(matches[matches.length - 1]);
   if (num === 1 || num === 2) return '#ef4444'; // Red
   if (num === 3 || num === 4) return '#a855f7'; // Purple
   if (num === 5 || num === 6) return '#3b82f6'; // Blue
@@ -6697,9 +6707,7 @@ export function TeacherDashboard({
                         {compressedActiveLayout.stations.map(station => {
                           const sName = station.rawStation.name || '';
                           const isTeacher = sName.toLowerCase().includes('lehrer') || sName.toLowerCase().includes('teacher');
-                          const instColor = station.rawStation.color && station.rawStation.color !== '#e5e7eb' && station.rawStation.color !== '#e2e8f0'
-                            ? station.rawStation.color
-                            : getStationColor(sName);
+                          const instColor = getStationColor(sName, station.rawStation.color);
 
                           // Align center coordinates relative to the bounding box
                           const alignedX = station.cx - minBoundX;
@@ -6812,9 +6820,7 @@ export function TeacherDashboard({
                     const sess = activeSessions.find(se => se.station_id === station.id);
                     const sName = station.name || '';
                     const num = parseInt(sName.match(/\d+/)?.[0] || '1');
-                    const instColor = station.color && station.color !== '#e5e7eb' && station.color !== '#e2e8f0'
-                      ? station.color
-                      : getStationColor(sName);
+                    const instColor = getStationColor(sName, station.color);
 
                     return (
                       <div key={station.id}>

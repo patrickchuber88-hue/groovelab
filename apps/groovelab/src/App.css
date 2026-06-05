@@ -877,3 +877,16 @@ div:hover > .photo-overlay {
   color: #ffffff !important;
 }
 
+/* Active background states for ensembles platform */
+.google-sidebar-item.active.ensembles, .sidebar-item.active.ensembles {
+  background: rgba(59, 130, 246, 0.08) !important;
+  color: #1d4ed8 !important;
+  font-weight: 700 !important;
+}
+
+.google-sidebar-item.active.ensembles .sidebar-icon-circle, .sidebar-item.active.ensembles .sidebar-icon-circle {
+  background: #3b82f6 !important;
+  color: #ffffff !important;
+}
+
+
