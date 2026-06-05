@@ -839,11 +839,49 @@ export function TeacherDashboard({
     };
   }, []);
 
+  const performDirectTeacherCheckin = async () => {
+    setCheckingInStatus('verifying');
+    const now = new Date().toISOString();
+    try {
+      // 1. Terminate existing sessions in DB
+      await supabase.from('sessions').update({ check_out_time: now }).eq('user_id', userId).is('check_out_time', null);
+      
+      // 2. Insert direct stationless session
+      const { data: sessData, error: sessErr } = await supabase
+        .from('sessions')
+        .insert({
+          user_id: userId,
+          station_id: null,
+          gps_verified: true,
+          check_in_time: now
+        })
+        .select('*, stations(name)')
+        .single();
+
+      if (sessErr) {
+        console.error('[Teacher Check-in] Error:', sessErr);
+        alert('Fehler beim Einchecken: ' + sessErr.message);
+        setCheckingInStatus('error');
+      } else {
+        console.log('[Teacher Check-in] Success:', sessData.id);
+        setCheckingInStatus('success');
+        if (onSessionChange) onSessionChange(sessData);
+      }
+    } catch (e: any) {
+      console.error('[Teacher Check-in] Unexpected Error:', e);
+      setCheckingInStatus('error');
+    }
+  };
+
   const handleGeofenceCheck = () => {
     // 1. Bypass check on localhost
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      setCheckingInStatus('success');
-      setShowKioskView(true);
+      if (isTeacher) {
+        performDirectTeacherCheckin();
+      } else {
+        setCheckingInStatus('success');
+        setShowKioskView(true);
+      }
       return;
     }
 
@@ -900,37 +938,7 @@ export function TeacherDashboard({
 
         if (isWithinAnyRoom) {
           if (isTeacher) {
-            setCheckingInStatus('verifying');
-            const now = new Date().toISOString();
-            try {
-              // 1. Terminate existing sessions in DB
-              await supabase.from('sessions').update({ check_out_time: now }).eq('user_id', userId).is('check_out_time', null);
-              
-              // 2. Insert direct stationless session
-              const { data: sessData, error: sessErr } = await supabase
-                .from('sessions')
-                .insert({
-                  user_id: userId,
-                  station_id: null,
-                  gps_verified: true,
-                  check_in_time: now
-                })
-                .select('*, stations(name)')
-                .single();
-
-              if (sessErr) {
-                console.error('[Teacher Check-in] Error:', sessErr);
-                alert('Fehler beim Einchecken: ' + sessErr.message);
-                setCheckingInStatus('error');
-              } else {
-                console.log('[Teacher Check-in] Success:', sessData.id);
-                setCheckingInStatus('success');
-                if (onSessionChange) onSessionChange(sessData);
-              }
-            } catch (e: any) {
-              console.error('[Teacher Check-in] Unexpected Error:', e);
-              setCheckingInStatus('error');
-            }
+            performDirectTeacherCheckin();
           } else {
             setCheckingInStatus('success');
             setShowKioskView(true);
