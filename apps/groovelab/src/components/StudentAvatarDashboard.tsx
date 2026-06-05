@@ -1692,10 +1692,15 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           .eq('student_id', studentId)
           .order('updated_at', { ascending: false });
 
-        // Apply asymmetric logic locally as fallback
-        const sanitized = (matrixItems || []).map((item: any) => {
-          return item;
+        // Apply asymmetric logic locally as fallback and deduplicate by topic_name
+        const uniqueItemsMap = new Map<string, any>();
+        (matrixItems || []).forEach((item: any) => {
+          const name = (item.topic_name || '').trim().toLowerCase();
+          if (name && !uniqueItemsMap.has(name)) {
+            uniqueItemsMap.set(name, item);
+          }
         });
+        const sanitized = Array.from(uniqueItemsMap.values());
 
         setProgressItems(sanitized);
       } catch (err) {
@@ -3132,11 +3137,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               
               {/* Card 1: XP */}
               <div style={{ 
-                background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', 
+                background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', 
                 borderRadius: '20px', 
                 color: 'white', 
                 padding: '16px', 
-                boxShadow: '0 4px 15px rgba(29, 78, 216, 0.15)',
+                boxShadow: '0 4px 15px rgba(99, 102, 241, 0.15)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '6px'
@@ -5657,6 +5662,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                   const currentWeekItems = progressItems.filter(item => 
                     !item.topic_name.startsWith('Hausaufgabe KW ') && 
+                    item.status !== 'MASTERED' && 
+                    item.status !== 'THEORY_DONE' &&
                     (item.is_current_homework || (item.updated_at && getISOWeekRaw(item.updated_at, 1) === currentWeekStr))
                   );
 
@@ -5673,6 +5680,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                   const prevWeekItems = progressItems.filter(item => 
                     !item.topic_name.startsWith('Hausaufgabe KW ') && 
+                    item.status !== 'MASTERED' && 
+                    item.status !== 'THEORY_DONE' && 
                     item.updated_at && 
                     getISOWeekRaw(item.updated_at, 1) === prevWeekStr
                   );

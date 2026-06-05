@@ -1891,7 +1891,16 @@ export function TeacherDashboard({
 
         const studentAvatar = avatarRes.data;
         const recentProgress = progressRes.data;
-        const matrixItems = matrixRes.data || [];
+        
+        // Deduplicate matrixItems by topic_name (latest wins)
+        const uniqueMatrixItemsMap = new Map<string, any>();
+        (matrixRes.data || []).forEach((item: any) => {
+          const name = (item.topic_name || '').trim().toLowerCase();
+          if (name && !uniqueMatrixItemsMap.has(name)) {
+            uniqueMatrixItemsMap.set(name, item);
+          }
+        });
+        const matrixItems = Array.from(uniqueMatrixItemsMap.values());
 
         const verifiedSongs = (recentProgress || []).map((p: any) => ({
           title: p.exercises?.title || 'Übungssong',
@@ -1919,6 +1928,8 @@ export function TeacherDashboard({
 
         const currentWeekItems = matrixItems.filter(item => 
           !item.topic_name.startsWith('Hausaufgabe KW ') && 
+          item.status !== 'MASTERED' && 
+          item.status !== 'THEORY_DONE' && 
           (item.is_current_homework || (item.updated_at && getISOWeekRaw(item.updated_at, 1) === currentWeekStr))
         );
 
@@ -1935,6 +1946,8 @@ export function TeacherDashboard({
 
         const prevWeekItems = matrixItems.filter(item => 
           !item.topic_name.startsWith('Hausaufgabe KW ') && 
+          item.status !== 'MASTERED' && 
+          item.status !== 'THEORY_DONE' && 
           item.updated_at && 
           getISOWeekRaw(item.updated_at, 1) === prevWeekStr
         );
@@ -2165,7 +2178,16 @@ export function TeacherDashboard({
 
             const studentAvatar = avatarRes.data;
             const recentProgress = progressRes.data;
-            const matrixItems = matrixRes.data || [];
+            
+            // Deduplicate matrixItems by topic_name (latest wins)
+            const uniqueMatrixItemsMap = new Map<string, any>();
+            (matrixRes.data || []).forEach((item: any) => {
+              const name = (item.topic_name || '').trim().toLowerCase();
+              if (name && !uniqueMatrixItemsMap.has(name)) {
+                uniqueMatrixItemsMap.set(name, item);
+              }
+            });
+            const matrixItems = Array.from(uniqueMatrixItemsMap.values());
 
             const verifiedSongs = (recentProgress || []).map((p: any) => ({
               title: p.exercises?.title || 'Übungssong',
@@ -2193,6 +2215,8 @@ export function TeacherDashboard({
 
             const currentWeekItems = matrixItems.filter(item => 
               !item.topic_name.startsWith('Hausaufgabe KW ') && 
+              item.status !== 'MASTERED' && 
+              item.status !== 'THEORY_DONE' && 
               (item.is_current_homework || (item.updated_at && getISOWeekRaw(item.updated_at, 1) === currentWeekStr))
             );
 
@@ -2209,6 +2233,8 @@ export function TeacherDashboard({
 
             const prevWeekItems = matrixItems.filter(item => 
               !item.topic_name.startsWith('Hausaufgabe KW ') && 
+              item.status !== 'MASTERED' && 
+              item.status !== 'THEORY_DONE' && 
               item.updated_at && 
               getISOWeekRaw(item.updated_at, 1) === prevWeekStr
             );

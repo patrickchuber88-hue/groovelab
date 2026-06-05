@@ -179,10 +179,15 @@ export async function getProgressHandler(req: Request, res: Response): Promise<v
       return;
     }
 
-    // 3. Process and sanitize based on premium status
-    const sanitizedProgress = (progressItems || []).map(item => {
-      return item;
+    // 3. Process and sanitize based on premium status, deduplicating by topic_name (latest wins)
+    const uniqueItemsMap = new Map<string, any>();
+    (progressItems || []).forEach(item => {
+      const name = (item.topic_name || '').trim().toLowerCase();
+      if (name && !uniqueItemsMap.has(name)) {
+        uniqueItemsMap.set(name, item);
+      }
     });
+    const sanitizedProgress = Array.from(uniqueItemsMap.values());
 
     res.status(200).json({
       success: true,
