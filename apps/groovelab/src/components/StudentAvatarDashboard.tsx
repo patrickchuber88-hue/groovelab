@@ -3228,8 +3228,18 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 </div>
                 <div>
                   <h4 style={{ fontWeight: 850, fontSize: '22px', color: '#1e293b', margin: 0 }}>Fokus-Timer</h4>
-                  <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '2px 0 0 0', fontWeight: 600 }}>
-                    {isExtraTime ? '🏆 Du bist in der Extra-Zeit!' : '📱 Handy flach hinlegen & Fokus halten'}
+                  <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '2px 0 0 0', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    {isExtraTime ? (
+                      <>
+                        <Award size={13} style={{ color: '#eab308', flexShrink: 0 }} />
+                        <span>Du bist in der Extra-Zeit!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Smartphone size={13} style={{ color: '#3b82f6', flexShrink: 0 }} />
+                        <span>Handy flach hinlegen & Fokus halten</span>
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
