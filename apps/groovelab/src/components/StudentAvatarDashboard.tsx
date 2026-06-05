@@ -3910,6 +3910,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 {(() => {
                   const brandColor = studentUser?.schools?.brand_color || '#16a34a';
                   
+                  const isMastered = (sng: any) => {
+                    const progressItem = progressItems.find(item => 
+                      item.topic_name.toLowerCase() === sng.title.toLowerCase() ||
+                      item.topic_name.toLowerCase().includes(sng.title.toLowerCase())
+                    );
+                    return progressItem?.status === 'MASTERED';
+                  };
+                  
                   const filteredSongs = songs.filter(song => {
                     const matchesSearch = songSearch === '' || 
                       song.title?.toLowerCase().includes(songSearch.toLowerCase()) || 
@@ -3919,7 +3927,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       item.topic_name.toLowerCase().includes(song.title.toLowerCase())
                     );
                     return matchesSearch && song.is_campus_active && isAssigned;
-                  }).sort((a, b) => (a.title || '').localeCompare(b.title || '', 'de', { sensitivity: 'base' }));
+                  }).sort((a, b) => {
+                    const aMastered = isMastered(a);
+                    const bMastered = isMastered(b);
+                    if (aMastered && !bMastered) return 1;
+                    if (!aMastered && bMastered) return -1;
+                    return (a.title || '').localeCompare(b.title || '', 'de', { sensitivity: 'base' });
+                  });
 
                   const filteredLehrwerke = lehrwerke.filter(item => {
                     const matchesSearch = songSearch === '' || 
