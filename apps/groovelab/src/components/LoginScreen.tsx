@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle } from 'lucide-react';
+import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock } from 'lucide-react';
 import { getDistanceFromLatLonInM } from '../utils/geo';
 import jsQR from 'jsqr';
 
@@ -265,8 +265,12 @@ const getStationColor = (name: string | null | undefined, dbColor?: string | nul
   if (!name) return '#64748b';
   
   const isStandardIpad = /^ipad\s*\d+/i.test(name);
-  if (!isStandardIpad && dbColor && dbColor !== '#e5e7eb' && dbColor !== '#e2e8f0' && dbColor !== '#cbd5e1' && dbColor !== '#64748b') {
-    return dbColor;
+  if (dbColor && dbColor !== '#e5e7eb' && dbColor !== '#e2e8f0' && dbColor !== '#cbd5e1') {
+    if (isStandardIpad && dbColor === '#64748b') {
+      // Fall through to number-based standard color
+    } else {
+      return dbColor;
+    }
   }
 
   const lowerName = name.toLowerCase();
@@ -2713,6 +2717,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     const stationColor = getStationColor(station.name, station.color);
 
                     const isSelected = selectedKioskStationId === station.id;
+                    const isYellow = stationColor.toLowerCase() === '#eab308';
 
                     return (
                       <button
@@ -2733,17 +2738,17 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                           width: '72px',
                           height: '72px',
                           borderRadius: '16px',
-                          border: isSelected 
-                            ? `3px solid ${schoolData?.primary_color || '#eab308'}`
-                            : (isOccupied ? '2px solid #ef4444' : `2px solid ${stationColor}`),
+                          border: isSelected
+                            ? `2px solid ${isYellow ? 'rgba(9, 9, 11, 0.15)' : 'rgba(255, 255, 255, 0.25)'}`
+                            : `2px solid ${stationColor}`,
                           background: isSelected 
-                            ? `${schoolData?.primary_color || '#eab308'}25`
-                            : (isOccupied 
-                              ? 'rgba(239, 68, 68, 0.12)' 
-                              : `${stationColor}15`),
-                          color: isGroovelabKiosk ? '#1e293b' : '#ffffff',
+                            ? stationColor
+                            : `${stationColor}15`,
+                          color: isSelected
+                            ? (isYellow ? '#09090b' : '#ffffff')
+                            : (isGroovelabKiosk ? '#1e293b' : '#ffffff'),
                           cursor: 'pointer',
-                          transition: 'all 0.2s ease',
+                          transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)', // Spring-like feel
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
@@ -2751,32 +2756,37 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                           gap: '2px',
                           textAlign: 'center',
                           boxShadow: isSelected 
-                            ? `0 0 15px ${schoolData?.primary_color || '#eab308'}40`
+                            ? `0 0 0 4px ${stationColor}40, 0 8px 20px rgba(0, 0, 0, 0.15)`
                             : '0 4px 10px rgba(0, 0, 0, 0.05)',
                           outline: 'none',
-                          zIndex: isSelected ? 10 : 1
+                          zIndex: isSelected ? 10 : 1,
+                          opacity: isSelected ? 1 : (isOccupied ? 0.7 : 1)
                         }}
                         title={`${station.name} (${isOccupied ? 'Besetzt' : 'Frei'})`}
                       >
                         {station.instrument && (
-                          <span style={{ fontSize: '7px', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.6, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', padding: '0 2px' }}>
+                          <span style={{ fontSize: '7px', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: isSelected ? 0.8 : 0.6, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', padding: '0 2px' }}>
                             {station.instrument}
                           </span>
                         )}
                         <span style={{ fontSize: '10px', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', padding: '0 2px', lineHeight: 1.1 }}>
                           {station.name}
                         </span>
-                        <div style={{ 
-                          width: '6px', 
-                          height: '6px', 
-                          borderRadius: '50%', 
-                          background: isSelected
-                            ? (schoolData?.primary_color || '#eab308')
-                            : (isOccupied ? '#ef4444' : '#22c55e'),
-                          border: '1px solid rgba(255,255,255,0.2)',
-                          marginTop: '2px',
-                          boxShadow: isSelected ? `0 0 8px ${schoolData?.primary_color || '#eab308'}` : 'none'
-                        }} />
+                        {isOccupied ? (
+                          <Lock size={10} style={{ color: isSelected ? (isYellow ? '#09090b' : '#ffffff') : (isGroovelabKiosk ? '#ef4444' : '#fca5a5'), marginTop: '2px' }} />
+                        ) : (
+                          <div style={{ 
+                            width: '6px', 
+                            height: '6px', 
+                            borderRadius: '50%', 
+                            background: isSelected
+                              ? (isYellow ? '#09090b' : '#ffffff')
+                              : '#22c55e',
+                            border: isSelected ? 'none' : '1px solid rgba(255,255,255,0.2)',
+                            marginTop: '3px',
+                            boxShadow: isSelected ? `0 0 6px ${isYellow ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.8)'}` : 'none'
+                          }} />
+                        )}
                       </button>
                     );
                   })}
