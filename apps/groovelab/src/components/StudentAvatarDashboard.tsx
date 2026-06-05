@@ -1767,6 +1767,21 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     };
   }, [studentId, activeTab]);
 
+  useEffect(() => {
+    if (!studentUser?.school_id) return;
+
+    const channel = supabase
+      .channel('realtime_student_class_focus_logs')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fokus_logs' }, () => {
+        fetchClassHighlights(studentUser.school_id, studentUser.teacher_id);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [studentUser?.school_id, studentUser?.teacher_id]);
+
   const fetchRanking = async () => {
     setRankingLoading(true);
     setRankingError(null);
@@ -4333,9 +4348,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               {/* Top Section: Header & Contribution */}
               {(() => {
                 const brandColor = studentUser?.schools?.brand_color || '#16a34a';
-                const totalSchoolMins = classMins + otherClassMins;
+                const activeSessionMins = sessionActive ? Math.round(secondsElapsed / 60) : 0;
+                const liveClassMins = classMins + activeSessionMins;
+                const liveClassWeeklyFocus = classWeeklyFocus + activeSessionMins;
+
+                const totalSchoolMins = liveClassMins + otherClassMins;
                 const contributionPercent = totalSchoolMins > 0 
-                  ? Math.round((classMins / totalSchoolMins) * 100) 
+                  ? Math.round((liveClassMins / totalSchoolMins) * 100) 
                   : 0;
 
                 // MoM performance percentage
@@ -4352,13 +4371,15 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 const currentMonthMins = classFocusLogs.filter(log => {
                   if (!log.created_at) return false;
                   const d = new Date(log.created_at);
-                  return classmateIds.includes(log.user_id) && d >= startOfCurrentMonth && d <= now;
-                }).reduce((sum, log) => sum + (log.duration_minutes || 0), 0);
+                  const isClassmateOrSelf = classmateIds.includes(log.user_id) || log.user_id === studentId;
+                  return isClassmateOrSelf && d >= startOfCurrentMonth && d <= now;
+                }).reduce((sum, log) => sum + (log.duration_minutes || 0), 0) + activeSessionMins;
 
                 const previousMonthMins = classFocusLogs.filter(log => {
                   if (!log.created_at) return false;
                   const d = new Date(log.created_at);
-                  return classmateIds.includes(log.user_id) && d >= startOfPreviousMonth && d <= limitOfPreviousMonth;
+                  const isClassmateOrSelf = classmateIds.includes(log.user_id) || log.user_id === studentId;
+                  return isClassmateOrSelf && d >= startOfPreviousMonth && d <= limitOfPreviousMonth;
                 }).reduce((sum, log) => sum + (log.duration_minutes || 0), 0);
 
                 const momPercent = previousMonthMins > 0
@@ -4384,13 +4405,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   ? Math.round((activeThisWeekCount / classCount) * 100)
                   : 0;
 
-                const pieData = classMins === 0 && otherClassMins === 0 
+                const pieData = liveClassMins === 0 && otherClassMins === 0 
                   ? [
                       { name: 'Unsere Klasse', value: 0.1, color: brandColor },
                       { name: 'Restliche Schule', value: 0.9, color: '#e2e8f0' }
                     ]
                   : [
-                      { name: 'Unsere Klasse', value: classMins, color: brandColor },
+                      { name: 'Unsere Klasse', value: liveClassMins, color: brandColor },
                       { name: 'Restliche Schule', value: otherClassMins, color: '#cbd5e1' }
                     ];
 
@@ -4411,13 +4432,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '12px' }}>
                         {[
                           { label: 'Deine Klasse', value: classCount, icon: Users, color: brandColor, bg: `${brandColor}08` },
-                          { label: 'Klassen-Übezeit (Gesamt)', value: formatMins(classMins), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
-                          { label: 'Klassen-Übezeit (Woche)', value: formatMins(classWeeklyFocus), icon: TrendingUp, color: '#10b981', bg: '#f0fdf4' },
+                          { label: 'Klassen-Übezeit (Monat)', value: formatMins(currentMonthMins), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
+                          { label: 'Klassen-Übezeit (Woche)', value: formatMins(liveClassWeeklyFocus), icon: TrendingUp, color: '#10b981', bg: '#f0fdf4' },
                           { label: 'Beitrag zur Schule', value: `${contributionPercent}%`, icon: Shield, color: '#6366f1', bg: '#f5f3ff' },
                           { label: 'Trend zum Vormonat', value: momPercent >= 0 ? `+${momPercent}%` : `${momPercent}%`, icon: Activity, color: momPercent >= 0 ? '#10b981' : '#ef4444', bg: momPercent >= 0 ? '#f0fdf4' : '#fef2f2' },
                           { label: 'Klassen-Aktivität', value: `${activityRate}%`, icon: Zap, color: '#ec4899', bg: '#fdf2f8' },
-                          { label: 'Ø Zeit / Kopf (Woche)', value: formatMins(classCount > 0 ? Math.round(classWeeklyFocus / classCount) : 0), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
-                          { label: 'Ø Zeit / Kopf (Gesamt)', value: formatMins(classCount > 0 ? Math.round(classMins / classCount) : 0), icon: Award, color: brandColor, bg: `${brandColor}08` }
+                          { label: 'Ø Zeit / Kopf (Woche)', value: formatMins(classCount > 0 ? Math.round(liveClassWeeklyFocus / classCount) : 0), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
+                          { label: 'Ø Zeit / Kopf (Monat)', value: formatMins(classCount > 0 ? Math.round(currentMonthMins / classCount) : 0), icon: Award, color: brandColor, bg: `${brandColor}08` }
                         ].map((stat, idx) => (
                           <div key={idx} style={{ padding: '12px 14px', background: stat.bg, borderRadius: '24px', border: `1px solid ${stat.color}15`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '92px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -4443,15 +4464,15 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         Wie viel trägt deine Klasse bei?
                       </p>
 
-                      <div style={{ width: '100%', height: '110px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                      <div style={{ width: '100%', height: '130px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
                         <ResponsiveContainer width="100%" height="100%">
                           <RechartsPieChart>
                             <Pie
                               data={pieData}
                               cx="50%"
                               cy="50%"
-                              innerRadius={36}
-                              outerRadius={52}
+                              innerRadius={42}
+                              outerRadius={58}
                               paddingAngle={3}
                               dataKey="value"
                             >
@@ -4479,7 +4500,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: brandColor }} />
                             <span style={{ fontSize: '0.72rem', fontWeight: 750, color: '#334155' }}>Unsere Klasse</span>
                           </div>
-                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>{formatMins(classMins)}</span>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>{formatMins(liveClassMins)}</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: '#f8fafc', borderRadius: '10px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -4747,11 +4768,16 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             const logsForMonth = classFocusLogs.filter(log => {
                               if (!log.created_at) return false;
                               const logDate = new Date(log.created_at);
-                              return classmateIds.includes(log.user_id) && logDate.getMonth() === item.month && logDate.getFullYear() === item.year;
+                              const isClassmateOrSelf = (classmateIds || []).includes(log.user_id) || log.user_id === studentId;
+                              return isClassmateOrSelf && logDate.getMonth() === item.month && logDate.getFullYear() === item.year;
                             });
-                            const totalSecs = logsForMonth.reduce((sum, log) => {
+                            let totalSecs = logsForMonth.reduce((sum, log) => {
                               return sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60));
                             }, 0);
+
+                            if (sessionActive && secondsElapsed > 0 && item.month === now.getMonth() && item.year === now.getFullYear()) {
+                              totalSecs += secondsElapsed;
+                            }
 
                             const minutes = Math.round(totalSecs / 60);
 

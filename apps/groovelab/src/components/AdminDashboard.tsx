@@ -2116,6 +2116,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, () => {
         fetchData();
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fokus_logs' }, () => {
+        fetchData();
+      })
       .subscribe();
       
     return () => { supabase.removeChannel(channel); };
@@ -2182,6 +2185,9 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     if (activePlatform === 'campus') studentListSq = studentListSq.eq('is_campus_active', true);
     else studentListSq = studentListSq.eq('is_groovelab_active', true);
     const { data: schoolStudents } = await studentListSq;
+    if (schoolStudents) {
+      setStudents(schoolStudents);
+    }
 
     let songSq = supabase.from('songs').select('*', { count: 'exact', head: true }).eq('school_id', schoolId);
     if (activePlatform === 'campus') songSq = songSq.eq('is_campus_active', true);
@@ -2201,7 +2207,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     // Fetch focus logs filtered by active students
     let focusLogsSq = supabase
       .from('fokus_logs')
-      .select('user_id, duration_minutes, created_at, users!inner(school_id, is_campus_active, is_groovelab_active)')
+      .select('user_id, duration_minutes, duration_seconds, created_at, users!inner(school_id, is_campus_active, is_groovelab_active)')
       .eq('users.school_id', schoolId);
     if (activePlatform === 'campus') focusLogsSq = focusLogsSq.eq('users.is_campus_active', true);
     else focusLogsSq = focusLogsSq.eq('users.is_groovelab_active', true);
@@ -8756,13 +8762,13 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '12px' }}>
                 {[
                   { label: 'Deine Schüler', value: stats.myClassCount || 0, icon: Users, color: brandColor, bg: `${brandColor}08` },
-                  { label: 'Klassen-Übezeit (Gesamt)', value: formatMins(myClassMins), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
+                  { label: 'Klassen-Übezeit (Monat)', value: formatMins(currentMonthMins), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
                   { label: 'Klassen-Übezeit (Woche)', value: formatMins(classWeeklyMins), icon: TrendingUp, color: '#10b981', bg: '#f0fdf4' },
                   { label: 'Beitrag zur Schule', value: `${contributionPercent}%`, icon: Shield, color: '#6366f1', bg: '#f5f3ff' },
                   { label: 'Trend zum Vormonat', value: momPercent >= 0 ? `+${momPercent}%` : `${momPercent}%`, icon: Activity, color: momPercent >= 0 ? '#10b981' : '#ef4444', bg: momPercent >= 0 ? '#f0fdf4' : '#fef2f2' },
                   { label: 'Klassen-Aktivität', value: `${activityRate}%`, icon: Zap, color: '#ec4899', bg: '#fdf2f8' },
                   { label: 'Ø Zeit / Kopf (Woche)', value: formatMins(classCount > 0 ? Math.round(classWeeklyMins / classCount) : 0), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
-                  { label: 'Ø Zeit / Kopf (Gesamt)', value: formatMins(classCount > 0 ? Math.round(myClassMins / classCount) : 0), icon: Award, color: brandColor, bg: `${brandColor}08` }
+                  { label: 'Ø Zeit / Kopf (Monat)', value: formatMins(classCount > 0 ? Math.round(currentMonthMins / classCount) : 0), icon: Award, color: brandColor, bg: `${brandColor}08` }
                 ].map((stat, idx) => (
                   <div key={idx} style={{ padding: '12px 14px', background: stat.bg, borderRadius: '24px', border: `1px solid ${stat.color}15`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '92px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -8788,15 +8794,15 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 Wie viel trägt deine Klasse bei?
               </p>
 
-              <div style={{ width: '100%', height: '110px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+              <div style={{ width: '100%', height: '130px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <RechartsPieChart>
                     <Pie
                       data={pieData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={36}
-                      outerRadius={52}
+                      innerRadius={42}
+                      outerRadius={58}
                       paddingAngle={3}
                       dataKey="value"
                     >
