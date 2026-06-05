@@ -1425,6 +1425,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [fokusLogs, setFokusLogs] = useState<any[]>([]);
   const [isExtraTime, setIsExtraTime] = useState(false);
   const [hasCompletedTargetToday, setHasCompletedTargetToday] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState<'logbook' | 'stats'>('logbook');
 
   const getTargetMinutes = (streak: number) => {
     if (streak >= 9) return 10;
@@ -3482,177 +3483,213 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             flexDirection: 'column',
             gap: '18px'
           }}>
-            {/* Jahres-Statistik Header */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid #f1f5f9', paddingBottom: '14px' }}>
-              <div style={{ background: '#ecfdf5', color: '#10b981', padding: '8px', borderRadius: '12px' }}>
-                <Calendar size={18} />
+            {/* Sidebar View Switcher Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '14px', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ 
+                  background: sidebarTab === 'logbook' ? '#fff7ed' : '#ecfdf5', 
+                  color: sidebarTab === 'logbook' ? '#ea580c' : '#10b981', 
+                  padding: '8px', 
+                  borderRadius: '12px',
+                  transition: 'all 0.3s ease'
+                }}>
+                  {sidebarTab === 'logbook' ? <Flame size={18} fill="currentColor" /> : <Calendar size={18} />}
+                </div>
+                <div>
+                  <h4 style={{ fontWeight: 850, fontSize: '18px', color: '#1e293b', margin: 0 }}>
+                    {sidebarTab === 'logbook' ? 'Log-Buch' : 'Jahres-Statistik'}
+                  </h4>
+                  <p style={{ fontSize: '0.7rem', color: '#94a3b8', margin: '2px 0 0 0', fontWeight: 600 }}>
+                    {sidebarTab === 'logbook' ? 'Tägliche Übe-Einträge' : 'Übeminuten (Sep - Aug)'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h4 style={{ fontWeight: 850, fontSize: '20px', color: '#1e293b', margin: 0 }}>Jahres-Statistik</h4>
-                <p style={{ fontSize: '0.72rem', color: '#94a3b8', margin: '2px 0 0 0', fontWeight: 600 }}>Übeminuten pro Monat (Sep - Aug)</p>
-              </div>
+              
+              {/* Toggle Button */}
+              <button
+                onClick={() => setSidebarTab(sidebarTab === 'logbook' ? 'stats' : 'logbook')}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '6px 12px',
+                  color: '#475569',
+                  fontSize: '0.68rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#e2e8f0'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
+              >
+                {sidebarTab === 'logbook' ? (
+                  <>
+                    <Calendar size={12} />
+                    <span>Statistik</span>
+                  </>
+                ) : (
+                  <>
+                    <Flame size={12} fill="currentColor" />
+                    <span>Log-Buch</span>
+                  </>
+                )}
+              </button>
             </div>
 
-            {/* Jahres-Statistik Grid */}
-            {(() => {
-              const now = new Date();
-              const currentMonth = now.getMonth();
-              const startYear = currentMonth >= 8 ? now.getFullYear() : now.getFullYear() - 1;
-              const monthsList = [
-                { month: 8, label: 'Sep', year: startYear },
-                { month: 9, label: 'Okt', year: startYear },
-                { month: 10, label: 'Nov', year: startYear },
-                { month: 11, label: 'Dez', year: startYear },
-                { month: 0, label: 'Jan', year: startYear + 1 },
-                { month: 1, label: 'Feb', year: startYear + 1 },
-                { month: 2, label: 'Mrz', year: startYear + 1 },
-                { month: 3, label: 'Apr', year: startYear + 1 },
-                { month: 4, label: 'Mai', year: startYear + 1 },
-                { month: 5, label: 'Jun', year: startYear + 1 },
-                { month: 6, label: 'Jul', year: startYear + 1 },
-                { month: 7, label: 'Aug', year: startYear + 1 }
-              ];
+            {/* Tab Panel Switcher */}
+            {sidebarTab === 'stats' ? (
+              /* Jahres-Statistik Grid */
+              (() => {
+                const now = new Date();
+                const currentMonth = now.getMonth();
+                const startYear = currentMonth >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+                const monthsList = [
+                  { month: 8, label: 'Sep', year: startYear },
+                  { month: 9, label: 'Okt', year: startYear },
+                  { month: 10, label: 'Nov', year: startYear },
+                  { month: 11, label: 'Dez', year: startYear },
+                  { month: 0, label: 'Jan', year: startYear + 1 },
+                  { month: 1, label: 'Feb', year: startYear + 1 },
+                  { month: 2, label: 'Mrz', year: startYear + 1 },
+                  { month: 3, label: 'Apr', year: startYear + 1 },
+                  { month: 4, label: 'Mai', year: startYear + 1 },
+                  { month: 5, label: 'Jun', year: startYear + 1 },
+                  { month: 6, label: 'Jul', year: startYear + 1 },
+                  { month: 7, label: 'Aug', year: startYear + 1 }
+                ];
 
-              return (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '4px' }}>
-                  {monthsList.map(item => {
-                    const logsForMonth = fokusLogs.filter(log => {
-                      if (!log.created_at) return false;
-                      const logDate = new Date(log.created_at);
-                      return logDate.getMonth() === item.month && logDate.getFullYear() === item.year;
-                    });
-                    let totalSecs = logsForMonth.reduce((sum, log) => {
-                      return sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60));
-                    }, 0);
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }} className="animation-fade-in">
+                    {monthsList.map(item => {
+                      const logsForMonth = fokusLogs.filter(log => {
+                        if (!log.created_at) return false;
+                        const logDate = new Date(log.created_at);
+                        return logDate.getMonth() === item.month && logDate.getFullYear() === item.year;
+                      });
+                      let totalSecs = logsForMonth.reduce((sum, log) => {
+                        return sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60));
+                      }, 0);
+                      
+                      if (sessionActive && secondsElapsed > 0 && item.month === now.getMonth() && item.year === now.getFullYear()) {
+                        totalSecs += secondsElapsed;
+                      }
+
+                      const minutes = Math.round(totalSecs / 60);
+                      const isActive = minutes > 0;
+
+                      return (
+                        <div 
+                          key={`${item.month}-${item.year}`}
+                          style={{
+                            background: isActive ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' : '#f8fafc',
+                            border: isActive ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                            borderRadius: '14px',
+                            padding: '10px 4px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '3px',
+                            minHeight: '64px',
+                            textAlign: 'center',
+                            boxShadow: isActive ? '0 2px 6px rgba(22, 163, 74, 0.08)' : 'none',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <span style={{ 
+                            fontSize: '0.62rem', 
+                            fontWeight: 800, 
+                            color: isActive ? '#15803d' : '#94a3b8',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.04em'
+                          }}>
+                            {item.label}
+                          </span>
+                          <span style={{ 
+                            fontSize: '0.85rem', 
+                            fontWeight: 900, 
+                            color: isActive ? '#166534' : '#64748b' 
+                          }}>
+                            {minutes}
+                            <span style={{ fontSize: '0.6rem', fontWeight: 700, marginLeft: '1px', color: isActive ? '#15803d' : '#94a3b8' }}>m</span>
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()
+            ) : (
+              /* List entries */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '480px', overflowY: 'auto', paddingRight: '4px' }} className="animation-fade-in">
+                {(() => {
+                  const grouped = getGroupedLogs();
+                  if (grouped.length === 0) {
+                    return (
+                      <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem', fontStyle: 'italic', padding: '40px 10px' }}>
+                        Noch keine Einträge im Log-Buch vorhanden. Starte deine erste Fokus-Session! 🚀
+                      </div>
+                    );
+                  }
+
+                  return grouped.map((group, idx) => {
+                    const focusMins = Math.round(group.focusSeconds / 60);
+                    const extraMins = Math.floor(group.extraSeconds / 60);
+                    const extraSecs = group.extraSeconds % 60;
                     
-                    if (sessionActive && secondsElapsed > 0 && item.month === now.getMonth() && item.year === now.getFullYear()) {
-                      totalSecs += secondsElapsed;
+                    const textParts = [];
+                    if (group.focusSeconds > 0) {
+                      textParts.push(`Fokuszeit (+${focusMins}m)`);
                     }
-
-                    const minutes = Math.round(totalSecs / 60);
-                    const isActive = minutes > 0;
+                    if (group.extraSeconds > 0) {
+                      textParts.push(`+${extraMins}:${String(extraSecs).padStart(2, '0')} (extra)`);
+                    }
+                    const statusText = textParts.join(' - ');
 
                     return (
                       <div 
-                        key={`${item.month}-${item.year}`}
-                        style={{
-                          background: isActive ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' : '#f8fafc',
-                          border: isActive ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                          borderRadius: '12px',
-                          padding: '8px 4px',
+                        key={idx}
+                        style={{ 
+                          background: '#f8fafc', 
+                          border: '1px solid #e2e8f0', 
+                          borderRadius: '16px', 
+                          padding: '12px 14px',
                           display: 'flex',
-                          flexDirection: 'column',
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '2px',
-                          minHeight: '52px',
-                          textAlign: 'center',
-                          boxShadow: isActive ? '0 2px 6px rgba(22, 163, 74, 0.08)' : 'none',
-                          transition: 'all 0.2s ease'
+                          gap: '12px',
+                          borderLeft: `4px solid ${group.focusSeconds > 0 ? '#ea580c' : '#10b981'}`
                         }}
                       >
-                        <span style={{ 
-                          fontSize: '0.6rem', 
-                          fontWeight: 800, 
-                          color: isActive ? '#15803d' : '#94a3b8',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.03em'
-                        }}>
-                          {item.label}
-                        </span>
-                        <span style={{ 
-                          fontSize: '0.8rem', 
-                          fontWeight: 900, 
-                          color: isActive ? '#166534' : '#64748b' 
-                        }}>
-                          {minutes}
-                          <span style={{ fontSize: '0.55rem', fontWeight: 700, marginLeft: '1px', color: isActive ? '#15803d' : '#94a3b8' }}>m</span>
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', whiteSpace: 'nowrap' }}>
+                            {group.date}
+                          </span>
+                          {statusText && (
+                            <span style={{ fontSize: '0.74rem', fontWeight: 650, color: '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              - {statusText}
+                            </span>
+                          )}
+                        </div>
+                        
+                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
+                          <Flame size={12} fill="#ea580c" color="#ea580c" />
+                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ea580c' }}>
+                            {group.flameLevel}
+                          </span>
+                        </div>
                       </div>
                     );
-                  })}
-                </div>
-              );
-            })()}
-
-            {/* Separator */}
-            <div style={{ borderTop: '1px dashed #e2e8f0', margin: '4px 0' }}></div>
-
-            {/* Sidebar Header */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid #f1f5f9', paddingBottom: '14px' }}>
-              <div style={{ background: '#fff7ed', color: '#ea580c', padding: '8px', borderRadius: '12px' }}>
-                <Flame size={18} fill="currentColor" />
+                  });
+                })()}
               </div>
-              <div>
-                <h4 style={{ fontWeight: 850, fontSize: '20px', color: '#1e293b', margin: 0 }}>Flammen Log-Buch</h4>
-                <p style={{ fontSize: '0.72rem', color: '#94a3b8', margin: '2px 0 0 0', fontWeight: 600 }}>Tägliche Fokuszeit-Einträge</p>
-              </div>
-            </div>
-
-            {/* List entries */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '300px', overflowY: 'auto', paddingRight: '4px' }}>
-              {(() => {
-                const grouped = getGroupedLogs();
-                if (grouped.length === 0) {
-                  return (
-                    <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem', fontStyle: 'italic', padding: '40px 10px' }}>
-                      Noch keine Einträge im Log-Buch vorhanden. Starte deine erste Fokus-Session! 🚀
-                    </div>
-                  );
-                }
-
-                return grouped.map((group, idx) => {
-                  const focusMins = Math.round(group.focusSeconds / 60);
-                  const extraMins = Math.floor(group.extraSeconds / 60);
-                  const extraSecs = group.extraSeconds % 60;
-                  
-                  const textParts = [];
-                  if (group.focusSeconds > 0) {
-                    textParts.push(`Fokuszeit (+${focusMins}m)`);
-                  }
-                  if (group.extraSeconds > 0) {
-                    textParts.push(`+${extraMins}:${String(extraSecs).padStart(2, '0')} (extra)`);
-                  }
-                  const statusText = textParts.join(' - ');
-
-                  return (
-                    <div 
-                      key={idx}
-                      style={{ 
-                        background: '#f8fafc', 
-                        border: '1px solid #e2e8f0', 
-                        borderRadius: '16px', 
-                        padding: '12px 14px',
-                        display: 'flex',
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: '12px',
-                        borderLeft: `4px solid ${group.focusSeconds > 0 ? '#ea580c' : '#10b981'}`
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
-                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', whiteSpace: 'nowrap' }}>
-                          {group.date}
-                        </span>
-                        {statusText && (
-                          <span style={{ fontSize: '0.74rem', fontWeight: 650, color: '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            - {statusText}
-                          </span>
-                        )}
-                      </div>
-                      
-                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
-                        <Flame size={12} fill="#ea580c" color="#ea580c" />
-                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ea580c' }}>
-                          {group.flameLevel}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                });
-              })()}
-            </div>
+            )}
           </div>
 
         </div>
