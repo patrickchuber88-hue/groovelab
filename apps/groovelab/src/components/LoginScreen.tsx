@@ -1877,12 +1877,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     <div style={{ 
       position: 'fixed',
       inset: 0,
-      backgroundColor: '#f8fafc', 
+      backgroundColor: '#34a853', // Solid Campus brand green
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      padding: '40px 20px',
-      fontFamily: 'Inter, system-ui, sans-serif',
+      padding: '50px 20px',
+      fontFamily: '"Outfit", "Inter", -apple-system, sans-serif',
       zIndex: 9999,
       overflowY: 'auto'
     }}>
@@ -1894,13 +1894,18 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          marginBottom: '16px'
+          marginBottom: '24px',
+          background: 'rgba(255, 255, 255, 0.95)',
+          padding: '12px 28px',
+          borderRadius: '24px',
+          boxShadow: '0 12px 30px rgba(0,0,0,0.12)',
+          border: '1px solid rgba(255, 255, 255, 0.8)'
         }}>
           <img 
             src={schoolData.logo_url} 
             alt="Logo" 
             style={{ 
-              maxHeight: '100px',
+              maxHeight: '76px',
               maxWidth: '100%',
               objectFit: 'contain'
             }} 
@@ -1908,19 +1913,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         </div>
       ) : (
         <div className="loading-pulse" style={{
-          width: '70px',
-          height: '70px',
-          background: '#ffffff',
+          width: '76px',
+          height: '76px',
+          background: 'rgba(255, 255, 255, 0.95)',
           borderRadius: '24px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          marginBottom: '16px',
-          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.05)',
-          border: '1px solid #e2e8f0',
+          marginBottom: '24px',
+          boxShadow: '0 12px 30px rgba(0, 0, 0, 0.12)',
+          border: '1px solid rgba(255, 255, 255, 0.8)',
           overflow: 'hidden'
         }}>
-          <Music size={36} color={schoolData?.primary_color || "#eab308"} />
+          <Music size={36} color={schoolData?.primary_color || "#0f766e"} />
         </div>
       )}
 
@@ -1936,20 +1941,21 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           });
         }}
         style={{ 
-          fontSize: '30px', 
-          fontWeight: 1000, 
-          color: '#0f172a', 
-          marginBottom: '4px', 
+          fontSize: '32px', 
+          fontWeight: 900, 
+          color: '#ffffff', 
+          marginBottom: '8px', 
           margin: 0, 
-          letterSpacing: '-0.02em',
+          letterSpacing: '-0.03em',
           cursor: 'default',
           userSelect: 'none',
-          textAlign: 'center'
+          textAlign: 'center',
+          textShadow: '0 2px 10px rgba(0,0,0,0.15)'
         }}
       >
         Campus-Login
       </h1>
-      <p style={{ color: '#64748b', textAlign: 'center', fontSize: '13px', marginBottom: '32px', maxWidth: '300px', lineHeight: '1.4', fontWeight: 600 }}>
+      <p style={{ color: '#a7f3d0', textAlign: 'center', fontSize: '14px', marginBottom: '40px', maxWidth: '320px', lineHeight: '1.5', fontWeight: 600, textShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
         {schoolName && !schoolData?.logo_url ? `für ${schoolName}` : `Halte deinen Ausweis vor die Kamera, um dich einzuloggen.`}
       </p>
 
@@ -1957,18 +1963,20 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       {expandedSection === 'none' && (
       <div style={{
         width: '100%',
-        maxWidth: '400px',
-        background: '#ffffff',
-        borderRadius: '40px',
-        padding: '24px',
-        boxShadow: '0 25px 60px rgba(15, 23, 42, 0.05)',
-        border: '1px solid #f1f5f9',
+        maxWidth: '420px',
+        background: 'rgba(255, 255, 255, 0.95)',
+        borderRadius: '36px',
+        padding: '28px',
+        boxShadow: '0 30px 60px rgba(0, 0, 0, 0.18), 0 2px 10px rgba(0, 0, 0, 0.05)',
+        border: '1px solid rgba(255, 255, 255, 0.7)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        position: 'relative'
+        position: 'relative',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)'
       }}>
-        <div style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', width: '100%', justifyContent: 'center' }}>
+        <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '20px', width: '100%', justifyContent: 'center' }}>
           <Tablet size={14} /> Standard Login über Campus QR-Ausweis
         </div>
 
@@ -2039,13 +2047,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               zIndex: 10,
               backdropFilter: 'blur(10px)'
             }}>
-              <div style={{ width: '40px', height: '40px', border: '4px solid #eab308', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+              <div style={{ width: '40px', height: '40px', border: '4px solid #0f766e', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
             </div>
           )}
         </div>
 
         {/* iOS-Style QR Image Upload & Ausweis ID Login side-by-side */}
-        <div style={{ display: 'flex', gap: '12px', marginTop: '16px', width: '100%' }}>
+        <div style={{ display: 'flex', gap: '12px', marginTop: '20px', width: '100%' }}>
           <div style={{ flex: 1 }}>
             <label 
               htmlFor="qr-image-upload"
@@ -2057,21 +2065,21 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 width: '100%',
                 padding: '12px 6px',
                 borderRadius: '16px',
-                background: '#f8fafc',
-                border: '1.5px dashed #cbd5e1',
-                color: '#475569',
+                background: '#f1f5f9',
+                border: '1px solid #e2e8f0',
+                color: '#334155',
                 fontSize: '13px',
                 fontWeight: 700,
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 textAlign: 'center',
                 boxSizing: 'border-box',
-                height: '46px'
+                height: '48px'
               }}
-              onMouseOver={(e) => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.borderColor = '#94a3b8'; }}
-              onMouseOut={(e) => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+              onMouseOver={(e) => { e.currentTarget.style.background = '#e2e8f0'; }}
+              onMouseOut={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
             >
-              <Upload size={16} />
+              <Upload size={16} color="#0f766e" />
               Foto hochladen
             </label>
             <input 
@@ -2093,22 +2101,22 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               gap: '8px',
               padding: '12px 6px',
               borderRadius: '16px',
-              background: '#f8fafc',
-              border: '1.5px solid #cbd5e1',
-              color: '#475569',
+              background: '#f1f5f9',
+              border: '1px solid #e2e8f0',
+              color: '#334155',
               fontSize: '13px',
               fontWeight: 700,
               cursor: 'pointer',
               transition: 'all 0.2s',
               textAlign: 'center',
               boxSizing: 'border-box',
-              height: '46px',
+              height: '48px',
               outline: 'none'
             }}
-            onMouseOver={(e) => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.borderColor = '#94a3b8'; }}
-            onMouseOut={(e) => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+            onMouseOver={(e) => { e.currentTarget.style.background = '#e2e8f0'; }}
+            onMouseOut={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
           >
-            <Key size={16} />
+            <Key size={16} color="#0f766e" />
             Passwort Anmeldung
           </button>
         </div>
@@ -2126,7 +2134,23 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         <div style={{ marginTop: '24px' }}>
           <button 
             onClick={() => setExpandedSection('kiosk')}
-            style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer', transition: 'color 0.2s' }}
+            style={{ 
+              background: 'rgba(255, 255, 255, 0.12)', 
+              border: '1px solid rgba(255, 255, 255, 0.2)', 
+              padding: '10px 24px',
+              borderRadius: '100px',
+              color: '#ffffff', 
+              fontSize: '12px', 
+              fontWeight: 800, 
+              textTransform: 'uppercase', 
+              letterSpacing: '0.05em', 
+              cursor: 'pointer', 
+              transition: 'all 0.2s',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)'
+            }}
+            onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'; }}
+            onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'; }}
           >
             Im GrooveLab anmelden
           </button>
@@ -2137,18 +2161,20 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       {expandedSection === 'pin' && (
       <div style={{
         width: '100%',
-        maxWidth: '400px',
-        background: '#ffffff',
-        borderRadius: '32px',
-        padding: '24px',
-        boxShadow: '0 10px 30px rgba(15, 23, 42, 0.03)',
-        border: '1px solid #f1f5f9',
+        maxWidth: '420px',
+        background: 'rgba(255, 255, 255, 0.95)',
+        borderRadius: '36px',
+        padding: '28px',
+        boxShadow: '0 30px 60px rgba(0, 0, 0, 0.18), 0 2px 10px rgba(0, 0, 0, 0.05)',
+        border: '1px solid rgba(255, 255, 255, 0.7)',
         display: 'flex',
         flexDirection: 'column',
-        gap: '12px',
-        marginTop: '20px'
+        gap: '16px',
+        marginTop: '20px',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)'
       }}>
-        <div style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <User size={14} /> Manueller Zugang über PIN / QR-Token
         </div>
         <form onSubmit={(e) => { e.preventDefault(); handlePinLogin(pinInput); }} style={{ display: 'flex', gap: '10px' }}>
@@ -2159,8 +2185,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             placeholder="Ausweis ID..."
             style={{
               flex: 1,
-              padding: '12px 16px',
-              borderRadius: '14px',
+              padding: '14px 18px',
+              borderRadius: '16px',
               border: '1.5px solid #cbd5e1',
               fontSize: '14px',
               fontWeight: 700,
@@ -2174,11 +2200,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             type="submit"
             disabled={loading || !pinInput.trim()}
             style={{
-              padding: '12px 20px',
-              borderRadius: '14px',
+              padding: '14px 24px',
+              borderRadius: '16px',
               border: 'none',
-              background: schoolData?.primary_color || '#eab308',
-              color: '#0f172a',
+              background: schoolData?.primary_color || '#0f766e',
+              color: '#ffffff',
               fontWeight: 800,
               fontSize: '14px',
               cursor: 'pointer',
@@ -2199,18 +2225,20 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       {expandedSection === 'kiosk' && schoolData && kioskRooms.length > 0 && (
         <div style={{
           width: '100%',
-          maxWidth: '400px',
-          background: '#ffffff',
-          borderRadius: '32px',
-          padding: '24px',
-          boxShadow: '0 10px 30px rgba(15, 23, 42, 0.03)',
-          border: '1px solid #f1f5f9',
+          maxWidth: '420px',
+          background: 'rgba(255, 255, 255, 0.95)',
+          borderRadius: '36px',
+          padding: '28px',
+          boxShadow: '0 30px 60px rgba(0, 0, 0, 0.18), 0 2px 10px rgba(0, 0, 0, 0.05)',
+          border: '1px solid rgba(255, 255, 255, 0.7)',
           display: 'flex',
           flexDirection: 'column',
           gap: '16px',
-          marginTop: '20px'
+          marginTop: '20px',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)'
         }}>
-          <div style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Tablet size={14} /> GrooveLab Kiosk aktivieren (iPad Stationen)
           </div>
           
@@ -2224,9 +2252,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   padding: '8px 14px',
                   borderRadius: '12px',
                   border: '1px solid',
-                  borderColor: kioskSelectedRoomId === room.id ? (schoolData?.primary_color || '#eab308') : '#e2e8f0',
-                  background: kioskSelectedRoomId === room.id ? (schoolData?.primary_color || '#eab308') : 'transparent',
-                  color: '#0f172a',
+                  borderColor: kioskSelectedRoomId === room.id ? (schoolData?.primary_color || '#0f766e') : '#e2e8f0',
+                  background: kioskSelectedRoomId === room.id ? (schoolData?.primary_color || '#0f766e') : 'transparent',
+                  color: kioskSelectedRoomId === room.id ? '#ffffff' : '#0f172a',
                   fontSize: '12px',
                   fontWeight: 700,
                   cursor: 'pointer',
@@ -2297,7 +2325,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           borderRadius: '32px', 
           fontSize: '13px', 
           width: '100%',
-          maxWidth: '400px',
+          maxWidth: '420px',
           backdropFilter: 'blur(10px)',
           border: '1px solid rgba(255,255,255,0.1)',
           boxShadow: '0 20px 50px rgba(0,0,0,0.1)'
@@ -2390,17 +2418,22 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             style={{
               width: '100%',
               padding: '16px',
-              background: '#fef9c3',
-              border: '2px solid #fde047',
+              background: 'rgba(254, 249, 195, 0.2)',
+              border: '2px solid rgba(253, 224, 71, 0.4)',
               borderRadius: '24px',
-              color: '#854d0e',
+              color: '#fef9c3',
               fontWeight: 800,
               fontSize: '13px',
               cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(234,179,8,0.15)',
+              boxShadow: '0 4px 12px rgba(234,179,8,0.1)',
               textTransform: 'uppercase',
-              letterSpacing: '0.02em'
+              letterSpacing: '0.02em',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              transition: 'all 0.2s'
             }}
+            onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(254, 249, 195, 0.3)'; }}
+            onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(254, 249, 195, 0.2)'; }}
           >
             🔓 ADMIN BYPASS (LOCAL ONLY)
           </button>
@@ -2411,7 +2444,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       <div style={{ marginTop: '24px', width: '100%', maxWidth: '360px', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '0 10px' }}>
         {effectiveStationId ? (
           <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#94a3b8', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#a7f3d0', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               <Tablet size={14} />
               Kiosk Modus aktiv
             </div>
@@ -2426,7 +2459,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   window.location.reload();
                 }
               }}
-              style={{ background: 'none', border: 'none', color: '#f87171', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', cursor: 'pointer' }}
+              style={{ background: 'none', border: 'none', color: '#fca5a5', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', cursor: 'pointer' }}
             >
               Beenden
             </button>
@@ -2441,18 +2474,22 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               display: 'flex', 
               alignItems: 'center', 
               gap: '12px', 
-              background: '#ffffff', 
-              border: '1px solid #e2e8f0', 
+              background: 'rgba(255, 255, 255, 0.12)', 
+              border: '1px solid rgba(255, 255, 255, 0.2)', 
               padding: '12px 24px', 
               borderRadius: '20px', 
-              color: '#64748b', 
+              color: '#ffffff', 
               fontSize: '12px', 
               fontWeight: 800, 
               textTransform: 'uppercase', 
               cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
-              transition: 'all 0.2s'
+              boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+              transition: 'all 0.2s',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)'
             }}
+            onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'; }}
+            onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'; }}
           >
             <Tablet size={16} />
             Kiosk Modus aktivieren
@@ -2460,33 +2497,31 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         )}
       </div>
 
-      {/* Impressum & Datenschutz Footer */}
-
       {/* Legal Footer */}
       <div style={{ 
-        marginTop: '32px', 
+        marginTop: '40px', 
         display: 'flex', 
         gap: '24px', 
         fontSize: '11px', 
         fontWeight: 800, 
-        color: '#94a3b8',
+        color: 'rgba(255, 255, 255, 0.6)',
         textTransform: 'uppercase',
         letterSpacing: '0.05em'
       }}>
         <span 
           onClick={() => setShowPrivacy(true)} 
           style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
-           
-          
+          onMouseOver={(e) => { e.currentTarget.style.color = '#ffffff'; }}
+          onMouseOut={(e) => { e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)'; }}
         >
           Datenschutz
         </span>
-        <span style={{ opacity: 0.5 }}>•</span>
+        <span style={{ opacity: 0.3 }}>•</span>
         <span 
           onClick={() => setShowImpressum(true)} 
           style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
-           
-          
+          onMouseOver={(e) => { e.currentTarget.style.color = '#ffffff'; }}
+          onMouseOut={(e) => { e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)'; }}
         >
           Impressum
         </span>
