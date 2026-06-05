@@ -4026,7 +4026,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     if (hasMastered) {
                       borderLeftColor = '#10b981'; // Green (Mastered)
                     } else if (isJokerDay) {
-                      borderLeftColor = '#f97d13'; // Golden-Orange (Joker Day)
+                      borderLeftColor = '#f97316'; // Same hue as Streak path KPI (Orange)
                     } else if (isToday) {
                       borderLeftColor = '#eab308'; // Yellow (Active)
                     } else {
@@ -4098,8 +4098,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           <div 
                             key={idx}
                             style={{ 
-                              background: 'linear-gradient(135deg, #f97d13 0%, #d96a06 100%)', 
-                              border: '1px solid #d96a06', 
+                              background: 'linear-gradient(135deg, #f97316 0%, #c2410c 100%)', 
+                              border: '1px solid #c2410c', 
                               borderRadius: '16px', 
                               padding: '12px 14px',
                               display: 'flex',
@@ -4107,7 +4107,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               justifyContent: 'space-between',
                               alignItems: 'center',
                               gap: '12px',
-                              boxShadow: '0 4px 12px rgba(249, 125, 19, 0.12)'
+                              boxShadow: '0 4px 12px rgba(194, 65, 12, 0.12)'
                             }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
@@ -4126,7 +4126,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               }}>
                                 Joker eingesetzt
                               </span>
-                              <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#fef3c7', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#ffedd5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 - Streak gerettet! 🎯
                               </span>
                             </div>
