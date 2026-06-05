@@ -370,6 +370,14 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
     return rooms.filter((r: any) => roomIds.has(r.id));
   }, [rooms, schedules, campusBookings, userId, admin]);
 
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Pre-select the room where the teacher teaches today
   useEffect(() => {
     if (hasInitializedRoom) return;
@@ -1213,6 +1221,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   const [vocalistOnlyMode, setVocalistOnlyMode] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'green' | 'yellow' | 'red'>('all');
   const [studentsXP, setStudentsXP] = useState<Record<string, number>>({});
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
   
   const [showAddBand, setShowAddBand] = useState(false);
   const [newBand, setNewBand] = useState({ name: '', song_id: '', coach_id: userId, photo_url: '' });
@@ -2470,7 +2479,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
       myClassCount: myStudents.length,
       classWeeklyMins,
       weeklyTargets,
-      highlights
+      highlights,
+      focusLogs: focusLogs || []
     });
   };
 
@@ -8771,247 +8781,384 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             </div>
           </div>
 
-          {/* Grid Layout: Left (Highlights) | Right (Goal) */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '32px', alignItems: 'start' }}>
-            {/* Left Column: Helden-Momente Feed */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-              
-              {/* Helden-Momente Feed */}
-              <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', minHeight: '350px' }}>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>✨</span> Helden-Momente
+          {/* Grid Section: Goals | Highlights | Annual Stats */}
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.2fr 1.2fr', gap: '32px', alignItems: 'start' }}>
+            
+            {/* Column 1: Übe-Ziele der Klasse */}
+            <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                  <span>🌱</span> Übe-Ziele der Klasse
                 </h3>
-                <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0 0 28px 0', fontWeight: 600 }}>
-                  Besondere Meilensteine und Fleiß-Highlights deiner Schüler aus dem aktuellen Monat.
-                </p>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {(stats.highlights || []).length === 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: '24px', border: '1px dashed #cbd5e1' }}>
-                      <span style={{ fontSize: '2.5rem', marginBottom: '16px' }}>🤫</span>
-                      <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#475569', margin: '0 0 6px 0' }}>Ruhe vor dem Sturm</h4>
-                      <p style={{ fontSize: '0.78rem', color: '#64748b', maxWidth: '300px', margin: 0, lineHeight: 1.4 }}>
-                        Sobald deine Schüler diesen Monat fleißig üben oder Challenges meistern, erscheinen ihre Erfolge hier!
-                      </p>
-                    </div>
-                  ) : (
-                    (stats.highlights || []).map((hl: any, idx: number) => {
-                      return (
-                        <div 
-                          key={idx} 
-                          style={{ 
-                            padding: '14px 18px', 
-                            background: '#f8fafc', 
-                            borderRadius: '16px', 
-                            border: '1px solid #e2e8f0', 
-                            display: 'flex', 
-                            alignItems: 'center',
-                            gap: '14px',
-                            transition: 'transform 0.2s, box-shadow 0.2s',
-                            cursor: 'default'
-                          }}
-                          className="hover-scale"
-                        >
-                          <span style={{ fontSize: '1.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            {hl.emoji}
-                          </span>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '8px' }}>
-                              <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a' }}>{hl.studentName}</span>
-                              <span style={{ fontSize: '0.65rem', fontWeight: 900, color: brandColor, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                                {hl.title}
-                              </span>
-                            </div>
-                            <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '3px 0 0 0', lineHeight: 1.3, fontWeight: 550 }}>
-                              {hl.text}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
+                <button 
+                  onClick={() => setShowAddGoalForm(!showAddGoalForm)}
+                  style={{ background: brandColor, color: 'white', border: 'none', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  className="hover-scale"
+                >
+                  <span>{showAddGoalForm ? 'Abbrechen' : '+ Ziel'}</span>
+                </button>
               </div>
 
-            </div>
-
-            {/* Right Column: Performance */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-              
-              {/* Weekly Class Targets Widget */}
-              <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                  <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                    <span>🌱</span> Übe-Ziele der Klasse
-                  </h3>
-                  <button 
-                    onClick={() => setShowAddGoalForm(!showAddGoalForm)}
-                    style={{ background: brandColor, color: 'white', border: 'none', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-                    className="hover-scale"
-                  >
-                    <span>{showAddGoalForm ? 'Abbrechen' : '+ Ziel'}</span>
-                  </button>
-                </div>
-
-                {showAddGoalForm && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: '#f8fafc', padding: '20px', borderRadius: '20px', border: '1px solid #e2e8f0', marginBottom: '24px' }}>
-                    <h4 style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0f172a', margin: 0 }}>Neues Ziel erstellen</h4>
+              {showAddGoalForm && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: '#f8fafc', padding: '20px', borderRadius: '20px', border: '1px solid #e2e8f0', marginBottom: '24px' }}>
+                  <h4 style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0f172a', margin: 0 }}>Neues Ziel erstellen</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Titel des Ziels</label>
+                    <input 
+                      type="text" 
+                      value={newGoalTitle} 
+                      onChange={(e) => setNewGoalTitle(e.target.value)} 
+                      placeholder="z.B. Wochenziel, Ferien-Challenge"
+                      style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600 }}
+                    />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Titel des Ziels</label>
+                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Ziel (Minuten)</label>
                       <input 
-                        type="text" 
-                        value={newGoalTitle} 
-                        onChange={(e) => setNewGoalTitle(e.target.value)} 
-                        placeholder="z.B. Wochenziel, Ferien-Challenge"
+                        type="number" 
+                        min="1"
+                        value={newGoalMinutes} 
+                        onChange={(e) => setNewGoalMinutes(e.target.value)} 
+                        style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 700 }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Deadline (optional)</label>
+                      <input 
+                        type="date" 
+                        value={newGoalDeadline} 
+                        onChange={(e) => setNewGoalDeadline(e.target.value)} 
                         style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600 }}
                       />
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Ziel (Minuten)</label>
-                        <input 
-                          type="number" 
-                          min="1"
-                          value={newGoalMinutes} 
-                          onChange={(e) => setNewGoalMinutes(e.target.value)} 
-                          style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 700 }}
-                        />
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Deadline (optional)</label>
-                        <input 
-                          type="date" 
-                          value={newGoalDeadline} 
-                          onChange={(e) => setNewGoalDeadline(e.target.value)} 
-                          style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600 }}
-                        />
-                      </div>
-                    </div>
-                    <button 
-                      onClick={handleAddGoal}
-                      style={{ background: brandColor, color: 'white', border: 'none', padding: '10px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', marginTop: '4px' }}
-                    >
-                      Ziel hinzufügen
-                    </button>
                   </div>
-                )}
+                  <button 
+                    onClick={handleAddGoal}
+                    style={{ background: brandColor, color: 'white', border: 'none', padding: '10px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', marginTop: '4px' }}
+                  >
+                    Ziel hinzufügen
+                  </button>
+                </div>
+              )}
 
-                {(() => {
-                  const targets = stats?.weeklyTargets || [];
-                  const totalGoals = targets.length;
-                  const masteredGoals = targets.filter((target: any) => {
-                    const targetPercent = Math.round((classWeeklyMins / target.minutes) * 100);
-                    return targetPercent >= 100;
-                  }).length;
-                  const highestPercent = targets.length > 0 
-                    ? Math.max(...targets.map((target: any) => Math.round((classWeeklyMins / target.minutes) * 100)))
-                    : 0;
+              {(() => {
+                const targets = stats?.weeklyTargets || [];
+                const totalGoals = targets.length;
+                const masteredGoals = targets.filter((target: any) => {
+                  const targetPercent = Math.round((classWeeklyMins / target.minutes) * 100);
+                  return targetPercent >= 100;
+                }).length;
+                const highestPercent = targets.length > 0 
+                  ? Math.max(...targets.map((target: any) => Math.round((classWeeklyMins / target.minutes) * 100)))
+                  : 0;
 
-                  return (
-                    <>
-                      {totalGoals > 0 && (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '16px', marginBottom: '20px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                            <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Missionen</span>
-                            <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', marginTop: '2px' }}>{totalGoals}</span>
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', borderLeft: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0' }}>
-                            <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Geknackt</span>
-                            <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#10b981', marginTop: '2px' }}>{masteredGoals}</span>
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                            <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Peak</span>
-                            <span style={{ fontSize: '1.05rem', fontWeight: 900, color: brandColor, marginTop: '2px' }}>{highestPercent}%</span>
-                          </div>
+                return (
+                  <>
+                    {totalGoals > 0 && (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '16px', marginBottom: '20px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Missionen</span>
+                          <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', marginTop: '2px' }}>{totalGoals}</span>
                         </div>
-                      )}
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', borderLeft: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0' }}>
+                          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Geknackt</span>
+                          <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#10b981', marginTop: '2px' }}>{masteredGoals}</span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Peak</span>
+                          <span style={{ fontSize: '1.05rem', fontWeight: 900, color: brandColor, marginTop: '2px' }}>{highestPercent}%</span>
+                        </div>
+                      </div>
+                    )}
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        {totalGoals === 0 ? (
-                          <p style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', margin: '20px 0', fontWeight: 600 }}>
-                            Keine aktiven Ziele angelegt.
-                          </p>
-                        ) : (
-                          targets.map((target: any) => {
-                            const targetPercent = Math.round((classWeeklyMins / target.minutes) * 100);
-                            const isDeadlinePassed = target.deadline ? new Date(target.deadline) < new Date() : false;
-                            
-                            const maxPercentOnBar = 133;
-                            const visualWidth = Math.min(100, (targetPercent / maxPercentOnBar) * 100);
-                            const isAchieved = targetPercent >= 100;
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {totalGoals === 0 ? (
+                        <p style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', margin: '20px 0', fontWeight: 600 }}>
+                          Keine aktiven Ziele angelegt.
+                        </p>
+                      ) : (
+                        targets.map((target: any) => {
+                          const targetPercent = Math.round((classWeeklyMins / target.minutes) * 100);
+                          const isDeadlinePassed = target.deadline ? new Date(target.deadline) < new Date() : false;
+                          
+                          const maxPercentOnBar = 133;
+                          const visualWidth = Math.min(100, (targetPercent / maxPercentOnBar) * 100);
+                          const isAchieved = targetPercent >= 100;
 
-                            return (
-                              <div key={target.id} style={{
-                                position: 'relative',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                background: '#10b981',
-                                boxShadow: '0 6px 20px rgba(16, 185, 129, 0.12)',
-                                borderRadius: '16px',
-                                padding: '12px 14px',
-                                gap: '8px'
-                              }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
-                                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ffffff', letterSpacing: '-0.01em', lineHeight: '1.25' }}>
-                                      {target.title || 'Challenge'}
-                                    </span>
-                                    {target.deadline && (
-                                      <span style={{ fontSize: '0.62rem', fontWeight: 500, color: isDeadlinePassed ? '#ff8780' : 'rgba(255, 255, 255, 0.75)', lineHeight: '1.2' }}>
-                                        bis {new Date(target.deadline).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
-                                        {isDeadlinePassed && ' (abgelaufen)'}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                                    <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em', fontFeatureSettings: '"tnum"' }}>
-                                      {targetPercent}%
-                                    </span>
-                                    <button 
-                                      onClick={() => handleDeleteGoal(target.id)}
-                                      style={{ background: 'rgba(255, 255, 255, 0.15)', border: 'none', color: '#ffffff', cursor: 'pointer', padding: '4px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                      title="Ziel löschen"
-                                    >
-                                      <X size={12} strokeWidth={2.5} />
-                                    </button>
-                                  </div>
-                                </div>
-
-                                <div style={{ position: 'relative', height: '6px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: '99px' }}>
-                                  <div style={{
-                                    width: `${visualWidth}%`,
-                                    height: '100%',
-                                    background: '#ffffff',
-                                    borderRadius: '99px',
-                                    transition: 'width 1.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                                    boxShadow: '0 0 6px rgba(255, 255, 255, 0.25)'
-                                  }} />
-                                </div>
-
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', gap: '10px' }}>
-                                  <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontFeatureSettings: '"tnum"', fontWeight: 500, whiteSpace: 'normal' }}>
-                                    <span style={{ fontWeight: 700, color: '#ffffff' }}>{formatMins(classWeeklyMins)}</span> von {target.minutes} Min.
+                          return (
+                            <div key={target.id} style={{
+                              position: 'relative',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              background: '#10b981',
+                              boxShadow: '0 6px 20px rgba(16, 185, 129, 0.12)',
+                              borderRadius: '16px',
+                              padding: '12px 14px',
+                              gap: '8px'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
+                                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ffffff', letterSpacing: '-0.01em', lineHeight: '1.25' }}>
+                                    {target.title || 'Challenge'}
                                   </span>
-                                  <span style={{
-                                    fontWeight: 700,
-                                    color: isAchieved ? '#a7f3d0' : 'rgba(255, 255, 255, 0.8)',
-                                    whiteSpace: 'normal',
-                                    textAlign: 'right'
-                                  }}>
-                                    {isAchieved ? 'Erreicht 🎉' : `Noch ${Math.max(0, target.minutes - classWeeklyMins)} Min.`}
+                                  {target.deadline && (
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 500, color: isDeadlinePassed ? '#ff8780' : 'rgba(255, 255, 255, 0.75)', lineHeight: '1.2' }}>
+                                      bis {new Date(target.deadline).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                                      {isDeadlinePassed && ' (abgelaufen)'}
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                  <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em', fontFeatureSettings: '"tnum"' }}>
+                                    {targetPercent}%
                                   </span>
+                                  <button 
+                                    onClick={() => handleDeleteGoal(target.id)}
+                                    style={{ background: 'rgba(255, 255, 255, 0.15)', border: 'none', color: '#ffffff', cursor: 'pointer', padding: '4px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                    title="Ziel löschen"
+                                  >
+                                    <X size={12} strokeWidth={2.5} />
+                                  </button>
                                 </div>
                               </div>
-                            );
-                          })
-                        )}
+
+                              <div style={{ position: 'relative', height: '6px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: '99px' }}>
+                                <div style={{
+                                  width: `${visualWidth}%`,
+                                  height: '100%',
+                                  background: '#ffffff',
+                                  borderRadius: '99px',
+                                  transition: 'width 1.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                                  boxShadow: '0 0 6px rgba(255, 255, 255, 0.25)'
+                                }} />
+                              </div>
+
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', gap: '10px' }}>
+                                <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontFeatureSettings: '"tnum"', fontWeight: 500, whiteSpace: 'normal' }}>
+                                  <span style={{ fontWeight: 700, color: '#ffffff' }}>{formatMins(classWeeklyMins)}</span> von {target.minutes} Min.
+                                </span>
+                                <span style={{
+                                  fontWeight: 700,
+                                  color: isAchieved ? '#a7f3d0' : 'rgba(255, 255, 255, 0.8)',
+                                  whiteSpace: 'normal',
+                                  textAlign: 'right'
+                                }}>
+                                  {isAchieved ? 'Erreicht 🎉' : `Noch ${Math.max(0, target.minutes - classWeeklyMins)} Min.`}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Column 2: Helden-Momente */}
+            <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', minHeight: '350px', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                <span>✨</span> Helden-Momente
+              </h3>
+              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '4px 0 20px 0', fontWeight: 600 }}>
+                Besondere Meilensteine und Fleiß-Highlights deiner Schüler aus dem aktuellen Monat.
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {(stats?.highlights || []).length === 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: '24px', border: '1px dashed #cbd5e1' }}>
+                    <span style={{ fontSize: '2.5rem', marginBottom: '16px' }}>🤫</span>
+                    <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#475569', margin: '0 0 6px 0' }}>Ruhe vor dem Sturm</h4>
+                    <p style={{ fontSize: '0.78rem', color: '#64748b', maxWidth: '300px', margin: 0, lineHeight: 1.4 }}>
+                      Sobald deine Schüler diesen Monat fleißig üben oder Challenges meistern, erscheinen ihre Erfolge hier!
+                    </p>
+                  </div>
+                ) : (
+                  (stats.highlights || []).map((hl: any, idx: number) => {
+                    return (
+                      <div 
+                        key={idx} 
+                        style={{ 
+                          padding: '14px 18px', 
+                          background: '#f8fafc', 
+                          borderRadius: '16px', 
+                          border: '1px solid #e2e8f0', 
+                          display: 'flex', 
+                          alignItems: 'center',
+                          gap: '14px',
+                          transition: 'transform 0.2s, box-shadow 0.2s',
+                          cursor: 'default'
+                        }}
+                        className="hover-scale"
+                      >
+                        <span style={{ fontSize: '1.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          {hl.emoji}
+                        </span>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '8px' }}>
+                            <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a' }}>{hl.studentName}</span>
+                            <span style={{ fontSize: '0.65rem', fontWeight: 900, color: brandColor, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                              {hl.title}
+                            </span>
+                          </div>
+                          <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '3px 0 0 0', lineHeight: 1.3, fontWeight: 550 }}>
+                            {hl.text}
+                          </p>
+                        </div>
                       </div>
-                    </>
-                  );
-                })()}
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Column 3: Jahresstatistik */}
+            <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
+                <div style={{ background: '#ecfdf5', color: '#10b981', padding: '8px', borderRadius: '12px' }}>
+                  <Calendar size={18} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>
+                    Jahres-Statistik
+                  </h3>
+                  <p style={{ fontSize: '0.7rem', color: '#94a3b8', margin: '2px 0 0 0', fontWeight: 600 }}>
+                    Übeminuten (Sep - Aug)
+                  </p>
+                </div>
               </div>
 
+              {(() => {
+                const now = new Date();
+                const currentMonth = now.getMonth();
+                const startYear = currentMonth >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+                const monthsList = [
+                  { month: 8, label: 'Sep', year: startYear },
+                  { month: 9, label: 'Okt', year: startYear },
+                  { month: 10, label: 'Nov', year: startYear },
+                  { month: 11, label: 'Dez', year: startYear },
+                  { month: 0, label: 'Jan', year: startYear + 1 },
+                  { month: 1, label: 'Feb', year: startYear + 1 },
+                  { month: 2, label: 'Mrz', year: startYear + 1 },
+                  { month: 3, label: 'Apr', year: startYear + 1 },
+                  { month: 4, label: 'Mai', year: startYear + 1 },
+                  { month: 5, label: 'Jun', year: startYear + 1 },
+                  { month: 6, label: 'Jul', year: startYear + 1 },
+                  { month: 7, label: 'Aug', year: startYear + 1 }
+                ];
+
+                const myStudentsList = (students || []).filter((s: any) => s.teacher_id === userId);
+                const classmateIds = myStudentsList.map((s: any) => s.id);
+                const classFocusLogs = stats?.focusLogs || [];
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                      {monthsList.map(item => {
+                        const logsForMonth = classFocusLogs.filter((log: any) => {
+                          if (!log.created_at) return false;
+                          const logDate = new Date(log.created_at);
+                          return classmateIds.includes(log.user_id) && logDate.getMonth() === item.month && logDate.getFullYear() === item.year;
+                        });
+                        const totalSecs = logsForMonth.reduce((sum: number, log: any) => {
+                          return sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60));
+                        }, 0);
+
+                        const minutes = Math.round(totalSecs / 60);
+
+                        // Heatmap calculations
+                        let bg = '#f8fafc';
+                        let border = '1px solid #e2e8f0';
+                        let labelColor = '#94a3b8';
+                        let textColor = '#64748b';
+                        let numColor = '#1e293b';
+                        let shadow = 'none';
+
+                        if (minutes > 0) {
+                          if (minutes <= 15) {
+                            bg = 'linear-gradient(135deg, #f0fdf4 0%, #e6fbf0 100%)';
+                            border = '1px solid #dcfce7';
+                            labelColor = '#166534';
+                            textColor = '#15803d';
+                            numColor = '#166534';
+                            shadow = '0 2px 6px rgba(22, 163, 74, 0.04)';
+                          } else if (minutes <= 60) {
+                            bg = 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)';
+                            border = '1px solid #bbf7d0';
+                            labelColor = '#14532d';
+                            textColor = '#166534';
+                            numColor = '#14532d';
+                            shadow = '0 3px 8px rgba(22, 163, 74, 0.07)';
+                          } else if (minutes <= 180) {
+                            bg = 'linear-gradient(135deg, #bbf7d0 0%, #86efac 100%)';
+                            border = '1px solid #86efac';
+                            labelColor = '#14532d';
+                            textColor = '#14532d';
+                            numColor = '#14532d';
+                            shadow = '0 4px 12px rgba(22, 163, 74, 0.12)';
+                          } else {
+                            bg = 'linear-gradient(135deg, #10b981 0%, #047857 100%)';
+                            border = '1px solid #059669';
+                            labelColor = 'rgba(255, 255, 255, 0.8)';
+                            textColor = 'rgba(255, 255, 255, 0.9)';
+                            numColor = '#ffffff';
+                            shadow = '0 6px 15px rgba(16, 185, 129, 0.25)';
+                          }
+                        }
+
+                        return (
+                          <div 
+                            key={`${item.month}-${item.year}`}
+                            style={{
+                              background: bg,
+                              border: border,
+                              borderRadius: '16px',
+                              padding: '12px 4px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '3px',
+                              minHeight: '66px',
+                              textAlign: 'center',
+                              boxShadow: shadow,
+                              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+                            }}
+                          >
+                            <span style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: labelColor }}>
+                              {item.label}
+                            </span>
+                            <span style={{ fontSize: '1.05rem', fontWeight: 950, color: numColor, fontFeatureSettings: '"tnum"', letterSpacing: '-0.02em' }}>
+                              {minutes}<span style={{ fontSize: '0.72rem', fontWeight: 700, color: textColor, marginLeft: '1px' }}>m</span>
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Legend */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: '8px 12px', background: '#f8fafc', padding: '10px 14px', borderRadius: '14px', border: '1px solid #e2e8f0', marginTop: '6px' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Heatmap:</span>
+                      {[
+                        { color: '#f8fafc', label: '0m', border: '#e2e8f0' },
+                        { color: '#f0fdf4', label: '<15m', border: '#dcfce7' },
+                        { color: '#dcfce7', label: '<1h', border: '#bbf7d0' },
+                        { color: '#bbf7d0', label: '<3h', border: '#86efac' },
+                        { color: '#10b981', label: '3h+', border: '#059669' }
+                      ].map(pill => (
+                        <div key={pill.label} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: pill.color, border: `1px solid ${pill.border}` }} />
+                          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b' }}>{pill.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
+
           </div>
         </div>
       );
