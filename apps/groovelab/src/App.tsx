@@ -4896,7 +4896,12 @@ function App() {
     }
   };
 
-  const handleLogout = async (updateDb = true) => {
+  const handleLogout = async (updateDb = true, askConfirm = false) => {
+    if (askConfirm === true) {
+      if (!window.confirm('Möchtest du dich wirklich abmelden?')) {
+        return;
+      }
+    }
     const currentUser = user;
     const currentSession = session;
 
@@ -5126,8 +5131,11 @@ function App() {
     // Immediate "Offline" signal when closing tab
     // We set last_seen to a past date so the dashboard catches it immediately.
     // Other open tabs will overwrite this with their own heartbeat within 30s.
-    const handleBeforeUnload = () => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (user?.id) {
+        e.preventDefault();
+        e.returnValue = 'Möchtest du dich wirklich abmelden oder die Seite verlassen?';
+        
         const pastDate = new Date(Date.now() - 10 * 60000).toISOString();
         const body = JSON.stringify({ last_seen: pastDate });
         const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/users?id=eq.${user.id}`;
@@ -5144,6 +5152,7 @@ function App() {
           body,
           keepalive: true
         });
+        return e.returnValue;
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -6049,7 +6058,7 @@ function App() {
             <ChevronRight size={16} color="#94a3b8" style={{ marginLeft: 'auto', flexShrink: 0 }} />
           </button>
           <button 
-            onClick={() => handleLogout()}
+            onClick={() => handleLogout(true, true)}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '12px', border: 'none', background: 'transparent', color: '#ef4444', fontWeight: 800, cursor: 'pointer' }}
           >
             <LogOut size={18} color="#ef4444" /> Abmelden
@@ -6425,7 +6434,7 @@ function App() {
               )}
               {/* Elegant Logout Button next to avatar */}
               <button 
-                onClick={() => handleLogout()}
+                onClick={() => handleLogout(true, true)}
                 style={{ 
                   display: 'flex', 
                   alignItems: 'center', 
