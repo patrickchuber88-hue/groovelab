@@ -3469,7 +3469,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
           </div>
 
-          {/* Right Pane (1/3 width) - Flammen Log-Buch Sidebar */}
+          {/* Right Pane (1/3 width) - Flammen Log-Buch & Jahres-Statistik Sidebar */}
           <div style={{ 
             flex: '1 1 300px', 
             background: '#ffffff', 
@@ -3482,6 +3482,102 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             flexDirection: 'column',
             gap: '18px'
           }}>
+            {/* Jahres-Statistik Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid #f1f5f9', paddingBottom: '14px' }}>
+              <div style={{ background: '#ecfdf5', color: '#10b981', padding: '8px', borderRadius: '12px' }}>
+                <Calendar size={18} />
+              </div>
+              <div>
+                <h4 style={{ fontWeight: 850, fontSize: '20px', color: '#1e293b', margin: 0 }}>Jahres-Statistik</h4>
+                <p style={{ fontSize: '0.72rem', color: '#94a3b8', margin: '2px 0 0 0', fontWeight: 600 }}>Übeminuten pro Monat (Sep - Aug)</p>
+              </div>
+            </div>
+
+            {/* Jahres-Statistik Grid */}
+            {(() => {
+              const now = new Date();
+              const currentMonth = now.getMonth();
+              const startYear = currentMonth >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+              const monthsList = [
+                { month: 8, label: 'Sep', year: startYear },
+                { month: 9, label: 'Okt', year: startYear },
+                { month: 10, label: 'Nov', year: startYear },
+                { month: 11, label: 'Dez', year: startYear },
+                { month: 0, label: 'Jan', year: startYear + 1 },
+                { month: 1, label: 'Feb', year: startYear + 1 },
+                { month: 2, label: 'Mrz', year: startYear + 1 },
+                { month: 3, label: 'Apr', year: startYear + 1 },
+                { month: 4, label: 'Mai', year: startYear + 1 },
+                { month: 5, label: 'Jun', year: startYear + 1 },
+                { month: 6, label: 'Jul', year: startYear + 1 },
+                { month: 7, label: 'Aug', year: startYear + 1 }
+              ];
+
+              return (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '4px' }}>
+                  {monthsList.map(item => {
+                    const logsForMonth = fokusLogs.filter(log => {
+                      if (!log.created_at) return false;
+                      const logDate = new Date(log.created_at);
+                      return logDate.getMonth() === item.month && logDate.getFullYear() === item.year;
+                    });
+                    let totalSecs = logsForMonth.reduce((sum, log) => {
+                      return sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60));
+                    }, 0);
+                    
+                    if (sessionActive && secondsElapsed > 0 && item.month === now.getMonth() && item.year === now.getFullYear()) {
+                      totalSecs += secondsElapsed;
+                    }
+
+                    const minutes = Math.round(totalSecs / 60);
+                    const isActive = minutes > 0;
+
+                    return (
+                      <div 
+                        key={`${item.month}-${item.year}`}
+                        style={{
+                          background: isActive ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' : '#f8fafc',
+                          border: isActive ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                          borderRadius: '12px',
+                          padding: '8px 4px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '2px',
+                          minHeight: '52px',
+                          textAlign: 'center',
+                          boxShadow: isActive ? '0 2px 6px rgba(22, 163, 74, 0.08)' : 'none',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        <span style={{ 
+                          fontSize: '0.6rem', 
+                          fontWeight: 800, 
+                          color: isActive ? '#15803d' : '#94a3b8',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.03em'
+                        }}>
+                          {item.label}
+                        </span>
+                        <span style={{ 
+                          fontSize: '0.8rem', 
+                          fontWeight: 900, 
+                          color: isActive ? '#166534' : '#64748b' 
+                        }}>
+                          {minutes}
+                          <span style={{ fontSize: '0.55rem', fontWeight: 700, marginLeft: '1px', color: isActive ? '#15803d' : '#94a3b8' }}>m</span>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            {/* Separator */}
+            <div style={{ borderTop: '1px dashed #e2e8f0', margin: '4px 0' }}></div>
+
             {/* Sidebar Header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid #f1f5f9', paddingBottom: '14px' }}>
               <div style={{ background: '#fff7ed', color: '#ea580c', padding: '8px', borderRadius: '12px' }}>
@@ -3494,7 +3590,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             </div>
 
             {/* List entries */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '500px', overflowY: 'auto', paddingRight: '4px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '300px', overflowY: 'auto', paddingRight: '4px' }}>
               {(() => {
                 const grouped = getGroupedLogs();
                 if (grouped.length === 0) {
