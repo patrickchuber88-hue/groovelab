@@ -3864,19 +3864,24 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 }}
               >
                 {/* Header Area */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <h2 style={{ fontSize: '1.85rem', color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontWeight: 900 }}>
-                      <div style={{ background: '#e0f2fe', color: '#0369a1', padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
-                        <Library size={20} />
+                {(() => {
+                  const brandColor = studentUser?.schools?.brand_color || '#16a34a';
+                  return (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <h2 style={{ fontSize: '1.85rem', color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontWeight: 900 }}>
+                          <div style={{ background: `${brandColor}15`, color: brandColor, padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
+                            <Library size={20} />
+                          </div>
+                          <span>Mediathek</span>
+                        </h2>
+                        <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '4px 0 0 0', fontWeight: 600 }}>
+                          Deine Songs und Lehrwerke für den Unterricht.
+                        </p>
                       </div>
-                      <span>Mediathek</span>
-                    </h2>
-                    <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '4px 0 0 0', fontWeight: 600 }}>
-                      Deine Songs und Lehrwerke für den Unterricht.
-                    </p>
-                  </div>
-                </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Unified Smart Search Field */}
                 <div style={{ position: 'relative', width: '100%' }}>
@@ -3909,13 +3914,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     const matchesSearch = songSearch === '' || 
                       song.title?.toLowerCase().includes(songSearch.toLowerCase()) || 
                       song.artist?.toLowerCase().includes(songSearch.toLowerCase());
-                    return matchesSearch && song.is_campus_active;
+                    const isAssigned = progressItems.some(item => 
+                      item.topic_name.toLowerCase() === song.title.toLowerCase() ||
+                      item.topic_name.toLowerCase().includes(song.title.toLowerCase())
+                    );
+                    return matchesSearch && song.is_campus_active && isAssigned;
                   }).sort((a, b) => (a.title || '').localeCompare(b.title || '', 'de', { sensitivity: 'base' }));
 
                   const filteredLehrwerke = lehrwerke.filter(item => {
-                    return songSearch === '' || 
+                    const matchesSearch = songSearch === '' || 
                       item.title?.toLowerCase().includes(songSearch.toLowerCase()) || 
                       item.author?.toLowerCase().includes(songSearch.toLowerCase());
+                    const isAssigned = localProgress.some((p: any) => p.studentId === studentId && p.lehrwerkId === item.id);
+                    return matchesSearch && isAssigned;
                   });
 
                   return (
@@ -4069,7 +4080,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             </div>
                           ) : (
                             filteredLehrwerke.map(item => {
-                              const gradient = getLehrwerkColor(item.title);
+                              const gradient = getLehrwerkColor(item.title, lehrwerke);
                               
                               // Check textbook progress
                               const assignment = localProgress.find((p: any) => p.studentId === studentId && p.lehrwerkId === item.id);
