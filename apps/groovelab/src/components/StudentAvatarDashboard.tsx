@@ -3905,55 +3905,58 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           <div 
                             key={idx}
                             style={{ 
-                              background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.05) 0%, rgba(234, 179, 8, 0.01) 100%)', 
-                              border: '1px dashed rgba(234, 179, 8, 0.35)', 
+                              background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.03) 0%, rgba(234, 179, 8, 0.01) 100%)', 
+                              border: '1px dashed rgba(234, 179, 8, 0.25)', 
                               borderRadius: '16px', 
                               padding: '12px 14px',
                               display: 'flex',
-                              flexDirection: 'column',
-                              gap: '6px',
+                              flexDirection: 'row',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              gap: '12px',
                               borderLeft: `4px solid ${borderLeftColor}`,
                               boxShadow: '0 2px 8px rgba(234, 179, 8, 0.01)'
                             }}
                           >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '4px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span style={{ fontSize: '0.78rem', fontWeight: 850, color: '#ca8a04', fontFamily: 'monospace' }}>
-                                  {group.date}
-                                </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1, flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ca8a04', fontFamily: 'monospace' }}>
+                                {group.date}
+                              </span>
+                              <span style={{ 
+                                fontSize: '0.58rem', 
+                                fontWeight: 900, 
+                                background: 'rgba(234, 179, 8, 0.08)', 
+                                color: '#ca8a04', 
+                                padding: '1px 6px', 
+                                borderRadius: '100px', 
+                                letterSpacing: '0.04em', 
+                                textTransform: 'uppercase' 
+                              }}>
+                                Aktiv
+                              </span>
+                              <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>
+                                - Sichere dir deinen Übe-Streak!
+                              </span>
+                            </div>
+                            
+                            {timeUntilMidnight && (
+                              <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
                                 <span style={{ 
-                                  fontSize: '0.58rem', 
-                                  fontWeight: 900, 
-                                  background: 'rgba(234, 179, 8, 0.08)', 
-                                  color: '#ca8a04', 
-                                  padding: '1px 6px', 
-                                  borderRadius: '100px', 
-                                  letterSpacing: '0.04em', 
-                                  textTransform: 'uppercase' 
-                                }}>
-                                  Aktiv
-                                </span>
-                              </div>
-                              {timeUntilMidnight && (
-                                <div style={{ 
                                   fontSize: '0.68rem', 
                                   fontWeight: 800, 
                                   color: '#a16207', 
                                   background: '#fef9c3',
                                   padding: '2px 6px',
                                   borderRadius: '6px',
-                                  display: 'flex', 
+                                  display: 'inline-flex', 
                                   alignItems: 'center', 
                                   gap: '3px', 
                                   fontFamily: 'monospace' 
                                 }}>
-                                  <span>⏳ Noch {timeUntilMidnight}</span>
-                                </div>
-                              )}
-                            </div>
-                            <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#4b5563', lineHeight: '1.4' }}>
-                              Sichere dir deinen Übe-Streak! Mach heute Musik zu deiner Pause. 🎵
-                            </div>
+                                  ⏳ {timeUntilMidnight}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         );
                       } else {
