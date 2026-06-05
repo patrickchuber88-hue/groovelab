@@ -737,7 +737,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                         overflow: 'hidden'
                       }}>
                         {school.logo_url ? (
-                          <img src={school.logo_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                          <img src={school.logo_url} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="" />
                         ) : (
                           school.name.substring(0, 2).toUpperCase()
                         )}
@@ -1394,7 +1394,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                 overflow: 'hidden'
               }}>
                 {editLogo ? (
-                  <img src={editLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={editLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                 ) : (
                   editName.substring(0, 2).toUpperCase()
                 )}
@@ -1527,7 +1527,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                   overflow: 'hidden'
                 }}>
                   {editLogo ? (
-                    <img src={editLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={editLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                   ) : (
                     '🏫'
                   )}
