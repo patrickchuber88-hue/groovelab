@@ -198,9 +198,24 @@ interface AdminDashboardProps {
   onTabChange?: (tab: string) => void;
   onOpenBandProfile?: (band: any) => void;
   activePlatform?: 'campus' | 'groovelab';
+  session?: any;
+  onSessionChange?: (session: any) => void;
+  locationMode?: 'lab' | 'home';
+  onLocationModeChange?: (mode: 'lab' | 'home') => void;
 }
 
-export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpenBandProfile, activePlatform = 'groovelab' }: AdminDashboardProps) {
+export function AdminDashboard({ 
+  userId, 
+  onLogout, 
+  forceTab, 
+  onTabChange, 
+  onOpenBandProfile, 
+  activePlatform = 'groovelab',
+  session,
+  onSessionChange,
+  locationMode,
+  onLocationModeChange
+}: AdminDashboardProps) {
   const [admin, setAdmin] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
@@ -3802,6 +3817,10 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         onTabChange={(id) => onTabChange?.(id)}
         isSidebarCollapsed={isSidebarCollapsed}
         setIsSidebarCollapsed={setIsSidebarCollapsed}
+        session={session}
+        onSessionChange={onSessionChange}
+        locationMode={locationMode}
+        onLocationModeChange={onLocationModeChange}
       />
     </div>
   );

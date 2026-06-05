@@ -6486,54 +6486,74 @@ function App() {
           </ErrorBoundary>
         )}
 
-        {/* Live Lab Tab for Students */}
-        {user.role?.toLowerCase() === 'student' && activePlatform !== 'ensembles' && activeStudentTab === 'live' && (
-          <ErrorBoundary>
-            <div className="animation-slide-up" style={{ width: '100%', padding: '24px 16px 16px 16px', display: 'flex', flexDirection: 'column', flex: 1, height: '100%' }}>
-              <TeacherDashboard 
-                key={activePlatform}
-                userId={user.id} 
-                hideHeader={true} 
-                viewMode="student" 
-                onTabChange={setActiveStudentTab}
-                isSidebarCollapsed={isSidebarCollapsed}
-                setIsSidebarCollapsed={setIsSidebarCollapsed}
-                onSidebarNotificationsChange={setSidebarNotificationsCount}
-                activePlatform={activePlatform as any}
-                onSwitchPlatform={(newPlatform) => {
-                  setActivePlatform(newPlatform);
-                  setActiveStudentTab(newPlatform === 'campus' ? 'briefing' : 'live');
-                }}
-                onFoundBand={(form, mySlot) => {
-                  console.log('[DEBUG-Groovelab] setSuggestingSkill (manual click) in TeacherDashboard onFoundBand');
-                  setSuggestingSkill({
-                    ...mySlot,
-                    isLeader: true,
-                    leaderName: 'Du',
-                    song_id: form.song?.id || form.song_id,
-                    songs: { id: form.song?.id || form.song_id, title: form.song?.title },
-                    formation_group: form.groupKey || form.id,
-                    members: form.members
-                  });
-                  setFoundingName(generateRandomBandName());
-                }}
-              />
-            </div>
-          </ErrorBoundary>
+        {/* Live Lab Tab for Students (Kept mounted for instant platform switching) */}
+        {user.role?.toLowerCase() === 'student' && (
+          <div style={{ 
+            display: (activePlatform !== 'ensembles' && activeStudentTab === 'live') ? 'flex' : 'none', 
+            flexDirection: 'column', 
+            flex: 1, 
+            minHeight: 0,
+            width: '100%' 
+          }}>
+            <ErrorBoundary>
+              <div className="animation-slide-up" style={{ width: '100%', padding: '24px 16px 16px 16px', display: 'flex', flexDirection: 'column', flex: 1, height: '100%' }}>
+                <TeacherDashboard 
+                  key="student-live-dashboard"
+                  userId={user.id} 
+                  hideHeader={true} 
+                  viewMode="student" 
+                  onTabChange={setActiveStudentTab}
+                  isSidebarCollapsed={isSidebarCollapsed}
+                  setIsSidebarCollapsed={setIsSidebarCollapsed}
+                  onSidebarNotificationsChange={setSidebarNotificationsCount}
+                  activePlatform={activePlatform as any}
+                  session={session}
+                  onSessionChange={setSession}
+                  locationMode={locationMode}
+                  onLocationModeChange={(mode) => {
+                    setLocationMode(mode);
+                    sessionStorage.setItem('groovelab_location_mode', mode);
+                  }}
+                  onSwitchPlatform={(newPlatform) => {
+                    setActivePlatform(newPlatform);
+                    setActiveStudentTab(newPlatform === 'campus' ? 'briefing' : 'live');
+                  }}
+                  onFoundBand={(form, mySlot) => {
+                    console.log('[DEBUG-Groovelab] setSuggestingSkill (manual click) in TeacherDashboard onFoundBand');
+                    setSuggestingSkill({
+                      ...mySlot,
+                      isLeader: true,
+                      leaderName: 'Du',
+                      song_id: form.song?.id || form.song_id,
+                      songs: { id: form.song?.id || form.song_id, title: form.song?.title },
+                      formation_group: form.groupKey || form.id,
+                      members: form.members
+                    });
+                    setFoundingName(generateRandomBandName());
+                  }}
+                />
+              </div>
+            </ErrorBoundary>
+          </div>
         )}
 
-        {/* Student Campus Dashboard Tabs */}
-        {user.role?.toLowerCase() === 'student' && activePlatform === 'campus' && ['briefing', 'mediathek', 'practice_board', 'campus_cup', 'flashback', 'events', 'profile', 'all_appointments'].includes(activeStudentTab) && (
-          <ErrorBoundary>
-            <StudentAvatarDashboard 
-              studentId={user.id} 
-              parentActiveTab={activeStudentTab}
-              onTabChange={(tab) => setActiveStudentTab(tab)}
-              onProfileUpdate={(updatedFields: any) => {
-                setUser((prev: any) => prev ? { ...prev, ...updatedFields } : null);
-              }}
-            />
-          </ErrorBoundary>
+        {/* Student Campus Dashboard Tabs (Kept mounted for instant platform switching) */}
+        {user.role?.toLowerCase() === 'student' && (
+          <div style={{ 
+            display: (activePlatform === 'campus' && ['briefing', 'mediathek', 'practice_board', 'campus_cup', 'flashback', 'events', 'profile', 'all_appointments'].includes(activeStudentTab)) ? 'block' : 'none',
+            width: '100%'
+          }}>
+            <ErrorBoundary>
+              <StudentAvatarDashboard 
+                studentId={user.id} 
+                parentActiveTab={activeStudentTab}
+                onTabChange={(tab) => setActiveStudentTab(tab)}
+                onProfileUpdate={(updatedFields: any) => {
+                  setUser((prev: any) => prev ? { ...prev, ...updatedFields } : null);
+                }}
+              />
+            </ErrorBoundary>
+          </div>
         )}
 
         {/* Profile Tab */}
@@ -7883,6 +7903,13 @@ function App() {
               onOpenBandProfile={(band: any) => {
                 setSelectedBandForProfile(band);
                 setShowBandProfile(true);
+              }}
+              session={session}
+              onSessionChange={setSession}
+              locationMode={locationMode}
+              onLocationModeChange={(mode) => {
+                setLocationMode(mode);
+                sessionStorage.setItem('groovelab_location_mode', mode);
               }}
             />
           </ErrorBoundary>

@@ -1012,7 +1012,15 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
   const [isAppUser, setIsAppUser] = useState(false);
   const [isPremiumUser, setIsPremiumUser] = useState(false);
-  const [avatar, setAvatar] = useState<Avatar | null>(null);
+  const [avatarFromDb, setAvatar] = useState<Avatar | null>(null);
+  const avatar = avatarFromDb || {
+    avatar_style: 'standard',
+    instrument_type: studentUser?.instrument || 'Guitar',
+    evolution_level: 1,
+    xp: 0,
+    asset_path: getInstrumentAvatarUrl(studentUser?.instrument),
+    streak_flame: 0
+  };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -3153,8 +3161,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       </div>
     );
   }
-
-  if (!avatar) return null;
 
   const currentLevel = avatar.evolution_level || 1;
   const currentXp = avatar.xp || 0;

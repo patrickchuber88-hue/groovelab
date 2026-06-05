@@ -1,14 +1,85 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
 import { renderInstrumentIcon } from '../utils/instruments';
+import { getDistanceFromLatLonInM } from '../utils/geo';
 
 const cleanRoomName = (name: string | null | undefined): string => {
   if (!name) return 'Unbenannter Raum';
   return name.replace(/^#\d+\s*[-:]*\s*/, '').trim();
+};
+
+const adjustPositions = (stations: any[], containerWidth: number = 364) => {
+  const items = stations.map(s => ({
+    ...s,
+    x: s.pos_x !== null && s.pos_x !== undefined ? s.pos_x : 50,
+    y: s.pos_y !== null && s.pos_y !== undefined ? s.pos_y : 50,
+    origX: s.pos_x !== null && s.pos_x !== undefined ? s.pos_x : 50,
+    origY: s.pos_y !== null && s.pos_y !== undefined ? s.pos_y : 50
+  }));
+
+  const containerHeight = containerWidth / 1.4;
+  const safeMarginPx = 45;
+  const safeMinX = Math.min(45, (safeMarginPx / containerWidth) * 100);
+  const safeMaxX = Math.max(55, 100 - safeMinX);
+  const safeMinY = Math.min(45, (safeMarginPx / containerHeight) * 100);
+  const safeMaxY = Math.max(55, 100 - safeMinY);
+  const minXDistPx = 76;
+  const minYDistPx = 76;
+  const iterations = 50;
+  const minXDist = (minXDistPx / containerWidth) * 100;
+  const minYDist = (minYDistPx / containerHeight) * 100;
+
+  for (let iter = 0; iter < iterations; iter++) {
+    let moved = false;
+    for (let i = 0; i < items.length; i++) {
+      for (let j = i + 1; j < items.length; j++) {
+        const dx = items[i].x - items[j].x;
+        const dy = items[i].y - items[j].y;
+        if (Math.abs(dx) < minXDist && Math.abs(dy) < minYDist) {
+          moved = true;
+          const isVerticallyAligned = Math.abs(items[i].origX - items[j].origX) < 6;
+          const isHorizontallyAligned = Math.abs(items[i].origY - items[j].origY) < 6;
+          if (isVerticallyAligned && !isHorizontallyAligned) {
+            const overlapY = minYDist - Math.abs(dy);
+            const forceY = dy === 0 ? (i % 2 === 0 ? 1 : -1) : Math.sign(dy);
+            const pushY = forceY * (overlapY / 2);
+            items[i].y += pushY;
+            items[j].y -= pushY;
+            items[i].x = items[i].origX;
+            items[j].x = items[j].origX;
+          } else if (isHorizontallyAligned && !isVerticallyAligned) {
+            const overlapX = minXDist - Math.abs(dx);
+            const forceX = dx === 0 ? (i % 2 === 0 ? 1 : -1) : Math.sign(dx);
+            const pushX = forceX * (overlapX / 2);
+            items[i].x += pushX;
+            items[j].x -= pushX;
+            items[i].y = items[i].origY;
+            items[j].y = items[j].origY;
+          } else {
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            const overlapX = minXDist - Math.abs(dx);
+            const overlapY = minYDist - Math.abs(dy);
+            const forceX = dx === 0 ? (i % 2 === 0 ? 1 : -1) : dx / dist;
+            const forceY = dy === 0 ? (i % 2 === 0 ? -1 : 1) : dy / dist;
+            items[i].x += forceX * (overlapX / 2);
+            items[i].y += forceY * (overlapY / 2);
+            items[j].x -= forceX * (overlapX / 2);
+            items[j].y -= forceY * (overlapY / 2);
+          }
+          items[i].x = Math.max(safeMinX, Math.min(safeMaxX, items[i].x));
+          items[i].y = Math.max(safeMinY, Math.min(safeMaxY, items[i].y));
+          items[j].x = Math.max(safeMinX, Math.min(safeMaxX, items[j].x));
+          items[j].y = Math.max(safeMinY, Math.min(safeMaxY, items[j].y));
+        }
+      }
+    }
+    if (!moved) break;
+  }
+  return items;
 };
 
 
@@ -633,6 +704,9 @@ interface TeacherDashboardProps {
   userId: string;
   onLogout?: () => void;
   locationMode?: 'lab' | 'home';
+  onLocationModeChange?: (mode: 'lab' | 'home') => void;
+  session?: any;
+  onSessionChange?: (sess: any) => void;
   hideHeader?: boolean;
   hideSidebar?: boolean;
   viewMode?: 'admin' | 'student';
@@ -651,6 +725,9 @@ export function TeacherDashboard({
   userId, 
   onLogout, 
   locationMode = 'lab', 
+  onLocationModeChange,
+  session,
+  onSessionChange,
   hideHeader = false,
   hideSidebar = false,
   viewMode = 'admin', 
@@ -664,6 +741,11 @@ export function TeacherDashboard({
   activePlatform = 'groovelab'
 }: TeacherDashboardProps) {
   const [teacher, setTeacher] = useState<any>(null);
+  const isUserCheckedIn = locationMode === 'lab' && !!session && !!session.station_id;
+  const [showKioskView, setShowKioskView] = useState(false);
+  const [checkingInStatus, setCheckingInStatus] = useState<'idle' | 'locating' | 'verifying' | 'success' | 'error'>('idle');
+  const [geoErrorMsg, setGeoErrorMsg] = useState<string>('');
+  const [shakeLock, setShakeLock] = useState(false);
   const [stations, setStations] = useState<any[]>([]);
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
   const [wallSongs, setWallSongs] = useState<any[]>([]);
@@ -752,6 +834,155 @@ export function TeacherDashboard({
       delete (window as any).openTageskompass;
     };
   }, []);
+
+  const handleGeofenceCheck = () => {
+    // 1. Bypass check on localhost
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      setCheckingInStatus('success');
+      setShowKioskView(true);
+      return;
+    }
+
+    setCheckingInStatus('locating');
+    setGeoErrorMsg('');
+
+    if (!navigator.geolocation) {
+      setCheckingInStatus('error');
+      setGeoErrorMsg('Geolocation wird von deinem Browser nicht unterstützt.');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        setCheckingInStatus('verifying');
+        const currentPos = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        };
+
+        let isWithinAnyRoom = false;
+
+        // Check against room coordinates & geofences
+        if (rooms && rooms.length > 0) {
+          for (const room of rooms) {
+            const points = Array.isArray(room.geofence_points) ? room.geofence_points : [];
+            const allCoords = [...points];
+            if (room.latitude && room.longitude) {
+              allCoords.push({ lat: room.latitude, lng: room.longitude });
+            }
+
+            for (const pt of allCoords) {
+              if (pt && pt.lat && pt.lng) {
+                const dist = getDistanceFromLatLonInM(currentPos.lat, currentPos.lng, Number(pt.lat), Number(pt.lng));
+                if (dist < 100) {
+                  isWithinAnyRoom = true;
+                  break;
+                }
+              }
+            }
+            if (isWithinAnyRoom) break;
+          }
+        }
+
+        // If not found in any room geofence, fallback to school coordinates
+        const schoolData = teacher?.schools;
+        if (!isWithinAnyRoom && schoolData?.latitude && schoolData?.longitude) {
+          const distToSchool = getDistanceFromLatLonInM(currentPos.lat, currentPos.lng, Number(schoolData.latitude), Number(schoolData.longitude));
+          const radius = schoolData.geofence_radius_meters || 150;
+          if (distToSchool < radius) {
+            isWithinAnyRoom = true;
+          }
+        }
+
+        if (isWithinAnyRoom) {
+          setCheckingInStatus('success');
+          setShowKioskView(true);
+        } else {
+          setCheckingInStatus('error');
+          setGeoErrorMsg('Du befindest dich anscheinend nicht vor Ort in der Musikschule.');
+          setShakeLock(true);
+          setTimeout(() => setShakeLock(false), 500);
+        }
+      },
+      (error) => {
+        setCheckingInStatus('error');
+        setShakeLock(true);
+        setTimeout(() => setShakeLock(false), 500);
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            setGeoErrorMsg('Standortzugriff wurde abgelehnt. Bitte aktiviere den GPS-Zugriff in deinen Browsereinstellungen.');
+            break;
+          case error.POSITION_UNAVAILABLE:
+            setGeoErrorMsg('Standortinformationen sind nicht verfügbar.');
+            break;
+          case error.TIMEOUT:
+            setGeoErrorMsg('Die GPS-Abfrage dauerte zu lange (Timeout).');
+            break;
+          default:
+            setGeoErrorMsg('Ein unbekannter Fehler bei der Standortabfrage ist aufgetreten.');
+            break;
+        }
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+    );
+  };
+
+  const handleKioskStationSelect = async (station: any) => {
+    if (!userId) return;
+    setCheckingInStatus('verifying');
+    const now = new Date().toISOString();
+
+    try {
+      // 1. Global Cleanup: Always terminate any existing active sessions for THIS USER
+      await supabase.from('sessions').update({ check_out_time: now }).eq('user_id', userId).is('check_out_time', null);
+
+      // 2. Station Cleanup: If another student is logged in here, terminate their session
+      const isTeacher = teacher?.role?.toLowerCase() === 'teacher' || teacher?.role?.toLowerCase() === 'admin';
+      if (!isTeacher) {
+        await supabase.from('sessions').update({ check_out_time: now }).eq('station_id', station.id).is('check_out_time', null);
+      }
+
+      // 3. Insert new session
+      const { data: sessData, error: sessErr } = await supabase
+        .from('sessions')
+        .insert({
+          user_id: userId,
+          station_id: station.id,
+          gps_verified: true,
+          check_in_time: now
+        })
+        .select('*, stations(name)')
+        .single();
+
+      if (sessErr) {
+        console.error('[Kiosk Check-in] Error creating session:', sessErr);
+        alert('Fehler beim Einchecken: ' + sessErr.message);
+        setCheckingInStatus('error');
+        return;
+      }
+
+      console.log('[Kiosk Check-in] Session created successfully:', sessData.id);
+
+      // 4. Update parent states if callbacks exist
+      if (onSessionChange) {
+        onSessionChange(sessData);
+      }
+      if (onLocationModeChange) {
+        onLocationModeChange('lab');
+      }
+
+      // 5. Refresh data to update Live Lab board locally
+      await fetchData();
+
+      // Close kiosk view
+      setShowKioskView(false);
+      setCheckingInStatus('idle');
+    } catch (err: any) {
+      console.error('[Kiosk Check-in] Catch error:', err);
+      alert('Fehler beim Einchecken: ' + err.message);
+      setCheckingInStatus('error');
+    }
+  };
 
   const handleZoomChange = (value: number) => {
     setZoomFactor(value);
@@ -2471,7 +2702,15 @@ export function TeacherDashboard({
 
       const mBands = mBandsRes.data;
       const cBands = cBandsRes.data;
-      const tData = tDataRes.data;
+      let tData = tDataRes.data;
+
+      // Fallback: if schools join failed (e.g. RLS on schools table for student), query users directly
+      if (!tData && userId) {
+        const { data: fallbackUser } = await supabase.from('users').select('*').eq('id', userId).single();
+        if (fallbackUser) {
+          tData = fallbackUser;
+        }
+      }
 
       if (mBands) bIds.push(...mBands.map(b => b.band_id));
       if (cBands) bIds.push(...cBands.map(b => b.id));
@@ -2522,19 +2761,19 @@ export function TeacherDashboard({
           wallRes,
           occRes
         ] = await Promise.all([
-          supabase.from('rooms').select('*').eq('school_id', tData.school_id).eq('is_groovelab_active', true).order('sort_order', { ascending: true }),
-          supabase.from('user_availability').select('*'),
-          supabase.from('sessions').select('*, users!inner(*), stations(*)').is('check_out_time', null),
-          supabase.from('users').select('*').in('role', ['teacher', 'admin']).eq('school_id', tData.school_id),
-          supabase.from('user_song_skills').select('*, users!user_id(*), songs(*)').eq('is_pending_approval', true),
-          supabase.from('bands').select('*, band_members(*, users(*)), coach:users!coach_id(id, first_name, last_name, photo_url), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))').eq('school_id', tData.school_id).order('name'),
-          studentQuery.order('first_name'),
-          viewMode !== 'student' 
-            ? supabase.from('help_requests').select('*, users(*)').eq('school_id', tData.school_id).eq('status', 'pending').order('created_at', { ascending: false })
-            : Promise.resolve({ data: null, error: null }),
-          supabase.from('bands').select('*, band_members(*, profiles:users(id, first_name, last_name, photo_url, created_at, birth_date)), songs(*), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, last_name, photo_url, created_at, birth_date)))').eq('school_id', tData.school_id).in('status', ['forming', 'active']),
-          wallSongsQuery,
-          supabase.from('band_song_slots').select('user_id, band_songs(song_id)')
+          Promise.resolve(supabase.from('rooms').select('*').eq('school_id', tData.school_id).eq('is_groovelab_active', true).order('sort_order', { ascending: true })).catch(e => ({ data: [], error: e })),
+          Promise.resolve(supabase.from('user_availability').select('*')).catch(e => ({ data: [], error: e })),
+          Promise.resolve(supabase.from('sessions').select('*, users!inner(*), stations(*)').is('check_out_time', null)).catch(e => ({ data: [], error: e })),
+          Promise.resolve(supabase.from('users').select('*').in('role', ['teacher', 'admin']).eq('school_id', tData.school_id)).catch(e => ({ data: [], error: e })),
+          Promise.resolve(supabase.from('user_song_skills').select('*, users!user_id(*), songs(*)').eq('is_pending_approval', true)).catch(e => ({ data: [], error: e })),
+          Promise.resolve(supabase.from('bands').select('*, band_members(*, users(*)), coach:users!coach_id(id, first_name, last_name, photo_url), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))').eq('school_id', tData.school_id).order('name')).catch(e => ({ data: [], error: e })),
+          Promise.resolve(studentQuery.order('first_name')).catch(e => ({ data: [], error: e })),
+          (viewMode !== 'student' 
+            ? Promise.resolve(supabase.from('help_requests').select('*, users(*)').eq('school_id', tData.school_id).eq('status', 'pending').order('created_at', { ascending: false }))
+            : Promise.resolve({ data: null, error: null })).catch(e => ({ data: [], error: e })),
+          Promise.resolve(supabase.from('bands').select('*, band_members(*, profiles:users(id, first_name, last_name, photo_url, created_at, birth_date)), songs(*), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, last_name, photo_url, created_at, birth_date)))').eq('school_id', tData.school_id).in('status', ['forming', 'active'])).catch(e => ({ data: [], error: e })),
+          Promise.resolve(wallSongsQuery).catch(e => ({ data: [], error: e })),
+          Promise.resolve(supabase.from('band_song_slots').select('user_id, band_songs(song_id)')).catch(e => ({ data: [], error: e }))
         ]);
 
         const rData = rRes.data;
@@ -2568,7 +2807,7 @@ export function TeacherDashboard({
 
         if (sessErr) {
           console.error('[Dashboard] Error fetching sessions:', sessErr);
-          return;
+          if (viewMode !== 'student') return;
         }
 
         const schoolSess = (sessData || [])
@@ -6543,8 +6782,8 @@ export function TeacherDashboard({
               const boundWidth = Math.max(100, maxBoundX - minBoundX);
               const boundHeight = Math.max(100, maxBoundY - minBoundY);
 
-              // Use the unified scale scaled by manual zoomFactor
-              const scale = unifiedScale * zoomFactor;
+              // Use the original size scaled by manual zoomFactor
+              const scale = 1.0 * zoomFactor;
 
               return (
                 <div 
@@ -6812,6 +7051,125 @@ export function TeacherDashboard({
 
                   {/* Horizontal Flex Wrapper for Blueprint Layout and Slider */}
                   <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '24px', justifyContent: 'center', width: '100%', position: 'relative' }}>
+                    {/* Glass Overlay if user is not checked in */}
+                    {!isUserCheckedIn && (
+                      <>
+                        <style dangerouslySetInnerHTML={{__html: `
+                          @keyframes softPulseCheckin {
+                            0% {
+                              box-shadow: 0 0 0 0 rgba(251, 188, 5, 0.45);
+                              transform: scale(1);
+                            }
+                            50% {
+                              box-shadow: 0 0 25px 8px rgba(251, 188, 5, 0.25);
+                              transform: scale(1.03);
+                            }
+                            100% {
+                              box-shadow: 0 0 0 0 rgba(251, 188, 5, 0.45);
+                              transform: scale(1);
+                            }
+                          }
+                          @keyframes spinCheckin {
+                            to { transform: rotate(360deg); }
+                          }
+                          @keyframes shakeLock {
+                            0%, 100% { transform: translateX(0); }
+                            20%, 60% { transform: translateX(-6px); }
+                            40%, 80% { transform: translateX(6px); }
+                          }
+                          .pulse-btn-checkin {
+                            animation: softPulseCheckin 2.5s infinite ease-in-out;
+                          }
+                          .spin-checkin {
+                            animation: spinCheckin 1s linear infinite;
+                          }
+                          .shake-lock-active {
+                            animation: shakeLock 0.4s ease-in-out;
+                          }
+                        `}} />
+                        <div style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          borderRadius: '24px',
+                          background: 'rgba(255, 255, 255, 0.15)',
+                          backdropFilter: 'blur(3px)',
+                          WebkitBackdropFilter: 'blur(3px)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          zIndex: 1000,
+                          border: '1px solid rgba(255, 255, 255, 0.2)',
+                          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.04)',
+                          padding: '24px',
+                          textAlign: 'center'
+                        }}>
+                          <div 
+                            className={shakeLock ? 'shake-lock-active' : ''}
+                            style={{
+                              width: '64px',
+                              height: '64px',
+                              borderRadius: '50%',
+                              background: 'rgba(251, 188, 5, 0.08)',
+                              border: '1px solid rgba(251, 188, 5, 0.15)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#eab308',
+                              marginBottom: '16px'
+                            }}
+                          >
+                            <Lock size={28} />
+                          </div>
+                          
+                          <h4 style={{ fontSize: '20px', fontWeight: 900, color: '#1e293b', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
+                            GrooveLab Live-Plattform
+                          </h4>
+                          <p style={{ fontSize: '14px', color: '#64748b', maxWidth: '300px', margin: '0 0 24px 0', lineHeight: 1.4 }}>
+                            Bitte checke vor Ort in der Musikschule ein, um deine iPad-Station zu aktivieren und die Live-Ansicht zu nutzen.
+                          </p>
+
+                          {checkingInStatus === 'locating' || checkingInStatus === 'verifying' ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                              <div className="spin-checkin" style={{ width: '24px', height: '24px', border: '3px solid #fbbc05', borderTopColor: 'transparent', borderRadius: '50%' }} />
+                              <span style={{ fontSize: '13px', fontWeight: 600, color: '#eab308' }}>
+                                {checkingInStatus === 'locating' ? 'Bestimme Standort...' : 'Verifiziere Geodaten...'}
+                              </span>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleGeofenceCheck}
+                              className="pulse-btn-checkin"
+                              style={{
+                                padding: '14px 28px',
+                                borderRadius: '16px',
+                                background: '#fbbc05',
+                                border: 'none',
+                                color: '#0f172a',
+                                fontSize: '15px',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                boxShadow: '0 4px 14px rgba(251, 188, 5, 0.3)'
+                              }}
+                            >
+                              Jetzt Einchecken
+                            </button>
+                          )}
+
+                          {checkingInStatus === 'error' && geoErrorMsg && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px', padding: '10px 16px', background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '12px', color: '#ef4444', fontSize: '13px', maxWidth: '340px' }}>
+                              <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                              <span style={{ fontWeight: 600, textAlign: 'left' }}>{geoErrorMsg}</span>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
                     {/* Scaled room blueprint to fit parent width and height without scrolling or overlaps */}
                     <div 
                       className="blueprint-viewport"
@@ -6826,7 +7184,9 @@ export function TeacherDashboard({
                         borderRadius: '24px', 
                         display: 'block', 
                         boxSizing: 'border-box', 
-                        padding: '16px' 
+                        padding: '16px',
+                        filter: !isUserCheckedIn ? 'blur(1px)' : 'none',
+                        pointerEvents: !isUserCheckedIn ? 'none' : 'auto'
                       }}
                     >
                       <div 
@@ -6958,38 +7318,133 @@ export function TeacherDashboard({
                   </div>
                 )}
                 {/* Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '24px', background: '#ffffff', padding: '24px', borderRadius: '32px', border: '1px solid #e2e8f0' }}>
-                  {/* Coaches Node */}
-                  <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-                    <CoachesNode coaches={coaches} onProfileSelect={setSelectedCoachProfile} activePlatform={activePlatform} />
-                  </div>
-                  {roomStations.filter(s => {
-                    const sName = s.name || '';
-                    return !(sName.toLowerCase().includes('lehrer') || sName.toLowerCase().includes('teacher'));
-                  }).map(station => {
-                    const sess = activeSessions.find(se => se.station_id === station.id);
-                    const sName = station.name || '';
-                    const num = parseInt(sName.match(/\d+/)?.[0] || '1');
-                    const instColor = getStationColor(sName, station.color);
-
-                    return (
-                      <div key={station.id}>
-                        <StationNode
-                          num={num}
-                          customName={station.name}
-                          color={instColor}
-                          inst={station.instrument || 'Tablet'}
-                          sess={sess}
-                          isMe={sess?.user_id === userId}
-                          viewMode={viewMode}
-                          onProfileSelect={setSelectedStudentProfile}
-                          onLogout={handleLogoutStudent}
-                          hasHelpRequest={helpRequests.some(r => r.station_id === station.id)}
-                          activePlatform={activePlatform}
-                        />
+                <div style={{ position: 'relative', width: '100%' }}>
+                  {!isUserCheckedIn && (
+                    <div style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      borderRadius: '32px',
+                      background: 'rgba(255, 255, 255, 0.15)',
+                      backdropFilter: 'blur(3px)',
+                      WebkitBackdropFilter: 'blur(3px)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      zIndex: 1000,
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.04)',
+                      padding: '24px',
+                      textAlign: 'center'
+                    }}>
+                      <div 
+                        className={shakeLock ? 'shake-lock-active' : ''}
+                        style={{
+                          width: '64px',
+                          height: '64px',
+                          borderRadius: '50%',
+                          background: 'rgba(251, 188, 5, 0.08)',
+                          border: '1px solid rgba(251, 188, 5, 0.15)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#eab308',
+                          marginBottom: '16px'
+                        }}
+                      >
+                        <Lock size={28} />
                       </div>
-                    );
-                  })}
+                      
+                      <h4 style={{ fontSize: '20px', fontWeight: 900, color: '#1e293b', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
+                        GrooveLab Live-Plattform
+                      </h4>
+                      <p style={{ fontSize: '14px', color: '#64748b', maxWidth: '300px', margin: '0 0 24px 0', lineHeight: 1.4 }}>
+                        Bitte checke vor Ort in der Musikschule ein, um deine iPad-Station zu aktivieren und die Live-Ansicht zu nutzen.
+                      </p>
+
+                      {checkingInStatus === 'locating' || checkingInStatus === 'verifying' ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                          <div className="spin-checkin" style={{ width: '24px', height: '24px', border: '3px solid #fbbc05', borderTopColor: 'transparent', borderRadius: '50%' }} />
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: '#eab308' }}>
+                            {checkingInStatus === 'locating' ? 'Bestimme Standort...' : 'Verifiziere Geodaten...'}
+                          </span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleGeofenceCheck}
+                          className="pulse-btn-checkin"
+                          style={{
+                            padding: '14px 28px',
+                            borderRadius: '16px',
+                            background: '#fbbc05',
+                            border: 'none',
+                            color: '#0f172a',
+                            fontSize: '15px',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            boxShadow: '0 4px 14px rgba(251, 188, 5, 0.3)'
+                          }}
+                        >
+                          Jetzt Einchecken
+                        </button>
+                      )}
+
+                      {checkingInStatus === 'error' && geoErrorMsg && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px', padding: '10px 16px', background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '12px', color: '#ef4444', fontSize: '13px', maxWidth: '340px' }}>
+                          <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                          <span style={{ fontWeight: 600, textAlign: 'left' }}>{geoErrorMsg}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', 
+                    gap: '24px', 
+                    background: '#ffffff', 
+                    padding: '24px', 
+                    borderRadius: '32px', 
+                    border: '1px solid #e2e8f0',
+                    filter: !isUserCheckedIn ? 'blur(1px)' : 'none',
+                    pointerEvents: !isUserCheckedIn ? 'none' : 'auto'
+                  }}>
+                    {/* Coaches Node */}
+                    <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+                      <CoachesNode coaches={coaches} onProfileSelect={setSelectedCoachProfile} activePlatform={activePlatform} />
+                    </div>
+                    {roomStations.filter(s => {
+                      const sName = s.name || '';
+                      return !(sName.toLowerCase().includes('lehrer') || sName.toLowerCase().includes('teacher'));
+                    }).map(station => {
+                      const sess = activeSessions.find(se => se.station_id === station.id);
+                      const sName = station.name || '';
+                      const num = parseInt(sName.match(/\d+/)?.[0] || '1');
+                      const instColor = getStationColor(sName, station.color);
+
+                      return (
+                        <div key={station.id}>
+                          <StationNode
+                            num={num}
+                            customName={station.name}
+                            color={instColor}
+                            inst={station.instrument || 'Tablet'}
+                            sess={sess}
+                            isMe={sess?.user_id === userId}
+                            viewMode={viewMode}
+                            onProfileSelect={setSelectedStudentProfile}
+                            onLogout={handleLogoutStudent}
+                            hasHelpRequest={helpRequests.some(r => r.station_id === station.id)}
+                            activePlatform={activePlatform}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             );
@@ -7778,6 +8233,191 @@ export function TeacherDashboard({
               </button>
             )}
           </aside>
+
+          {showKioskView && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+              padding: '16px'
+            }}>
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '32px',
+                width: '100%',
+                maxWidth: '650px',
+                padding: '32px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                border: '1px solid rgba(226, 232, 240, 0.8)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '24px',
+                position: 'relative'
+              }}>
+                {/* Close Button */}
+                <button 
+                  onClick={() => {
+                    setShowKioskView(false);
+                    setCheckingInStatus('idle');
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: '24px',
+                    right: '24px',
+                    background: '#f1f5f9',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '36px',
+                    height: '36px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#64748b',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <X size={18} />
+                </button>
+
+                {/* Header */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#6366f1', marginBottom: '8px' }}>
+                    <Monitor size={20} />
+                    <span style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Einchecken</span>
+                  </div>
+                  <h3 style={{ fontSize: '24px', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>Wähle deine iPad-Station</h3>
+                  <p style={{ fontSize: '14px', color: '#64748b', margin: '4px 0 0 0' }}>
+                    Wähle das iPad aus, an dem du dich anmelden möchtest, um dem Live-Lab beizutreten.
+                  </p>
+                </div>
+
+                {/* Room Selector inside Kiosk */}
+                {rooms.length > 0 && (
+                  <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+                    {rooms.map((room, idx) => (
+                      <button
+                        key={room.id}
+                        type="button"
+                        onClick={() => setSelectedRoomId(room.id)}
+                        style={{
+                          padding: '8px 14px',
+                          borderRadius: '12px',
+                          border: '1px solid',
+                          borderColor: selectedRoomId === room.id ? '#6366f1' : 'rgba(0,0,0,0.1)',
+                          background: selectedRoomId === room.id ? '#6366f1' : 'transparent',
+                          color: selectedRoomId === room.id ? '#ffffff' : '#1e293b',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        {`${idx + 1} - ${cleanRoomName(room.name)}`}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Kiosk stations map */}
+                <div 
+                  style={{
+                    position: 'relative',
+                    width: '100%',
+                    aspectRatio: '1.4',
+                    background: 'rgba(0, 0, 0, 0.02)',
+                    borderRadius: '24px',
+                    border: '1px solid rgba(0, 0, 0, 0.06)',
+                    overflow: 'hidden',
+                    padding: '16px'
+                  }}
+                >
+                  {(() => {
+                    const kioskStations = stations.filter(s => s.room_id === selectedRoomId && !s.name.toLowerCase().includes('lehrer') && !s.name.toLowerCase().includes('teacher'));
+                    // Active sessions station IDs
+                    const activeSessionStationIds = activeSessions.map(se => se.station_id);
+
+                    return adjustPositions(kioskStations, 586).map((station) => {
+                      const isOccupied = activeSessionStationIds.includes(station.id);
+                      const posX = station.x;
+                      const posY = station.y;
+                      const stationColor = getStationColor(station.name, station.color);
+
+                      return (
+                        <button
+                          key={station.id}
+                          type="button"
+                          onClick={async () => {
+                            if (isOccupied) {
+                              const confirm = window.confirm(`Dieses iPad ist besetzt. Möchtest du die alte Sitzung beenden und dieses iPad übernehmen?`);
+                              if (!confirm) return;
+                            }
+                            await handleKioskStationSelect(station);
+                          }}
+                          style={{
+                            position: 'absolute',
+                            left: `${posX}%`,
+                            top: `${posY}%`,
+                            transform: 'translate(-50%, -50%)',
+                            width: '72px',
+                            height: '72px',
+                            borderRadius: '16px',
+                            border: `2px solid ${stationColor}`,
+                            background: `${stationColor}15`,
+                            color: '#1e293b',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '2px',
+                            textAlign: 'center',
+                            boxShadow: '0 4px 10px rgba(0, 0, 0, 0.05)',
+                            outline: 'none',
+                            zIndex: 1,
+                            opacity: isOccupied ? 0.7 : 1
+                          }}
+                          title={`${station.name} (${isOccupied ? 'Besetzt' : 'Frei'})`}
+                        >
+                          {station.instrument && (
+                            <span style={{ fontSize: '7px', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.6, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', padding: '0 2px' }}>
+                              {station.instrument}
+                            </span>
+                          )}
+                          <span style={{ fontSize: '10px', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', padding: '0 2px', lineHeight: 1.1 }}>
+                            {station.name}
+                          </span>
+                          {isOccupied ? (
+                            <Lock size={10} style={{ color: '#ef4444', marginTop: '2px' }} />
+                          ) : (
+                            <div style={{ 
+                              width: '6px', 
+                              height: '6px', 
+                              borderRadius: '50%', 
+                              background: '#22c55e',
+                              border: '1px solid rgba(255,255,255,0.2)',
+                              marginTop: '3px'
+                            }} />
+                          )}
+                        </button>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       ) : activeTab === 'proposals' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
