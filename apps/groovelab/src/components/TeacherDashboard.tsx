@@ -866,6 +866,7 @@ export function TeacherDashboard({
         console.log('[Teacher Check-in] Success:', sessData.id);
         setCheckingInStatus('success');
         if (onSessionChange) onSessionChange(sessData);
+        if (onLocationModeChange) onLocationModeChange('lab');
       }
     } catch (e: any) {
       console.error('[Teacher Check-in] Unexpected Error:', e);
@@ -2884,7 +2885,7 @@ export function TeacherDashboard({
 
         // 4. Coaches
         const hidePresence = sessionStorage.getItem('groovelab_teacher_hide_presence') === 'true';
-        const isHomeMode = sessionStorage.getItem('groovelab_location_mode') === 'home';
+        const isHomeMode = (locationMode || sessionStorage.getItem('groovelab_location_mode')) === 'home';
         
         const activeCoaches = (allCoaches || []).filter(c => {
           if (c.is_observer) return false; // Hospitanten are never shown in Live Lab
