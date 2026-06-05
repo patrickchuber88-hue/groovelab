@@ -56,7 +56,16 @@ function getSubdomainOrigin(schoolName: string): string {
     if (cleanHost.startsWith('www.')) {
       cleanHost = cleanHost.substring(4);
     }
-    return `${protocol}//${cleanHost}?school=${subdomain}`;
+    // Determine the base domain from cleanHost, default to 'campus-groovelab.de'
+    let baseDomain = 'campus-groovelab.de';
+    const mainDomains = ['campus-groovelab.de', 'groovelab.de', 'campus-groovelab.com'];
+    for (const domain of mainDomains) {
+      if (cleanHost.endsWith(domain)) {
+        baseDomain = domain;
+        break;
+      }
+    }
+    return `${protocol}//${subdomain}.${baseDomain}`;
   }
 }
 
