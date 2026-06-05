@@ -744,7 +744,7 @@ export function TeacherDashboard({
   activePlatform = 'groovelab'
 }: TeacherDashboardProps) {
   const [teacher, setTeacher] = useState<any>(null);
-  const isTeacher = teacher?.role?.toLowerCase() === 'teacher' || teacher?.role?.toLowerCase() === 'admin';
+  const isTeacher = viewMode === 'admin';
   const isUserCheckedIn = locationMode === 'lab' && !!session && (!!session.station_id || isTeacher);
   const [showKioskView, setShowKioskView] = useState(false);
   const [checkingInStatus, setCheckingInStatus] = useState<'idle' | 'locating' | 'verifying' | 'success' | 'error'>('idle');
