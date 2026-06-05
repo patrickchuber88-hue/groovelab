@@ -67,6 +67,7 @@ interface BypassTeacher {
   isActive?: boolean;
   role?: string;
   isPinActivated?: boolean;
+  sick_until?: string | null;
 }
 
 interface GrooveLabCoach {
@@ -84,6 +85,7 @@ interface GrooveLabCoach {
   isPinActivated?: boolean;
   studentCount?: number;
   contractEndsAt?: string | null;
+  sick_until?: string | null;
 }
 
 interface SecretaryBriefingData {
@@ -1418,7 +1420,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       // Fetch all users
       const { data: allUsers, error: usersErr } = await supabase
         .from('users')
-        .select('id, first_name, last_name, role, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token, is_pin_activated')
+        .select('id, first_name, last_name, role, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token, is_pin_activated, sick_until')
         .eq('school_id', schoolId);
 
       if (usersErr) throw usersErr;
@@ -1480,7 +1482,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               isGroovelabActive: u.is_groovelab_active,
               isActive: u.is_active ?? false,
               role: u.role,
-              isPinActivated: u.is_pin_activated
+              isPinActivated: u.is_pin_activated,
+              sick_until: u.sick_until
             });
           } else {
             if (u.is_groovelab_active) {
@@ -1497,7 +1500,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 ausweisNummer: u.ausweis_nummer || '',
                 teacherQrToken: u.teacher_qr_token || '',
                 studentCount: currentStudentCount,
-                contractEndsAt: u.contract_ends_at || null
+                contractEndsAt: u.contract_ends_at || null,
+                sick_until: u.sick_until
               });
             }
             if (u.is_campus_active) {
@@ -1514,7 +1518,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 ausweisNummer: u.ausweis_nummer || '',
                 teacherQrToken: u.teacher_qr_token || '',
                 studentCount: currentStudentCount,
-                contractEndsAt: u.contract_ends_at || null
+                contractEndsAt: u.contract_ends_at || null,
+                sick_until: u.sick_until
               });
             }
           }
@@ -6038,315 +6043,505 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           </div>
 
           {/* TAB 1: SECRETARY - BRIEFING */}
-          {activeTab === 'secretary' && secretarySubTab === 'briefing' && (
-          <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start' }}>
-            
-            {/* LEFT COLUMN: GREETING & WIDGET KPI GRID & TAGESPLAN */}
-            <div style={{ flex: 1.6, display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div>
-                <h3 className="swiss-h2" style={{ margin: 0, color: '#ea4335', fontFamily: 'Urbanist', fontWeight: 900 }}>
-                  Systemauslastung stabil, {students.filter(s => s.is_active).length} Lizenzen aktiv erfasst.
-                </h3>
-                <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 500, fontFamily: 'Inter' }}>
-                  Heute ist {new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })} &bull; Ausfall-Kaskaden aktiv &bull; {pendingSchedules.length} Freigaben ausstehend.
-                </p>
-              </div>
+          {/* TAB 1: SECRETARY - BRIEFING */}
+          {activeTab === 'secretary' && secretarySubTab === 'briefing' && (() => {
+            const todayDayNum = new Date().getDay() === 0 ? 7 : new Date().getDay();
+            const todayDateStr = new Date().toISOString().split('T')[0];
 
-              {/* AdminLTE style KPI Cards row */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '8px' }}>
-                {/* Card 1: Blue */}
-                <div style={{ background: '#007bff', color: '#ffffff', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '130px' }}>
-                  <div style={{ padding: '20px 20px 10px 20px', position: 'relative', zIndex: 2 }}>
-                    <div style={{ fontSize: '1.8rem', fontWeight: 900, lineHeight: 1 }}>{students.filter((s: any) => s.is_active).length + coaches.length}</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 800, marginTop: '6px', opacity: 0.9 }}>Aktive Lizenzen</div>
-                  </div>
-                  <div style={{ position: 'absolute', top: '10px', right: '15px', fontSize: '4.5rem', opacity: 0.2, pointerEvents: 'none', zIndex: 1 }}>👥</div>
-                  <div style={{ background: 'rgba(0, 0, 0, 0.1)', padding: '6px 12px', fontSize: '0.72rem', fontWeight: 800, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                    Mehr Infos ➜
-                  </div>
-                </div>
+            // 1. Raumauslastung Heute
+            const todayAllocations = matrixAllocations.filter(p => p.dayOfWeek === todayDayNum && p.roomId);
+            const totalSlotsCount = rooms.length * 8; // standard 8 slots per room per day
+            const roomOccupancyRate = totalSlotsCount > 0 ? Math.round((todayAllocations.length / totalSlotsCount) * 100) : 0;
 
-                {/* Card 2: Green */}
-                <div style={{ background: '#28a745', color: '#ffffff', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '130px' }}>
-                  <div style={{ padding: '20px 20px 10px 20px', position: 'relative', zIndex: 2 }}>
-                    <div style={{ fontSize: '1.8rem', fontWeight: 900, lineHeight: 1 }}>{((students.filter((s: any) => s.is_active).length * 0.49) + 4.99 + (students.filter((s: any) => s.is_premium_user).length * 9.99)).toFixed(2)} €</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 800, marginTop: '6px', opacity: 0.9 }}>Umsatz-Tacho</div>
-                  </div>
-                  <div style={{ position: 'absolute', top: '10px', right: '15px', fontSize: '4.5rem', opacity: 0.2, pointerEvents: 'none', zIndex: 1 }}>📈</div>
-                  <div style={{ background: 'rgba(0, 0, 0, 0.1)', padding: '6px 12px', fontSize: '0.72rem', fontWeight: 800, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                    Mehr Infos ➜
-                  </div>
-                </div>
+            // 2. Heutige Krankmeldungen
+            const activeSickTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].filter(t => {
+              if (!t.sick_until) return false;
+              return t.sick_until.substring(0, 10) >= todayDateStr;
+            }).reduce((acc: any[], current) => {
+              if (!acc.some(item => item.id === current.id)) {
+                acc.push(current);
+              }
+              return acc;
+            }, []);
 
-                {/* Card 3: Yellow */}
-                <div style={{ background: '#fbbc05', color: '#1f2937', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '130px' }}>
-                  <div style={{ padding: '20px 20px 10px 20px', position: 'relative', zIndex: 2 }}>
-                    <div style={{ fontSize: '1.8rem', fontWeight: 900, lineHeight: 1 }}>{pendingSchedules.length}</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 800, marginTop: '6px', opacity: 0.9 }}>Reviews Ausstehend</div>
-                  </div>
-                  <div style={{ position: 'absolute', top: '10px', right: '15px', fontSize: '4.5rem', opacity: 0.25, pointerEvents: 'none', zIndex: 1 }}>📅</div>
-                  <div style={{ background: 'rgba(0, 0, 0, 0.1)', padding: '6px 12px', fontSize: '0.72rem', fontWeight: 800, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                    Mehr Infos ➜
-                  </div>
-                </div>
+            // 3. Schüler-Aktivierungsquote
+            const totalStudentsCount = students.length;
+            const activeStudentsCount = students.filter(s => s.is_active).length;
+            const activationRate = totalStudentsCount > 0 ? Math.round((activeStudentsCount / totalStudentsCount) * 100) : 0;
 
-                {/* Card 4: Red */}
-                <div style={{ background: '#dc3545', color: '#ffffff', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '130px' }}>
-                  <div style={{ padding: '20px 20px 10px 20px', position: 'relative', zIndex: 2 }}>
-                    <div style={{ fontSize: '1.8rem', fontWeight: 900, lineHeight: 1 }}>{tickets.filter((t: any) => t.status === 'OPEN').length}</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 800, marginTop: '6px', opacity: 0.9 }}>Offene Tickets</div>
-                  </div>
-                  <div style={{ position: 'absolute', top: '10px', right: '15px', fontSize: '4.5rem', opacity: 0.2, pointerEvents: 'none', zIndex: 1 }}>🎫</div>
-                  <div style={{ background: 'rgba(0, 0, 0, 0.1)', padding: '6px 12px', fontSize: '0.72rem', fontWeight: 800, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                    Mehr Infos ➜
-                  </div>
-                </div>
-              </div>
+            // 4. Systemische Termin-Konflikte (Overlap checkers)
+            const scheduleConflicts = (() => {
+              const list: { type: 'room' | 'teacher'; key: string; message: string }[] = [];
+              
+              // Room conflicts
+              const byRoomDay: Record<string, any[]> = {};
+              matrixAllocations.filter(p => p.roomId).forEach(p => {
+                const k = `${p.roomId}_${p.dayOfWeek}`;
+                if (!byRoomDay[k]) byRoomDay[k] = [];
+                byRoomDay[k].push(p);
+              });
+              Object.entries(byRoomDay).forEach(([k, group]) => {
+                if (group.length > 1) {
+                  group.forEach((p, i) => {
+                    group.forEach((q, j) => {
+                      if (i < j && p.startTime < q.endTime && q.startTime < p.endTime) {
+                        const roomName = roomMap[p.roomId] || 'Unbekannter Raum';
+                        const days = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+                        const dayLabel = days[p.dayOfWeek - 1] || 'Wochentag';
+                        list.push({
+                          type: 'room',
+                          key: `${p.id}_${q.id}`,
+                          message: `Raum-Kollision in "${roomName}" (${dayLabel}): ${userMap[p.teacherId] || 'Lehrer'} / ${userMap[p.studentId] || 'Schüler'} (${p.startTime}-${p.endTime}) überlappt mit ${userMap[q.teacherId] || 'Lehrer'} / ${userMap[q.studentId] || 'Schüler'} (${q.startTime}-${q.endTime}).`
+                        });
+                      }
+                    });
+                  });
+                }
+              });
 
-              {/* Tagesplan Card styled exactly like screenshot */}
-              <div className="google-card" style={{ padding: '24px', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 4px 20px rgba(15, 23, 42, 0.02)', background: 'white' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#1f2937' }}>
-                    <Calendar size={20} color="#0b57d0" />
-                    <strong style={{ fontSize: '1rem', fontWeight: 700, fontFamily: 'Urbanist' }}>Tagesplan</strong>
-                  </div>
-                  <span style={{
-                    fontSize: '0.72rem',
-                    fontWeight: 800,
-                    padding: '4px 12px',
-                    borderRadius: '100px',
-                    background: '#e8f0fe',
-                    color: '#0b57d0',
-                    fontFamily: 'Inter'
-                  }}>
-                    LIVE
-                  </span>
-                </div>
+              // Teacher conflicts
+              const byTeacherDay: Record<string, any[]> = {};
+              matrixAllocations.forEach(p => {
+                if (p.teacherId) {
+                  const k = `${p.teacherId}_${p.dayOfWeek}`;
+                  if (!byTeacherDay[k]) byTeacherDay[k] = [];
+                  byTeacherDay[k].push(p);
+                }
+              });
+              Object.entries(byTeacherDay).forEach(([k, group]) => {
+                if (group.length > 1) {
+                  group.forEach((p, i) => {
+                    group.forEach((q, j) => {
+                      if (i < j && p.startTime < q.endTime && q.startTime < p.endTime) {
+                        const teacherName = userMap[p.teacherId] || 'Lehrkraft';
+                        const days = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+                        const dayLabel = days[p.dayOfWeek - 1] || 'Wochentag';
+                        list.push({
+                          type: 'teacher',
+                          key: `${p.id}_${q.id}`,
+                          message: `Lehrer-Doppelbuchung für ${teacherName} (${dayLabel}): Stunden mit ${userMap[p.studentId] || 'Schüler'} (${p.startTime}-${p.endTime}) und ${userMap[q.studentId] || 'Schüler'} (${q.startTime}-${q.endTime}) überschneiden sich.`
+                        });
+                      }
+                    });
+                  });
+                }
+              });
 
-                {/* Timeline content mimicking screenshot layout */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', position: 'relative' }}>
-                  <div style={{ position: 'absolute', top: '16px', bottom: '16px', left: '11px', width: '2px', background: '#e2e8f0' }} />
-                  
-                  {/* Current Slot */}
-                  <div style={{ display: 'flex', gap: '16px', position: 'relative', zIndex: 1 }}>
-                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#0b57d0', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '4px solid #ffffff' }}>
-                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffffff' }} />
-                    </div>
-                    <div style={{ flex: 1, padding: '16px 20px', borderRadius: '16px', border: '1.5px solid #e8f0fe', background: '#f8fafc', fontFamily: 'Inter' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                          <span className="swiss-label">Aktuelle System-Prüfung</span>
-                          <h4 style={{ margin: '2px 0 0 0', fontSize: '0.92rem', fontWeight: 700, color: '#1f2937' }}>Infrastruktur &amp; Auslastung</h4>
-                        </div>
-                        <span style={{ fontSize: '0.8rem', color: '#4b5563', fontWeight: 600 }}>100% stabil</span>
-                      </div>
-                      <p style={{ margin: '8px 0 0 0', fontSize: '0.78rem', color: '#6b7280' }}>
-                        GrooveLab Kiosk API &bull; Campus DB-Sync aktiv.
-                      </p>
-                    </div>
-                  </div>
+              return list;
+            })();
 
-                  {/* Pending Schedules Slot */}
-                  <div style={{ display: 'flex', gap: '16px', position: 'relative', zIndex: 1 }}>
-                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '4px solid #ffffff' }}>
-                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ffffff' }} />
-                    </div>
-                    <div style={{ flex: 1, fontFamily: 'Inter' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                          <span className="swiss-label">Stundenplan-Reviews</span>
-                          <h5 style={{ margin: '2px 0 0 0', fontSize: '0.88rem', fontWeight: 700, color: '#4b5563' }}>
-                            {briefingData?.schedules.readyForReview || 0} Ausstehende Freigaben
-                          </h5>
-                        </div>
-                        <span style={{ fontSize: '0.78rem', color: '#6b7280' }}>Review-Modus</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Bypass Lehrer Slot */}
-                  <div style={{ display: 'flex', gap: '16px', position: 'relative', zIndex: 1 }}>
-                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '4px solid #ffffff' }}>
-                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ffffff' }} />
-                    </div>
-                    <div style={{ flex: 1, fontFamily: 'Inter' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                          <span className="swiss-label">Campus Onboarding</span>
-                          <h5 style={{ margin: '2px 0 0 0', fontSize: '0.88rem', fontWeight: 700, color: '#4b5563' }}>
-                            {briefingData?.inactiveTeachers || 0} Inaktive Profile (Bypass)
-                          </h5>
-                        </div>
-                        <span style={{ fontSize: '0.78rem', color: '#6b7280' }}>Warten auf Aktivierung</span>
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-
-              {/* Relationship Banner styled exactly like green card in screenshot */}
-              <div style={{
-                background: '#e6f4ea', 
-                borderRadius: '24px', 
-                padding: '24px', 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '20px',
-                color: '#137333',
-                border: '1px solid rgba(52, 168, 83, 0.1)',
-                fontFamily: 'Inter'
-              }}>
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+                
+                {/* GLASS DASHBOARD GREETING HEADER */}
                 <div style={{
-                  width: '48px',
-                  height: '48px',
-                  borderRadius: '50%',
-                  background: '#ffffff',
+                  background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                  borderRadius: '24px',
+                  padding: '24px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '1.5rem',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.05)'
+                  justifyContent: 'space-between',
+                  gap: '16px',
+                  color: 'white',
+                  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.15)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)'
                 }}>
-                  🎂
-                </div>
-                <div style={{ flex: 1 }}>
-                  <strong style={{ display: 'block', fontSize: '0.92rem', marginBottom: '2px', fontFamily: 'Urbanist', fontWeight: 800 }}>Beziehungsticker: Campus &amp; GrooveLab</strong>
-                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#137333', opacity: 0.9 }}>
-                    Alle Plattform-Schnittstellen laufen synchron. Keine Kommunikations-Ausfälle erfasst.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* RIGHT COLUMN: LIVE-AUSFALLTICKER & ADMIN TICKETS */}
-            <div style={{ width: '360px', display: 'flex', flexDirection: 'column', gap: '24px', flexShrink: 0 }}>
-              
-              {/* Live warning ticker styled exactly like red card in screenshot */}
-              <div style={{
-                background: '#fee2e2',
-                borderRadius: '24px',
-                padding: '24px',
-                border: '1.5px solid #fecaca',
-                color: '#7f1d1d'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <ShieldAlert size={18} color="#991b1b" />
-                    <strong style={{ fontSize: '0.92rem', fontWeight: 800 }}>Auslastungs-Ticker</strong>
-                  </div>
-                  <span style={{
-                    fontSize: '0.62rem',
-                    fontWeight: 900,
-                    padding: '3px 8px',
-                    borderRadius: '6px',
-                    background: '#991b1b',
-                    color: '#ffffff'
-                  }}>
-                    JETZT
-                  </span>
-                </div>
-
-                {alerts.filter(a => !a.resolved).length === 0 ? (
-                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#991b1b' }}>
-                    Optimaler Zustand. Es liegen keine aktiven Limit-Überschreitungen vor.
-                  </p>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {alerts.filter(a => !a.resolved).slice(0, 2).map(alert => (
-                      <div key={alert.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>{alert.teacherName}</span>
-                          <span style={{ fontSize: '0.65rem', background: '#991b1b', color: '#ffffff', padding: '2px 6px', borderRadius: '4px', fontWeight: 800 }}>LIMIT EXCEEDED</span>
-                        </div>
-                        <p style={{ margin: 0, fontSize: '0.78rem', opacity: 0.9 }}>
-                          {alert.message}
-                        </p>
-                      </div>
-                    ))}
-                    <button 
-                      onClick={() => {
-                        setActiveTab('campus');
-                        setCampusSubTab('status');
-                      }} 
-                      className="google-btn-secondary" 
-                      style={{ background: 'transparent', color: '#991b1b', borderColor: '#fca5a5', width: '100%', fontSize: '0.75rem', padding: '8px' }}
-                    >
-                      Zum Störungsprotokoll
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Admin Tickets Card styled exactly like screenshot */}
-              <div className="google-card" style={{ padding: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', color: '#1f2937' }}>
-                  <ClipboardList size={20} color="#0b57d0" />
-                  <strong style={{ fontSize: '0.98rem', fontWeight: 700 }}>Ausstehende Aufgaben</strong>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  {pendingSchedules.slice(0, 3).map(sched => (
-                    <div 
-                      key={sched.id} 
-                      className="ticket-item"
-                      onClick={() => { setActiveTab('campus'); setCampusSubTab('schedules'); }}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Clock size={16} color="#64748b" />
-                        </div>
-                        <div>
-                          <strong style={{ display: 'block', fontSize: '0.82rem', color: '#1f2937', fontWeight: 700 }}>Stundenplan-Freigabe</strong>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b' }}>{sched.teacher_name} &bull; {sched.student_name}</span>
-                        </div>
-                      </div>
-                      <ChevronRight size={16} color="#9ca3af" />
-                    </div>
-                  ))}
-
-                  {bypassTeachers.slice(0, 2).map(teacher => (
-                    <div 
-                      key={teacher.id} 
-                      className="ticket-item"
-                      onClick={() => { setActiveTab('campus'); setCampusSubTab('onboarding'); }}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Key size={16} color="#64748b" />
-                        </div>
-                        <div>
-                          <strong style={{ display: 'block', fontSize: '0.82rem', color: '#1f2937', fontWeight: 700 }}>Bypass-Aktivierung</strong>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b' }}>{teacher.firstName} {teacher.lastName} &bull; {teacher.ausweisNummer}</span>
-                        </div>
-                      </div>
-                      <ChevronRight size={16} color="#9ca3af" />
-                    </div>
-                  ))}
-
-                  {pendingSchedules.length === 0 && bypassTeachers.length === 0 && (
-                    <p style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', padding: '16px' }}>
-                      Keine ausstehenden Freigaben oder Aktivierungen vorhanden.
+                  <div style={{ flex: 1 }}>
+                    <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      Hallo, GrooveLab-Zentrale! <span className="inline-block animate-bounce">👋</span>
+                    </h2>
+                    <p style={{ margin: '6px 0 0 0', fontSize: '0.84rem', color: '#94a3b8', fontWeight: 600 }}>
+                      Heute ist {new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} &bull; Systemstatus stabil &bull; {pendingSchedules.length} ausstehende Stundenpläne.
                     </p>
-                  )}
+                  </div>
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '16px',
+                    padding: '8px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', fontWeight: 800, color: '#34d399', letterSpacing: '0.05em' }}>
+                      {new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} UHR
+                    </span>
+                  </div>
                 </div>
 
-                {(pendingSchedules.length > 0 || bypassTeachers.length > 0) && (
-                  <button 
-                    onClick={() => { setActiveTab('campus'); setCampusSubTab('schedules'); }} 
-                    className="google-btn-secondary" 
-                    style={{ width: '100%', marginTop: '16px', fontSize: '0.8rem', padding: '10px' }}
-                  >
-                    Alle Tickets anzeigen
-                  </button>
-                )}
-              </div>
+                {/* 4 GAMIFIED CARD METRICS ROW */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                  
+                  {/* Card 1: Raumauslastung (Blue Gradient) */}
+                  <div style={{
+                    position: 'relative', overflow: 'hidden',
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', color: 'white',
+                    borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.3)',
+                    display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
+                    padding: '16px', boxSizing: 'border-box',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                  }} className="hover-scale">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Raumauslastung Heute</span>
+                      <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
+                        <DoorOpen size={13} color="white" />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                      <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{roomOccupancyRate}</span>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>% ({todayAllocations.length} Slots)</span>
+                    </div>
+                  </div>
 
-            </div>
-          </div>
-        )}
+                  {/* Card 2: Aktivierungsquote (Emerald Gradient) */}
+                  <div style={{
+                    position: 'relative', overflow: 'hidden',
+                    background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', color: 'white',
+                    borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.3)',
+                    display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
+                    padding: '16px', boxSizing: 'border-box',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                  }} className="hover-scale">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Schüler-Aktivierung</span>
+                      <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
+                        <UserCheck size={13} color="white" />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                      <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{activationRate}</span>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>% ({activeStudentsCount} / {totalStudentsCount})</span>
+                    </div>
+                  </div>
+
+                  {/* Card 3: Krankmeldungen (Red Gradient) */}
+                  <div style={{
+                    position: 'relative', overflow: 'hidden',
+                    background: activeSickTeachers.length > 0 ? 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)' : 'linear-gradient(135deg, #6b7280 0%, #374151 100%)', color: 'white',
+                    borderRadius: '20px', boxShadow: activeSickTeachers.length > 0 ? '0 10px 25px -5px rgba(239, 68, 68, 0.3)' : 'none',
+                    display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
+                    padding: '16px', boxSizing: 'border-box',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                  }} className="hover-scale">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Krankmeldungen</span>
+                      <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
+                        <UserX size={13} color="white" />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                      <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
+                        {activeSickTeachers.length}
+                      </span>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>
+                        {activeSickTeachers.length === 1 ? 'Lehrkraft krank' : 'Lehrkräfte krank'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Card 4: Konflikte (Amber/Orange Gradient) */}
+                  <div style={{
+                    position: 'relative', overflow: 'hidden',
+                    background: scheduleConflicts.length > 0 ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white',
+                    borderRadius: '20px', boxShadow: scheduleConflicts.length > 0 ? '0 10px 25px -5px rgba(245, 158, 11, 0.3)' : 'none',
+                    display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
+                    padding: '16px', boxSizing: 'border-box',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                  }} className="hover-scale">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Terminkonflikte</span>
+                      <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
+                        <ShieldAlert size={13} color="white" />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                      <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
+                        {scheduleConflicts.length}
+                      </span>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>
+                        {scheduleConflicts.length === 0 ? 'System-Prüfung stabil' : 'Konflikte gefunden'}
+                      </span>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* TWO COLUMN CONTENT LAYOUT */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '24px', alignItems: 'start' }}>
+                  
+                  {/* LEFT COLUMN */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                    
+                    {/* WIDGET 1.1: Raumauslastung Details */}
+                    <div style={{
+                      background: '#ffffff',
+                      borderRadius: '24px',
+                      padding: '24px',
+                      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+                      border: '1px solid #f1f5f9'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ background: '#e0e7ff', color: '#4f46e5', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <DoorOpen size={16} />
+                          </div>
+                          <div>
+                            <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                              Raumauslastung &amp; Belegung
+                            </h3>
+                            <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                              Details für den heutigen Tag
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        {rooms.length === 0 ? (
+                          <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8', fontStyle: 'italic', fontSize: '0.85rem' }}>
+                            Keine Räume im System erfasst.
+                          </div>
+                        ) : (
+                          rooms.map(room => {
+                            const roomAlloc = todayAllocations.filter(a => a.roomId === room.id);
+                            const roomOccupiedRate = Math.round((roomAlloc.length / 8) * 100);
+                            return (
+                              <div key={room.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '12px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #f1f5f9' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
+                                    🚪 {room.name} {room.floor ? `(${room.floor})` : ''}
+                                  </span>
+                                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: roomOccupiedRate > 75 ? '#ef4444' : roomOccupiedRate > 30 ? '#f59e0b' : '#10b981' }}>
+                                    {roomOccupiedRate}% ({roomAlloc.length} / 8 Slots)
+                                  </span>
+                                </div>
+                                <div style={{ height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
+                                  <div style={{
+                                    height: '100%',
+                                    width: `${Math.min(100, roomOccupiedRate)}%`,
+                                    background: roomOccupiedRate > 75 ? '#ef4444' : roomOccupiedRate > 30 ? '#f59e0b' : '#10b981',
+                                    borderRadius: '3px',
+                                    transition: 'width 0.5s'
+                                  }} />
+                                </div>
+                                {roomAlloc.length > 0 && (
+                                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+                                    {roomAlloc.map((alloc, idx) => (
+                                      <span key={idx} style={{ fontSize: '0.65rem', background: '#ffffff', border: '1px solid #e2e8f0', padding: '3px 8px', borderRadius: '6px', color: '#475569', fontWeight: 600 }}>
+                                        ⏱️ {alloc.startTime} - {userMap[alloc.teacherId]?.split(' ')[0] || 'Lehrer'}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+
+                    {/* WIDGET 2.1: Systemische Terminkonflikte */}
+                    <div style={{
+                      background: '#ffffff',
+                      borderRadius: '24px',
+                      padding: '24px',
+                      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+                      border: '1px solid #f1f5f9'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                        <div style={{ background: '#fef3c7', color: '#d97706', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <ShieldAlert size={16} />
+                        </div>
+                        <div>
+                          <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                            System-Kollisionsprüfer
+                          </h3>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                            Prüfung auf Überschneidungen
+                          </span>
+                        </div>
+                      </div>
+
+                      {scheduleConflicts.length === 0 ? (
+                        <div style={{
+                          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.06) 0%, rgba(16, 185, 129, 0.02) 100%)',
+                          border: '1px solid rgba(16, 185, 129, 0.12)',
+                          color: '#065f46',
+                          borderRadius: '16px',
+                          padding: '16px 20px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px'
+                        }}>
+                          <CheckCircle size={20} color="#10b981" />
+                          <div>
+                            <strong style={{ display: 'block', fontSize: '0.85rem', fontWeight: 800 }}>Konfliktfreier Stundenplan</strong>
+                            <span style={{ fontSize: '0.74rem', opacity: 0.9 }}>Alle aktiven Stundenpläne sind sauber strukturiert. Keine Raum- oder Lehrerdoppelbelegungen gefunden.</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          {scheduleConflicts.map((conflict, idx) => (
+                            <div key={idx} style={{
+                              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.06) 0%, rgba(245, 158, 11, 0.02) 100%)',
+                              border: '1px solid rgba(245, 158, 11, 0.12)',
+                              color: '#92400e',
+                              borderRadius: '16px',
+                              padding: '12px 16px',
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: '10px'
+                            }}>
+                              <ShieldAlert size={16} style={{ marginTop: '2px', flexShrink: 0 }} />
+                              <span style={{ fontSize: '0.78rem', fontWeight: 600, lineHeight: 1.4 }}>
+                                {conflict.message}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+
+                  {/* RIGHT COLUMN */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                    
+                    {/* WIDGET 1.2: Heutige Krankmeldungen */}
+                    <div style={{
+                      background: '#ffffff',
+                      borderRadius: '24px',
+                      padding: '24px',
+                      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+                      border: '1px solid #f1f5f9'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                        <div style={{ background: '#fee2e2', color: '#b91c1c', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <UserX size={16} color="#ef4444" />
+                        </div>
+                        <div>
+                          <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                            Lehrer-Präsenz &amp; Status
+                          </h3>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                            Aktuelle Krankmeldungen
+                          </span>
+                        </div>
+                      </div>
+
+                      {activeSickTeachers.length === 0 ? (
+                        <div style={{
+                          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.06) 0%, rgba(16, 185, 129, 0.02) 100%)',
+                          border: '1px solid rgba(16, 185, 129, 0.12)',
+                          color: '#065f46',
+                          borderRadius: '16px',
+                          padding: '16px',
+                          textAlign: 'center'
+                        }}>
+                          <div style={{ fontSize: '1.4rem', marginBottom: '4px' }}>🎉</div>
+                          <strong style={{ display: 'block', fontSize: '0.82rem', fontWeight: 800 }}>Volle Präsenz</strong>
+                          <span style={{ fontSize: '0.72rem', opacity: 0.9 }}>Alle Lehrkräfte sind einsatzbereit. Es liegen keine Krankmeldungen vor.</span>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          {activeSickTeachers.map(teacher => {
+                            const sickUntilStr = teacher.sick_until ? new Date(teacher.sick_until).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }) : 'unbefristet';
+                            return (
+                              <div key={teacher.id} style={{
+                                padding: '12px',
+                                borderRadius: '16px',
+                                border: '1px solid #fee2e2',
+                                background: '#fff5f5',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px'
+                              }}>
+                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', animation: 'pulse 1.5s infinite' }} />
+                                <div style={{ flex: 1 }}>
+                                  <strong style={{ display: 'block', fontSize: '0.82rem', color: '#991b1b', fontWeight: 700 }}>
+                                    {teacher.firstName} {teacher.lastName}
+                                  </strong>
+                                  <span style={{ fontSize: '0.7rem', color: '#b91c1c', fontWeight: 600 }}>
+                                    Ausfall gemeldet: bis {sickUntilStr}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* WIDGET 3.1: Schüler-Aktivierungsquote */}
+                    <div style={{
+                      background: '#ffffff',
+                      borderRadius: '24px',
+                      padding: '24px',
+                      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+                      border: '1px solid #f1f5f9'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                        <div style={{ background: '#d1fae5', color: '#059669', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <UserCheck size={16} />
+                        </div>
+                        <div>
+                          <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                            Aktivierungsquote
+                          </h3>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                            Schüler-Onboarding Status
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600 }}>Erfolgreich Aktiviert</span>
+                          <span style={{ fontSize: '0.8rem', color: '#1e293b', fontWeight: 800 }}>{activeStudentsCount} / {totalStudentsCount} Profile</span>
+                        </div>
+                        
+                        <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${activationRate}%`, background: 'linear-gradient(90deg, #10b981 0%, #34d399 100%)', borderRadius: '4px' }} />
+                        </div>
+
+                        {/* Inaktive Schüler list for reference */}
+                        {totalStudentsCount > activeStudentsCount && (
+                          <div style={{ marginTop: '8px' }}>
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                              Ausstehende Aktivierungen ({totalStudentsCount - activeStudentsCount}):
+                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '140px', overflowY: 'auto', paddingRight: '4px' }}>
+                              {students.filter(s => !s.is_active).slice(0, 5).map(s => (
+                                <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '8px' }}>
+                                  <span style={{ fontSize: '0.74rem', color: '#334155', fontWeight: 600 }}>{s.first_name} {s.last_name}</span>
+                                  <span style={{ fontSize: '0.62rem', background: '#cbd5e1', color: '#475569', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                                    PIN: {s.personal_pin || 'ausstehend'}
+                                  </span>
+                                </div>
+                              ))}
+                              {totalStudentsCount - activeStudentsCount > 5 && (
+                                <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontStyle: 'italic', textAlign: 'center', display: 'block', marginTop: '4px' }}>
+                                  und {totalStudentsCount - activeStudentsCount - 5} weitere Schüler...
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
+
+                </div>
+
+              </div>
+            );
+          })()}
 
         {/* TAB 1.1: SECRETARY - CRISIS */}
         {activeTab === 'secretary' && secretarySubTab === 'crisis' && (
