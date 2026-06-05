@@ -8742,8 +8742,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
           {/* Top Section: Header & Contribution */}
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2.2fr 1.2fr', gap: '32px', alignItems: 'stretch' }}>
             {/* Top Left: Header and summary cards */}
-            <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+            <div className="glass-panel" style={{ padding: '20px 24px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
                 <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: `${brandColor}15`, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Award size={24} />
                 </div>
@@ -8753,7 +8753,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '12px' }}>
                 {[
                   { label: 'Deine Schüler', value: stats.myClassCount || 0, icon: Users, color: brandColor, bg: `${brandColor}08` },
                   { label: 'Klassen-Übezeit (Gesamt)', value: formatMins(myClassMins), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
@@ -8764,7 +8764,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   { label: 'Ø Zeit / Kopf (Woche)', value: formatMins(classCount > 0 ? Math.round(classWeeklyMins / classCount) : 0), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
                   { label: 'Ø Zeit / Kopf (Gesamt)', value: formatMins(classCount > 0 ? Math.round(myClassMins / classCount) : 0), icon: Award, color: brandColor, bg: `${brandColor}08` }
                 ].map((stat, idx) => (
-                  <div key={idx} style={{ padding: '20px', background: stat.bg, borderRadius: '24px', border: `1px solid ${stat.color}15`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '120px' }}>
+                  <div key={idx} style={{ padding: '12px 14px', background: stat.bg, borderRadius: '24px', border: `1px solid ${stat.color}15`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '92px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{stat.label}</span>
                       <div style={{ padding: '6px', borderRadius: '8px', background: 'white', color: stat.color, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.02)' }}>
@@ -8772,7 +8772,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                       </div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '1.5rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', marginTop: '8px' }}>{stat.value}</div>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', marginTop: '4px' }}>{stat.value}</div>
                     </div>
                   </div>
                 ))}
@@ -8780,23 +8780,23 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             </div>
 
             {/* Top Right: Donut Chart (Gemeinsamer Schul-Beitrag) */}
-            <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="glass-panel" style={{ padding: '20px 24px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', width: '100%', marginBottom: '4px', textAlign: 'left' }}>
                 Gemeinsamer Schul-Beitrag
               </h3>
-              <p style={{ fontSize: '0.75rem', color: '#64748b', width: '100%', margin: '0 0 16px 0', textAlign: 'left', fontWeight: 600 }}>
+              <p style={{ fontSize: '0.75rem', color: '#64748b', width: '100%', margin: '0 0 12px 0', textAlign: 'left', fontWeight: 600 }}>
                 Wie viel trägt deine Klasse bei?
               </p>
 
-              <div style={{ width: '100%', height: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+              <div style={{ width: '100%', height: '110px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <RechartsPieChart>
                     <Pie
                       data={pieData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={48}
-                      outerRadius={68}
+                      innerRadius={36}
+                      outerRadius={52}
                       paddingAngle={3}
                       dataKey="value"
                     >
@@ -8809,7 +8809,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 </ResponsiveContainer>
                 
                 <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', lineHeight: 1 }}>
+                  <span style={{ fontSize: '1.25rem', fontWeight: 950, color: '#0f172a', lineHeight: 1 }}>
                     {contributionPercent}%
                   </span>
                   <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '2px' }}>
