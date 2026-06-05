@@ -4315,7 +4315,6 @@ export function TeacherDashboard({
                                       <Activity size={18} color="#007aff" />
                                     </div>
                                     <div>
-                                      <div style={{ fontSize: '0.78rem', color: '#86868b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Unterrichte heute</div>
                                       <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1d1d1f' }}>
                                         Heute stehen <strong style={{ color: '#007aff', fontWeight: 800 }}>{activeLessonsCount} Termine</strong> auf dem Fahrplan.
                                       </span>

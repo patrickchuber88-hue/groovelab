@@ -1281,7 +1281,17 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
           `}
         </style>
 
-        <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '12px' }}>
+        <div ref={gridRef} style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', 
+          gap: '0px',
+          background: '#ffffff',
+          borderRadius: '24px',
+          border: '1px solid #e2e8f0',
+          padding: '20px 8px',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+          overflow: 'hidden'
+        }}>
         {[0, 1, 2, 3, 4, 5, 6].map(offset => {
           const dayDate = new Date(weekStart);
           dayDate.setDate(dayDate.getDate() + offset);
@@ -1351,7 +1361,15 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
           return (
             <div 
               key={offset} 
-              style={{ background: 'rgba(255, 255, 255, 0.4)', backdropFilter: 'blur(10px)', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.6)', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', minHeight: '400px' }}
+              style={{ 
+                background: 'transparent', 
+                padding: '0 16px', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '8px', 
+                minHeight: '400px',
+                borderRight: offset < 6 ? '1px solid #e2e8f0' : 'none'
+              }}
             >
               <div style={{ textAlign: 'center', paddingBottom: '8px', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
                 <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{dayName}</div>

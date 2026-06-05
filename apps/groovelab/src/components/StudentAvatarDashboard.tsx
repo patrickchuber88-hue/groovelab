@@ -4,7 +4,7 @@ import {
   Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, 
   ChevronRight, Coffee, Clock, Flame, BookOpen, Share2, Play, 
   Pause, RotateCcw, Volume2, Moon, QrCode, X, EyeOff, Zap, Music, Library, Calendar, Check, Target, MessageSquare, Send,
-  Pencil, User, Mail, Phone, MapPin, Activity, Camera, TrendingUp, Users, Shield
+  Pencil, User, Mail, Phone, MapPin, Activity, Camera, TrendingUp, Users, Shield, Search
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Tooltip } from 'recharts';
@@ -151,6 +151,21 @@ const getLehrwerkColor = (title: string, customLehrwerkeList?: any[]) => {
     };
   }
 
+  const firstChar = trimmed.charAt(0).toUpperCase();
+  const charCode = firstChar.charCodeAt(0) || 65;
+  const clampedCode = Math.max(65, Math.min(90, charCode));
+  const hue = Math.round(((clampedCode - 65) / 25) * 360);
+  return {
+    from: `hsl(${hue}, 85%, 94%)`,
+    to: `hsl(${hue}, 80%, 84%)`,
+    text: `hsl(${hue}, 90%, 25%)`,
+    shadowFrom: `hsla(${hue}, 85%, 50%, 0.2)`,
+    shadowTo: `hsla(${hue}, 80%, 40%, 0.15)`
+  };
+};
+
+const getSongColor = (title: string) => {
+  const trimmed = (title || '').trim();
   const firstChar = trimmed.charAt(0).toUpperCase();
   const charCode = firstChar.charCodeAt(0) || 65;
   const clampedCode = Math.max(65, Math.min(90, charCode));
@@ -1583,6 +1598,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [progressItems, setProgressItems] = useState<any[]>([]);
   const [progressLoading, setProgressLoading] = useState(false);
   const [lehrwerke, setLehrwerke] = useState<any[]>([]);
+  const [songs, setSongs] = useState<any[]>([]);
+  const [songSearch, setSongSearch] = useState('');
   const [selectedLehrwerkForDetail, setSelectedLehrwerkForDetail] = useState<any | null>(null);
   const [localProgress, setLocalProgress] = useState<any[]>(() => {
     try {
@@ -1626,6 +1643,24 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       }
     } catch (err) {
       console.error('Error fetching lehrwerke:', err);
+    }
+
+    try {
+      let schoolId = studentUser?.school_id;
+      if (!schoolId) {
+        const { data: u } = await supabase.from('users').select('school_id').eq('id', studentId).single();
+        schoolId = u?.school_id;
+      }
+      let query = supabase.from('songs').select('*');
+      if (schoolId) {
+        query = query.eq('school_id', schoolId);
+      }
+      const { data: songsData } = await query.order('title');
+      if (songsData) {
+        setSongs(songsData);
+      }
+    } catch (err) {
+      console.error('Error fetching songs:', err);
     }
 
     try {
@@ -3813,80 +3848,168 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               gap: '24px',
               alignItems: 'start'
             }}>
-              
-              {/* LEFT COLUMN: SONGS & LEHRWERKE LIST */}
-              <div style={{
-                background: '#ffffff',
-                border: '1px solid #e2e8f0',
-                borderRadius: '24px',
-                padding: '24px',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.02)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '24px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid #f1f5f9', paddingBottom: '14px' }}>
-                  <div style={{ background: '#e0f2fe', color: '#0369a1', padding: '8px', borderRadius: '12px' }}>
-                    <Library size={18} />
-                  </div>
+              {/* LEFT COLUMN: MAIN MEDIATHEK AREA */}
+              <div 
+                className="glass-panel" 
+                style={{ 
+                  flex: 1,
+                  background: 'white', 
+                  borderRadius: '20px', 
+                  border: '1px solid rgba(0, 0, 0, 0.05)', 
+                  padding: '24px 30px', 
+                  boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '24px' 
+                }}
+              >
+                {/* Header Area */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <h4 style={{ fontWeight: 800, fontSize: '24px', color: '#1e293b', margin: 0 }}>Mediathek</h4>
-                    <p style={{ fontSize: '0.72rem', color: '#94a3b8', margin: '2px 0 0 0', fontWeight: 600 }}>Deine Meilensteine & Hausaufgaben</p>
+                    <h2 style={{ fontSize: '1.85rem', color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontWeight: 900 }}>
+                      <div style={{ background: '#e0f2fe', color: '#0369a1', padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
+                        <Library size={20} />
+                      </div>
+                      <span>Mediathek</span>
+                    </h2>
+                    <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '4px 0 0 0', fontWeight: 600 }}>
+                      Deine Songs und Lehrwerke für den Unterricht.
+                    </p>
                   </div>
                 </div>
 
+                {/* Unified Smart Search Field */}
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <Search size={18} color="#94a3b8" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
+                  <input 
+                    placeholder="Songs nach Titel/Interpret oder Lehrwerke nach Titel/Autor durchsuchen..." 
+                    value={songSearch}
+                    onChange={e => setSongSearch(e.target.value)}
+                    style={{ 
+                      width: '100%', 
+                      padding: '12px 14px 12px 48px', 
+                      borderRadius: '14px', 
+                      border: '1px solid #e2e8f0', 
+                      background: '#f8fafc', 
+                      fontWeight: 600, 
+                      fontSize: '0.92rem', 
+                      outline: 'none', 
+                      transition: 'all 0.2s',
+                      boxSizing: 'border-box',
+                      boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.01)'
+                    }}
+                  />
+                </div>
+
+                {/* Two Columns Layout */}
                 <div style={{ 
                   display: 'grid', 
                   gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', 
-                  gap: '24px', 
-                  alignItems: 'start' 
+                  gap: '30px', 
+                  alignItems: 'flex-start' 
                 }}>
                   {/* Left Column: Songs & Projekte */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <h5 style={{ fontSize: '0.8rem', fontWeight: 900, color: '#0ea5e9', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Music size={14} /> Songs & Projekte
-                    </h5>
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Music size={16} color="#0ea5e9" /> Songs & Projekte
+                    </h3>
 
                     {/* Pinned current homework "Aktuelle Mission" */}
-                    {progressItems.some(item => item.is_current_homework && !item.topic_name.includes(' - Seite ')) && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                          🎯 Aktuelle Mission
-                        </span>
-                        {progressItems.filter(item => item.is_current_homework && !item.topic_name.includes(' - Seite ')).map(item => {
-                          let statusColor = '#eab308';
-                          let statusBg = '#fffbeb';
-                          let statusText = 'In Arbeit';
+                    {(() => {
+                      const activeHWs = progressItems.filter(item => item.is_current_homework && !item.topic_name.includes(' - Seite '));
+                      if (activeHWs.length === 0) return null;
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            🎯 Aktuelle Mission
+                          </span>
+                          {activeHWs.map(item => {
+                            let statusColor = '#eab308';
+                            let statusBg = '#fffbeb';
+                            let statusText = 'In Arbeit';
 
-                          if (item.status === 'THEORY_DONE') {
-                            statusColor = '#a855f7';
-                            statusBg = '#f3e8ff';
-                            statusText = 'Theorie gelesen';
-                          } else if (item.status === 'MASTERED') {
-                            statusColor = '#10b981';
-                            statusBg = '#d1fae5';
-                            statusText = 'Meisterwerk!';
-                          }
+                            if (item.status === 'THEORY_DONE') {
+                              statusColor = '#a855f7';
+                              statusBg = '#f3e8ff';
+                              statusText = 'Theorie gelesen';
+                            } else if (item.status === 'MASTERED') {
+                              statusColor = '#10b981';
+                              statusBg = '#d1fae5';
+                              statusText = 'Meisterwerk!';
+                            }
 
-                          return (
-                            <div 
-                              key={item.id} 
-                              style={{
-                                background: '#f0fdfa',
-                                borderRadius: '20px',
-                                border: '2px solid #06b6d4',
-                                padding: '16px',
-                                boxShadow: '0 0 15px rgba(6, 182, 212, 0.15)',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '8px'
-                              }}
-                              className="animate-pulse"
-                            >
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontWeight: 900, fontSize: '0.92rem', color: '#0f172a' }}>
-                                  {item.topic_name}
-                                </span>
+                            const matchingSong = songs.find(s => s.title.toLowerCase() === item.topic_name.toLowerCase());
+                            const artist = matchingSong?.artist || 'Unbekannt';
+                            const songColor = getSongColor(item.topic_name);
+                            const coverBg = `linear-gradient(135deg, ${songColor.from} 0%, ${songColor.to} 100%)`;
+
+                            return (
+                              <div 
+                                key={item.id} 
+                                style={{
+                                  background: '#ffffff',
+                                  borderRadius: '24px',
+                                  border: '2px solid #06b6d4',
+                                  padding: '14px 18px',
+                                  borderLeft: `5px solid ${songColor.from}`,
+                                  boxShadow: '0 0 15px rgba(6, 182, 212, 0.15)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '12px',
+                                  position: 'relative'
+                                }}
+                                className="animate-pulse"
+                              >
+                                {/* Pink/Peach Sleeve + Vinyl peeking out Cover Icon */}
+                                <div style={{ position: 'relative', width: '68px', height: '56px', flexShrink: 0 }}>
+                                  <div style={{
+                                    position: 'absolute',
+                                    right: '4px',
+                                    top: '5px',
+                                    width: '46px',
+                                    height: '46px',
+                                    borderRadius: '50%',
+                                    background: '#090a0f',
+                                    boxShadow: '0 4px 10px rgba(0,0,0,0.25)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    zIndex: 1
+                                  }}>
+                                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: songColor.to, opacity: 0.45 }} />
+                                  </div>
+                                  <div style={{
+                                    position: 'absolute',
+                                    left: 0,
+                                    top: 0,
+                                    width: '56px',
+                                    height: '56px',
+                                    background: coverBg,
+                                    borderRadius: '16px',
+                                    boxShadow: '0 8px 20px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    zIndex: 2,
+                                    border: `1px solid ${songColor.text}18`
+                                  }}>
+                                    <span style={{ fontSize: '28px', lineHeight: 1, filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.1))' }}>🎵</span>
+                                  </div>
+                                </div>
+
+                                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                  <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '1.15rem', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                                    {item.topic_name}
+                                  </div>
+                                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>
+                                    von {artist}
+                                  </div>
+                                  {item.teacher_notes && (
+                                    <div style={{ background: '#f8fafc', padding: '6px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.72rem', color: '#0f172a', fontWeight: 650, fontStyle: 'italic', marginTop: '4px' }}>
+                                      Notiz: {item.teacher_notes}
+                                    </div>
+                                  )}
+                                </div>
                                 <span style={{
                                   background: statusBg,
                                   color: statusColor,
@@ -3894,190 +4017,18 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   borderRadius: '8px',
                                   fontSize: '0.65rem',
                                   fontWeight: 900,
-                                  textTransform: 'uppercase'
+                                  textTransform: 'uppercase',
+                                  whiteSpace: 'nowrap',
+                                  alignSelf: 'flex-start'
                                 }}>
                                   {statusText}
                                 </span>
                               </div>
-                              {item.teacher_notes && (
-                                <div style={{ background: 'white', padding: '10px 14px', borderRadius: '12px', border: '1px solid #ccfbf1', fontSize: '0.78rem', color: '#0f172a', fontWeight: 600, fontStyle: 'italic' }}>
-                                  Notiz: {item.teacher_notes}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* Complete grid of song tiles */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        Deine Meilensteine
-                      </span>
-                      {progressItems.filter(item => !item.topic_name.includes(' - Seite ')).length === 0 ? (
-                        <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem', fontStyle: 'italic' }}>
-                          Noch keine Songs am Board.
-                        </div>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          {progressItems.filter(item => !item.topic_name.includes(' - Seite ')).map(item => {
-                            let tileBg = 'white';
-                            let tileBorder = '1px solid #e2e8f0';
-                            let badgeBg = '#f1f5f9';
-                            let badgeColor = '#475569';
-                            let badgeText = 'In Arbeit';
-
-                            if (item.status === 'IN_PROGRESS') {
-                              tileBg = '#fffbeb';
-                              tileBorder = '1.5px solid #fef08a';
-                              badgeBg = '#fef9c3';
-                              badgeColor = '#854d0e';
-                            } else if (item.status === 'THEORY_DONE') {
-                              tileBg = '#faf5ff';
-                              tileBorder = '1.5px solid #e9d5ff';
-                              badgeBg = '#f3e8ff';
-                              badgeColor = '#6b21a8';
-                              badgeText = 'Theorie gelesen';
-                            } else if (item.status === 'MASTERED') {
-                              tileBg = '#f0fdf4';
-                              tileBorder = '1.5px solid #a7f3d0';
-                              badgeBg = '#d1fae5';
-                              badgeColor = '#065f46';
-                              badgeText = 'Meisterwerk!';
-                            }
-
-                            return (
-                              <div 
-                                key={item.id} 
-                                style={{
-                                  background: tileBg,
-                                  border: item.is_current_homework ? '2px solid #06b6d4' : tileBorder,
-                                  borderRadius: '16px',
-                                  padding: '14px',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: '8px',
-                                  boxShadow: item.is_current_homework ? '0 0 10px rgba(6, 182, 212, 0.1)' : 'none',
-                                  position: 'relative'
-                                }}
-                                className={item.is_current_homework ? 'animate-pulse' : 'hover-scale'}
-                              >
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                                  <span style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b' }}>
-                                    {item.topic_name}
-                                  </span>
-                                  <span style={{
-                                    background: badgeBg,
-                                    color: badgeColor,
-                                    padding: '2px 6px',
-                                    borderRadius: '6px',
-                                    fontSize: '0.6rem',
-                                    fontWeight: 900,
-                                    textTransform: 'uppercase',
-                                    whiteSpace: 'nowrap'
-                                  }}>
-                                    {badgeText}
-                                  </span>
-                                </div>
-                                {item.teacher_notes && (
-                                  <p style={{ fontSize: '0.75rem', color: '#475569', margin: 0, fontWeight: 550, lineHeight: 1.3 }}>
-                                    {item.teacher_notes}
-                                  </p>
-                                )}
-                              </div>
                             );
                           })}
                         </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Right Column: Lehrwerke */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <h5 style={{ fontSize: '0.8rem', fontWeight: 900, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <BookOpen size={14} /> Lehrwerke
-                    </h5>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        Deine Schulbücher & Lehrwerke
-                      </span>
-                      {(() => {
-                        const assignedBookIds = localProgress.filter((p: any) => p.studentId === studentId).map((p: any) => p.lehrwerkId);
-                        const assignedLehrwerke = lehrwerke.filter(book => assignedBookIds.includes(book.id));
-
-                        if (assignedLehrwerke.length === 0) {
-                          return (
-                            <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem', fontStyle: 'italic' }}>
-                              Keine Lehrwerke zugewiesen.
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {assignedLehrwerke.map(book => {
-                              const gradient = getLehrwerkColor(book.title, lehrwerke);
-                              const assignment = localProgress.find((p: any) => p.studentId === studentId && p.lehrwerkId === book.id);
-                              
-                              let masteredCount = 0;
-                              if (assignment && assignment.pageStates) {
-                                masteredCount = Object.values(assignment.pageStates).filter((s: any) => s.status === 'mastered').length;
-                              }
-
-                              return (
-                                <div 
-                                  key={book.id}
-                                  onClick={() => setSelectedLehrwerkForDetail(book)}
-                                  style={{ 
-                                    padding: '14px 16px', 
-                                    background: 'white', 
-                                    display: 'flex', 
-                                    gap: '12px', 
-                                    alignItems: 'center', 
-                                    borderRadius: '20px', 
-                                    border: '1px solid #e2e8f0', 
-                                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.02)',
-                                    position: 'relative',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s ease'
-                                  }}
-                                  className="hover-scale"
-                                >
-                                  <div style={{ 
-                                    width: '44px', 
-                                    height: '58px', 
-                                    background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`, 
-                                    borderRadius: '6px', 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'center', 
-                                    color: gradient.text, 
-                                    boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
-                                    flexShrink: 0
-                                  }}>
-                                    <BookOpen size={18} color={gradient.text} />
-                                  </div>
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <h4 style={{ margin: '0 0 2px 0', fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{book.title}</h4>
-                                    {book.author && <p style={{ margin: '0 0 4px 0', fontSize: '0.72rem', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>von {book.author}</p>}
-                                    
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.65rem', color: '#475569', fontWeight: 700, marginTop: '6px', marginBottom: '2px' }}>
-                                      <span style={{ color: '#94a3b8' }}>📖 {book.totalPages || 50} Seiten</span>
-                                      <span>{masteredCount} / {book.totalPages || 50} S.</span>
-                                    </div>
-                                    <div style={{ width: '100%', height: '4px', borderRadius: '2px', background: '#e2e8f0', overflow: 'hidden' }}>
-                                      <div style={{ width: `${Math.min(100, (masteredCount / (book.totalPages || 50)) * 100)}%`, height: '100%', background: gradient.text, borderRadius: '2px', transition: 'width 0.3s ease' }} />
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        );
-                      })()}
-                    </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -4123,7 +4074,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     </div>
                   </div>
 
-                  {/* Mastered Songs */}
+                  {/* Mastered Songs Count */}
                   {(() => {
                     const masteredCount = progressItems.filter(item => !item.topic_name.includes(' - Seite ') && item.status === 'MASTERED').length;
                     return (
@@ -4209,8 +4160,109 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     );
                   })()}
                 </div>
-              </div>
 
+                {/* List of Mastered Songs & Lehrwerke */}
+                <div style={{ marginTop: '4px', borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* Mastered Songs Section */}
+                  <div>
+                    <h5 style={{ fontSize: '0.72rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      🏆 Gemeisterte Songs
+                    </h5>
+                    {(() => {
+                      const masteredSongs = progressItems.filter(item => !item.topic_name.includes(' - Seite ') && item.status === 'MASTERED');
+                      if (masteredSongs.length === 0) {
+                        return (
+                          <div style={{ padding: '12px', textAlign: 'center', color: '#94a3b8', fontSize: '0.72rem', fontStyle: 'italic', background: 'rgba(255, 255, 255, 0.4)', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                            Noch keine Meisterwerke.
+                          </div>
+                        );
+                      }
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {masteredSongs.map(item => {
+                            const matchingSong = songs.find(s => s.title.toLowerCase() === item.topic_name.toLowerCase());
+                            const artist = matchingSong?.artist || 'Unbekannt';
+                            return (
+                              <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#f0fdf4', padding: '10px 12px', borderRadius: '12px', border: '1px solid #d1fae5' }}>
+                                <div style={{ background: '#d1fae5', color: '#10b981', padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
+                                  <Trophy size={14} fill="currentColor" />
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#065f46', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {item.topic_name}
+                                  </div>
+                                  <div style={{ fontSize: '0.65rem', color: '#047857', fontWeight: 650 }}>
+                                    von {artist}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Mastered / Active Lehrwerke Section */}
+                  <div>
+                    <h5 style={{ fontSize: '0.72rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      📚 Lehrwerke Fortschritt
+                    </h5>
+                    {(() => {
+                      const studentAssignments = localProgress.filter((p: any) => p.studentId === studentId);
+                      const assignedLehrwerke = lehrwerke.filter(book => studentAssignments.some((p: any) => p.lehrwerkId === book.id));
+
+                      if (assignedLehrwerke.length === 0) {
+                        return (
+                          <div style={{ padding: '12px', textAlign: 'center', color: '#94a3b8', fontSize: '0.72rem', fontStyle: 'italic', background: 'rgba(255, 255, 255, 0.4)', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                            Keine Lehrwerke zugewiesen.
+                          </div>
+                        );
+                      }
+
+                      // Sort so that completed (100%) come first, then sort by progress percentage descending
+                      const booksWithProgress = assignedLehrwerke.map(book => {
+                        const assignment = studentAssignments.find((p: any) => p.lehrwerkId === book.id);
+                        let masteredCount = 0;
+                        if (assignment && assignment.pageStates) {
+                          masteredCount = Object.values(assignment.pageStates).filter((s: any) => s.status === 'mastered').length;
+                        }
+                        const pct = book.totalPages > 0 ? (masteredCount / book.totalPages) : 0;
+                        return { book, masteredCount, pct };
+                      }).sort((a, b) => b.pct - a.pct);
+
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {booksWithProgress.map(({ book, masteredCount, pct }) => {
+                            const isFullyMastered = pct >= 1;
+                            const cardBg = isFullyMastered ? '#f5f3ff' : '#f8fafc';
+                            const cardBorder = isFullyMastered ? '1px solid #ddd6fe' : '1px solid #e2e8f0';
+                            const iconBg = isFullyMastered ? '#ddd6fe' : '#e2e8f0';
+                            const iconColor = isFullyMastered ? '#7c3aed' : '#64748b';
+                            const textThemeColor = isFullyMastered ? '#5b21b6' : '#334155';
+
+                            return (
+                              <div key={book.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: cardBg, padding: '10px 12px', borderRadius: '12px', border: cardBorder }}>
+                                <div style={{ background: iconBg, color: iconColor, padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
+                                  <BookOpen size={14} />
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: textThemeColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {book.title}
+                                  </div>
+                                  <div style={{ fontSize: '0.65rem', color: iconColor, fontWeight: 650 }}>
+                                    {isFullyMastered ? '100% gemeistert! 🎉' : `${masteredCount} / ${book.totalPages} S. (${Math.round(pct * 100)}%)`}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>

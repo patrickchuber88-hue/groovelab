@@ -1152,10 +1152,22 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 240px', gap: '14px', alignItems: 'start' }}>
             
             {/* Trello Board List Column Area */}
-            <div style={{ display: 'flex', gap: '12px', width: '100%', minHeight: '520px', alignItems: 'start' }}>
-              {boards.map(board => {
+            <div style={{ 
+              display: 'flex', 
+              gap: '0px', 
+              width: '100%', 
+              minHeight: '520px', 
+              alignItems: 'stretch',
+              background: '#ffffff',
+              border: '1px solid #e2e8f0',
+              borderRadius: '24px',
+              padding: '20px 8px',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+              overflow: 'hidden'
+            }}>
+              {boards.map((board, index) => {
                 const dayLabel = DAYS_OF_WEEK.find(d => d.value === board.dayOfWeek)?.name || '';
-
+ 
                 return (
                   <div
                     key={board.id}
@@ -1164,12 +1176,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     style={{ 
                       flex: 1,
                       minWidth: '170px',
-                      background: 'rgba(255, 255, 255, 0.4)', 
-                      backdropFilter: 'blur(10px)',
-                      WebkitBackdropFilter: 'blur(10px)',
-                      border: '1px solid rgba(255, 255, 255, 0.6)', 
-                      borderRadius: '16px', 
-                      padding: '12px', 
+                      background: 'transparent', 
+                      borderRight: index < boards.length - 1 ? '1px solid #e2e8f0' : 'none', 
+                      padding: '0 16px', 
                       display: 'flex', 
                       flexDirection: 'column', 
                       gap: '8px', 
