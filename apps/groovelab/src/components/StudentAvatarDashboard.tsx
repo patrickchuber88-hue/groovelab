@@ -4026,7 +4026,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     if (hasMastered) {
                       borderLeftColor = '#10b981'; // Green (Mastered)
                     } else if (isJokerDay) {
-                      borderLeftColor = '#8b5cf6'; // Purple (Joker Day)
+                      borderLeftColor = '#f97d13'; // Golden-Orange (Joker Day)
                     } else if (isToday) {
                       borderLeftColor = '#eab308'; // Yellow (Active)
                     } else {
@@ -4098,8 +4098,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           <div 
                             key={idx}
                             style={{ 
-                              background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.03) 0%, rgba(139, 92, 246, 0.01) 100%)', 
-                              border: '1px dashed rgba(139, 92, 246, 0.25)', 
+                              background: 'linear-gradient(135deg, #f97d13 0%, #d96a06 100%)', 
+                              border: '1px solid #d96a06', 
                               borderRadius: '16px', 
                               padding: '12px 14px',
                               display: 'flex',
@@ -4107,19 +4107,18 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               justifyContent: 'space-between',
                               alignItems: 'center',
                               gap: '12px',
-                              borderLeft: `4px solid ${borderLeftColor}`,
-                              boxShadow: '0 2px 8px rgba(139, 92, 246, 0.01)'
+                              boxShadow: '0 4px 12px rgba(249, 125, 19, 0.12)'
                             }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
-                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#8b5cf6', fontFamily: 'monospace' }}>
+                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ffffff', fontFamily: 'monospace' }}>
                                 {group.date}
                               </span>
                               <span style={{ 
                                 fontSize: '0.58rem', 
                                 fontWeight: 900, 
-                                background: 'rgba(139, 92, 246, 0.08)', 
-                                color: '#8b5cf6', 
+                                background: 'rgba(255, 255, 255, 0.22)', 
+                                color: '#ffffff', 
                                 padding: '1px 6px', 
                                 borderRadius: '100px', 
                                 letterSpacing: '0.04em', 
@@ -4127,14 +4126,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               }}>
                                 Joker eingesetzt
                               </span>
-                              <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#4b5563', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#fef3c7', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 - Streak gerettet! 🎯
                               </span>
                             </div>
                             
                             <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
-                              <Flame size={iconSize} fill="#8b5cf6" color="#8b5cf6" />
-                              <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#8b5cf6' }}>
+                              <Flame size={iconSize} fill="#ffffff" color="#ffffff" />
+                              <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ffffff' }}>
                                 Joker
                               </span>
                             </div>
