@@ -160,6 +160,96 @@ const isWithinOpeningHours = (openingHours: any) => {
   }
 };
 
+// Simple layout adjustment to prevent overlapping of iPad stations
+const adjustPositions = (stations: any[], containerWidth: number = 364) => {
+  // Clone stations with pos_x and pos_y, and save original coordinates to detect alignment
+  const items = stations.map(s => ({
+    ...s,
+    x: s.pos_x !== null && s.pos_x !== undefined ? s.pos_x : 50,
+    y: s.pos_y !== null && s.pos_y !== undefined ? s.pos_y : 50,
+    origX: s.pos_x !== null && s.pos_x !== undefined ? s.pos_x : 50,
+    origY: s.pos_y !== null && s.pos_y !== undefined ? s.pos_y : 50
+  }));
+
+  const containerHeight = containerWidth / 1.4;
+  
+  // Minimum gap of 4px: Button width/height is 72px, so minimum center-to-center is 72px + 4px = 76px.
+  const minXDistPx = 76;
+  const minYDistPx = 76;
+
+  const iterations = 50;
+  const minXDist = (minXDistPx / containerWidth) * 100; // minimum X distance in percentage
+  const minYDist = (minYDistPx / containerHeight) * 100; // minimum Y distance in percentage
+
+  for (let iter = 0; iter < iterations; iter++) {
+    let moved = false;
+    for (let i = 0; i < items.length; i++) {
+      for (let j = i + 1; j < items.length; j++) {
+        const dx = items[i].x - items[j].x;
+        const dy = items[i].y - items[j].y;
+        
+        // Check if they overlap (distance in X < minXDist AND Y < minYDist)
+        if (Math.abs(dx) < minXDist && Math.abs(dy) < minYDist) {
+          moved = true;
+          
+          // Detect alignment intent from database coordinates (threshold of 6% variation)
+          const isVerticallyAligned = Math.abs(items[i].origX - items[j].origX) < 6;
+          const isHorizontallyAligned = Math.abs(items[i].origY - items[j].origY) < 6;
+          
+          if (isVerticallyAligned && !isHorizontallyAligned) {
+            // They are aligned vertically: only push them apart vertically, preserving X alignment
+            const overlapY = minYDist - Math.abs(dy);
+            const forceY = dy === 0 ? (i % 2 === 0 ? 1 : -1) : Math.sign(dy);
+            const pushY = forceY * (overlapY / 2);
+            
+            items[i].y += pushY;
+            items[j].y -= pushY;
+            
+            // Keep X aligned to their original intended column position
+            items[i].x = items[i].origX;
+            items[j].x = items[j].origX;
+          } else if (isHorizontallyAligned && !isVerticallyAligned) {
+            // They are aligned horizontally: only push them apart horizontally, preserving Y alignment
+            const overlapX = minXDist - Math.abs(dx);
+            const forceX = dx === 0 ? (i % 2 === 0 ? 1 : -1) : Math.sign(dx);
+            const pushX = forceX * (overlapX / 2);
+            
+            items[i].x += pushX;
+            items[j].x -= pushX;
+            
+            // Keep Y aligned to their original intended row position
+            items[i].y = items[i].origY;
+            items[j].y = items[j].origY;
+          } else {
+            // No strict alignment or both (e.g. direct overlap at same spot): push on both axes
+            const overlapX = minXDist - Math.abs(dx);
+            const overlapY = minYDist - Math.abs(dy);
+            
+            const forceX = dx === 0 ? (Math.random() - 0.5 || 0.1) : Math.sign(dx);
+            const forceY = dy === 0 ? (Math.random() - 0.5 || 0.1) : Math.sign(dy);
+            
+            const pushX = forceX * (overlapX / 2);
+            const pushY = forceY * (overlapY / 2);
+            
+            items[i].x += pushX;
+            items[j].x -= pushX;
+            items[i].y += pushY;
+            items[j].y -= pushY;
+          }
+          
+          // Clamp individual positions to keep them inside the safe area (12% to 88% for X, 15% to 85% for Y)
+          items[i].x = Math.max(12, Math.min(88, items[i].x));
+          items[j].x = Math.max(12, Math.min(88, items[j].x));
+          items[i].y = Math.max(15, Math.min(85, items[i].y));
+          items[j].y = Math.max(15, Math.min(85, items[j].y));
+        }
+      }
+    }
+    if (!moved) break;
+  }
+  return items;
+};
+
 const cleanRoomName = (name: string | null | undefined): string => {
   if (!name) return 'Unbenannter Raum';
   return name.replace(/^#\d+\s*[-:]*\s*/, '').trim();
@@ -191,9 +281,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [pinInput, setPinInput] = useState('');
   const [kioskRooms, setKioskRooms] = useState<any[]>([]);
   const [kioskStations, setKioskStations] = useState<any[]>([]);
+  const kioskMapRef = useRef<HTMLDivElement>(null);
+  const [kioskMapWidth, setKioskMapWidth] = useState<number>(364);
   const [kioskSelectedRoomId, setKioskSelectedRoomId] = useState<string>('');
   const [activeSessionStationIds, setActiveSessionStationIds] = useState<string[]>([]);
   const [loadingKioskData, setLoadingKioskData] = useState(false);
+  const [loadingLocation, setLoadingLocation] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(true);
 
   // Onboarding States
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -211,6 +305,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [onboardIPAddress, setOnboardIPAddress] = useState('unknown');
   const [expandedSection, setExpandedSection] = useState<'none' | 'pin' | 'kiosk'>('none');
   const [isGroovelabKiosk, setIsGroovelabKiosk] = useState(false);
+
+  useEffect(() => {
+    if (!kioskMapRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        if (entry.contentRect.width) {
+          setKioskMapWidth(entry.contentRect.width);
+        }
+      }
+    });
+    observer.observe(kioskMapRef.current);
+    return () => observer.disconnect();
+  }, [kioskMapRef.current, isGroovelabKiosk]);
 
 
   const fetchIpAddress = async () => {
@@ -689,6 +796,71 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   
   const [schoolName, setSchoolName] = useState<string>('');
   const [schoolData, setSchoolData] = useState<any>(null);
+  const [logoTheme, setLogoTheme] = useState<'light' | 'dark'>('light');
+
+  useEffect(() => {
+    if (!schoolData?.logo_url) return;
+    
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          setLogoTheme('light');
+          return;
+        }
+        
+        canvas.width = 30;
+        canvas.height = 30;
+        ctx.drawImage(img, 0, 0, 30, 30);
+        
+        const imgData = ctx.getImageData(0, 0, 30, 30);
+        const data = imgData.data;
+        
+        let darkPixels = 0;
+        let lightPixels = 0;
+        let totalCount = 0;
+        
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          const a = data[i + 3];
+          
+          if (a > 50) { // Opaque enough
+            const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+            if (brightness < 140) { // Dark pixel threshold
+              darkPixels++;
+            } else {
+              lightPixels++;
+            }
+            totalCount++;
+          }
+        }
+        
+        if (totalCount > 0) {
+          // If more dark pixels than light pixels, it's a dark logo -> needs light background
+          if (darkPixels > lightPixels) {
+            setLogoTheme('light');
+          } else {
+            setLogoTheme('dark');
+          }
+        } else {
+          setLogoTheme('light');
+        }
+      } catch (err) {
+        console.warn("[Logo Analysis] CORS or canvas read error, defaulting to light background:", err);
+        setLogoTheme('light');
+      }
+    };
+    img.onerror = () => {
+      setLogoTheme('light');
+    };
+    img.src = schoolData.logo_url;
+  }, [schoolData?.logo_url]);
+
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [registeredUser, setRegisteredUser] = useState<any>(null);
@@ -696,15 +868,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [signingUp, setSigningUp] = useState(false);
   const [userPos, setUserPos] = useState<{lat: number, lng: number} | null>(null);
   
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => setUserPos({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        (err) => console.warn('[Login] Initial geo fetch failed:', err),
-        { enableHighAccuracy: true, maximumAge: 30000 }
-      );
-    }
-  }, []);
+
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -1093,14 +1257,16 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     prefetch();
   }, [effectiveStationId]);
 
-  // Fetch rooms and stations for the Kiosk activator when schoolData is resolved
+  // Fetch rooms and stations for the Kiosk activator when schoolData is resolved (or query all active if not set yet)
   useEffect(() => {
-    if (!schoolData?.id) return;
     async function fetchKioskData() {
       try {
         setLoadingKioskData(true);
         // The Kiosk Activator is always for GrooveLab Kiosks, so we fetch groovelab-active rooms
-        let roomsQuery = supabase.from('rooms').select('*').eq('school_id', schoolData.id).eq('is_groovelab_active', true);
+        let roomsQuery = supabase.from('rooms').select('*').eq('is_groovelab_active', true);
+        if (schoolData?.id) {
+          roomsQuery = roomsQuery.eq('school_id', schoolData.id);
+        }
         const [roomsRes, stationsRes, sessionsRes] = await Promise.all([
           roomsQuery.order('sort_order', { ascending: true }),
           supabase.from('stations').select('*').order('name'),
@@ -1336,12 +1502,17 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           return;
         }
 
-        if (isWithinAnyRoom) {
-          setPendingTeacherUser({ user, isWithinAnyRoom: true });
-          setShowTeacherChoiceModal(true);
-          setLoading(false);
+        const isGroovelabScreen = !!(effectiveStationId || isGroovelabKiosk);
+        if (isGroovelabScreen) {
+          await finalizeLogin(user, effectiveStationId, isWithinAnyRoom, false);
         } else {
-          await finalizeLogin(user, effectiveStationId, false, true);
+          if (isWithinAnyRoom) {
+            setPendingTeacherUser({ user, isWithinAnyRoom: true });
+            setShowTeacherChoiceModal(true);
+            setLoading(false);
+          } else {
+            await finalizeLogin(user, effectiveStationId, false, true);
+          }
         }
         return;
       }
@@ -1576,15 +1747,20 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           return;
         }
 
-        if (isWithinAnyRoom) {
-          // Only show choice modal if within geofence (i.e. groovelab is "open" / accessible)
-          setPendingTeacherUser({ user, isWithinAnyRoom: true });
-          setShowTeacherChoiceModal(true);
-          setLoading(false);
+        const isGroovelabScreen = !!(effectiveStationId || isGroovelabKiosk);
+        if (isGroovelabScreen) {
+          await finalizeLogin(user, effectiveStationId, isWithinAnyRoom, false);
         } else {
-          // Directly set to Home mode (hidePresence = true, isWithinAnyRoom = false) without asking
-          console.log('[Login] Teacher outside geofence. Directing to Home mode without prompt.');
-          await finalizeLogin(user, effectiveStationId, false, true);
+          if (isWithinAnyRoom) {
+            // Only show choice modal if within geofence (i.e. groovelab is "open" / accessible)
+            setPendingTeacherUser({ user, isWithinAnyRoom: true });
+            setShowTeacherChoiceModal(true);
+            setLoading(false);
+          } else {
+            // Directly set to Home mode (hidePresence = true, isWithinAnyRoom = false) without asking
+            console.log('[Login] Teacher outside geofence. Directing to Home mode without prompt.');
+            await finalizeLogin(user, effectiveStationId, false, true);
+          }
         }
         return;
       }
@@ -1894,13 +2070,31 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       position: 'fixed',
       inset: 0,
       display: 'flex',
-      flexDirection: isMobile ? 'column' : 'row',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: isGroovelabKiosk ? 'flex-start' : 'center',
       fontFamily: '"Outfit", "Inter", -apple-system, sans-serif',
+      background: isGroovelabKiosk ? '#ca8a04' : '#0a361c', // Chalkboard yellow/green
+      backgroundImage: isGroovelabKiosk 
+        ? 'radial-gradient(circle at 50% 50%, #fef08a 0%, #ca8a04 100%)' 
+        : 'radial-gradient(circle at 50% 50%, #11572e 0%, #062413 100%)',
+      color: isGroovelabKiosk ? '#062413' : 'white',
       zIndex: 9999,
-      overflow: 'hidden'
+      overflowY: 'auto',
+      padding: '48px 16px 24px 16px',
+      boxSizing: 'border-box',
+      transition: 'background 0.5s ease, color 0.5s ease'
     }}>
+      {/* Subtle Chalk board dust overlays */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        opacity: 0.025,
+        pointerEvents: 'none',
+        backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.85\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")'
+      }} />
       {/* Left Presentation Panel: School green chalkboard artwork with Apple-style product presentation */}
-      {!isMobile && (
+      {false && !isMobile && (
         <div style={{
           flex: 1.2,
           background: '#0a361c', // Chalkboard dark green
@@ -2014,32 +2208,31 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       {/* Right Login Panel */}
       <div style={{
-        flex: 1,
+        width: '100%',
+        maxWidth: '440px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: isMobile ? '40px 16px' : '50px 40px',
-        background: isGroovelabKiosk 
-          ? 'linear-gradient(135deg, #fef08a 0%, #fef9c3 100%)' 
-          : 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)', // Cheerful, light green chalkboard matching theme background
-        overflowY: 'auto',
-        position: 'relative'
+        position: 'relative',
+        zIndex: 2
       }}>
         
         {schoolData?.logo_url ? (
           <div style={{
-            maxHeight: '80px',
-            maxWidth: '280px',
+            maxHeight: '70px',
+            maxWidth: '240px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             marginBottom: '20px',
-            background: 'rgba(255, 255, 255, 0.95)',
+            background: logoTheme === 'light' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
             padding: '10px 24px',
             borderRadius: '20px',
-            boxShadow: '0 8px 20px rgba(0,0,0,0.06)',
-            border: '1px solid rgba(255, 255, 255, 0.8)'
+            border: logoTheme === 'light' ? '1px solid rgba(255, 255, 255, 0.8)' : '1px solid rgba(255, 255, 255, 0.15)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.15)'
           }}>
             <img 
               src={schoolData.logo_url} 
@@ -2053,19 +2246,21 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           </div>
         ) : (
           <div className="loading-pulse" style={{
-            width: '64px',
-            height: '64px',
-            background: 'rgba(255, 255, 255, 0.95)',
+            width: '60px',
+            height: '60px',
+            background: 'rgba(255, 255, 255, 0.08)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
             borderRadius: '20px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             marginBottom: '20px',
-            boxShadow: '0 8px 20px rgba(0, 0, 0, 0.06)',
-            border: '1px solid rgba(255, 255, 255, 0.8)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
             overflow: 'hidden'
           }}>
-            <Music size={30} color={schoolData?.primary_color || "#064e3b"} />
+            <Music size={28} color="#000000" />
           </div>
         )}
 
@@ -2081,20 +2276,32 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             });
           }}
           style={{ 
-            fontSize: '28px', 
-            fontWeight: 950, 
-            color: '#064e3b', 
+            fontSize: '32px', 
+            fontWeight: 900, 
+            color: isGroovelabKiosk ? '#062413' : '#ffffff', 
             marginBottom: '6px', 
             margin: 0, 
             letterSpacing: '-0.03em',
             cursor: 'default',
             userSelect: 'none',
-            textAlign: 'center'
+            textAlign: 'center',
+            textShadow: isGroovelabKiosk ? 'none' : '0 2px 8px rgba(0,0,0,0.2)',
+            transition: 'color 0.5s ease'
           }}
         >
           {isGroovelabKiosk ? 'GrooveLab-Login' : 'Campus-Login'}
         </h1>
-        <p style={{ color: '#047857', textAlign: 'center', fontSize: '13px', marginBottom: '28px', maxWidth: '320px', lineHeight: '1.4', fontWeight: 700 }}>
+        <p style={{ 
+          color: isGroovelabKiosk ? '#78350f' : '#a7f3d0', 
+          textAlign: 'center', 
+          fontSize: '14px', 
+          marginBottom: '32px', 
+          maxWidth: '340px', 
+          lineHeight: '1.4', 
+          fontWeight: 600, 
+          textShadow: isGroovelabKiosk ? 'none' : '0 1px 2px rgba(0,0,0,0.1)',
+          transition: 'color 0.5s ease'
+        }}>
           {schoolName && !schoolData?.logo_url ? `für ${schoolName}` : `Halte deinen Ausweis vor die Kamera, um dich einzuloggen.`}
         </p>
 
@@ -2103,22 +2310,26 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       <div style={{
         width: '100%',
         maxWidth: '420px',
-        background: 'rgba(255, 255, 255, 0.94)',
-        borderRadius: '36px',
+        background: isGroovelabKiosk ? 'rgba(255, 255, 255, 0.82)' : 'rgba(255, 255, 255, 0.07)',
+        borderRadius: '40px',
         padding: '28px',
-        boxShadow: '0 2px 5px rgba(0, 0, 0, 0.04), 0 30px 80px rgba(6, 78, 59, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
-        border: '1px solid rgba(255, 255, 255, 0.7)',
-        borderBottomColor: 'rgba(255, 255, 255, 0.3)',
-        borderRightColor: 'rgba(255, 255, 255, 0.45)',
+        boxShadow: isGroovelabKiosk 
+          ? '0 40px 100px rgba(120, 53, 15, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.6)' 
+          : '0 40px 100px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15)',
+        border: isGroovelabKiosk 
+          ? '1px solid rgba(255, 255, 255, 0.4)' 
+          : '1px solid rgba(255, 255, 255, 0.12)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         position: 'relative',
-        backdropFilter: 'blur(25px)',
-        WebkitBackdropFilter: 'blur(25px)'
+        backdropFilter: 'blur(30px)',
+        WebkitBackdropFilter: 'blur(30px)',
+        transition: 'all 0.5s ease'
       }}>
-        <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '20px', width: '100%', justifyContent: 'center' }}>
-          <Tablet size={14} /> Standard Login über Campus QR-Ausweis
+        <div style={{ fontSize: '11px', fontWeight: 800, color: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.6)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', width: '100%', justifyContent: 'center' }}>
+          <Tablet size={14} style={{ color: isGroovelabKiosk ? '#78350f' : '#a7f3d0' }} />
+          {isGroovelabKiosk ? 'GrooveLab QR-Code scannen' : 'Standard Login über Campus QR-Ausweis'}
         </div>
 
         <div style={{
@@ -2137,7 +2348,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           <div style={{
             width: '100%',
             height: '100%',
-            borderRadius: '27.5px',
+            borderRadius: '26px',
             overflow: 'hidden',
             position: 'relative',
             background: '#0c0f12'
@@ -2147,235 +2358,333 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               position: 'absolute',
               inset: 0,
               boxShadow: 'inset 0 5px 15px rgba(0, 0, 0, 0.4)',
-              borderRadius: '27.5px',
+              borderRadius: '26px',
               pointerEvents: 'none',
               zIndex: 9
             }} />
-            <CustomQRScanner
-              onScan={(val) => {
-                console.log('[Scanner] Extracted QR value:', val);
-                handleScan(val);
-              }}
-              onError={(err: any) => {
-                console.error('[Scanner] Camera error:', err);
-                const errMsg = err?.message || String(err || '');
-                if (!errMsg.toLowerCase().includes('abort') && !errMsg.toLowerCase().includes('aborted')) {
-                  setError(`Kamera-Fehler: ${errMsg}`);
-                }
-              }}
-              paused={loading}
-              facingMode={facingMode}
-            />
+            {isCameraActive ? (
+              <>
+                <CustomQRScanner
+                  onScan={(val) => {
+                    console.log('[Scanner] Extracted QR value:', val);
+                    handleScan(val);
+                  }}
+                  onError={(err: any) => {
+                    console.error('[Scanner] Camera error:', err);
+                    const errMsg = err?.message || String(err || '');
+                    if (!errMsg.toLowerCase().includes('abort') && !errMsg.toLowerCase().includes('aborted')) {
+                      setError(`Kamera-Fehler: ${errMsg}`);
+                    }
+                  }}
+                  paused={loading}
+                  facingMode={facingMode}
+                />
 
-            {/* Scanner UI Overlay: Animated scan laser and bounding target corners */}
-            <div style={{
-              position: 'absolute',
-              inset: 0,
-              pointerEvents: 'none',
-              zIndex: 10
-            }}>
-              {/* 4 Corner brackets for scanner target */}
-              <div style={{ position: 'absolute', top: '20px', left: '20px', width: '24px', height: '24px', borderTop: '3px solid #0f766e', borderLeft: '3px solid #0f766e', borderTopLeftRadius: '8px' }} />
-              <div style={{ position: 'absolute', top: '20px', right: '20px', width: '24px', height: '24px', borderTop: '3px solid #0f766e', borderRight: '3px solid #0f766e', borderTopRightRadius: '8px' }} />
-              <div style={{ position: 'absolute', bottom: '20px', left: '20px', width: '24px', height: '24px', borderBottom: '3px solid #0f766e', borderLeft: '3px solid #0f766e', borderBottomLeftRadius: '8px' }} />
-              <div style={{ position: 'absolute', bottom: '20px', right: '20px', width: '24px', height: '24px', borderBottom: '3px solid #0f766e', borderRight: '3px solid #0f766e', borderBottomRightRadius: '8px' }} />
-              
-              {/* Animated Laser line */}
+                {/* Scanner UI Overlay: Animated scan laser and bounding target corners */}
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  pointerEvents: 'none',
+                  zIndex: 10
+                }}>
+                  {/* 4 Corner brackets for scanner target */}
+                  <div style={{ position: 'absolute', top: '20px', left: '20px', width: '24px', height: '24px', borderTop: '3px solid #a7f3d0', borderLeft: '3px solid #a7f3d0', borderTopLeftRadius: '8px' }} />
+                  <div style={{ position: 'absolute', top: '20px', right: '20px', width: '24px', height: '24px', borderTop: '3px solid #a7f3d0', borderRight: '3px solid #a7f3d0', borderTopRightRadius: '8px' }} />
+                  <div style={{ position: 'absolute', bottom: '20px', left: '20px', width: '24px', height: '24px', borderBottom: '3px solid #a7f3d0', borderLeft: '3px solid #a7f3d0', borderBottomLeftRadius: '8px' }} />
+                  <div style={{ position: 'absolute', bottom: '20px', right: '20px', width: '24px', height: '24px', borderBottom: '3px solid #a7f3d0', borderRight: '3px solid #a7f3d0', borderBottomRightRadius: '8px' }} />
+                  
+                  {/* Animated Laser line */}
+                  <div style={{
+                    position: 'absolute',
+                    left: 0,
+                    width: '100%',
+                    height: '80px',
+                    background: 'linear-gradient(180deg, rgba(167, 243, 208, 0) 0%, rgba(167, 243, 208, 0.08) 50%, rgba(167, 243, 208, 0) 100%)',
+                    filter: 'blur(6px)',
+                    animation: 'scanLaser 4s ease-in-out infinite',
+                    pointerEvents: 'none'
+                  }} />
+                </div>
+
+                <style dangerouslySetInnerHTML={{__html: `
+                  @keyframes scanLaser {
+                    0% { top: -20%; }
+                    50% { top: 100%; }
+                    100% { top: -20%; }
+                  }
+                `}} />
+
+                {/* Switch Camera Button */}
+                <button
+                  onClick={() => setFacingMode(prev => prev === 'user' ? 'environment' : 'user')}
+                  style={{
+                    position: 'absolute',
+                    top: '12px',
+                    right: '12px',
+                    zIndex: 15,
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '50%',
+                    background: 'rgba(255, 255, 255, 0.15)',
+                    backdropFilter: 'blur(10px)',
+                    WebkitBackdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255, 255, 255, 0.25)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: 'white',
+                    boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
+                    transition: 'all 0.2s ease',
+                    outline: 'none'
+                  }}
+                  onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'; }}
+                  onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'; }}
+                  title="Kamera wechseln"
+                >
+                  <RotateCw size={18} />
+                </button>
+              </>
+            ) : (
               <div style={{
-                position: 'absolute',
-                left: 0,
                 width: '100%',
-                height: '80px',
-                background: 'linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0) 100%)',
-                filter: 'blur(6px)',
-                animation: 'scanLaser 4s ease-in-out infinite',
-                pointerEvents: 'none'
-              }} />
-            </div>
-
-            <style dangerouslySetInnerHTML={{__html: `
-              @keyframes scanLaser {
-                0% { top: -20%; }
-                50% { top: 100%; }
-                100% { top: -20%; }
-              }
-            `}} />
-
-            {/* Switch Camera Button */}
-            <button
-              onClick={() => setFacingMode(prev => prev === 'user' ? 'environment' : 'user')}
-              style={{
-                position: 'absolute',
-                top: '12px',
-                right: '12px',
-                zIndex: 15,
-                width: '38px',
-                height: '38px',
-                borderRadius: '50%',
-                background: 'rgba(255, 255, 255, 0.25)',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
+                height: '100%',
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                cursor: 'pointer',
+                gap: '16px',
                 color: 'white',
-                boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
-                transition: 'all 0.2s ease',
-                outline: 'none'
-              }}
-              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.35)'; }}
-              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)'; }}
-              title="Kamera wechseln"
-            >
-              <RotateCw size={18} />
-            </button>
+                padding: '24px',
+                textAlign: 'center'
+              }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a7f3d0' }}>
+                  <Tablet size={24} />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCameraActive(true)}
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: '#a7f3d0',
+                    color: '#062413',
+                    fontWeight: 800,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(167, 243, 208, 0.2)'
+                  }}
+                >
+                  Kamera aktivieren
+                </button>
+              </div>
+            )}
 
             {loading && (
               <div style={{
                 position: 'absolute',
                 inset: 0,
-                background: 'rgba(255,255,255,0.8)',
+                background: 'rgba(0,0,0,0.6)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 zIndex: 10,
                 backdropFilter: 'blur(10px)'
               }}>
-                <div style={{ width: '36px', height: '36px', border: '3px solid #0f766e', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                <div style={{ width: '36px', height: '36px', border: '3px solid #a7f3d0', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
               </div>
             )}
           </div>
         </div>
 
-        {/* iOS-Style Ausweis ID Login button */}
-        <div style={{ marginTop: '20px', width: '100%' }}>
-          <button 
-            onClick={() => setExpandedSection('pin')}
-            style={{
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              padding: '12px 16px',
-              borderRadius: '16px',
-              background: '#f1f5f9',
-              border: '1px solid #e2e8f0',
-              color: '#334155',
-              fontSize: '13px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              textAlign: 'center',
-              boxSizing: 'border-box',
-              height: '48px',
-              outline: 'none'
-            }}
-            onMouseOver={(e) => { e.currentTarget.style.background = '#e2e8f0'; }}
-            onMouseOut={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
-          >
-            <KeyRound size={16} color="#0f766e" />
-            Passwort Anmeldung
-          </button>
-        </div>
+        {/* iOS-Style Ausweis ID Login button - Hidden in Kiosk Mode */}
+        {!isGroovelabKiosk && (
+          <div style={{ marginTop: '20px', width: '100%' }}>
+            <button 
+              onClick={() => setExpandedSection('pin')}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                padding: '12px 16px',
+                borderRadius: '16px',
+                background: 'rgba(255, 255, 255, 0.06)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                color: '#ffffff',
+                fontSize: '13px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                textAlign: 'center',
+                boxSizing: 'border-box',
+                height: '48px',
+                outline: 'none'
+              }}
+              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'; }}
+              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'; }}
+            >
+              <KeyRound size={16} color="#a7f3d0" />
+              Passwort Anmeldung
+            </button>
+          </div>
+        )}
 
         {error && (
-          <div style={{ marginTop: '16px', background: '#fef2f2', border: '1px solid #fee2e2', color: '#ef4444', padding: '14px', borderRadius: '16px', fontSize: '13px', fontWeight: 800, textAlign: 'center', width: '100%' }}>
+          <div style={{ marginTop: '16px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#fca5a5', padding: '14px', borderRadius: '16px', fontSize: '13px', fontWeight: 800, textAlign: 'center', width: '100%' }}>
             {error}
           </div>
         )}
 
         {/* Kiosk Activator Nested Inside Scanner Card */}
-        {isGroovelabKiosk && schoolData && kioskRooms.length > 0 && (
+        {isGroovelabKiosk && (
           <div style={{
             width: '100%',
             display: 'flex',
             flexDirection: 'column',
             gap: '16px',
             marginTop: '20px',
-            borderTop: '1px solid #cbd5e1',
+            borderTop: '1px solid rgba(0, 0, 0, 0.1)',
             paddingTop: '20px'
           }}>
-            <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Tablet size={14} /> GrooveLab Kiosk aktivieren (iPad Stationen)
+            <div style={{ fontSize: '11px', fontWeight: 800, color: 'rgba(0, 0, 0, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Tablet size={14} style={{ color: '#78350f' }} /> GrooveLab Kiosk aktivieren
             </div>
             
-            {/* Room Selector */}
-            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
-              {kioskRooms.map((room, idx) => (
-                <button
-                  key={room.id}
-                  type="button"
-                  onClick={() => setKioskSelectedRoomId(room.id)}
+            {kioskRooms.length > 0 ? (
+              <>
+                {/* Room Selector */}
+                <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+                  {kioskRooms.map((room, idx) => (
+                    <button
+                      key={room.id}
+                      type="button"
+                      onClick={() => setKioskSelectedRoomId(room.id)}
+                      style={{
+                        padding: '8px 14px',
+                        borderRadius: '12px',
+                        border: '1px solid',
+                        borderColor: kioskSelectedRoomId === room.id ? (schoolData?.primary_color || '#eab308') : (isGroovelabKiosk ? 'rgba(0,0,0,0.1)' : 'rgba(255, 255, 255, 0.15)'),
+                        background: kioskSelectedRoomId === room.id ? (schoolData?.primary_color || '#eab308') : 'transparent',
+                        color: kioskSelectedRoomId === room.id ? '#ffffff' : (isGroovelabKiosk ? '#1e293b' : '#ffffff'),
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      {`${idx + 1} - ${cleanRoomName(room.name)}`}
+                    </button>
+                  ))}
+                </div>
+
+                 {/* iPad Stations Visual Layout Map */}
+                <div 
+                  ref={kioskMapRef}
                   style={{
-                    padding: '8px 14px',
-                    borderRadius: '12px',
-                    border: '1px solid',
-                    borderColor: kioskSelectedRoomId === room.id ? (schoolData?.primary_color || '#eab308') : '#e2e8f0',
-                    background: kioskSelectedRoomId === room.id ? (schoolData?.primary_color || '#eab308') : 'transparent',
-                    color: kioskSelectedRoomId === room.id ? '#ffffff' : '#0f172a',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.2s'
+                    position: 'relative',
+                    width: '100%',
+                    aspectRatio: '1.4', // Standard room shape ratio
+                    background: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.04)',
+                    borderRadius: '24px',
+                    border: isGroovelabKiosk ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid rgba(255, 255, 255, 0.1)',
+                    marginTop: '12px',
+                    overflow: 'hidden'
                   }}
                 >
-                  {`${idx + 1} - ${cleanRoomName(room.name)}`}
-                </button>
-              ))}
-            </div>
+                  {adjustPositions(
+                    kioskStations.filter(s => s.room_id === kioskSelectedRoomId && !s.name.toLowerCase().includes('lehrer') && !s.name.toLowerCase().includes('teacher')),
+                    kioskMapWidth
+                  ).map((station) => {
+                    const isOccupied = activeSessionStationIds.includes(station.id);
+                    const posX = station.x;
+                    const posY = station.y;
+                    const stationColor = station.color || '#cbd5e1';
 
-            {/* iPad Stations Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              {kioskStations.filter(s => s.room_id === kioskSelectedRoomId).map((station) => {
-                const isOccupied = activeSessionStationIds.includes(station.id);
-                return (
-                  <button
-                    key={station.id}
-                    type="button"
-                    onClick={async () => {
-                      if (isOccupied) {
-                        const confirm = window.confirm(`Dieses iPad ist besetzt. Möchtest du die alte Sitzung beenden und dieses iPad übernehmen?`);
-                        if (!confirm) return;
-                        // End previous session
-                        await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('station_id', station.id).is('check_out_time', null);
-                      }
-                      sessionStorage.removeItem('groovelab_user_id');
-                      localStorage.setItem('groovelab_station_id', station.id);
-                      localStorage.setItem('groovelab_school_id', schoolData.id);
-                      localStorage.setItem('groovelab_active_platform', 'groovelab');
-                      window.location.reload();
-                    }}
-                    style={{
-                      padding: '12px',
-                      borderRadius: '16px',
-                      border: '1.5px solid',
-                      borderColor: isOccupied ? '#fca5a5' : '#bbf7d0',
-                      background: isOccupied ? '#fef2f2' : '#f0fdf4',
-                      color: '#1e293b',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '4px'
-                    }}
-                  >
-                    <span style={{ fontSize: '13px', fontWeight: 800 }}>{station.name}</span>
-                    <span style={{ fontSize: '10px', color: isOccupied ? '#ef4444' : '#16a34a', fontWeight: 700 }}>
-                      {isOccupied ? 'Besetzt (Übernehmen)' : 'Frei'}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+                    return (
+                      <button
+                        key={station.id}
+                        type="button"
+                        onClick={async () => {
+                          if (isOccupied) {
+                            const confirm = window.confirm(`Dieses iPad ist besetzt. Möchtest du die alte Sitzung beenden und dieses iPad übernehmen?`);
+                            if (!confirm) return;
+                            // End previous session
+                            await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('station_id', station.id).is('check_out_time', null);
+                          }
+                          sessionStorage.removeItem('groovelab_user_id');
+                          localStorage.setItem('groovelab_station_id', station.id);
+                          const parentRoom = kioskRooms.find(r => r.id === station.room_id);
+                          const finalSchoolId = schoolData?.id || parentRoom?.school_id || '';
+                          localStorage.setItem('groovelab_school_id', finalSchoolId);
+                          localStorage.setItem('groovelab_active_platform', 'groovelab');
+                          window.location.reload();
+                        }}
+                        style={{
+                          position: 'absolute',
+                          left: `${posX}%`,
+                          top: `${posY}%`,
+                          transform: 'translate(-50%, -50%)',
+                          width: '72px',
+                          height: '72px',
+                          borderRadius: '16px',
+                          border: isOccupied ? '2px solid #ef4444' : `2px solid ${stationColor}`,
+                          background: isOccupied 
+                            ? 'rgba(239, 68, 68, 0.12)' 
+                            : `${stationColor}15`,
+                          color: isGroovelabKiosk ? '#1e293b' : '#ffffff',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '2px',
+                          textAlign: 'center',
+                          boxShadow: '0 4px 10px rgba(0, 0, 0, 0.05)',
+                          outline: 'none'
+                        }}
+                        title={`${station.name} (${isOccupied ? 'Besetzt' : 'Frei'})`}
+                      >
+                        {station.instrument && (
+                          <span style={{ fontSize: '7px', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.6, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', padding: '0 2px' }}>
+                            {station.instrument}
+                          </span>
+                        )}
+                        <span style={{ fontSize: '10px', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', padding: '0 2px', lineHeight: 1.1 }}>
+                          {station.name}
+                        </span>
+                        <div style={{ 
+                          width: '5px', 
+                          height: '5px', 
+                          borderRadius: '50%', 
+                          background: isOccupied ? '#ef4444' : '#22c55e',
+                          border: '1px solid rgba(255,255,255,0.2)',
+                          marginTop: '2px'
+                        }} />
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center', margin: '8px 0' }}>
+                <p style={{ fontSize: '12px', color: isGroovelabKiosk ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.6)', margin: 0, textAlign: 'center' }}>
+                  Keine GrooveLab-iPad-Räume eingerichtet.
+                </p>
+              </div>
+            )}
+            
             <button 
               type="button" 
-              onClick={() => setIsGroovelabKiosk(false)} 
-              style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', marginTop: '12px', cursor: 'pointer', alignSelf: 'center' }}
+              onClick={() => {
+                setIsGroovelabKiosk(false);
+                setIsCameraActive(false);
+              }} 
+              style={{ background: 'none', border: 'none', color: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.4)' : 'rgba(255, 255, 255, 0.4)', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', marginTop: '12px', cursor: 'pointer', alignSelf: 'center' }}
             >
               Abbrechen
             </button>
@@ -2386,15 +2695,38 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 }
 
       {/* Kiosk Modus button under the card if available */}
-      {expandedSection === 'none' && schoolData && kioskRooms.length > 0 && !effectiveStationId && !isGroovelabKiosk && (
+      {expandedSection === 'none' && !isGroovelabKiosk && (
         <div style={{ marginTop: '24px' }}>
           <button 
             onClick={() => {
-              setIsGroovelabKiosk(true);
+              if (navigator.geolocation) {
+                setLoadingLocation(true);
+                navigator.geolocation.getCurrentPosition(
+                  (pos) => {
+                    const currentPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                    setUserPos(currentPos);
+                    console.log('[Kiosk] Geolocation success:', currentPos);
+                    setLoadingLocation(false);
+                    setIsGroovelabKiosk(true);
+                    setIsCameraActive(true);
+                  },
+                  (err) => {
+                    console.warn('[Kiosk] Geolocation failed:', err);
+                    setLoadingLocation(false);
+                    setIsGroovelabKiosk(true); // Fallback: still show kiosk rooms
+                    setIsCameraActive(true);
+                  },
+                  { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 }
+                );
+              } else {
+                setIsGroovelabKiosk(true);
+                setIsCameraActive(true);
+              }
             }}
+            disabled={loadingLocation}
             style={{ 
-              background: 'rgba(255, 255, 255, 0.12)', 
-              border: '1px solid rgba(255, 255, 255, 0.2)', 
+              background: 'rgba(255, 255, 255, 0.08)', 
+              border: '1px solid rgba(255, 255, 255, 0.15)', 
               padding: '10px 24px',
               borderRadius: '100px',
               color: '#ffffff', 
@@ -2402,15 +2734,26 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               fontWeight: 800, 
               textTransform: 'uppercase', 
               letterSpacing: '0.05em', 
-              cursor: 'pointer', 
+              cursor: loadingLocation ? 'wait' : 'pointer', 
               transition: 'all 0.2s',
               backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)'
+              WebkitBackdropFilter: 'blur(10px)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              opacity: loadingLocation ? 0.7 : 1
             }}
-            onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'; }}
-            onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'; }}
+            onMouseOver={(e) => { if (!loadingLocation) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.16)'; }}
+            onMouseOut={(e) => { if (!loadingLocation) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
           >
-            Im GrooveLab anmelden
+            {loadingLocation ? (
+              <>
+                <div style={{ width: '12px', height: '12px', border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                Standort wird ermittelt...
+              </>
+            ) : (
+              "Im GrooveLab anmelden"
+            )}
           </button>
         </div>
       )}
@@ -2420,22 +2763,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       <div style={{
         width: '100%',
         maxWidth: '420px',
-        background: 'rgba(255, 255, 255, 0.94)',
-        borderRadius: '36px',
+        background: 'rgba(255, 255, 255, 0.07)',
+        borderRadius: '40px',
         padding: '28px',
-        boxShadow: '0 2px 5px rgba(0, 0, 0, 0.04), 0 30px 80px rgba(6, 78, 59, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
-        border: '1px solid rgba(255, 255, 255, 0.7)',
-        borderBottomColor: 'rgba(255, 255, 255, 0.3)',
-        borderRightColor: 'rgba(255, 255, 255, 0.45)',
+        boxShadow: '0 40px 100px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15)',
+        border: '1px solid rgba(255, 255, 255, 0.12)',
         display: 'flex',
         flexDirection: 'column',
         gap: '16px',
-        marginTop: '20px',
-        backdropFilter: 'blur(25px)',
-        WebkitBackdropFilter: 'blur(25px)'
+        backdropFilter: 'blur(30px)',
+        WebkitBackdropFilter: 'blur(30px)'
       }}>
-        <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <User size={14} /> Manueller Zugang über PIN / QR-Token
+        <div style={{ fontSize: '11px', fontWeight: 800, color: 'rgba(255, 255, 255, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <User size={14} style={{ color: '#a7f3d0' }} /> Manueller Zugang über PIN / QR-Token
         </div>
         <form onSubmit={(e) => { e.preventDefault(); handlePinLogin(pinInput); }} style={{ display: 'flex', gap: '10px' }}>
           <input
@@ -2447,13 +2787,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               flex: 1,
               padding: '14px 18px',
               borderRadius: '16px',
-              border: '1.5px solid #cbd5e1',
+              border: '1.5px solid rgba(255, 255, 255, 0.15)',
               fontSize: '14px',
               fontWeight: 700,
               outline: 'none',
               transition: 'all 0.2s',
-              background: '#f8fafc',
-              color: '#0f172a'
+              background: 'rgba(255, 255, 255, 0.05)',
+              color: '#ffffff'
             }}
           />
           <button
@@ -2463,8 +2803,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               padding: '14px 24px',
               borderRadius: '16px',
               border: 'none',
-              background: schoolData?.primary_color || '#0f766e',
-              color: '#ffffff',
+              background: schoolData?.primary_color || '#a7f3d0',
+              color: schoolData?.primary_color ? '#ffffff' : '#062413',
               fontWeight: 800,
               fontSize: '14px',
               cursor: 'pointer',
@@ -2475,7 +2815,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             Login
           </button>
         </form>
-        <button onClick={() => setExpandedSection('none')} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', marginTop: '12px', cursor: 'pointer', alignSelf: 'center' }}>
+        <button onClick={() => setExpandedSection('none')} style={{ background: 'none', border: 'none', color: 'rgba(255, 255, 255, 0.4)', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', marginTop: '12px', cursor: 'pointer', alignSelf: 'center' }}>
           Zurück
         </button>
       </div>
@@ -2586,8 +2926,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             style={{
               width: '100%',
               padding: '16px',
-              background: 'rgba(254, 249, 195, 0.2)',
-              border: '2px solid rgba(253, 224, 71, 0.4)',
+              background: 'rgba(254, 249, 195, 0.08)',
+              border: '2px solid rgba(253, 224, 71, 0.25)',
               borderRadius: '24px',
               color: '#fef9c3',
               fontWeight: 800,
@@ -2600,8 +2940,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               WebkitBackdropFilter: 'blur(10px)',
               transition: 'all 0.2s'
             }}
-            onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(254, 249, 195, 0.3)'; }}
-            onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(254, 249, 195, 0.2)'; }}
+            onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(254, 249, 195, 0.15)'; }}
+            onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(254, 249, 195, 0.08)'; }}
           >
             🔓 ADMIN BYPASS (LOCAL ONLY)
           </button>
@@ -2609,31 +2949,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         </div>
       )}
 
-      {effectiveStationId && (
-        <div style={{ marginTop: '24px', width: '100%', maxWidth: '360px', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '0 10px' }}>
-          <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#a7f3d0', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              <Tablet size={14} />
-              Kiosk Modus aktiv
-            </div>
-            <button 
-              onClick={() => {
-                localStorage.removeItem('groovelab_station_id');
-                const savedKioskRoomId = localStorage.getItem('groovelab_kiosk_room_id');
-                if (savedKioskRoomId) {
-                  // Navigate to setup mode → shows DeviceSetupScreen
-                  window.location.href = `${window.location.origin}${window.location.pathname}?kiosk_room_id=${savedKioskRoomId}&kiosk_setup=1`;
-                } else {
-                  window.location.reload();
-                }
-              }}
-              style={{ background: 'none', border: 'none', color: '#fca5a5', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', cursor: 'pointer' }}
-            >
-              Beenden
-            </button>
-          </div>
-        </div>
-      )}
+
 
       {/* Legal Footer */}
       <div style={{ 
@@ -2969,7 +3285,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     borderRadius: '12px',
                     background: '#ffffff',
                     border: '1.5px solid #e2e8f0',
-                    color: '#1e293b',
+                    color: '#ffffff',
                     fontSize: '0.95rem',
                     fontWeight: 600,
                     outline: 'none',
@@ -3001,7 +3317,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     borderRadius: '12px',
                     background: '#ffffff',
                     border: '1.5px solid #e2e8f0',
-                    color: '#1e293b',
+                    color: '#ffffff',
                     fontSize: '0.95rem',
                     fontWeight: 600,
                     outline: 'none',
@@ -3017,7 +3333,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               </div>
 
               {error && (
-                <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#ef4444', padding: '12px', borderRadius: '12px', fontSize: '12px', fontWeight: 700, textAlign: 'center' }}>
+                <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#fca5a5', padding: '12px', borderRadius: '12px', fontSize: '12px', fontWeight: 700, textAlign: 'center' }}>
                   {error}
                 </div>
               )}
@@ -3265,12 +3581,17 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   if (isTeacher) {
                     if (user.is_observer) {
                       await finalizeLogin(user, effectiveStationId, false, true);
-                    } else if (pinVerificationIsWithinRoom) {
-                      setPendingTeacherUser({ user, isWithinAnyRoom: true });
-                      setShowTeacherChoiceModal(true);
-                      setLoading(false);
                     } else {
-                      await finalizeLogin(user, effectiveStationId, false, true);
+                      const isGroovelabScreen = !!(effectiveStationId || isGroovelabKiosk);
+                      if (isGroovelabScreen) {
+                        await finalizeLogin(user, effectiveStationId, pinVerificationIsWithinRoom, false);
+                      } else if (pinVerificationIsWithinRoom) {
+                        setPendingTeacherUser({ user, isWithinAnyRoom: true });
+                        setShowTeacherChoiceModal(true);
+                        setLoading(false);
+                      } else {
+                        await finalizeLogin(user, effectiveStationId, false, true);
+                      }
                     }
                   } else {
                     await finalizeLogin(user, effectiveStationId, pinVerificationIsWithinRoom);
@@ -3375,12 +3696,17 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   if (isTeacher) {
                     if (user.is_observer) {
                       await finalizeLogin(user, effectiveStationId, false, true);
-                    } else if (pinVerificationIsWithinRoom) {
-                      setPendingTeacherUser({ user, isWithinAnyRoom: true });
-                      setShowTeacherChoiceModal(true);
-                      setLoading(false);
                     } else {
-                      await finalizeLogin(user, effectiveStationId, false, true);
+                      const isGroovelabScreen = !!(effectiveStationId || isGroovelabKiosk);
+                      if (isGroovelabScreen) {
+                        await finalizeLogin(user, effectiveStationId, pinVerificationIsWithinRoom, false);
+                      } else if (pinVerificationIsWithinRoom) {
+                        setPendingTeacherUser({ user, isWithinAnyRoom: true });
+                        setShowTeacherChoiceModal(true);
+                        setLoading(false);
+                      } else {
+                        await finalizeLogin(user, effectiveStationId, false, true);
+                      }
                     }
                   } else {
                     await finalizeLogin(user, effectiveStationId, pinVerificationIsWithinRoom);
