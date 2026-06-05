@@ -166,6 +166,13 @@ const cleanRoomName = (name: string | null | undefined): string => {
 };
 
 export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const [loading, setLoading] = useState(false);
   const [pinSetupUser, setPinSetupUser] = useState<any>(null);
   const [pinVerificationUser, setPinVerificationUser] = useState<any>(null);
@@ -1883,92 +1890,213 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   }
 
   return (
-    <div style={{ 
+    <div style={{
       position: 'fixed',
       inset: 0,
-      background: isGroovelabKiosk 
-        ? 'linear-gradient(180deg, #facc15 0%, #facc15 25%, #eab308 55%, #ca8a04 80%, #9f5c10 100%)' 
-        : 'linear-gradient(180deg, #12b853 0%, #12b853 25%, #0fa147 55%, #0c7c35 80%, #095a26 100%)', // Premium campus green gradient background / GrooveLab yellow KPI gradient
       display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      padding: '50px 20px',
+      flexDirection: isMobile ? 'column' : 'row',
       fontFamily: '"Outfit", "Inter", -apple-system, sans-serif',
       zIndex: 9999,
-      overflowY: 'auto'
+      overflow: 'hidden'
     }}>
-      
-      {schoolData?.logo_url ? (
+      {/* Left Presentation Panel: School green chalkboard artwork with Apple-style product presentation */}
+      {!isMobile && (
         <div style={{
-          maxHeight: '100px',
-          maxWidth: '320px',
+          flex: 1.2,
+          background: '#0a361c', // Chalkboard dark green
+          backgroundImage: 'radial-gradient(circle at 50% 50%, #11572e 0%, #062413 100%)',
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          marginBottom: '24px',
-          background: 'rgba(255, 255, 255, 0.95)',
-          padding: '12px 28px',
-          borderRadius: '24px',
-          boxShadow: '0 12px 30px rgba(0,0,0,0.12)',
-          border: '1px solid rgba(255, 255, 255, 0.8)'
+          padding: '40px',
+          color: 'white',
+          position: 'relative',
+          overflow: 'hidden',
+          boxShadow: 'inset -20px 0 40px rgba(0,0,0,0.15)',
+          borderRight: '1px solid rgba(255,255,255,0.06)'
         }}>
-          <img 
-            src={schoolData.logo_url} 
-            alt="Logo" 
-            style={{ 
-              maxHeight: '76px',
-              maxWidth: '100%',
-              objectFit: 'contain'
-            }} 
-          />
-        </div>
-      ) : (
-        <div className="loading-pulse" style={{
-          width: '76px',
-          height: '76px',
-          background: 'rgba(255, 255, 255, 0.95)',
-          borderRadius: '24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: '24px',
-          boxShadow: '0 12px 30px rgba(0, 0, 0, 0.12)',
-          border: '1px solid rgba(255, 255, 255, 0.8)',
-          overflow: 'hidden'
-        }}>
-          <Music size={36} color={schoolData?.primary_color || "#0f766e"} />
+          {/* Subtle Chalk board dust overlays */}
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            opacity: 0.03,
+            pointerEvents: 'none',
+            backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.85\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")'
+          }} />
+
+          {/* Chalkboard frame/header */}
+          <div style={{
+            width: '100%',
+            maxWidth: '460px',
+            marginBottom: '32px',
+            textAlign: 'center',
+            zIndex: 2
+          }}>
+            <h2 style={{
+              fontSize: '3.2rem',
+              fontWeight: 900,
+              color: '#ffffff',
+              margin: 0,
+              letterSpacing: '-0.04em',
+              textShadow: '0 4px 12px rgba(0,0,0,0.2)'
+            }}>
+              Campus
+            </h2>
+            <p style={{
+              fontSize: '1.25rem',
+              color: '#a7f3d0',
+              marginTop: '6px',
+              marginBottom: '0',
+              fontWeight: 600,
+              textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}>
+              Das digitale Musikzimmer.
+            </p>
+          </div>
+
+          {/* Chalk board illustration frame */}
+          <div style={{
+            width: '100%',
+            maxWidth: '460px',
+            aspectRatio: '1/1',
+            borderRadius: '24px',
+            background: '#ffffff',
+            padding: '12px',
+            boxShadow: '0 25px 60px rgba(0,0,0,0.25), inset 0 2px 4px rgba(255,255,255,0.2)',
+            border: '12px solid #5d4037', // Wooden brown board frame
+            boxSizing: 'border-box',
+            zIndex: 2,
+            transform: 'rotate(-0.5deg)',
+            transition: 'transform 0.3s ease'
+          }}>
+            <img 
+              src="/campus_login_hero.png" 
+              alt="Campus Chalk Illustration"
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                borderRadius: '8px'
+              }}
+            />
+          </div>
+
+          {/* Friendly value statements */}
+          <div style={{
+            marginTop: '36px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            maxWidth: '420px',
+            zIndex: 2
+          }}>
+            {[
+              "🎸 Lerne deine Lieblingssongs spielerisch leicht",
+              "📊 Verfolge deine Übezeiten & Ziele in Echtzeit",
+              "🏆 Meistere Levels & sammle Helden-Momente"
+            ].map((text, idx) => (
+              <div key={idx} style={{
+                fontSize: '1rem',
+                fontWeight: 650,
+                color: 'rgba(255,255,255,0.9)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+              }}>
+                {text}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      <h1 
-        onClick={() => {
-          setLogoClicks(prev => {
-            const next = prev + 1;
-            if (next >= 5) {
-              setShowAdminModal(true);
-              return 0;
-            }
-            return next;
-          });
-        }}
-        style={{ 
-          fontSize: '32px', 
-          fontWeight: 900, 
-          color: '#ffffff', 
-          marginBottom: '8px', 
-          margin: 0, 
-          letterSpacing: '-0.03em',
-          cursor: 'default',
-          userSelect: 'none',
-          textAlign: 'center',
-          textShadow: '0 2px 10px rgba(0,0,0,0.15)'
-        }}
-      >
-        {isGroovelabKiosk ? 'GrooveLab-Login' : 'Campus-Login'}
-      </h1>
-      <p style={{ color: isGroovelabKiosk ? '#fefcbf' : '#a7f3d0', textAlign: 'center', fontSize: '14px', marginBottom: '40px', maxWidth: '320px', lineHeight: '1.5', fontWeight: 600, textShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
-        {schoolName && !schoolData?.logo_url ? `für ${schoolName}` : `Halte deinen Ausweis vor die Kamera, um dich einzuloggen.`}
-      </p>
+      {/* Right Login Panel */}
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: isMobile ? '40px 16px' : '50px 40px',
+        background: isGroovelabKiosk 
+          ? 'linear-gradient(135deg, #fef08a 0%, #fef9c3 100%)' 
+          : 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)', // Cheerful, light green chalkboard matching theme background
+        overflowY: 'auto',
+        position: 'relative'
+      }}>
+        
+        {schoolData?.logo_url ? (
+          <div style={{
+            maxHeight: '80px',
+            maxWidth: '280px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: '20px',
+            background: 'rgba(255, 255, 255, 0.95)',
+            padding: '10px 24px',
+            borderRadius: '20px',
+            boxShadow: '0 8px 20px rgba(0,0,0,0.06)',
+            border: '1px solid rgba(255, 255, 255, 0.8)'
+          }}>
+            <img 
+              src={schoolData.logo_url} 
+              alt="Logo" 
+              style={{ 
+                maxHeight: '60px',
+                maxWidth: '100%',
+                objectFit: 'contain'
+              }} 
+            />
+          </div>
+        ) : (
+          <div className="loading-pulse" style={{
+            width: '64px',
+            height: '64px',
+            background: 'rgba(255, 255, 255, 0.95)',
+            borderRadius: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: '20px',
+            boxShadow: '0 8px 20px rgba(0, 0, 0, 0.06)',
+            border: '1px solid rgba(255, 255, 255, 0.8)',
+            overflow: 'hidden'
+          }}>
+            <Music size={30} color={schoolData?.primary_color || "#064e3b"} />
+          </div>
+        )}
+
+        <h1 
+          onClick={() => {
+            setLogoClicks(prev => {
+              const next = prev + 1;
+              if (next >= 5) {
+                setShowAdminModal(true);
+                return 0;
+              }
+              return next;
+            });
+          }}
+          style={{ 
+            fontSize: '28px', 
+            fontWeight: 950, 
+            color: '#064e3b', 
+            marginBottom: '6px', 
+            margin: 0, 
+            letterSpacing: '-0.03em',
+            cursor: 'default',
+            userSelect: 'none',
+            textAlign: 'center'
+          }}
+        >
+          {isGroovelabKiosk ? 'GrooveLab-Login' : 'Campus-Login'}
+        </h1>
+        <p style={{ color: '#047857', textAlign: 'center', fontSize: '13px', marginBottom: '28px', maxWidth: '320px', lineHeight: '1.4', fontWeight: 700 }}>
+          {schoolName && !schoolData?.logo_url ? `für ${schoolName}` : `Halte deinen Ausweis vor die Kamera, um dich einzuloggen.`}
+        </p>
 
       {/* Main Standard QR-Scanner Card */}
       {expandedSection === 'none' && (
@@ -2514,15 +2642,15 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         gap: '24px', 
         fontSize: '11px', 
         fontWeight: 800, 
-        color: 'rgba(255, 255, 255, 0.6)',
+        color: '#047857',
         textTransform: 'uppercase',
         letterSpacing: '0.05em'
       }}>
         <span 
           onClick={() => setShowPrivacy(true)} 
           style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
-          onMouseOver={(e) => { e.currentTarget.style.color = '#ffffff'; }}
-          onMouseOut={(e) => { e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)'; }}
+          onMouseOver={(e) => { e.currentTarget.style.color = '#064e3b'; }}
+          onMouseOut={(e) => { e.currentTarget.style.color = '#047857'; }}
         >
           Datenschutz
         </span>
@@ -2530,12 +2658,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         <span 
           onClick={() => setShowImpressum(true)} 
           style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
-          onMouseOver={(e) => { e.currentTarget.style.color = '#ffffff'; }}
-          onMouseOut={(e) => { e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)'; }}
+          onMouseOver={(e) => { e.currentTarget.style.color = '#064e3b'; }}
+          onMouseOut={(e) => { e.currentTarget.style.color = '#047857'; }}
         >
           Impressum
         </span>
       </div>
+
+    </div> {/* Closing Right Login Panel */}
 
       {/* Privacy Policy Modal */}
       {showPrivacy && (
