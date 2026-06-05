@@ -846,12 +846,19 @@ export function TeacherDashboard({
       // 1. Terminate existing sessions in DB
       await supabase.from('sessions').update({ check_out_time: now }).eq('user_id', userId).is('check_out_time', null);
       
-      // 2. Insert direct stationless session
+      // Find the Lehrer iPad station for the selected room
+      const lehrerStation = (stations || []).find(s => 
+        s.room_id === selectedRoomId && 
+        ((s.name || '').toLowerCase().includes('lehrer') || (s.name || '').toLowerCase().includes('teacher'))
+      );
+      const targetStationId = lehrerStation ? lehrerStation.id : null;
+
+      // 2. Insert session associated with Lehrer iPad station if found
       const { data: sessData, error: sessErr } = await supabase
         .from('sessions')
         .insert({
           user_id: userId,
-          station_id: null,
+          station_id: targetStationId,
           gps_verified: true,
           check_in_time: now
         })
@@ -867,6 +874,7 @@ export function TeacherDashboard({
         setCheckingInStatus('success');
         if (onSessionChange) onSessionChange(sessData);
         if (onLocationModeChange) onLocationModeChange('lab');
+        await fetchData();
       }
     } catch (e: any) {
       console.error('[Teacher Check-in] Unexpected Error:', e);
@@ -2707,31 +2715,39 @@ export function TeacherDashboard({
 
     if (!userId) return;
 
+    let debounceTimer: any = null;
+    const debouncedFetchData = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        fetchData();
+      }, 500);
+    };
+
     const channelSessions = supabase
       .channel('realtime_teacher_sessions')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, () => {
-        fetchData();
+        debouncedFetchData();
       })
       .subscribe();
 
     const channelHelp = supabase
       .channel('realtime_teacher_help')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'help_requests' }, () => {
-        fetchData();
+        debouncedFetchData();
       })
       .subscribe();
 
     const channelSkills = supabase
       .channel('realtime_teacher_skills')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_song_skills' }, () => {
-        fetchData();
+        debouncedFetchData();
       })
       .subscribe();
 
     const channelBands = supabase
       .channel('realtime_teacher_bands')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bands' }, () => {
-        fetchData();
+        debouncedFetchData();
       })
       .subscribe();
 
@@ -2740,8 +2756,9 @@ export function TeacherDashboard({
       supabase.removeChannel(channelHelp);
       supabase.removeChannel(channelSkills);
       supabase.removeChannel(channelBands);
+      if (debounceTimer) clearTimeout(debounceTimer);
     };
-  }, [userId, activePlatform]);
+  }, [userId, activePlatform, selectedRoomId, locationMode]);
 
   const fetchData = async () => {
     if (!userId) return;
@@ -2822,7 +2839,7 @@ export function TeacherDashboard({
         ] = await Promise.all([
           Promise.resolve(supabase.from('rooms').select('*').eq('school_id', tData.school_id).eq('is_groovelab_active', true).order('sort_order', { ascending: true })).catch(e => ({ data: [], error: e })),
           Promise.resolve(supabase.from('user_availability').select('*')).catch(e => ({ data: [], error: e })),
-          Promise.resolve(supabase.from('sessions').select('*, users!inner(*), stations(*)').is('check_out_time', null)).catch(e => ({ data: [], error: e })),
+          Promise.resolve(supabase.from('sessions').select('*, users!inner(*), stations(*)').is('check_out_time', null).eq('users.school_id', tData.school_id)).catch(e => ({ data: [], error: e })),
           Promise.resolve(supabase.from('users').select('*').in('role', ['teacher', 'admin', 'Teacher', 'Admin', 'TEACHER', 'ADMIN']).eq('school_id', tData.school_id)).catch(e => ({ data: [], error: e })),
           Promise.resolve(supabase.from('user_song_skills').select('*, users!user_id(*), songs(*)').eq('is_pending_approval', true)).catch(e => ({ data: [], error: e })),
           Promise.resolve(supabase.from('bands').select('*, band_members(*, users(*)), coach:users!coach_id(id, first_name, last_name, photo_url), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))').eq('school_id', tData.school_id).order('name')).catch(e => ({ data: [], error: e })),

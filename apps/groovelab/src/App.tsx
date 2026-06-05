@@ -5090,12 +5090,20 @@ function App() {
         }
       }
     }
+    let debounceCountTimer: any = null;
+    const debouncedFetchActiveStudentCount = (schoolId: string) => {
+      if (debounceCountTimer) clearTimeout(debounceCountTimer);
+      debounceCountTimer = setTimeout(() => {
+        fetchActiveStudentCount(schoolId);
+      }, 500);
+    };
+
     // Realtime subscription for sessions (Active Student Count)
     const sessionsChannel = supabase
       .channel('public:sessions_count')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, () => {
         if (user?.school_id) {
-          fetchActiveStudentCount(user.school_id);
+          debouncedFetchActiveStudentCount(user.school_id);
         }
       })
       .subscribe();
@@ -5108,12 +5116,6 @@ function App() {
           .from('users')
           .update({ last_seen: now })
           .eq('id', user.id);
-      }
-      if (session?.id) {
-        await supabase
-          .from('sessions')
-          .update({ last_seen: now })
-          .eq('id', session.id);
       }
     };
 
@@ -5160,8 +5162,9 @@ function App() {
     return () => {
       supabase.removeChannel(sessionsChannel);
       clearInterval(heartbeat);
+      if (debounceCountTimer) clearTimeout(debounceCountTimer);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-        window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, [user?.id, user?.school_id, session?.id]);
 

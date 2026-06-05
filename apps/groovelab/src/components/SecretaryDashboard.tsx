@@ -1337,7 +1337,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       const { data: sessData, error: sessErr } = await supabase
         .from('sessions')
         .select('*, users!inner(*), stations(*)')
-        .is('check_out_time', null);
+        .is('check_out_time', null)
+        .eq('users.school_id', schoolId);
 
       if (!sessErr && sessData) {
         const schoolSess = sessData
@@ -1705,11 +1706,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         }))
       });
 
-      // Fetch active sessions for Live Lab
       const { data: sessData, error: sessErr } = await supabase
         .from('sessions')
         .select('*, users!inner(*), stations(*)')
-        .is('check_out_time', null);
+        .is('check_out_time', null)
+        .eq('users.school_id', schoolId);
 
       if (!sessErr && sessData) {
         const schoolSess = sessData
@@ -6135,38 +6136,98 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 
                 {/* GLASS DASHBOARD GREETING HEADER */}
                 <div style={{
-                  background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
+                  backdropFilter: 'blur(24px) saturate(1.8)',
+                  WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
+                  border: '1px solid rgba(255, 255, 255, 0.5)',
                   borderRadius: '24px',
-                  padding: '24px',
                   display: 'flex',
-                  alignItems: 'center',
+                  alignItems: 'stretch',
                   justifyContent: 'space-between',
-                  gap: '16px',
-                  color: 'white',
-                  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.15)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)'
+                  boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+                  transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                  width: '100%',
+                  minHeight: '130px',
+                  boxSizing: 'border-box',
+                  overflow: 'hidden'
                 }}>
-                  <div style={{ flex: 1 }}>
-                    <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                      Hallo, GrooveLab-Zentrale! <span className="inline-block animate-bounce">👋</span>
-                    </h2>
-                    <p style={{ margin: '6px 0 0 0', fontSize: '0.84rem', color: '#94a3b8', fontWeight: 600 }}>
-                      Heute ist {new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} &bull; Systemstatus stabil &bull; {pendingSchedules.length} ausstehende Stundenpläne.
-                    </p>
-                  </div>
-                  <div style={{
-                    background: 'rgba(255, 255, 255, 0.08)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '16px',
-                    padding: '8px 16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}>
-                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                    <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', fontWeight: 800, color: '#34d399', letterSpacing: '0.05em' }}>
-                      {new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} UHR
-                    </span>
+                  <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
+                    {/* Full Height Graphic on the left */}
+                    <div style={{
+                      width: '116px',
+                      height: '100%',
+                      flexShrink: 0,
+                      position: 'relative',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                      borderRight: '1px solid rgba(0, 0, 0, 0.05)'
+                    }}>
+                      <img 
+                        src="/campus_login_hero.png" 
+                        alt="" 
+                        style={{ 
+                          width: '100%', 
+                          height: '100%', 
+                          objectFit: 'cover'
+                        }} 
+                      />
+                    </div>
+                    
+                    <div style={{ 
+                      padding: '12px 20px', 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      justifyContent: 'center',
+                      minWidth: 0,
+                      flex: 1 
+                    }}>
+                      {/* Live Clock Badge */}
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: '#ffffff',
+                        border: '1px solid rgba(0, 0, 0, 0.06)',
+                        borderRadius: '100px',
+                        padding: '4px 10px',
+                        alignSelf: 'flex-start',
+                        marginBottom: '6px',
+                        flexShrink: 0
+                      }}>
+                        <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }} />
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#475569', letterSpacing: '0.04em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
+                          {new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} UHR
+                        </span>
+                      </div>
+
+                      <h3 style={{ 
+                        margin: 0, 
+                        fontSize: '30px', 
+                        fontWeight: 950, 
+                        color: '#0f172a', 
+                        fontFamily: "'Plus Jakarta Sans', sans-serif", 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '8px',
+                        lineHeight: 1.15
+                      }}>
+                        Hallo, <span style={{ 
+                          color: '#ef4444', 
+                          fontWeight: 900,
+                          letterSpacing: '-0.01em',
+                          display: 'inline-flex',
+                          alignItems: 'center'
+                        }}>GrooveLab-Zentrale</span>! 
+                        <span className="inline-block animate-bounce" style={{ marginLeft: '4px' }}>
+                          👋
+                        </span>
+                      </h3>
+                      <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: 1.25 }}>
+                        Heute ist {new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} &bull; Systemstatus stabil &bull; {pendingSchedules.length} ausstehende Stundenpläne.
+                      </p>
+                    </div>
                   </div>
                 </div>
 
@@ -6282,8 +6343,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       background: '#ffffff',
                       borderRadius: '24px',
                       padding: '24px',
-                      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
-                      border: '1px solid #f1f5f9'
+                      boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
+                      border: '1px solid rgba(0, 0, 0, 0.05)'
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -6311,7 +6372,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             const roomAlloc = todayAllocations.filter(a => a.roomId === room.id);
                             const roomOccupiedRate = Math.round((roomAlloc.length / 8) * 100);
                             return (
-                              <div key={room.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '12px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #f1f5f9' }}>
+                              <div key={room.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '14px', borderRadius: '16px', background: 'rgba(248, 250, 252, 0.6)', border: '1px solid rgba(0, 0, 0, 0.03)' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
                                     🚪 {room.name} {room.floor ? `(${room.floor})` : ''}
@@ -6320,19 +6381,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                     {roomOccupiedRate}% ({roomAlloc.length} / 8 Slots)
                                   </span>
                                 </div>
-                                <div style={{ height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
+                                <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '100px', overflow: 'hidden' }}>
                                   <div style={{
                                     height: '100%',
                                     width: `${Math.min(100, roomOccupiedRate)}%`,
                                     background: roomOccupiedRate > 75 ? '#ef4444' : roomOccupiedRate > 30 ? '#f59e0b' : '#10b981',
-                                    borderRadius: '3px',
+                                    borderRadius: '100px',
                                     transition: 'width 0.5s'
                                   }} />
                                 </div>
                                 {roomAlloc.length > 0 && (
-                                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+                                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
                                     {roomAlloc.map((alloc, idx) => (
-                                      <span key={idx} style={{ fontSize: '0.65rem', background: '#ffffff', border: '1px solid #e2e8f0', padding: '3px 8px', borderRadius: '6px', color: '#475569', fontWeight: 600 }}>
+                                      <span key={idx} style={{ fontSize: '0.65rem', background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.05)', padding: '4px 8px', borderRadius: '8px', color: '#475569', fontWeight: 650, boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
                                         ⏱️ {alloc.startTime} - {userMap[alloc.teacherId]?.split(' ')[0] || 'Lehrer'}
                                       </span>
                                     ))}
@@ -6350,8 +6411,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       background: '#ffffff',
                       borderRadius: '24px',
                       padding: '24px',
-                      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
-                      border: '1px solid #f1f5f9'
+                      boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
+                      border: '1px solid rgba(0, 0, 0, 0.05)'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
                         <div style={{ background: '#fef3c7', color: '#d97706', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -6369,8 +6430,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                       {scheduleConflicts.length === 0 ? (
                         <div style={{
-                          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.06) 0%, rgba(16, 185, 129, 0.02) 100%)',
-                          border: '1px solid rgba(16, 185, 129, 0.12)',
+                          background: 'rgba(16, 185, 129, 0.04)',
+                          border: '1px solid rgba(16, 185, 129, 0.1)',
                           color: '#065f46',
                           borderRadius: '16px',
                           padding: '16px 20px',
@@ -6388,8 +6449,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                           {scheduleConflicts.map((conflict, idx) => (
                             <div key={idx} style={{
-                              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.06) 0%, rgba(245, 158, 11, 0.02) 100%)',
-                              border: '1px solid rgba(245, 158, 11, 0.12)',
+                              background: 'rgba(245, 158, 11, 0.04)',
+                              border: '1px solid rgba(245, 158, 11, 0.1)',
                               color: '#92400e',
                               borderRadius: '16px',
                               padding: '12px 16px',
@@ -6417,8 +6478,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       background: '#ffffff',
                       borderRadius: '24px',
                       padding: '24px',
-                      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
-                      border: '1px solid #f1f5f9'
+                      boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
+                      border: '1px solid rgba(0, 0, 0, 0.05)'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
                         <div style={{ background: '#fee2e2', color: '#b91c1c', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -6436,8 +6497,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                       {activeSickTeachers.length === 0 ? (
                         <div style={{
-                          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.06) 0%, rgba(16, 185, 129, 0.02) 100%)',
-                          border: '1px solid rgba(16, 185, 129, 0.12)',
+                          background: 'rgba(16, 185, 129, 0.04)',
+                          border: '1px solid rgba(16, 185, 129, 0.1)',
                           color: '#065f46',
                           borderRadius: '16px',
                           padding: '16px',
@@ -6455,8 +6516,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               <div key={teacher.id} style={{
                                 padding: '12px',
                                 borderRadius: '16px',
-                                border: '1px solid #fee2e2',
-                                background: '#fff5f5',
+                                border: '1px solid rgba(239, 68, 68, 0.1)',
+                                background: 'rgba(239, 68, 68, 0.04)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '10px'
@@ -6482,8 +6543,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       background: '#ffffff',
                       borderRadius: '24px',
                       padding: '24px',
-                      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
-                      border: '1px solid #f1f5f9'
+                      boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
+                      border: '1px solid rgba(0, 0, 0, 0.05)'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
                         <div style={{ background: '#d1fae5', color: '#059669', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -6505,21 +6566,21 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           <span style={{ fontSize: '0.8rem', color: '#1e293b', fontWeight: 800 }}>{activeStudentsCount} / {totalStudentsCount} Profile</span>
                         </div>
                         
-                        <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
-                          <div style={{ height: '100%', width: `${activationRate}%`, background: 'linear-gradient(90deg, #10b981 0%, #34d399 100%)', borderRadius: '4px' }} />
+                        <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '100px', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${activationRate}%`, background: 'linear-gradient(90deg, #10b981 0%, #34d399 100%)', borderRadius: '100px' }} />
                         </div>
 
                         {/* Inaktive Schüler list for reference */}
                         {totalStudentsCount > activeStudentsCount && (
                           <div style={{ marginTop: '8px' }}>
-                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '8px', paddingLeft: '2px' }}>
                               Ausstehende Aktivierungen ({totalStudentsCount - activeStudentsCount}):
                             </span>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '140px', overflowY: 'auto', paddingRight: '4px' }}>
                               {students.filter(s => !s.is_active).slice(0, 5).map(s => (
-                                <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '8px' }}>
-                                  <span style={{ fontSize: '0.74rem', color: '#334155', fontWeight: 600 }}>{s.first_name} {s.last_name}</span>
-                                  <span style={{ fontSize: '0.62rem', background: '#cbd5e1', color: '#475569', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                                <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'rgba(248, 250, 252, 0.6)', border: '1px solid rgba(0, 0, 0, 0.03)', borderRadius: '12px' }}>
+                                  <span style={{ fontSize: '0.74rem', color: '#334155', fontWeight: 650 }}>{s.first_name} {s.last_name}</span>
+                                  <span style={{ fontSize: '0.62rem', background: '#e2e8f0', color: '#475569', padding: '2px 8px', borderRadius: '6px', fontWeight: 800, fontFamily: 'monospace' }}>
                                     PIN: {s.personal_pin || 'ausstehend'}
                                   </span>
                                 </div>
@@ -7530,7 +7591,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                               {/* Pupil Count */}
                               <div style={{ flex: '1', minWidth: '100px', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', fontSize: '0.78rem', fontWeight: 700, color: '#3a3a3c' }}>
-                                <span>👥</span>
+                                <Users size={16} style={{ color: '#86868b' }} />
                                 <span>{t.studentCount || 0} Schüler</span>
                               </div>
 
@@ -7562,13 +7623,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                     background: 'transparent',
                                     border: 'none',
                                     color: '#ea4335',
-                                    fontSize: '0.9rem',
-                                    fontWeight: 800,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
                                     cursor: 'pointer',
                                     padding: '2px 6px'
                                   }}
                                 >
-                                  ❌
+                                  <X size={18} />
                                 </button>
                               </div>
 
@@ -8553,15 +8615,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 width: '36px',
                                 height: '36px',
                                 borderRadius: '50%',
-                                background: '#e2f6ea',
-                                color: '#137333',
+                                background: '#f1f5f9',
+                                color: '#475569',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                fontSize: '1rem',
                                 flexShrink: 0
                               }}>
-                                🎸
+                                <Music size={18} />
                               </div>
                               <div style={{ display: 'flex', flexDirection: 'column' }}>
                                 <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
