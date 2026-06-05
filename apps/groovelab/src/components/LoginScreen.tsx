@@ -203,6 +203,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [onboardCreatedUser, setOnboardCreatedUser] = useState<any>(null);
   const [onboardIPAddress, setOnboardIPAddress] = useState('unknown');
   const [expandedSection, setExpandedSection] = useState<'none' | 'pin' | 'kiosk'>('none');
+  const [isGroovelabKiosk, setIsGroovelabKiosk] = useState(false);
+
 
   const fetchIpAddress = async () => {
     try {
@@ -857,11 +859,23 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           return;
         }
 
-        // Set default platform: prioritize campus by default, fallback to groovelab
-        if (user.is_campus_active) {
-          localStorage.setItem('groovelab_active_platform', 'campus');
-        } else if (user.is_groovelab_active) {
+        // Enforce strict separation: Campus-Login strictly loads Campus, GrooveLab-Login strictly loads GrooveLab
+        if (effectiveStationId || isGroovelabKiosk) {
+          if (!user.is_groovelab_active) {
+            alert("Login verweigert. Dein Benutzerkonto ist nicht für die GrooveLab-Plattform freigeschaltet.");
+            await supabase.auth.signOut();
+            setLoading(false);
+            return;
+          }
           localStorage.setItem('groovelab_active_platform', 'groovelab');
+        } else {
+          if (!user.is_campus_active) {
+            alert("Login verweigert. Dein Benutzerkonto ist nicht für den Campus freigeschaltet.");
+            await supabase.auth.signOut();
+            setLoading(false);
+            return;
+          }
+          localStorage.setItem('groovelab_active_platform', 'campus');
         }
 
         // Enforce school matching check for students using component-level schoolData state or userSchool fallback
@@ -1877,7 +1891,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     <div style={{ 
       position: 'fixed',
       inset: 0,
-      background: 'radial-gradient(circle at top, #0f766e 0%, #064e3b 100%)', // Premium campus green gradient background
+      background: isGroovelabKiosk 
+        ? 'radial-gradient(circle at 50% -20%, #facc15 0%, #9f5c10 100%)' 
+        : 'radial-gradient(circle at 50% -20%, #13978c 0%, #086c52 100%)', // Premium campus green gradient background / GrooveLab yellow KPI gradient
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -1953,9 +1969,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           textShadow: '0 2px 10px rgba(0,0,0,0.15)'
         }}
       >
-        Campus-Login
+        {isGroovelabKiosk ? 'GrooveLab-Login' : 'Campus-Login'}
       </h1>
-      <p style={{ color: '#a7f3d0', textAlign: 'center', fontSize: '14px', marginBottom: '40px', maxWidth: '320px', lineHeight: '1.5', fontWeight: 600, textShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
+      <p style={{ color: isGroovelabKiosk ? '#fefcbf' : '#a7f3d0', textAlign: 'center', fontSize: '14px', marginBottom: '40px', maxWidth: '320px', lineHeight: '1.5', fontWeight: 600, textShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
         {schoolName && !schoolData?.logo_url ? `für ${schoolName}` : `Halte deinen Ausweis vor die Kamera, um dich einzuloggen.`}
       </p>
 
@@ -2147,16 +2163,111 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             {error}
           </div>
         )}
+
+        {/* Kiosk Activator Nested Inside Scanner Card */}
+        {isGroovelabKiosk && schoolData && kioskRooms.length > 0 && (
+          <div style={{
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            marginTop: '20px',
+            borderTop: '1px solid #cbd5e1',
+            paddingTop: '20px'
+          }}>
+            <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Tablet size={14} /> GrooveLab Kiosk aktivieren (iPad Stationen)
+            </div>
+            
+            {/* Room Selector */}
+            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+              {kioskRooms.map((room, idx) => (
+                <button
+                  key={room.id}
+                  type="button"
+                  onClick={() => setKioskSelectedRoomId(room.id)}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '12px',
+                    border: '1px solid',
+                    borderColor: kioskSelectedRoomId === room.id ? (schoolData?.primary_color || '#eab308') : '#e2e8f0',
+                    background: kioskSelectedRoomId === room.id ? (schoolData?.primary_color || '#eab308') : 'transparent',
+                    color: kioskSelectedRoomId === room.id ? '#ffffff' : '#0f172a',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {`${idx + 1} - ${cleanRoomName(room.name)}`}
+                </button>
+              ))}
+            </div>
+
+            {/* iPad Stations Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              {kioskStations.filter(s => s.room_id === kioskSelectedRoomId).map((station) => {
+                const isOccupied = activeSessionStationIds.includes(station.id);
+                return (
+                  <button
+                    key={station.id}
+                    type="button"
+                    onClick={async () => {
+                      if (isOccupied) {
+                        const confirm = window.confirm(`Dieses iPad ist besetzt. Möchtest du die alte Sitzung beenden und dieses iPad übernehmen?`);
+                        if (!confirm) return;
+                        // End previous session
+                        await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('station_id', station.id).is('check_out_time', null);
+                      }
+                      sessionStorage.removeItem('groovelab_user_id');
+                      localStorage.setItem('groovelab_station_id', station.id);
+                      localStorage.setItem('groovelab_school_id', schoolData.id);
+                      localStorage.setItem('groovelab_active_platform', 'groovelab');
+                      window.location.reload();
+                    }}
+                    style={{
+                      padding: '12px',
+                      borderRadius: '16px',
+                      border: '1.5px solid',
+                      borderColor: isOccupied ? '#fca5a5' : '#bbf7d0',
+                      background: isOccupied ? '#fef2f2' : '#f0fdf4',
+                      color: '#1e293b',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px'
+                    }}
+                  >
+                    <span style={{ fontSize: '13px', fontWeight: 800 }}>{station.name}</span>
+                    <span style={{ fontSize: '10px', color: isOccupied ? '#ef4444' : '#16a34a', fontWeight: 700 }}>
+                      {isOccupied ? 'Besetzt (Übernehmen)' : 'Frei'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <button 
+              type="button" 
+              onClick={() => setIsGroovelabKiosk(false)} 
+              style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', marginTop: '12px', cursor: 'pointer', alignSelf: 'center' }}
+            >
+              Abbrechen
+            </button>
+          </div>
+        )}
       </div>
-      )}
+      )
+}
 
       {/* Kiosk Modus button under the card if available */}
-      {expandedSection === 'none' && schoolData && kioskRooms.length > 0 && !effectiveStationId && (
+      {expandedSection === 'none' && schoolData && kioskRooms.length > 0 && !effectiveStationId && !isGroovelabKiosk && (
         <div style={{ marginTop: '24px' }}>
           <button 
             onClick={() => {
-              localStorage.removeItem('groovelab_station_id');
-              window.location.search = '?kiosk_room_id=setup';
+              setIsGroovelabKiosk(true);
             }}
             style={{ 
               background: 'rgba(255, 255, 255, 0.12)', 
@@ -2247,99 +2358,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       </div>
       )}
 
-      {/* Kiosk Activator for internal school rooms */}
-      {expandedSection === 'kiosk' && schoolData && kioskRooms.length > 0 && (
-        <div style={{
-          width: '100%',
-          maxWidth: '420px',
-          background: 'rgba(255, 255, 255, 0.95)',
-          borderRadius: '36px',
-          padding: '28px',
-          boxShadow: '0 30px 60px rgba(0, 0, 0, 0.18), 0 2px 10px rgba(0, 0, 0, 0.05)',
-          border: '1px solid rgba(255, 255, 255, 0.7)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
-          marginTop: '20px',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)'
-        }}>
-          <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Tablet size={14} /> GrooveLab Kiosk aktivieren (iPad Stationen)
-          </div>
-          
-          {/* Room Selector */}
-          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
-            {kioskRooms.map((room, idx) => (
-              <button
-                key={room.id}
-                onClick={() => setKioskSelectedRoomId(room.id)}
-                style={{
-                  padding: '8px 14px',
-                  borderRadius: '12px',
-                  border: '1px solid',
-                  borderColor: kioskSelectedRoomId === room.id ? (schoolData?.primary_color || '#0f766e') : '#e2e8f0',
-                  background: kioskSelectedRoomId === room.id ? (schoolData?.primary_color || '#0f766e') : 'transparent',
-                  color: kioskSelectedRoomId === room.id ? '#ffffff' : '#0f172a',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.2s'
-                }}
-              >
-                {`${idx + 1} - ${cleanRoomName(room.name)}`}
-              </button>
-            ))}
-          </div>
 
-          {/* iPad Stations Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            {kioskStations.filter(s => s.room_id === kioskSelectedRoomId).map((station) => {
-              const isOccupied = activeSessionStationIds.includes(station.id);
-              return (
-                <button
-                  key={station.id}
-                  onClick={async () => {
-                    if (isOccupied) {
-                      const confirm = window.confirm(`Dieses iPad ist besetzt. Möchtest du die alte Sitzung beenden und dieses iPad übernehmen?`);
-                      if (!confirm) return;
-                      // End previous session
-                      await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('station_id', station.id).is('check_out_time', null);
-                    }
-                    sessionStorage.removeItem('groovelab_user_id');
-                    localStorage.setItem('groovelab_station_id', station.id);
-                    localStorage.setItem('groovelab_school_id', schoolData.id);
-                    window.location.reload();
-                  }}
-                  style={{
-                    padding: '12px',
-                    borderRadius: '16px',
-                    border: '1.5px solid',
-                    borderColor: isOccupied ? '#fca5a5' : '#bbf7d0',
-                    background: isOccupied ? '#fef2f2' : '#f0fdf4',
-                    color: '#1e293b',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px'
-                  }}
-                >
-                  <span style={{ fontSize: '13px', fontWeight: 800 }}>{station.name}</span>
-                  <span style={{ fontSize: '10px', color: isOccupied ? '#ef4444' : '#16a34a', fontWeight: 700 }}>
-                    {isOccupied ? 'Besetzt (Übernehmen)' : 'Frei'}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          <button onClick={() => setExpandedSection('none')} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', marginTop: '12px', cursor: 'pointer', alignSelf: 'center' }}>
-            Zurück
-          </button>
-        </div>
-      )}
 
       {/* Geofence Diagnostic Panel (Localhost only) */}
       {isLocalhost && geoDebug && (

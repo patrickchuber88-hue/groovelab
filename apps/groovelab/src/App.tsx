@@ -5009,9 +5009,14 @@ function App() {
     // Default start tab
     let startTab = 'live';
     if (userToLogin?.role === 'student') {
-      startTab = mode === 'home' 
-        ? (userToLogin.is_external_vocalist ? 'repertoire' : 'practice')
-        : 'briefing';
+      const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+      if (activePlatform === 'groovelab' && mode === 'lab') {
+        startTab = 'live';
+      } else {
+        startTab = mode === 'home' 
+          ? (userToLogin.is_external_vocalist ? 'repertoire' : 'practice')
+          : 'briefing';
+      }
     }
     setActiveStudentTab(startTab);
     localStorage.setItem('groovelab_active_tab', startTab);
