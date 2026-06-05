@@ -1420,7 +1420,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
       let isWithinAnyRoom = true;
-      const isBypass = true; // Bypassed: Geofence deactivated, user is always let in if credentials match
+      const isGroovelabScreen = !!(effectiveStationId || isGroovelabKiosk);
+      const isBypass = !isGroovelabScreen;
 
       if (!isBypass) {
         isWithinAnyRoom = false;
@@ -1637,7 +1638,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       // 2. Geofence Check (Simpel & Stabil)
       const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
       let isWithinAnyRoom = true;
-      const isBypass = true; // Bypassed: Geofence deactivated, user is always let in if credentials match
+      const isGroovelabScreen = !!(effectiveStationId || isGroovelabKiosk);
+      const isBypass = !isGroovelabScreen;
 
       if (!isBypass) {
         isWithinAnyRoom = false;
