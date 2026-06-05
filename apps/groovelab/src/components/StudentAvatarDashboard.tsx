@@ -4338,6 +4338,52 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   ? Math.round((classMins / totalSchoolMins) * 100) 
                   : 0;
 
+                // MoM performance percentage
+                const now = new Date();
+                const currentMonth = now.getMonth();
+                const currentYear = now.getFullYear();
+                const startOfCurrentMonth = new Date(currentYear, currentMonth, 1, 0, 0, 0, 0);
+                const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+                const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+                const startOfPreviousMonth = new Date(prevYear, prevMonth, 1, 0, 0, 0, 0);
+                const daysElapsed = now.getDate();
+                const limitOfPreviousMonth = new Date(prevYear, prevMonth, daysElapsed, now.getHours(), now.getMinutes(), now.getSeconds());
+
+                const currentMonthMins = classFocusLogs.filter(log => {
+                  if (!log.created_at) return false;
+                  const d = new Date(log.created_at);
+                  return classmateIds.includes(log.user_id) && d >= startOfCurrentMonth && d <= now;
+                }).reduce((sum, log) => sum + (log.duration_minutes || 0), 0);
+
+                const previousMonthMins = classFocusLogs.filter(log => {
+                  if (!log.created_at) return false;
+                  const d = new Date(log.created_at);
+                  return classmateIds.includes(log.user_id) && d >= startOfPreviousMonth && d <= limitOfPreviousMonth;
+                }).reduce((sum, log) => sum + (log.duration_minutes || 0), 0);
+
+                const momPercent = previousMonthMins > 0
+                  ? Math.round(((currentMonthMins - previousMonthMins) / previousMonthMins) * 100)
+                  : (currentMonthMins > 0 ? 100 : 0);
+
+                // Weekly activity rate
+                const startOfWeek = new Date();
+                const day = startOfWeek.getDay();
+                const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+                startOfWeek.setDate(diff);
+                startOfWeek.setHours(0, 0, 0, 0);
+
+                const activeThisWeekCount = (classmateIds || []).filter(id => {
+                  return classFocusLogs.some(log => {
+                    if (!log.created_at) return false;
+                    const d = new Date(log.created_at);
+                    return log.user_id === id && d >= startOfWeek && d <= now;
+                  });
+                }).length;
+
+                const activityRate = classCount > 0
+                  ? Math.round((activeThisWeekCount / classCount) * 100)
+                  : 0;
+
                 const pieData = classMins === 0 && otherClassMins === 0 
                   ? [
                       { name: 'Unsere Klasse', value: 0.1, color: brandColor },
@@ -4362,12 +4408,16 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         </div>
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '16px' }}>
                         {[
                           { label: 'Deine Klasse', value: classCount, icon: Users, color: brandColor, bg: `${brandColor}08` },
                           { label: 'Klassen-Übezeit (Gesamt)', value: formatMins(classMins), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
                           { label: 'Klassen-Übezeit (Woche)', value: formatMins(classWeeklyFocus), icon: TrendingUp, color: '#10b981', bg: '#f0fdf4' },
-                          { label: 'Beitrag zur Schule', value: `${contributionPercent}%`, icon: Shield, color: '#6366f1', bg: '#f5f3ff' }
+                          { label: 'Beitrag zur Schule', value: `${contributionPercent}%`, icon: Shield, color: '#6366f1', bg: '#f5f3ff' },
+                          { label: 'Trend zum Vormonat', value: momPercent >= 0 ? `+${momPercent}%` : `${momPercent}%`, icon: Activity, color: momPercent >= 0 ? '#10b981' : '#ef4444', bg: momPercent >= 0 ? '#f0fdf4' : '#fef2f2' },
+                          { label: 'Klassen-Aktivität', value: `${activityRate}%`, icon: Zap, color: '#ec4899', bg: '#fdf2f8' },
+                          { label: 'Ø Zeit / Kopf (Woche)', value: formatMins(classCount > 0 ? Math.round(classWeeklyFocus / classCount) : 0), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
+                          { label: 'Ø Zeit / Kopf (Gesamt)', value: formatMins(classCount > 0 ? Math.round(classMins / classCount) : 0), icon: Award, color: brandColor, bg: `${brandColor}08` }
                         ].map((stat, idx) => (
                           <div key={idx} style={{ padding: '20px', background: stat.bg, borderRadius: '24px', border: `1px solid ${stat.color}15`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '120px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>

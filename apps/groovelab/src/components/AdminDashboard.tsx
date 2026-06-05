@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, ChevronLeft, ChevronRight, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock } from 'lucide-react';
+import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, ChevronLeft, ChevronRight, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap } from 'lucide-react';
 import { 
   ResponsiveContainer,
   BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell,
@@ -8685,6 +8685,58 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         ? Math.round((myClassMins / totalSchoolMins) * 100) 
         : 0;
 
+      const myStudentsList = (students || []).filter((s: any) => s.teacher_id === userId);
+      const classmateIds = myStudentsList.map((s: any) => s.id);
+      const classCount = classmateIds.length;
+
+      // MoM performance percentage
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      const startOfCurrentMonth = new Date(currentYear, currentMonth, 1, 0, 0, 0, 0);
+      const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+      const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+      const startOfPreviousMonth = new Date(prevYear, prevMonth, 1, 0, 0, 0, 0);
+      const daysElapsed = now.getDate();
+      const limitOfPreviousMonth = new Date(prevYear, prevMonth, daysElapsed, now.getHours(), now.getMinutes(), now.getSeconds());
+
+      const classFocusLogs = stats?.focusLogs || [];
+
+      const currentMonthMins = classFocusLogs.filter((log: any) => {
+        if (!log.created_at) return false;
+        const d = new Date(log.created_at);
+        return classmateIds.includes(log.user_id) && d >= startOfCurrentMonth && d <= now;
+      }).reduce((sum: number, log: any) => sum + (log.duration_minutes || 0), 0);
+
+      const previousMonthMins = classFocusLogs.filter((log: any) => {
+        if (!log.created_at) return false;
+        const d = new Date(log.created_at);
+        return classmateIds.includes(log.user_id) && d >= startOfPreviousMonth && d <= limitOfPreviousMonth;
+      }).reduce((sum: number, log: any) => sum + (log.duration_minutes || 0), 0);
+
+      const momPercent = previousMonthMins > 0
+        ? Math.round(((currentMonthMins - previousMonthMins) / previousMonthMins) * 100)
+        : (currentMonthMins > 0 ? 100 : 0);
+
+      // Weekly activity rate
+      const startOfWeek = new Date();
+      const day = startOfWeek.getDay();
+      const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+      startOfWeek.setDate(diff);
+      startOfWeek.setHours(0, 0, 0, 0);
+
+      const activeThisWeekCount = (classmateIds || []).filter(id => {
+        return classFocusLogs.some((log: any) => {
+          if (!log.created_at) return false;
+          const d = new Date(log.created_at);
+          return log.user_id === id && d >= startOfWeek && d <= now;
+        });
+      }).length;
+
+      const activityRate = classCount > 0
+        ? Math.round((activeThisWeekCount / classCount) * 100)
+        : 0;
+
       return (
         <div style={{ marginTop: '0px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
           {/* Top Section: Header & Contribution */}
@@ -8701,12 +8753,16 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '16px' }}>
                 {[
                   { label: 'Deine Schüler', value: stats.myClassCount || 0, icon: Users, color: brandColor, bg: `${brandColor}08` },
                   { label: 'Klassen-Übezeit (Gesamt)', value: formatMins(myClassMins), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
                   { label: 'Klassen-Übezeit (Woche)', value: formatMins(classWeeklyMins), icon: TrendingUp, color: '#10b981', bg: '#f0fdf4' },
-                  { label: 'Beitrag zur Schule', value: `${contributionPercent}%`, icon: Shield, color: '#6366f1', bg: '#f5f3ff' }
+                  { label: 'Beitrag zur Schule', value: `${contributionPercent}%`, icon: Shield, color: '#6366f1', bg: '#f5f3ff' },
+                  { label: 'Trend zum Vormonat', value: momPercent >= 0 ? `+${momPercent}%` : `${momPercent}%`, icon: Activity, color: momPercent >= 0 ? '#10b981' : '#ef4444', bg: momPercent >= 0 ? '#f0fdf4' : '#fef2f2' },
+                  { label: 'Klassen-Aktivität', value: `${activityRate}%`, icon: Zap, color: '#ec4899', bg: '#fdf2f8' },
+                  { label: 'Ø Zeit / Kopf (Woche)', value: formatMins(classCount > 0 ? Math.round(classWeeklyMins / classCount) : 0), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
+                  { label: 'Ø Zeit / Kopf (Gesamt)', value: formatMins(classCount > 0 ? Math.round(myClassMins / classCount) : 0), icon: Award, color: brandColor, bg: `${brandColor}08` }
                 ].map((stat, idx) => (
                   <div key={idx} style={{ padding: '20px', background: stat.bg, borderRadius: '24px', border: `1px solid ${stat.color}15`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '120px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
