@@ -1125,6 +1125,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [employeeLastName, setEmployeeLastName] = useState<string>('');
   const [employeeNickname, setEmployeeNickname] = useState<string>('');
   const [employeeEmail, setEmployeeEmail] = useState<string>('');
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState<string>('');
+  const [employeeStatusTab, setEmployeeStatusTab] = useState<'all' | 'active' | 'inactive'>('all');
+  const [employeeFilterRole, setEmployeeFilterRole] = useState<string>('All');
+  const [isEmployeeCsvExpanded, setIsEmployeeCsvExpanded] = useState<boolean>(false);
+  const [employeeCsvText, setEmployeeCsvText] = useState<string>('');
+  const [employeeImportStatus, setEmployeeImportStatus] = useState<{ success: boolean; message: string } | null>(null);
+  const [showAddEmployeeModal, setShowAddEmployeeModal] = useState<boolean>(false);
+  const [dragHoveredEmployeeRole, setDragHoveredEmployeeRole] = useState<string | null>(null);
 
   const [userQuota, setUserQuota] = useState<number>(150);
   const [activeUserQuota, setActiveUserQuota] = useState<number>(150);
@@ -1421,7 +1429,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       // Fetch all users
       const { data: allUsers, error: usersErr } = await supabase
         .from('users')
-        .select('id, first_name, last_name, role, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token, is_pin_activated, sick_until')
+        .select('id, first_name, last_name, role, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token, is_pin_activated, sick_until, personal_pin, created_at')
         .eq('school_id', schoolId);
 
       if (usersErr) throw usersErr;
@@ -2201,14 +2209,15 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     if (!employeeFirstName || !employeeLastName || !employeeEmail) return;
 
     try {
-      const pin = generateStarterPin('admin', false, false);
+      const selectedRole = (e.currentTarget as any).elements.employeeRoleSelect?.value || 'admin';
+      const pin = generateStarterPin(selectedRole, false, false);
       const qrToken = generateSecureQrToken();
 
       const { error } = await supabase
         .from('users')
         .insert({
           school_id: schoolId,
-          role: 'admin',
+          role: selectedRole,
           first_name: employeeFirstName,
           last_name: employeeLastName,
           nickname: employeeNickname || null,
@@ -2228,9 +2237,86 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       setEmployeeLastName('');
       setEmployeeNickname('');
       setEmployeeEmail('');
+      setShowAddEmployeeModal(false);
       fetchDashboardData();
     } catch (err: any) {
       alert('Fehler: ' + err.message);
+    }
+  };
+
+  const handleImportEmployees = async () => {
+    if (!employeeCsvText.trim()) return;
+    try {
+      setEmployeeImportStatus(null);
+      const lines = employeeCsvText.split('\n');
+      let successCount = 0;
+      let skippedCount = 0;
+
+      for (let line of lines) {
+        line = line.trim();
+        if (!line || line.toLowerCase().includes('vorname')) continue;
+
+        const parts = line.split(/[;,]/);
+        if (parts.length < 3) {
+          skippedCount++;
+          continue;
+        }
+
+        const firstName = parts[0]?.trim();
+        const lastName = parts[1]?.trim();
+        const email = parts[2]?.trim();
+        const nickname = parts[3]?.trim() || null;
+        const role = parts[4]?.trim()?.toLowerCase() === 'admin' ? 'admin' : 'secretary';
+        const pin = generateStarterPin(role, false, false);
+        const qrToken = generateSecureQrToken();
+
+        const { error } = await supabase
+          .from('users')
+          .insert({
+            school_id: schoolId,
+            role: role,
+            first_name: firstName,
+            last_name: lastName,
+            email: email,
+            nickname: nickname,
+            ausweis_nummer: pin,
+            teacher_qr_token: qrToken,
+            is_active: true,
+            is_app_user: true,
+            is_campus_active: false,
+            is_groovelab_active: false
+          });
+
+        if (error) {
+          console.error("Error inserting employee during import:", error);
+          skippedCount++;
+        } else {
+          successCount++;
+        }
+      }
+
+      setEmployeeImportStatus({
+        success: true,
+        message: `Import abgeschlossen: ${successCount} Mitarbeiterprofile angelegt. PINs bereit zur Verteilung.`
+      });
+      setEmployeeCsvText('');
+      fetchDashboardData();
+    } catch (err: any) {
+      alert('Fehler: ' + err.message);
+    }
+  };
+
+  const handleUpdateEmployeeRole = async (employeeId: string, newRole: string) => {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ role: newRole })
+        .eq('id', employeeId);
+      if (error) throw error;
+      alert(`Mitarbeiter-Rolle erfolgreich auf "${newRole === 'admin' ? 'Admin' : 'Verwaltung'}" aktualisiert.`);
+      fetchDashboardData();
+    } catch (err: any) {
+      alert('Fehler beim Aktualisieren der Rolle: ' + err.message);
     }
   };
 
@@ -3849,7 +3935,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   }}
                   style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: 'white', fontWeight: 700 }}
                 >
-                  <option value="All">🎸 Alle Instrumente</option>
+                  <option value="All">♫ Alle Instrumente</option>
                   {uniqueInstruments.map(inst => (
                     <option key={inst} value={inst}>{inst}</option>
                   ))}
@@ -3882,7 +3968,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   }}
                   style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: 'white', fontWeight: 700 }}
                 >
-                  <option value="all">⚡ Alle Tarife</option>
+                  <option value="all">☇ Alle Tarife</option>
                   <option value="campus">🎓 Campus Aktiv</option>
                   <option value="groovelab">🎸 GrooveLab Aktiv</option>
                   <option value="inactive">⚪ Inaktiv</option>
@@ -4180,7 +4266,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           className="hover-scale-mini"
                           title="Schüler unwiderruflich löschen"
                         >
-                          ❌
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     </div>
@@ -5012,6 +5098,39 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       fetchDashboardData();
     } catch (err: any) {
       console.error('Error rejecting plan:', err);
+      alert('Fehler: ' + err.message);
+    }
+  };
+
+  const handleApproveSingleSchedule = async (scheduleId: string) => {
+    try {
+      const { error } = await supabase
+        .from('schedules')
+        .update({ status: 'approved' })
+        .eq('id', scheduleId);
+
+      if (error) throw error;
+      alert('Stundenplan-Eintrag erfolgreich genehmigt.');
+      fetchDashboardData();
+    } catch (err: any) {
+      console.error('Error approving schedule slot:', err);
+      alert('Fehler: ' + err.message);
+    }
+  };
+
+  const handleRejectSingleSchedule = async (scheduleId: string) => {
+    if (!window.confirm('Möchtest du diesen Stundenplan-Eintrag zur Überarbeitung zurückweisen?')) return;
+    try {
+      const { error } = await supabase
+        .from('schedules')
+        .update({ status: 'draft' })
+        .eq('id', scheduleId);
+
+      if (error) throw error;
+      alert('Stundenplan-Eintrag zur Überarbeitung zurückgewiesen.');
+      fetchDashboardData();
+    } catch (err: any) {
+      console.error('Error rejecting schedule slot:', err);
       alert('Fehler: ' + err.message);
     }
   };
@@ -5945,68 +6064,60 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           </div>
 
           {/* Action & Profile */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-            {/* School Pill */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* Integrated School & User Pill */}
             <div style={{ 
               display: 'flex', 
               alignItems: 'center', 
               gap: '8px', 
-              background: 'rgba(239, 68, 68, 0.06)', 
+              background: 'rgba(59, 130, 246, 0.04)', 
               padding: '8px 16px', 
               borderRadius: '12px', 
-              border: '1px solid rgba(239, 68, 68, 0.18)',
+              border: '1px solid rgba(59, 130, 246, 0.12)',
               boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
             }}>
-              <School size={14} color="#ef4444" />
-              <span style={{ color: '#ef4444', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                {schoolName || 'Meine Musikschule'}
-              </span>
-            </div>
-
-            {/* Role Pill */}
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px', 
-              background: 'rgba(139, 92, 246, 0.06)', 
-              padding: '8px 16px', 
-              borderRadius: '12px', 
-              border: '1px solid rgba(139, 92, 246, 0.18)',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-            }}>
-              <Shield size={14} color="#8b5cf6" />
-              <span style={{ color: '#8b5cf6', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Verwaltung
-              </span>
-            </div>
-
-            <button 
-              onClick={fetchDashboardData}
-              disabled={loading}
-              className="google-btn-primary"
-              style={{ background: activeTab === 'secretary' ? '#ea4335' : activeTab === 'campus' ? '#34a853' : '#fbbc05', color: activeTab === 'groovelab' ? '#09090b' : '#ffffff' }}
-            >
-              Aktualisieren
-            </button>
-
-            <div style={{ display: 'flex', gap: '14px', alignItems: 'center', borderLeft: '1px solid rgba(0,0,0,0.08)', paddingLeft: '20px' }}>
-              <Bell size={20} color="var(--text-secondary)" style={{ cursor: 'pointer' }} onClick={fetchDashboardData} />
-              
-              {/* User Name */}
-              {currentUserProfile && (
-                <span style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-                  {currentUserProfile.first_name} {currentUserProfile.last_name}
+              <span style={{ fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <School size={12} color="#ef4444" />
+                  <span>{schoolName || 'Meine Musikschule'}</span>
                 </span>
-              )}
-
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#e8f0fe', color: '#0b57d0', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.82rem', overflow: 'hidden' }}>
-                {currentUserProfile?.photo_url ? (
-                  <img src={currentUserProfile.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
-                ) : (
-                  currentUserProfile?.first_name?.[0] || 'A'
-                )}
-              </div>
+                <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
+                <span style={{ color: '#ea860c', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <User size={14} color="#ea860c" />
+                  <span>
+                    {currentUserProfile ? `${currentUserProfile.first_name} ${currentUserProfile.last_name}` : 'Verwaltung'}
+                  </span>
+                </span>
+              </span>
             </div>
+
+            {/* Elegant Logout Button */}
+            {onLogout && (
+              <button 
+                onClick={onLogout}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  background: '#fff1f2', 
+                  border: '1px solid #ffe4e6', 
+                  padding: '8px 14px', 
+                  borderRadius: '12px', 
+                  color: '#f43f5e', 
+                  fontWeight: 800, 
+                  fontSize: '0.8rem', 
+                  cursor: 'pointer',
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  boxShadow: '0 4px 12px rgba(244, 63, 94, 0.08)',
+                  flexShrink: 0
+                }}
+                className="hover-scale"
+                title="Abmelden"
+              >
+                <LogOut size={14} color="#f43f5e" />
+                <span>Abmelden</span>
+              </button>
+            )}
           </div>
         </div>
         
@@ -6024,7 +6135,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           {/* Active Tab Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              {!((activeTab as any) === 'campus') && !((activeTab as any) === 'campus' && (campusSubTab === 'onboarding' || campusSubTab === 'schedules')) && !(activeTab === 'secretary' && (secretarySubTab === 'crisis' || secretarySubTab === 'rooms')) && (
+              {!((activeTab as any) === 'campus') && !((activeTab as any) === 'campus' && (campusSubTab === 'onboarding' || campusSubTab === 'schedules')) && !(activeTab === 'secretary' && (secretarySubTab === 'crisis' || secretarySubTab === 'rooms' || secretarySubTab === 'briefing')) && (
                 <>
                   <h2 className="swiss-h1" style={{ margin: 0, color: (activeTab as any) === 'campus' ? '#10b981' : '#f59e0b' }}>
                     {getTabTitle()}
@@ -6067,7 +6178,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
             // 3. Schüler-Aktivierungsquote
             const totalStudentsCount = students.length;
-            const activeStudentsCount = students.filter(s => s.is_active).length;
+            const activeStudentsCount = students.filter(s => s.is_pin_activated).length;
             const activationRate = totalStudentsCount > 0 ? Math.round((activeStudentsCount / totalStudentsCount) * 100) : 0;
 
             // 4. Systemische Termin-Konflikte (Overlap checkers)
@@ -6120,382 +6231,309 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         list.push({
                           type: 'teacher',
                           key: `${p.id}_${q.id}`,
-                          message: `Lehrer-Doppelbuchung für ${teacherName} (${dayLabel}): Stunden mit ${userMap[p.studentId] || 'Schüler'} (${p.startTime}-${p.endTime}) und ${userMap[q.studentId] || 'Schüler'} (${q.startTime}-${q.endTime}) überschneiden sich.`
+                          message: `Lehrer-Kollision für ${teacherName} (${dayLabel}): ${userMap[p.studentId] || 'Schüler'} (${p.startTime}-${p.endTime}) überlappt mit ${userMap[q.studentId] || 'Schüler'} (${q.startTime}-${q.endTime}).`
                         });
                       }
                     });
                   });
                 }
               });
-
+              
               return list;
             })();
 
             return (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '24px', alignItems: 'start' }}>
                 
-                {/* GLASS DASHBOARD GREETING HEADER */}
-                <div style={{
-                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
-                  backdropFilter: 'blur(24px) saturate(1.8)',
-                  WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
-                  border: '1px solid rgba(255, 255, 255, 0.5)',
-                  borderRadius: '24px',
-                  display: 'flex',
-                  alignItems: 'stretch',
-                  justifyContent: 'space-between',
-                  boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
-                  transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                  width: '100%',
-                  minHeight: '130px',
-                  boxSizing: 'border-box',
-                  overflow: 'hidden'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
-                    {/* Full Height Graphic on the left */}
-                    <div style={{
-                      width: '116px',
-                      height: '100%',
-                      flexShrink: 0,
-                      position: 'relative',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      overflow: 'hidden',
-                      borderRight: '1px solid rgba(0, 0, 0, 0.05)'
-                    }}>
-                      <img 
-                        src="/campus_login_hero.png" 
-                        alt="" 
-                        style={{ 
-                          width: '100%', 
-                          height: '100%', 
-                          objectFit: 'cover'
-                        }} 
-                      />
-                    </div>
-                    
-                    <div style={{ 
-                      padding: '12px 20px', 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      justifyContent: 'center',
-                      minWidth: 0,
-                      flex: 1 
-                    }}>
-                      {/* Live Clock Badge */}
+                {/* LEFT COLUMN: MAIN CONTENT AREA */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  
+                  {/* GLASS DASHBOARD GREETING HEADER */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
+                    backdropFilter: 'blur(24px) saturate(1.8)',
+                    WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
+                    border: '1px solid rgba(255, 255, 255, 0.5)',
+                    borderRadius: '24px',
+                    display: 'flex',
+                    alignItems: 'stretch',
+                    justifyContent: 'space-between',
+                    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+                    transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                    width: '100%',
+                    minHeight: '130px',
+                    boxSizing: 'border-box',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
+                      {/* Full Height Graphic on the left */}
                       <div style={{
-                        display: 'inline-flex',
+                        width: '116px',
+                        height: '100%',
+                        flexShrink: 0,
+                        position: 'relative',
+                        display: 'flex',
                         alignItems: 'center',
-                        gap: '6px',
-                        background: '#ffffff',
-                        border: '1px solid rgba(0, 0, 0, 0.06)',
-                        borderRadius: '100px',
-                        padding: '4px 10px',
-                        alignSelf: 'flex-start',
-                        marginBottom: '6px',
-                        flexShrink: 0
+                        justifyContent: 'center',
+                        overflow: 'hidden',
+                        borderRight: '1px solid rgba(0, 0, 0, 0.05)'
                       }}>
-                        <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }} />
-                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#475569', letterSpacing: '0.04em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
-                          {new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} UHR
-                        </span>
+                        <img 
+                          src="/campus_login_hero.png" 
+                          alt="" 
+                          style={{ 
+                            width: '100%', 
+                            height: '100%', 
+                            objectFit: 'cover'
+                          }} 
+                        />
                       </div>
-
-                      <h3 style={{ 
-                        margin: 0, 
-                        fontSize: '30px', 
-                        fontWeight: 950, 
-                        color: '#0f172a', 
-                        fontFamily: "'Plus Jakarta Sans', sans-serif", 
+                      
+                      <div style={{ 
+                        padding: '12px 20px', 
                         display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '8px',
-                        lineHeight: 1.15
+                        flexDirection: 'column', 
+                        justifyContent: 'center',
+                        minWidth: 0,
+                        flex: 1 
                       }}>
-                        Hallo, <span style={{ 
-                          color: '#ef4444', 
-                          fontWeight: 900,
-                          letterSpacing: '-0.01em',
+                        {/* Live Clock Badge */}
+                        <div style={{
                           display: 'inline-flex',
-                          alignItems: 'center'
-                        }}>GrooveLab-Zentrale</span>! 
-                        <span className="inline-block animate-bounce" style={{ marginLeft: '4px' }}>
-                          👋
-                        </span>
-                      </h3>
-                      <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: 1.25 }}>
-                        Heute ist {new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} &bull; Systemstatus stabil &bull; {pendingSchedules.length} ausstehende Stundenpläne.
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: '#ffffff',
+                          border: '1px solid rgba(0, 0, 0, 0.06)',
+                          borderRadius: '100px',
+                          padding: '4px 10px',
+                          alignSelf: 'flex-start',
+                          marginBottom: '6px',
+                          flexShrink: 0
+                        }}>
+                          <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }} />
+                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#475569', letterSpacing: '0.04em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
+                            {new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} UHR
+                          </span>
+                        </div>
 
-                {/* 4 GAMIFIED CARD METRICS ROW */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                  
-                  {/* Card 1: Raumauslastung (Blue Gradient) */}
-                  <div style={{
-                    position: 'relative', overflow: 'hidden',
-                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', color: 'white',
-                    borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.3)',
-                    display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
-                    padding: '16px', boxSizing: 'border-box',
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)'
-                  }} className="hover-scale">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Raumauslastung Heute</span>
-                      <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
-                        <DoorOpen size={13} color="white" />
+                        <h3 style={{ 
+                          margin: 0, 
+                          fontSize: '30px', 
+                          fontWeight: 950, 
+                          color: '#0f172a', 
+                          fontFamily: "'Plus Jakarta Sans', sans-serif", 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '8px',
+                          lineHeight: 1.15
+                        }}>
+                          Hallo, <span style={{ 
+                            color: '#ef4444', 
+                            fontWeight: 900,
+                            letterSpacing: '-0.01em',
+                            display: 'inline-flex',
+                            alignItems: 'center'
+                          }}>Zentrale</span>! 
+                          <span className="inline-block animate-bounce" style={{ marginLeft: '4px' }}>
+                            👋
+                          </span>
+                        </h3>
+                        <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: 1.25 }}>
+                          Heute ist {new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} &bull; Systemstatus stabil &bull; {pendingSchedules.length} ausstehende Stundenpläne.
+                        </p>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                      <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{roomOccupancyRate}</span>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>% ({todayAllocations.length} Slots)</span>
-                    </div>
                   </div>
 
-                  {/* Card 2: Aktivierungsquote (Emerald Gradient) */}
-                  <div style={{
-                    position: 'relative', overflow: 'hidden',
-                    background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', color: 'white',
-                    borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.3)',
-                    display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
-                    padding: '16px', boxSizing: 'border-box',
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)'
-                  }} className="hover-scale">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Schüler-Aktivierung</span>
-                      <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
-                        <UserCheck size={13} color="white" />
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                      <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{activationRate}</span>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>% ({activeStudentsCount} / {totalStudentsCount})</span>
-                    </div>
-                  </div>
-
-                  {/* Card 3: Krankmeldungen (Red Gradient) */}
-                  <div style={{
-                    position: 'relative', overflow: 'hidden',
-                    background: activeSickTeachers.length > 0 ? 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)' : 'linear-gradient(135deg, #6b7280 0%, #374151 100%)', color: 'white',
-                    borderRadius: '20px', boxShadow: activeSickTeachers.length > 0 ? '0 10px 25px -5px rgba(239, 68, 68, 0.3)' : 'none',
-                    display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
-                    padding: '16px', boxSizing: 'border-box',
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)'
-                  }} className="hover-scale">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Krankmeldungen</span>
-                      <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
-                        <UserX size={13} color="white" />
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                      <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
-                        {activeSickTeachers.length}
-                      </span>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>
-                        {activeSickTeachers.length === 1 ? 'Lehrkraft krank' : 'Lehrkräfte krank'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Card 4: Konflikte (Amber/Orange Gradient) */}
-                  <div style={{
-                    position: 'relative', overflow: 'hidden',
-                    background: scheduleConflicts.length > 0 ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white',
-                    borderRadius: '20px', boxShadow: scheduleConflicts.length > 0 ? '0 10px 25px -5px rgba(245, 158, 11, 0.3)' : 'none',
-                    display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
-                    padding: '16px', boxSizing: 'border-box',
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)'
-                  }} className="hover-scale">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Terminkonflikte</span>
-                      <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
-                        <ShieldAlert size={13} color="white" />
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                      <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
-                        {scheduleConflicts.length}
-                      </span>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>
-                        {scheduleConflicts.length === 0 ? 'System-Prüfung stabil' : 'Konflikte gefunden'}
-                      </span>
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* TWO COLUMN CONTENT LAYOUT */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '24px', alignItems: 'start' }}>
-                  
-                  {/* LEFT COLUMN */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  {/* 4 GAMIFIED CARD METRICS ROW (KPIs) */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                     
-                    {/* WIDGET 1.1: Raumauslastung Details */}
+                    {/* Card 1: Raumauslastung (Blue Gradient) */}
                     <div style={{
-                      background: '#ffffff',
-                      borderRadius: '24px',
-                      padding: '24px',
-                      boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
-                      border: '1px solid rgba(0, 0, 0, 0.05)'
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{ background: '#e0e7ff', color: '#4f46e5', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <DoorOpen size={16} />
-                          </div>
-                          <div>
-                            <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                              Raumauslastung &amp; Belegung
-                            </h3>
-                            <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                              Details für den heutigen Tag
+                      position: 'relative', overflow: 'hidden',
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', color: 'white',
+                      borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.3)',
+                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
+                      padding: '16px', boxSizing: 'border-box',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }} className="hover-scale">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Raumauslastung Heute</span>
+                        <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
+                          <DoorOpen size={13} color="white" />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                        <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{roomOccupancyRate}</span>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>% ({todayAllocations.length} Slots)</span>
+                      </div>
+                    </div>
+
+                    {/* Card 2: Aktivierungsquote (Emerald Gradient) */}
+                    <div style={{
+                      position: 'relative', overflow: 'hidden',
+                      background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', color: 'white',
+                      borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.3)',
+                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
+                      padding: '16px', boxSizing: 'border-box',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }} className="hover-scale">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Schüler-Aktivierung</span>
+                        <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
+                          <UserCheck size={13} color="white" />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                        <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{activationRate}</span>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>% ({activeStudentsCount} / {totalStudentsCount})</span>
+                      </div>
+                    </div>
+
+                    {/* Card 3: Konflikte (Amber/Orange Gradient) */}
+                    <div style={{
+                      position: 'relative', overflow: 'hidden',
+                      background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)', color: 'white',
+                      borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(245, 158, 11, 0.3)',
+                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
+                      padding: '16px', boxSizing: 'border-box',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }} className="hover-scale">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Terminkonflikte</span>
+                        <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
+                          <ShieldAlert size={13} color="white" />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                        <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
+                          {scheduleConflicts.length}
+                        </span>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>
+                          {scheduleConflicts.length === 0 ? 'System-Prüfung stabil' : 'Konflikte gefunden'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Card 4: Krankmeldungen (Red Gradient) */}
+                    <div style={{
+                      position: 'relative', overflow: 'hidden',
+                      background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)', color: 'white',
+                      borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.3)',
+                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
+                      padding: '16px', boxSizing: 'border-box',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }} className="hover-scale">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Krankmeldungen</span>
+                        <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
+                          <UserX size={13} color="white" />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                        <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
+                          {activeSickTeachers.length}
+                        </span>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>
+                          {activeSickTeachers.length === 1 ? 'Lehrkraft krank' : 'Lehrkräfte krank'}
+                        </span>
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* WIDGET: Systemische Terminkonflikte */}
+                  <div style={{
+                    background: '#ffffff',
+                    borderRadius: '24px',
+                    padding: '24px',
+                    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
+                    border: '1px solid rgba(0, 0, 0, 0.05)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                      <div style={{ background: '#fef3c7', color: '#d97706', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <ShieldAlert size={16} />
+                      </div>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                          System-Kollisionsprüfer
+                        </h3>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                          Prüfung auf Überschneidungen
+                        </span>
+                      </div>
+                    </div>
+
+                    {scheduleConflicts.length === 0 ? (
+                      <div style={{
+                        background: 'rgba(16, 185, 129, 0.04)',
+                        border: '1px solid rgba(16, 185, 129, 0.1)',
+                        color: '#065f46',
+                        borderRadius: '16px',
+                        padding: '16px 20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px'
+                      }}>
+                        <CheckCircle size={20} color="#10b981" />
+                        <div>
+                          <strong style={{ display: 'block', fontSize: '0.85rem', fontWeight: 800 }}>Konfliktfreier Stundenplan</strong>
+                          <span style={{ fontSize: '0.74rem', opacity: 0.9 }}>Alle aktiven Stundenpläne sind sauber strukturiert. Keine Raum- oder Lehrerdoppelbelegungen gefunden.</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {scheduleConflicts.map((conflict, idx) => (
+                          <div key={idx} style={{
+                            background: 'rgba(245, 158, 11, 0.04)',
+                            border: '1px solid rgba(245, 158, 11, 0.1)',
+                            color: '#92400e',
+                            borderRadius: '16px',
+                            padding: '12px 16px',
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: '10px'
+                          }}>
+                            <ShieldAlert size={16} style={{ marginTop: '2px', flexShrink: 0 }} />
+                            <span style={{ fontSize: '0.78rem', fontWeight: 600, lineHeight: 1.4 }}>
+                              {conflict.message}
                             </span>
                           </div>
-                        </div>
+                        ))}
                       </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        {rooms.length === 0 ? (
-                          <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8', fontStyle: 'italic', fontSize: '0.85rem' }}>
-                            Keine Räume im System erfasst.
-                          </div>
-                        ) : (
-                          rooms.map(room => {
-                            const roomAlloc = todayAllocations.filter(a => a.roomId === room.id);
-                            const roomOccupiedRate = Math.round((roomAlloc.length / 8) * 100);
-                            return (
-                              <div key={room.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '14px', borderRadius: '16px', background: 'rgba(248, 250, 252, 0.6)', border: '1px solid rgba(0, 0, 0, 0.03)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
-                                    🚪 {room.name} {room.floor ? `(${room.floor})` : ''}
-                                  </span>
-                                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: roomOccupiedRate > 75 ? '#ef4444' : roomOccupiedRate > 30 ? '#f59e0b' : '#10b981' }}>
-                                    {roomOccupiedRate}% ({roomAlloc.length} / 8 Slots)
-                                  </span>
-                                </div>
-                                <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '100px', overflow: 'hidden' }}>
-                                  <div style={{
-                                    height: '100%',
-                                    width: `${Math.min(100, roomOccupiedRate)}%`,
-                                    background: roomOccupiedRate > 75 ? '#ef4444' : roomOccupiedRate > 30 ? '#f59e0b' : '#10b981',
-                                    borderRadius: '100px',
-                                    transition: 'width 0.5s'
-                                  }} />
-                                </div>
-                                {roomAlloc.length > 0 && (
-                                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
-                                    {roomAlloc.map((alloc, idx) => (
-                                      <span key={idx} style={{ fontSize: '0.65rem', background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.05)', padding: '4px 8px', borderRadius: '8px', color: '#475569', fontWeight: 650, boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                                        ⏱️ {alloc.startTime} - {userMap[alloc.teacherId]?.split(' ')[0] || 'Lehrer'}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    </div>
-
-                    {/* WIDGET 2.1: Systemische Terminkonflikte */}
-                    <div style={{
-                      background: '#ffffff',
-                      borderRadius: '24px',
-                      padding: '24px',
-                      boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
-                      border: '1px solid rgba(0, 0, 0, 0.05)'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                        <div style={{ background: '#fef3c7', color: '#d97706', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <ShieldAlert size={16} />
-                        </div>
-                        <div>
-                          <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                            System-Kollisionsprüfer
-                          </h3>
-                          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                            Prüfung auf Überschneidungen
-                          </span>
-                        </div>
-                      </div>
-
-                      {scheduleConflicts.length === 0 ? (
-                        <div style={{
-                          background: 'rgba(16, 185, 129, 0.04)',
-                          border: '1px solid rgba(16, 185, 129, 0.1)',
-                          color: '#065f46',
-                          borderRadius: '16px',
-                          padding: '16px 20px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '12px'
-                        }}>
-                          <CheckCircle size={20} color="#10b981" />
-                          <div>
-                            <strong style={{ display: 'block', fontSize: '0.85rem', fontWeight: 800 }}>Konfliktfreier Stundenplan</strong>
-                            <span style={{ fontSize: '0.74rem', opacity: 0.9 }}>Alle aktiven Stundenpläne sind sauber strukturiert. Keine Raum- oder Lehrerdoppelbelegungen gefunden.</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          {scheduleConflicts.map((conflict, idx) => (
-                            <div key={idx} style={{
-                              background: 'rgba(245, 158, 11, 0.04)',
-                              border: '1px solid rgba(245, 158, 11, 0.1)',
-                              color: '#92400e',
-                              borderRadius: '16px',
-                              padding: '12px 16px',
-                              display: 'flex',
-                              alignItems: 'flex-start',
-                              gap: '10px'
-                            }}>
-                              <ShieldAlert size={16} style={{ marginTop: '2px', flexShrink: 0 }} />
-                              <span style={{ fontSize: '0.78rem', fontWeight: 600, lineHeight: 1.4 }}>
-                                {conflict.message}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
+                    )}
                   </div>
 
-                  {/* RIGHT COLUMN */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                    
-                    {/* WIDGET 1.2: Heutige Krankmeldungen */}
-                    <div style={{
-                      background: '#ffffff',
-                      borderRadius: '24px',
-                      padding: '24px',
-                      boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
-                      border: '1px solid rgba(0, 0, 0, 0.05)'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                        <div style={{ background: '#fee2e2', color: '#b91c1c', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <UserX size={16} color="#ef4444" />
+                  {/* WIDGET: Termineinreichungen */}
+                  <div style={{
+                    background: '#ffffff',
+                    borderRadius: '24px',
+                    padding: '24px',
+                    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
+                    border: '1px solid rgba(0, 0, 0, 0.05)'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ background: '#eff6ff', color: '#2563eb', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <ClipboardList size={16} />
                         </div>
                         <div>
                           <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                            Lehrer-Präsenz &amp; Status
+                            Termineinreichungen
                           </h3>
                           <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                            Aktuelle Krankmeldungen
+                            Zu prüfende Stundenpläne ({pendingSchedules.length})
                           </span>
                         </div>
                       </div>
+                    </div>
 
-                      {activeSickTeachers.length === 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {pendingSchedules.length === 0 ? (
                         <div style={{
                           background: 'rgba(16, 185, 129, 0.04)',
                           border: '1px solid rgba(16, 185, 129, 0.1)',
@@ -6504,98 +6542,364 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           padding: '16px',
                           textAlign: 'center'
                         }}>
-                          <div style={{ fontSize: '1.4rem', marginBottom: '4px' }}>🎉</div>
-                          <strong style={{ display: 'block', fontSize: '0.82rem', fontWeight: 800 }}>Volle Präsenz</strong>
-                          <span style={{ fontSize: '0.72rem', opacity: 0.9 }}>Alle Lehrkräfte sind einsatzbereit. Es liegen keine Krankmeldungen vor.</span>
+                          <div style={{ fontSize: '1.4rem', marginBottom: '4px' }}>👍</div>
+                          <strong style={{ display: 'block', fontSize: '0.82rem', fontWeight: 800 }}>Alles freigegeben</strong>
+                          <span style={{ fontSize: '0.72rem', opacity: 0.9 }}>Es liegen aktuell keine ausstehenden Stundenplaneinreichungen vor.</span>
                         </div>
                       ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          {activeSickTeachers.map(teacher => {
-                            const sickUntilStr = teacher.sick_until ? new Date(teacher.sick_until).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }) : 'unbefristet';
-                            return (
-                              <div key={teacher.id} style={{
-                                padding: '12px',
-                                borderRadius: '16px',
-                                border: '1px solid rgba(239, 68, 68, 0.1)',
-                                background: 'rgba(239, 68, 68, 0.04)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '10px'
-                              }}>
-                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', animation: 'pulse 1.5s infinite' }} />
-                                <div style={{ flex: 1 }}>
-                                  <strong style={{ display: 'block', fontSize: '0.82rem', color: '#991b1b', fontWeight: 700 }}>
-                                    {teacher.firstName} {teacher.lastName}
+                        pendingSchedules.slice(0, 5).map((sched) => {
+                          const days = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+                          const dayLabel = days[sched.day_of_week - 1] || 'Wochentag';
+                          return (
+                            <div key={sched.id} style={{
+                              padding: '12px 14px',
+                              borderRadius: '16px',
+                              border: '1px solid rgba(37, 99, 235, 0.1)',
+                              background: 'rgba(37, 99, 235, 0.02)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '8px'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                <div>
+                                  <strong style={{ display: 'block', fontSize: '0.82rem', color: '#1e293b', fontWeight: 750 }}>
+                                    👨‍🏫 {sched.teacher_name}
                                   </strong>
-                                  <span style={{ fontSize: '0.7rem', color: '#b91c1c', fontWeight: 600 }}>
-                                    Ausfall gemeldet: bis {sickUntilStr}
+                                  <span style={{ fontSize: '0.72rem', color: '#4b5563', fontWeight: 600 }}>
+                                    🎓 Schüler: {sched.student_name}
                                   </span>
                                 </div>
+                                <div style={{ display: 'flex', gap: '6px' }}>
+                                  <button
+                                    onClick={() => handleApproveSingleSchedule(sched.id)}
+                                    style={{
+                                      background: '#10b981',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      borderRadius: '8px',
+                                      padding: '4px 8px',
+                                      fontSize: '0.65rem',
+                                      fontWeight: 800,
+                                      cursor: 'pointer',
+                                      boxShadow: '0 2px 4px rgba(16, 185, 129, 0.2)'
+                                    }}
+                                  >
+                                    Freigeben
+                                  </button>
+                                  <button
+                                    onClick={() => handleRejectSingleSchedule(sched.id)}
+                                    style={{
+                                      background: '#ef4444',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      borderRadius: '8px',
+                                      padding: '4px 8px',
+                                      fontSize: '0.65rem',
+                                      fontWeight: 800,
+                                      cursor: 'pointer',
+                                      boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)'
+                                    }}
+                                  >
+                                    Ablehnen
+                                  </button>
+                                </div>
                               </div>
-                            );
-                          })}
-                        </div>
+                              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', borderTop: '1px solid rgba(0,0,0,0.03)', paddingTop: '6px' }}>
+                                <span style={{ fontSize: '0.65rem', background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.05)', padding: '2px 6px', borderRadius: '6px', color: '#4b5563', fontWeight: 650 }}>
+                                  📅 {dayLabel}
+                                </span>
+                                <span style={{ fontSize: '0.65rem', background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.05)', padding: '2px 6px', borderRadius: '6px', color: '#4b5563', fontWeight: 650 }}>
+                                  ⏱️ {sched.time_slot}
+                                </span>
+                                <span style={{ fontSize: '0.65rem', background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.05)', padding: '2px 6px', borderRadius: '6px', color: '#4b5563', fontWeight: 650 }}>
+                                  🚪 {sched.room_name}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                      {pendingSchedules.length > 5 && (
+                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontStyle: 'italic', textAlign: 'center', display: 'block', marginTop: '4px' }}>
+                          und {pendingSchedules.length - 5} weitere ausstehende Einreichungen...
+                        </span>
                       )}
                     </div>
+                  </div>
 
-                    {/* WIDGET 3.1: Schüler-Aktivierungsquote */}
-                    <div style={{
-                      background: '#ffffff',
-                      borderRadius: '24px',
-                      padding: '24px',
-                      boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
-                      border: '1px solid rgba(0, 0, 0, 0.05)'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                        <div style={{ background: '#d1fae5', color: '#059669', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <UserCheck size={16} />
+                  {/* WIDGET: Raumauslastung Details */}
+                  <div style={{
+                    background: '#ffffff',
+                    borderRadius: '24px',
+                    padding: '24px',
+                    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
+                    border: '1px solid rgba(0, 0, 0, 0.05)'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ background: '#e0e7ff', color: '#4f46e5', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <DoorOpen size={16} />
                         </div>
                         <div>
                           <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                            Aktivierungsquote
+                            Raumauslastung &amp; Belegung
                           </h3>
                           <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                            Schüler-Onboarding Status
+                            Details für den heutigen Tag
                           </span>
                         </div>
                       </div>
+                    </div>
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600 }}>Erfolgreich Aktiviert</span>
-                          <span style={{ fontSize: '0.8rem', color: '#1e293b', fontWeight: 800 }}>{activeStudentsCount} / {totalStudentsCount} Profile</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {rooms.length === 0 ? (
+                        <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8', fontStyle: 'italic', fontSize: '0.85rem' }}>
+                          Keine Räume im System erfasst.
                         </div>
-                        
-                        <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '100px', overflow: 'hidden' }}>
-                          <div style={{ height: '100%', width: `${activationRate}%`, background: 'linear-gradient(90deg, #10b981 0%, #34d399 100%)', borderRadius: '100px' }} />
-                        </div>
-
-                        {/* Inaktive Schüler list for reference */}
-                        {totalStudentsCount > activeStudentsCount && (
-                          <div style={{ marginTop: '8px' }}>
-                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '8px', paddingLeft: '2px' }}>
-                              Ausstehende Aktivierungen ({totalStudentsCount - activeStudentsCount}):
-                            </span>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '140px', overflowY: 'auto', paddingRight: '4px' }}>
-                              {students.filter(s => !s.is_active).slice(0, 5).map(s => (
-                                <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'rgba(248, 250, 252, 0.6)', border: '1px solid rgba(0, 0, 0, 0.03)', borderRadius: '12px' }}>
-                                  <span style={{ fontSize: '0.74rem', color: '#334155', fontWeight: 650 }}>{s.first_name} {s.last_name}</span>
-                                  <span style={{ fontSize: '0.62rem', background: '#e2e8f0', color: '#475569', padding: '2px 8px', borderRadius: '6px', fontWeight: 800, fontFamily: 'monospace' }}>
-                                    PIN: {s.personal_pin || 'ausstehend'}
-                                  </span>
-                                </div>
-                              ))}
-                              {totalStudentsCount - activeStudentsCount > 5 && (
-                                <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontStyle: 'italic', textAlign: 'center', display: 'block', marginTop: '4px' }}>
-                                  und {totalStudentsCount - activeStudentsCount - 5} weitere Schüler...
+                      ) : (
+                        rooms.map(room => {
+                          const roomAlloc = todayAllocations.filter(a => a.roomId === room.id);
+                          const roomOccupiedRate = Math.round((roomAlloc.length / 8) * 100);
+                          return (
+                            <div key={room.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '14px', borderRadius: '16px', background: 'rgba(248, 250, 252, 0.6)', border: '1px solid rgba(0, 0, 0, 0.03)' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
+                                  🚪 {room.name} {room.floor ? `(${room.floor})` : ''}
                                 </span>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: roomOccupiedRate > 75 ? '#ef4444' : roomOccupiedRate > 30 ? '#f59e0b' : '#10b981' }}>
+                                  {roomOccupiedRate}% ({roomAlloc.length} / 8 Slots)
+                                </span>
+                              </div>
+                              <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '100px', overflow: 'hidden' }}>
+                                <div style={{
+                                  height: '100%',
+                                  width: `${Math.min(100, roomOccupiedRate)}%`,
+                                  background: roomOccupiedRate > 75 ? '#ef4444' : roomOccupiedRate > 30 ? '#f59e0b' : '#10b981',
+                                  borderRadius: '100px',
+                                  transition: 'width 0.5s'
+                                }} />
+                              </div>
+                              {roomAlloc.length > 0 && (
+                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
+                                  {roomAlloc.map((alloc, idx) => (
+                                    <span key={idx} style={{ fontSize: '0.65rem', background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.05)', padding: '4px 8px', borderRadius: '8px', color: '#475569', fontWeight: 650, boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                                      ⏱️ {alloc.startTime} - {userMap[alloc.teacherId]?.split(' ')[0] || 'Lehrer'}
+                                    </span>
+                                  ))}
+                                </div>
                               )}
                             </div>
-                          </div>
-                        )}
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* RIGHT COLUMN: SIDEBAR */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  
+                  {/* WIDGET: Schultermine */}
+                  <div style={{
+                    background: '#ffffff',
+                    borderRadius: '24px',
+                    padding: '24px',
+                    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
+                    border: '1px solid rgba(0, 0, 0, 0.05)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                      <div style={{ background: '#fef3c7', color: '#d97706', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Calendar size={16} color="#fbbf24" />
+                      </div>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                          Schultermine
+                        </h3>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                          Wichtige Termine der Musikschule
+                        </span>
                       </div>
                     </div>
 
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {[
+                        { date: '12. Juni 2026', time: '10:00 Uhr', title: '👥 Lehrkräfte-Konferenz', desc: 'Dienstbesprechung & Stundenplan-Update (Konferenzraum)' },
+                        { date: '18. Juni 2026', time: '15:30 Uhr', title: '🎹 Klassenvorspiel Klavier', desc: 'Klasse von Fr. Meier (Saal 1)' },
+                        { date: '20. Juni 2026', time: '17:00 Uhr', title: '🎸 GrooveLab Sommerkonzert 2026', desc: 'Schüler-Bands Live-Auftritt (Aula Hauptgebäude)' },
+                        { date: '01. Juli 2026', time: 'Ganztägig', title: '☀️ Beginn der Sommerferien', desc: 'Kein regulärer Unterricht (Schließzeit beachten)' }
+                      ].map((evt, idx) => (
+                        <div key={idx} style={{
+                          padding: '12px 16px',
+                          borderRadius: '16px',
+                          border: '1px solid rgba(245, 158, 11, 0.1)',
+                          background: 'rgba(245, 158, 11, 0.03)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <strong style={{ fontSize: '0.82rem', color: '#1e293b', fontWeight: 750 }}>
+                              {evt.title}
+                            </strong>
+                            <span style={{ fontSize: '0.68rem', background: 'rgba(245, 158, 11, 0.1)', color: '#d97706', padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>
+                              {evt.date}
+                            </span>
+                          </div>
+                          <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: 1.3 }}>
+                            {evt.desc}
+                          </span>
+                          <span style={{ fontSize: '0.66rem', color: '#a1a1aa', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            ⏱️ {evt.time}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* WIDGET: Schüler-Aktivierungsquote */}
+                  <div style={{
+                    background: '#ffffff',
+                    borderRadius: '24px',
+                    padding: '24px',
+                    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
+                    border: '1px solid rgba(0, 0, 0, 0.05)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                      <div style={{ background: '#d1fae5', color: '#059669', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <UserCheck size={16} />
+                      </div>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                          Aktivierungsquote
+                        </h3>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                          Schüler-Onboarding Status
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600 }}>Erfolgreich Aktiviert</span>
+                        <span style={{ fontSize: '0.8rem', color: '#1e293b', fontWeight: 800 }}>{activeStudentsCount} / {totalStudentsCount} Profile</span>
+                      </div>
+                      
+                      <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '100px', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${activationRate}%`, background: 'linear-gradient(90deg, #10b981 0%, #34d399 100%)', borderRadius: '100px' }} />
+                      </div>
+                      
+                      {/* Heutige Aktivierungen */}
+                      <div style={{ marginTop: '8px' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '8px', paddingLeft: '2px' }}>
+                          Heutige Aktivierungen ({(() => {
+                            const d = new Date();
+                            const localTodayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                            return students.filter(s => s.is_pin_activated && (s.updated_at?.startsWith(localTodayStr) || s.created_at?.startsWith(localTodayStr))).length;
+                          })()}):
+                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '140px', overflowY: 'auto', paddingRight: '4px' }}>
+                          {(() => {
+                            const d = new Date();
+                            const localTodayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                            const todayList = students.filter(s => s.is_pin_activated && (s.updated_at?.startsWith(localTodayStr) || s.created_at?.startsWith(localTodayStr)));
+                            if (todayList.length === 0) {
+                              return (
+                                <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontStyle: 'italic', paddingLeft: '2px' }}>
+                                  Heute noch keine Aktivierungen erfolgt.
+                                  </span>
+                              );
+                            }
+                            return todayList.slice(0, 5).map(s => (
+                              <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'rgba(16, 185, 129, 0.04)', border: '1px solid rgba(16, 185, 129, 0.08)', borderRadius: '12px' }}>
+                                <span style={{ fontSize: '0.74rem', color: '#065f46', fontWeight: 650 }}>{s.first_name} {s.last_name}</span>
+                                <span style={{ fontSize: '0.62rem', background: '#d1fae5', color: '#065f46', padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>
+                                  Aktiv ✔
+                                </span>
+                              </div>
+                            ));
+                          })()}
+                          {(() => {
+                            const d = new Date();
+                            const localTodayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                            const todayCount = students.filter(s => s.is_pin_activated && (s.updated_at?.startsWith(localTodayStr) || s.created_at?.startsWith(localTodayStr))).length;
+                            if (todayCount > 5) {
+                              return (
+                                <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontStyle: 'italic', textAlign: 'center', display: 'block', marginTop: '4px' }}>
+                                  und {todayCount - 5} weitere...
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* WIDGET: Heutige Krankmeldungen */}
+                  <div style={{
+                    background: '#ffffff',
+                    borderRadius: '24px',
+                    padding: '24px',
+                    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
+                    border: '1px solid rgba(0, 0, 0, 0.05)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                      <div style={{ background: '#fee2e2', color: '#b91c1c', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
+                        <UserX size={16} color="#ef4444" />
+                      </div>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                          Lehrer-Präsenz &amp; Status
+                        </h3>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                          Aktuelle Krankmeldungen
+                        </span>
+                      </div>
+                    </div>
+
+                    {activeSickTeachers.length === 0 ? (
+                      <div style={{
+                        background: 'rgba(16, 185, 129, 0.04)',
+                        border: '1px solid rgba(16, 185, 129, 0.1)',
+                        color: '#065f46',
+                        borderRadius: '16px',
+                        padding: '16px',
+                        textAlign: 'center'
+                      }}>
+                        <div style={{ fontSize: '1.4rem', marginBottom: '4px' }}>🎉</div>
+                        <strong style={{ display: 'block', fontSize: '0.82rem', fontWeight: 800 }}>Volle Präsenz</strong>
+                        <span style={{ fontSize: '0.72rem', opacity: 0.9 }}>Alle Lehrkräfte sind einsatzbereit. Es liegen keine Krankmeldungen vor.</span>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {activeSickTeachers.map(teacher => {
+                          const sickUntilStr = teacher.sick_until ? new Date(teacher.sick_until).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }) : 'unbefristet';
+                          return (
+                            <div key={teacher.id} style={{
+                              padding: '12px',
+                              borderRadius: '16px',
+                              border: '1px solid rgba(239, 68, 68, 0.1)',
+                              background: 'rgba(239, 68, 68, 0.04)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '10px'
+                            }}>
+                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', animation: 'pulse 1.5s infinite' }} />
+                              <div style={{ flex: 1 }}>
+                                <strong style={{ display: 'block', fontSize: '0.82rem', color: '#991b1b', fontWeight: 700 }}>
+                                  {teacher.firstName || teacher.first_name} {teacher.lastName || teacher.last_name}
+                                </strong>
+                                <span style={{ fontSize: '0.7rem', color: '#b91c1c', fontWeight: 600 }}>
+                                  Ausfall gemeldet: bis {sickUntilStr}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
                 </div>
@@ -6942,94 +7246,830 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         )}
 
         {/* TAB 1.5: SECRETARY - EMPLOYEES */}
-        {activeTab === 'secretary' && secretarySubTab === 'employees' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        {activeTab === 'secretary' && secretarySubTab === 'employees' && (() => {
+          const filteredEmployees = employees.filter(emp => {
+            const firstName = (emp.first_name || '').toLowerCase();
+            const lastName = (emp.last_name || '').toLowerCase();
+            const email = (emp.email || '').toLowerCase();
+            const query = employeeSearchQuery.toLowerCase().trim();
             
-            {/* Form to add an employee */}
-            <div className="google-card" style={{ paddingLeft: '44px' }}>
-              <div className="google-kpi-bar bg-google-blue" style={{ background: '#0b57d0' }} />
-              <h3 style={{ margin: '0 0 20px 0', fontSize: '1.1rem', fontWeight: 800 }}>👤 Neuen Mitarbeiter anlegen</h3>
-              <form onSubmit={handleCreateEmployee} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
-                <input 
-                  type="text" 
-                  required 
-                  placeholder="Vorname *" 
-                  value={employeeFirstName} 
-                  onChange={(e) => setEmployeeFirstName(e.target.value)} 
-                  style={{ padding: '10px', borderRadius: '12px', border: '1px solid #dadce0', outline: 'none', fontSize: '0.85rem' }} 
-                />
-                <input 
-                  type="text" 
-                  required 
-                  placeholder="Nachname *" 
-                  value={employeeLastName} 
-                  onChange={(e) => setEmployeeLastName(e.target.value)} 
-                  style={{ padding: '10px', borderRadius: '12px', border: '1px solid #dadce0', outline: 'none', fontSize: '0.85rem' }} 
-                />
-                <input 
-                  type="text" 
-                  placeholder="Spitzname (für Briefing)" 
-                  value={employeeNickname} 
-                  onChange={(e) => setEmployeeNickname(e.target.value)} 
-                  style={{ padding: '10px', borderRadius: '12px', border: '1px solid #dadce0', outline: 'none', fontSize: '0.85rem' }} 
-                />
-                <input 
-                  type="email" 
-                  required 
-                  placeholder="E-Mail *" 
-                  value={employeeEmail} 
-                  onChange={(e) => setEmployeeEmail(e.target.value)} 
-                  style={{ padding: '10px', borderRadius: '12px', border: '1px solid #dadce0', outline: 'none', fontSize: '0.85rem' }} 
-                />
-                <button type="submit" className="google-btn-primary" style={{ background: '#0b57d0', color: '#ffffff' }}>Mitarbeiter anlegen</button>
-              </form>
-            </div>
+            const matchesSearch = !query || firstName.includes(query) || lastName.includes(query) || email.includes(query);
+            const matchesRole = employeeFilterRole === 'All' || emp.role === employeeFilterRole;
+            
+            const isActive = emp.is_active ?? true;
+            const matchesStatus = employeeStatusTab === 'all' ||
+              (employeeStatusTab === 'active' && isActive) ||
+              (employeeStatusTab === 'inactive' && !isActive);
+              
+            return matchesSearch && matchesRole && matchesStatus;
+          });
 
-            {/* List of employees */}
-            <div className="google-card">
-              <h3 style={{ margin: '0 0 20px 0', fontSize: '1rem', fontWeight: 800 }}>👥 Verwaltung &amp; Administration</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
-                {employees.map(emp => (
-                  <div key={emp.id} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#ffffff', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <strong style={{ fontSize: '0.88rem', color: '#1d1d1f', display: 'block' }}>
-                          {emp.first_name} {emp.last_name}
-                        </strong>
-                        {emp.nickname && (
-                          <span style={{ fontSize: '0.75rem', color: '#0b57d0', fontWeight: 600 }}>
-                            Spitzname: "{emp.nickname}"
-                          </span>
-                        )}
-                        <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block', marginTop: '2px' }}>
-                          {emp.email}
-                        </span>
-                      </div>
-                      <span style={{ fontSize: '0.62rem', background: '#e8f0fe', color: '#0b57d0', padding: '2px 8px', borderRadius: '100px', fontWeight: 800 }}>
-                        {emp.role === 'admin' ? 'Admin' : 'Verwaltung'}
-                      </span>
+          const adminCount = employees.filter(e => e.role === 'admin').length;
+          const secretaryCount = employees.filter(e => e.role === 'secretary').length;
+
+          return (
+            <div className="campus-grid">
+              
+              {/* Left Content Pane (Main Board Content) */}
+              <div style={{ flex: '1', display: 'flex', flexDirection: 'column', gap: '24px', width: '100%', minWidth: 0 }}>
+                
+                {/* 1. EMPLOYEE BOARD HEADER CARD */}
+                <div className="google-card" style={{
+                  width: '100%',
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '24px', 
+                  padding: '24px',
+                  borderRadius: '24px',
+                  border: '1.5px solid #cbd5e1',
+                  background: '#ffffff',
+                  boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)',
+                  minWidth: 0
+                }}>
+                  {/* TITLE BLOCK & ACTIONS */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <Users size={22} style={{ color: '#0f172a' }} />
+                      <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                        Mitarbeiterverwaltung ({employees.length})
+                      </h3>
                     </div>
                     
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', borderTop: '1px solid #dadce0', paddingTop: '10px' }}>
-                      <div>
-                        <span style={{ fontSize: '0.58rem', color: '#64748b', textTransform: 'uppercase', display: 'block', fontWeight: 800 }}>Mitarbeiter-PIN</span>
-                        <strong style={{ fontSize: '0.88rem', fontFamily: 'monospace', color: '#4b5563' }}>{emp.ausweis_nummer || 'Keine'}</strong>
-                      </div>
-                      {emp.id !== userId && (
-                        <button 
-                          onClick={() => handleDeleteUser(emp.id)} 
-                          style={{ border: 'none', background: 'transparent', color: '#ea4335', cursor: 'pointer', padding: '4px' }}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      )}
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => setIsEmployeeCsvExpanded(!isEmployeeCsvExpanded)}
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '6px', 
+                          borderRadius: '12px', 
+                          padding: '8px 16px', 
+                          fontSize: '0.8rem', 
+                          fontWeight: 800,
+                          background: isEmployeeCsvExpanded ? '#f1f5f9' : '#ffffff',
+                          color: '#475569',
+                          border: '1.5px solid #cbd5e1',
+                          cursor: 'pointer',
+                          fontFamily: 'Urbanist',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        📄 Sammel-Onboarding (CSV) {isEmployeeCsvExpanded ? '▲' : '▼'}
+                      </button>
+
+                      <button
+                        onClick={() => setShowAddEmployeeModal(true)}
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '6px', 
+                          borderRadius: '12px', 
+                          padding: '8px 16px', 
+                          fontSize: '0.8rem', 
+                          fontWeight: 800,
+                          background: '#0b57d0',
+                          color: '#ffffff',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontFamily: 'Urbanist',
+                          boxShadow: '0 4px 10px rgba(11,87,208,0.15)',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        ➕ Mitarbeiter anlegen
+                      </button>
                     </div>
                   </div>
-                ))}
+
+                  {/* Collapsible CSV Box */}
+                  {isEmployeeCsvExpanded && (
+                    <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px dashed #cbd5e1', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                        <strong style={{ fontSize: '0.88rem', color: '#0f172a', fontWeight: 900, fontFamily: 'Urbanist' }}>
+                          Sammel-Onboarding (Mitarbeiter)
+                        </strong>
+                        <span style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'Inter' }}>
+                          Format pro Zeile: <code>Vorname; Nachname; E-Mail; Spitzname (optional); Rolle (admin/secretary)</code>
+                        </span>
+                      </div>
+
+                      {employeeFilterRole && employeeFilterRole !== 'All' && (() => {
+                        const roleName = employeeFilterRole === 'admin' ? 'Admin' : 'Verwaltung';
+                        const { avatarBg: instAvatarBg, avatarColor: instAvatarColor } = getAlphabeticalColor(roleName);
+
+                        return (
+                          <div style={{
+                            background: 'rgba(11, 87, 208, 0.03)',
+                            border: '1.5px solid rgba(11, 87, 208, 0.12)',
+                            borderRadius: '16px',
+                            padding: '12px 16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '16px',
+                            marginTop: '2px',
+                            marginBottom: '2px',
+                            flexWrap: 'wrap',
+                            transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flex: 1 }}>
+                              <span style={{ fontSize: '0.68rem', color: '#0b57d0', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>
+                                ⚡ Smart Auto-Zuweisung:
+                              </span>
+
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                background: '#ffffff',
+                                border: '1.5px solid #cbd5e1',
+                                padding: '4px 10px 4px 6px',
+                                borderRadius: '100px',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                              }}>
+                                <div style={{
+                                  width: '24px',
+                                  height: '24px',
+                                  borderRadius: '50%',
+                                  background: instAvatarBg,
+                                  color: instAvatarColor,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '0.65rem',
+                                  fontWeight: 900,
+                                  fontFamily: 'Urbanist'
+                                }}>
+                                  {roleName[0]?.toUpperCase()}
+                                </div>
+                                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                                  {roleName}
+                                </span>
+                                <span style={{ fontSize: '0.6rem', fontWeight: 900, background: '#f1f5f9', color: '#64748b', padding: '1px 6px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                  Rolle
+                                </span>
+                              </div>
+                            </div>
+                            
+                            <span style={{ fontSize: '0.65rem', color: '#0b57d0', fontWeight: 900, background: '#e8f0fe', padding: '4px 10px', borderRadius: '8px', letterSpacing: '0.02em', textTransform: 'uppercase', fontFamily: 'Urbanist' }}>
+                              Rolle wird automatisch verknüpft!
+                            </span>
+                          </div>
+                        );
+                      })()}
+
+                      <textarea
+                        value={employeeCsvText}
+                        onChange={(e) => setEmployeeCsvText(e.target.value)}
+                        placeholder={
+                          employeeFilterRole && employeeFilterRole !== 'All'
+                            ? "Markus; Weber; markus@schule.de; Webbi\nAnna; Becker; anna@schule.de"
+                            : "Markus; Weber; markus@schule.de; Webbi; admin\nAnna; Becker; anna@schule.de; ; secretary"
+                        }
+                        style={{
+                          width: '100%',
+                          height: '100px',
+                          borderRadius: '10px',
+                          border: '1px solid #cbd5e1',
+                          padding: '10px',
+                          fontSize: '0.78rem',
+                          fontFamily: 'monospace',
+                          outline: 'none',
+                          resize: 'vertical'
+                        }}
+                      />
+                      <button
+                        onClick={handleImportEmployees}
+                        className="google-btn-primary"
+                        style={{ background: '#0b57d0', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, alignSelf: 'flex-start', cursor: 'pointer' }}
+                      >
+                        Mitarbeiter importieren
+                      </button>
+                    </div>
+                  )}
+
+                  {/* FILTERS ROW */}
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div style={{ position: 'relative', flex: 1.5, minWidth: '240px' }}>
+                      <input
+                        type="text"
+                        value={employeeSearchQuery}
+                        onChange={(e) => setEmployeeSearchQuery(e.target.value)}
+                        placeholder="Mitarbeiter nach Name oder E-Mail suchen..."
+                        style={{
+                          width: '100%',
+                          padding: '10px 16px 10px 38px',
+                          borderRadius: '14px',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '0.85rem',
+                          fontFamily: 'Urbanist',
+                          fontWeight: 600,
+                          outline: 'none',
+                          background: '#ffffff'
+                        }}
+                      />
+                      <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '0.85rem' }}>🔍</span>
+                    </div>
+
+                    <select
+                      value={employeeFilterRole}
+                      onChange={(e) => setEmployeeFilterRole(e.target.value)}
+                      style={{
+                        padding: '10px 16px',
+                        borderRadius: '14px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.85rem',
+                        fontFamily: 'Urbanist',
+                        fontWeight: 600,
+                        outline: 'none',
+                        background: 'white',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="All">👥 Alle Rollen</option>
+                      <option value="admin">Administrator</option>
+                      <option value="secretary">Verwaltung</option>
+                    </select>
+
+                    <select
+                      value={employeeStatusTab}
+                      onChange={(e) => setEmployeeStatusTab(e.target.value as any)}
+                      style={{
+                        padding: '10px 16px',
+                        borderRadius: '14px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.85rem',
+                        fontFamily: 'Urbanist',
+                        fontWeight: 600,
+                        outline: 'none',
+                        background: 'white',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="all">⚡ Alle</option>
+                      <option value="active">Aktiv</option>
+                      <option value="inactive">Inaktiv</option>
+                    </select>
+                  </div>
+
+                  {/* DYNAMIC EMPLOYEE LIST */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowX: 'auto', width: '100%' }}>
+                    {filteredEmployees.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                        Keine Mitarbeiter gefunden. Lege ein neues Profil an oder passe deine Filter an.
+                      </div>
+                    ) : (
+                      filteredEmployees.map((emp: any) => {
+                        const empName = `${emp.first_name || ''} ${emp.last_name || ''}`.trim();
+                        const { avatarBg, avatarColor } = getAlphabeticalColor(empName);
+                        const roleLabel = emp.role === 'admin' ? 'Admin' : 'Verwaltung';
+                        const isActive = emp.is_active ?? true;
+
+                        return (
+                          <div
+                            key={emp.id}
+                            draggable={true}
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData("employeeId", emp.id);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '10px 16px',
+                              borderRadius: '16px',
+                              border: '1px solid #f1f5f9',
+                              background: '#ffffff',
+                              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.01)',
+                              transition: 'all 0.25s ease',
+                              minWidth: '850px'
+                            }}
+                            className="hover-scale"
+                          >
+                            {/* Avatar & Name Info */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: '1.6', minWidth: '180px' }}>
+                              <div style={{
+                                width: '42px',
+                                height: '42px',
+                                borderRadius: '50%',
+                                background: avatarBg,
+                                color: avatarColor,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 800,
+                                fontSize: '0.88rem',
+                                fontFamily: 'Urbanist',
+                                flexShrink: 0
+                              }}>
+                                {(emp.first_name?.[0] || 'M')}{(emp.last_name?.[0] || 'W')}
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1d1d1f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {empName}
+                                </span>
+                                <span style={{ fontSize: '0.74rem', color: '#86868b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {emp.email || 'Keine E-Mail'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Nickname/Spitzname Badge */}
+                            <div style={{ flex: '1', minWidth: '100px' }}>
+                              {emp.nickname ? (
+                                <span style={{
+                                  display: 'inline-block',
+                                  padding: '6px 12px',
+                                  borderRadius: '10px',
+                                  background: '#f5f5f7',
+                                  color: '#0b57d0',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 700,
+                                  textAlign: 'center',
+                                  width: '100%',
+                                  boxSizing: 'border-box'
+                                }}>
+                                  "{emp.nickname}"
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: '0.78rem', color: '#cbd5e1', display: 'block', textAlign: 'center' }}>-</span>
+                              )}
+                            </div>
+
+                            {/* Role Badge */}
+                            <div style={{ flex: '1', minWidth: '100px', display: 'flex', justifyContent: 'center' }}>
+                              <span style={{
+                                padding: '5px 12px',
+                                borderRadius: '10px',
+                                background: emp.role === 'admin' ? '#e8f0fe' : '#e2f6ea',
+                                color: emp.role === 'admin' ? '#0b57d0' : '#137333',
+                                fontSize: '0.74rem',
+                                fontWeight: 700,
+                                minWidth: '75px',
+                                textAlign: 'center'
+                              }}>
+                                {roleLabel}
+                              </span>
+                            </div>
+
+                            {/* Status Badge */}
+                            <div style={{ flex: '1', minWidth: '100px', display: 'flex', justifyContent: 'center' }}>
+                              <span style={{
+                                padding: '5px 12px',
+                                borderRadius: '10px',
+                                background: isActive ? '#e2f6ea' : '#f5f5f7',
+                                color: isActive ? '#137333' : '#86868b',
+                                fontSize: '0.74rem',
+                                fontWeight: 700,
+                                minWidth: '55px',
+                                textAlign: 'center'
+                              }}>
+                                {isActive ? 'Aktiv' : 'Inaktiv'}
+                              </span>
+                            </div>
+
+                            {/* Monospace PIN */}
+                            <div style={{ flex: '1', minWidth: '120px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                              <span style={{ fontSize: '0.58rem', color: '#86868b', textTransform: 'uppercase', fontWeight: 800 }}>Mitarbeiter-PIN</span>
+                              <strong style={{ fontSize: '0.88rem', fontFamily: 'monospace', color: '#4b5563' }}>{emp.ausweis_nummer || 'Keine'}</strong>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div style={{ flex: '1.2', minWidth: '120px', display: 'flex', gap: '14px', alignItems: 'center', justifyContent: 'flex-end' }}>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (emp.ausweis_nummer) {
+                                    navigator.clipboard.writeText(emp.ausweis_nummer);
+                                    alert(`PIN "${emp.ausweis_nummer}" wurde in die Zwischenablage kopiert.`);
+                                  } else {
+                                    alert('Keine PIN vorhanden.');
+                                  }
+                                }}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: '#1a73e8',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  fontFamily: 'Urbanist'
+                                }}
+                              >
+                                Pass teilen
+                              </button>
+                              {emp.id !== userId && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteUser(emp.id);
+                                  }}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: '#ea4335',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    padding: '2px 6px'
+                                  }}
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              )}
+                            </div>
+
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Manual Add Employee Modal */}
+                  {showAddEmployeeModal && (
+                    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                      <div style={{ background: '#ffffff', borderRadius: '24px', maxWidth: '520px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column' }}>
+                        {/* Modal Header */}
+                        <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                            ➕ Neuen Mitarbeiter hinzufügen
+                          </h3>
+                          <button 
+                            onClick={() => setShowAddEmployeeModal(false)}
+                            style={{ border: 'none', background: 'transparent', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <form onSubmit={handleCreateEmployee}>
+                          <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Vorname *</label>
+                                <input
+                                  type="text"
+                                  required
+                                  value={employeeFirstName}
+                                  onChange={(e) => setEmployeeFirstName(e.target.value)}
+                                  placeholder="z.B. Clara"
+                                  style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                                />
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Nachname *</label>
+                                <input
+                                  type="text"
+                                  required
+                                  value={employeeLastName}
+                                  onChange={(e) => {
+                                    setEmployeeLastName(e.target.value);
+                                  }}
+                                  placeholder="z.B. Schumann"
+                                  style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                                />
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Spitzname</label>
+                              <input
+                                type="text"
+                                value={employeeNickname}
+                                onChange={(e) => setEmployeeNickname(e.target.value)}
+                                placeholder="z.B. Clärchen"
+                                style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                              />
+                            </div>
+                            
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>E-Mail-Adresse *</label>
+                              <input
+                                type="email"
+                                required
+                                value={employeeEmail}
+                                onChange={(e) => setEmployeeEmail(e.target.value)}
+                                placeholder="z.B. clara@musaek.de"
+                                style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                              />
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Rolle *</label>
+                              <select
+                                name="employeeRoleSelect"
+                                defaultValue="secretary"
+                                style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
+                              >
+                                <option value="secretary">Verwaltung</option>
+                                <option value="admin">Administrator</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* Modal Footer */}
+                          <div style={{ padding: '16px 24px', background: '#f8fafc', borderTop: '1px solid #f1f5f9', borderRadius: '0 0 24px 24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                            <button
+                              type="button"
+                              onClick={() => setShowAddEmployeeModal(false)}
+                              style={{ background: 'transparent', border: 'none', color: '#64748b', fontWeight: 800, cursor: 'pointer', fontSize: '0.82rem' }}
+                            >
+                              Abbrechen
+                            </button>
+                            <button
+                              type="submit"
+                              className="google-btn-primary"
+                              style={{ background: '#0b57d0', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '10px 20px', fontSize: '0.82rem', fontWeight: 700 }}
+                            >
+                              Mitarbeiter anlegen
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
+
+              {/* Right Sidebar Pane */}
+              <div style={{ width: '340px', display: 'flex', flexDirection: 'column', gap: '24px', flexShrink: 0 }}>
+                
+                <div className="google-card" style={{ 
+                  padding: '24px', 
+                  borderRadius: '24px', 
+                  border: '1.5px solid #cbd5e1', 
+                  background: '#ffffff',
+                  boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '20px'
+                }}>
+                  {/* Header */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <ShieldAlert size={20} style={{ color: '#0f172a' }} />
+                      <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                        Rollen &amp; Berechtigungen
+                      </h4>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', lineHeight: '1.45', fontFamily: 'Inter' }}>
+                      Klicke auf eine Rolle, um die Ansicht zu filtern, oder ziehe einen Mitarbeiter hierher, um seine Rolle direkt anzupassen.
+                    </p>
+                  </div>
+
+                  {/* Role List */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    
+                    {/* "Alle Rollen anzeigen" Row */}
+                    {(() => {
+                      const isActive = employeeFilterRole === 'All';
+                      const isHovered = dragHoveredEmployeeRole === 'All';
+                      return (
+                        <div
+                          onClick={() => setEmployeeFilterRole('All')}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            setDragHoveredEmployeeRole('All');
+                          }}
+                          onDragLeave={() => setDragHoveredEmployeeRole(null)}
+                          onDrop={(e) => {
+                            const empId = e.dataTransfer.getData("employeeId");
+                            // Dropping on "All" doesn't change role, or default to secretary
+                            setDragHoveredEmployeeRole(null);
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '12px 16px',
+                            borderRadius: '16px',
+                            border: isHovered 
+                              ? '2px dashed #0b57d0' 
+                              : isActive 
+                                ? '1.5px solid #0b57d0' 
+                                : '1.5px solid #cbd5e1',
+                            background: isHovered 
+                              ? '#e8f0fe' 
+                              : isActive 
+                                ? '#e8f0fe' 
+                                : '#ffffff',
+                            cursor: 'pointer',
+                            transform: isHovered ? 'scale(1.02)' : 'scale(1)',
+                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                            boxShadow: isActive ? '0 4px 12px rgba(11,87,208,0.06)' : 'none'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '50%',
+                              background: '#f1f5f9',
+                              color: '#475569',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              <Users size={18} />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                                Alle Rollen anzeigen
+                              </span>
+                              <span style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'Inter' }}>
+                                Gesamtübersicht
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <span style={{
+                            padding: '4px 10px',
+                            borderRadius: '10px',
+                            background: isActive ? '#d2e3fc' : '#f1f5f9',
+                            color: isActive ? '#1a73e8' : '#64748b',
+                            fontSize: '0.68rem',
+                            fontWeight: 800,
+                            fontFamily: 'Urbanist',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {employees.length} Mitarbeiter
+                          </span>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Admin Role Drop Row */}
+                    {(() => {
+                      const isActive = employeeFilterRole === 'admin';
+                      const isHovered = dragHoveredEmployeeRole === 'admin';
+                      return (
+                        <div
+                          onClick={() => setEmployeeFilterRole('admin')}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            setDragHoveredEmployeeRole('admin');
+                          }}
+                          onDragLeave={() => setDragHoveredEmployeeRole(null)}
+                          onDrop={(e) => {
+                            const empId = e.dataTransfer.getData("employeeId");
+                            if (empId) {
+                              handleUpdateEmployeeRole(empId, 'admin');
+                            }
+                            setDragHoveredEmployeeRole(null);
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '12px 16px',
+                            borderRadius: '16px',
+                            border: isHovered 
+                              ? '2px dashed #0b57d0' 
+                              : isActive 
+                                ? '1.5px solid #0b57d0' 
+                                : '1.5px solid #cbd5e1',
+                            background: isHovered 
+                              ? '#e8f0fe' 
+                              : isActive 
+                                ? '#e8f0fe' 
+                                : '#ffffff',
+                            cursor: 'pointer',
+                            transform: isHovered ? 'scale(1.02)' : 'scale(1)',
+                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                            boxShadow: isActive ? '0 4px 12px rgba(11,87,208,0.06)' : 'none'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '50%',
+                              background: '#e8f0fe',
+                              color: '#0b57d0',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              <UserCheck size={18} />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                                Administratoren
+                              </span>
+                              <span style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'Inter' }}>
+                                Volle Systemrechte
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <span style={{
+                            padding: '4px 10px',
+                            borderRadius: '10px',
+                            background: isActive ? '#d2e3fc' : '#f1f5f9',
+                            color: isActive ? '#1a73e8' : '#64748b',
+                            fontSize: '0.68rem',
+                            fontWeight: 800,
+                            fontFamily: 'Urbanist',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {adminCount} Admin
+                          </span>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Secretary/Verwaltung Role Drop Row */}
+                    {(() => {
+                      const isActive = employeeFilterRole === 'secretary';
+                      const isHovered = dragHoveredEmployeeRole === 'secretary';
+                      return (
+                        <div
+                          onClick={() => setEmployeeFilterRole('secretary')}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            setDragHoveredEmployeeRole('secretary');
+                          }}
+                          onDragLeave={() => setDragHoveredEmployeeRole(null)}
+                          onDrop={(e) => {
+                            const empId = e.dataTransfer.getData("employeeId");
+                            if (empId) {
+                              handleUpdateEmployeeRole(empId, 'secretary');
+                            }
+                            setDragHoveredEmployeeRole(null);
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '12px 16px',
+                            borderRadius: '16px',
+                            border: isHovered 
+                              ? '2px dashed #0b57d0' 
+                              : isActive 
+                                ? '1.5px solid #0b57d0' 
+                                : '1.5px solid #cbd5e1',
+                            background: isHovered 
+                              ? '#e8f0fe' 
+                              : isActive 
+                                ? '#e8f0fe' 
+                                : '#ffffff',
+                            cursor: 'pointer',
+                            transform: isHovered ? 'scale(1.02)' : 'scale(1)',
+                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                            boxShadow: isActive ? '0 4px 12px rgba(11,87,208,0.06)' : 'none'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '50%',
+                              background: '#e2f6ea',
+                              color: '#137333',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              <UserCheck size={18} />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                                Verwaltung
+                              </span>
+                              <span style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'Inter' }}>
+                                Schulsekretariat
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <span style={{
+                            padding: '4px 10px',
+                            borderRadius: '10px',
+                            background: isActive ? '#d2e3fc' : '#f1f5f9',
+                            color: isActive ? '#1a73e8' : '#64748b',
+                            fontSize: '0.68rem',
+                            fontWeight: 800,
+                            fontFamily: 'Urbanist',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {secretaryCount} Verwaltung
+                          </span>
+                        </div>
+                      );
+                    })()}
+
+                  </div>
+                </div>
+
+              </div>
+
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* TAB 1.6: SECRETARY - LINKING */}
         {activeTab === 'secretary' && secretarySubTab === 'linking' && (
@@ -7452,7 +8492,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           cursor: 'pointer'
                         }}
                       >
-                        <option value="All">🎸 Alle Instrumente</option>
+                        <option value="All">♫ Alle Instrumente</option>
                         {uniqueInstruments.map(inst => (
                           <option key={inst} value={inst}>{inst}</option>
                         ))}
@@ -7473,7 +8513,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           cursor: 'pointer'
                         }}
                       >
-                        <option value="all">⚡ Alle</option>
+                        <option value="all">☇ Alle</option>
                         <option value="active">Aktiv (Campus)</option>
                         <option value="inactive">Inaktiv (Bypass)</option>
                       </select>
@@ -7630,7 +8670,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                     padding: '2px 6px'
                                   }}
                                 >
-                                  <X size={18} />
+                                  <Trash2 size={16} />
                                 </button>
                               </div>
 
@@ -10801,11 +11841,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: 'auto', flexShrink: 0 }}>
                                 <button
                                   onClick={() => handleDeleteRoom(room.id)}
-                                  style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '1.2rem', fontWeight: 900, cursor: 'pointer', padding: '0 4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                  style={{ background: 'transparent', border: 'none', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: '0 4px' }}
                                   className="hover-scale-mini"
                                   title="Löschen"
                                 >
-                                  ❌
+                                  <Trash2 size={18} />
                                 </button>
                               </div>
                             </div>
