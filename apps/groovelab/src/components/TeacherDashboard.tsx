@@ -571,27 +571,30 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
               <AlertCircle size={10} fill="white" /> HELP
             </div>
           )}
-          {isActive && viewMode === 'admin' && (
+          {isActive && (viewMode === 'admin' || isMe) && (
             <button 
               onClick={(e) => { e.stopPropagation(); onLogout(sess.id); }}
               style={{ 
                 background: '#fef2f2', 
                 border: '1px solid #fee2e2', 
-                padding: '2px 6px', 
-                borderRadius: '6px', 
+                width: '20px',
+                height: '20px',
+                borderRadius: '50%', 
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 cursor: 'pointer', 
                 color: '#ef4444', 
-                fontSize: '0.6rem', 
-                fontWeight: 900, 
-                textTransform: 'uppercase',
-                transition: 'all 0.2s',
+                fontSize: '10px', 
+                fontWeight: 'bold', 
+                transition: 'all 0.2s ease',
                 flexShrink: 0,
-                marginLeft: '4px'
+                marginLeft: '4px',
+                padding: 0
               }}
-              
-              
+              title="Auschecken"
             >
-              Logout
+              ✕
             </button>
           )}
         </div>
