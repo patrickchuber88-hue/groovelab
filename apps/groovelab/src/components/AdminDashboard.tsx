@@ -1911,7 +1911,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         else sq = sq.eq('is_groovelab_active', true);
         // REGEL: Lehrer sehen nur ihre eigenen Songs (teacher_id-Filter)
         if (adminData.role === 'teacher') sq = sq.eq('teacher_id', adminData.id);
-        const { data: songsData } = await sq.order('artist');
+        const { data: songsData } = await sq.order('title');
         if (songsData) setSongs(songsData);
 
         // REGEL: Lehrer sehen nur ihre eigenen Lehrwerke (teacher_id-Filter)
@@ -3865,7 +3865,11 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Song (Optional)</label>
                   <select value={newBand.song_id} onChange={e => setNewBand({...newBand, song_id: e.target.value})} style={{ padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700 }}>
                     <option value="">-- Kein Song --</option>
-                    {songs.map(s => <option key={s.id} value={s.id}>{s.artist} - {s.title}</option>)}
+                    {[...songs].sort((a, b) => {
+                      const artistCompare = (a.artist || '').localeCompare(b.artist || '', 'de', { sensitivity: 'base' });
+                      if (artistCompare !== 0) return artistCompare;
+                      return (a.title || '').localeCompare(b.title || '', 'de', { sensitivity: 'base' });
+                    }).map(s => <option key={s.id} value={s.id}>{s.artist} - {s.title}</option>)}
                   </select>
                 </div>
               </div>
@@ -8134,7 +8138,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   : song.is_groovelab_active;
                   
                 return matchesSearch && matchesPlatform;
-              }).map(song => {
+              }).sort((a, b) => (a.title || '').localeCompare(b.title || '', 'de', { sensitivity: 'base' })).map(song => {
                 const lwColor = getSongColor(song.title || '');
                 const coverBg = `linear-gradient(135deg, ${lwColor.from} 0%, ${lwColor.to} 100%)`;
                 return (

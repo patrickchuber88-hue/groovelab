@@ -3902,135 +3902,243 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 </div>
 
                 {/* Two Columns Layout */}
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', 
-                  gap: '30px', 
-                  alignItems: 'flex-start' 
-                }}>
-                  {/* Left Column: Songs & Projekte */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Music size={16} color="#0ea5e9" /> Songs & Projekte
-                    </h3>
+                {(() => {
+                  const brandColor = studentUser?.schools?.brand_color || '#16a34a';
+                  
+                  const filteredSongs = songs.filter(song => {
+                    const matchesSearch = songSearch === '' || 
+                      song.title?.toLowerCase().includes(songSearch.toLowerCase()) || 
+                      song.artist?.toLowerCase().includes(songSearch.toLowerCase());
+                    return matchesSearch && song.is_campus_active;
+                  }).sort((a, b) => (a.title || '').localeCompare(b.title || '', 'de', { sensitivity: 'base' }));
 
-                    {/* Pinned current homework "Aktuelle Mission" */}
-                    {(() => {
-                      const activeHWs = progressItems.filter(item => item.is_current_homework && !item.topic_name.includes(' - Seite '));
-                      if (activeHWs.length === 0) return null;
-                      return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            🎯 Aktuelle Mission
-                          </span>
-                          {activeHWs.map(item => {
-                            let statusColor = '#eab308';
-                            let statusBg = '#fffbeb';
-                            let statusText = 'In Arbeit';
+                  const filteredLehrwerke = lehrwerke.filter(item => {
+                    return songSearch === '' || 
+                      item.title?.toLowerCase().includes(songSearch.toLowerCase()) || 
+                      item.author?.toLowerCase().includes(songSearch.toLowerCase());
+                  });
 
-                            if (item.status === 'THEORY_DONE') {
-                              statusColor = '#a855f7';
-                              statusBg = '#f3e8ff';
-                              statusText = 'Theorie gelesen';
-                            } else if (item.status === 'MASTERED') {
-                              statusColor = '#10b981';
-                              statusBg = '#d1fae5';
-                              statusText = 'Meisterwerk!';
-                            }
+                  return (
+                    <div style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', 
+                      gap: '30px', 
+                      alignItems: 'flex-start' 
+                    }}>
+                      {/* Left Column: Songs */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Music size={16} color={brandColor} /> Songs ({filteredSongs.length})
+                        </h3>
 
-                            const matchingSong = songs.find(s => s.title.toLowerCase() === item.topic_name.toLowerCase());
-                            const artist = matchingSong?.artist || 'Unbekannt';
-                            const songColor = getSongColor(item.topic_name);
-                            const coverBg = `linear-gradient(135deg, ${songColor.from} 0%, ${songColor.to} 100%)`;
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {filteredSongs.length === 0 ? (
+                            <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', fontStyle: 'italic', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1' }}>
+                              Keine Songs gefunden.
+                            </div>
+                          ) : (
+                            filteredSongs.map(song => {
+                              const lwColor = getSongColor(song.title || '');
+                              const coverBg = `linear-gradient(135deg, ${lwColor.from} 0%, ${lwColor.to} 100%)`;
 
-                            return (
-                              <div 
-                                key={item.id} 
-                                style={{
-                                  background: '#ffffff',
-                                  borderRadius: '24px',
-                                  border: '2px solid #06b6d4',
-                                  padding: '14px 18px',
-                                  borderLeft: `5px solid ${songColor.from}`,
-                                  boxShadow: '0 0 15px rgba(6, 182, 212, 0.15)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '12px',
-                                  position: 'relative'
-                                }}
-                                className="animate-pulse"
-                              >
-                                {/* Pink/Peach Sleeve + Vinyl peeking out Cover Icon */}
-                                <div style={{ position: 'relative', width: '68px', height: '56px', flexShrink: 0 }}>
-                                  <div style={{
-                                    position: 'absolute',
-                                    right: '4px',
-                                    top: '5px',
-                                    width: '46px',
-                                    height: '46px',
-                                    borderRadius: '50%',
-                                    background: '#090a0f',
-                                    boxShadow: '0 4px 10px rgba(0,0,0,0.25)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    zIndex: 1
-                                  }}>
-                                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: songColor.to, opacity: 0.45 }} />
-                                  </div>
-                                  <div style={{
-                                    position: 'absolute',
-                                    left: 0,
-                                    top: 0,
-                                    width: '56px',
-                                    height: '56px',
-                                    background: coverBg,
-                                    borderRadius: '16px',
-                                    boxShadow: '0 8px 20px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    zIndex: 2,
-                                    border: `1px solid ${songColor.text}18`
-                                  }}>
-                                    <span style={{ fontSize: '28px', lineHeight: 1, filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.1))' }}>🎵</span>
-                                  </div>
-                                </div>
+                              // Check progress status
+                              const progressItem = progressItems.find(item => 
+                                item.topic_name.toLowerCase() === song.title.toLowerCase() ||
+                                item.topic_name.toLowerCase().includes(song.title.toLowerCase())
+                              );
 
-                                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                                  <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '1.15rem', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                                    {item.topic_name}
-                                  </div>
-                                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>
-                                    von {artist}
-                                  </div>
-                                  {item.teacher_notes && (
-                                    <div style={{ background: '#f8fafc', padding: '6px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.72rem', color: '#0f172a', fontWeight: 650, fontStyle: 'italic', marginTop: '4px' }}>
-                                      Notiz: {item.teacher_notes}
+                              let statusColor = '';
+                              let statusBg = '';
+                              let statusText = '';
+
+                              if (progressItem) {
+                                if (progressItem.is_current_homework) {
+                                  statusColor = '#06b6d4';
+                                  statusBg = '#ecfeff';
+                                  statusText = 'Aktuelle Mission';
+                                } else if (progressItem.status === 'THEORY_DONE') {
+                                  statusColor = '#a855f7';
+                                  statusBg = '#f3e8ff';
+                                  statusText = 'Theorie gelesen';
+                                } else if (progressItem.status === 'MASTERED') {
+                                  statusColor = '#10b981';
+                                  statusBg = '#d1fae5';
+                                  statusText = 'Meisterwerk!';
+                                } else {
+                                  statusColor = '#eab308';
+                                  statusBg = '#fffbeb';
+                                  statusText = 'In Arbeit';
+                                }
+                              }
+
+                              return (
+                                <div 
+                                  key={song.id} 
+                                  className="glass-panel hover-scale"
+                                  style={{ 
+                                    padding: '14px 18px', 
+                                    display: 'flex', 
+                                    gap: '12px',
+                                    alignItems: 'center', 
+                                    background: 'white', 
+                                    borderRadius: '24px', 
+                                    border: '1px solid #e2e8f0', 
+                                    borderLeft: `5px solid ${lwColor.from}`,
+                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)', 
+                                    transition: 'all 0.2s ease',
+                                    minHeight: '92px',
+                                    boxSizing: 'border-box'
+                                  }}
+                                >
+                                  {/* Pink/Peach Sleeve + Vinyl peeking out Cover Icon */}
+                                  <div style={{ position: 'relative', width: '68px', height: '56px', flexShrink: 0 }}>
+                                    <div style={{
+                                      position: 'absolute',
+                                      right: '4px',
+                                      top: '5px',
+                                      width: '46px',
+                                      height: '46px',
+                                      borderRadius: '50%',
+                                      background: '#090a0f',
+                                      boxShadow: '0 4px 10px rgba(0,0,0,0.25)',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      zIndex: 1
+                                    }}>
+                                      <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: lwColor.to, opacity: 0.45 }} />
                                     </div>
+                                    <div style={{
+                                      position: 'absolute',
+                                      left: 0,
+                                      top: 0,
+                                      width: '56px',
+                                      height: '56px',
+                                      background: coverBg,
+                                      borderRadius: '16px',
+                                      boxShadow: '0 8px 20px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06)',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      zIndex: 2,
+                                      border: `1px solid ${lwColor.text}18`
+                                    }}>
+                                      <span style={{ fontSize: '28px', lineHeight: 1, filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.1))' }}>🎵</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Title and Artist */}
+                                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                    <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '1.15rem', letterSpacing: '-0.02em', lineHeight: '1.2' }}>{song.title}</div>
+                                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>von {song.artist}</div>
+                                  </div>
+
+                                  {statusText && (
+                                    <span style={{
+                                      background: statusBg,
+                                      color: statusColor,
+                                      padding: '4px 8px',
+                                      borderRadius: '8px',
+                                      fontSize: '0.65rem',
+                                      fontWeight: 900,
+                                      textTransform: 'uppercase',
+                                      whiteSpace: 'nowrap',
+                                      alignSelf: 'center',
+                                      boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+                                    }}>
+                                      {statusText}
+                                    </span>
                                   )}
                                 </div>
-                                <span style={{
-                                  background: statusBg,
-                                  color: statusColor,
-                                  padding: '4px 8px',
-                                  borderRadius: '8px',
-                                  fontSize: '0.65rem',
-                                  fontWeight: 900,
-                                  textTransform: 'uppercase',
-                                  whiteSpace: 'nowrap',
-                                  alignSelf: 'flex-start'
-                                }}>
-                                  {statusText}
-                                </span>
-                              </div>
-                            );
-                          })}
+                              );
+                            })
+                          )}
                         </div>
-                      );
-                    })()}
-                  </div>
-                </div>
+                      </div>
+
+                      {/* Right Column: Lehrwerke */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Library size={16} color={brandColor} /> Lehrwerke ({filteredLehrwerke.length})
+                        </h3>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
+                          {filteredLehrwerke.length === 0 ? (
+                            <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', fontStyle: 'italic', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1' }}>
+                              Keine Lehrwerke gefunden.
+                            </div>
+                          ) : (
+                            filteredLehrwerke.map(item => {
+                              const gradient = getLehrwerkColor(item.title);
+                              
+                              // Check textbook progress
+                              const assignment = localProgress.find((p: any) => p.studentId === studentId && p.lehrwerkId === item.id);
+                              let masteredCount = 0;
+                              if (assignment && assignment.pageStates) {
+                                masteredCount = Object.values(assignment.pageStates).filter((s: any) => s.status === 'mastered').length;
+                              }
+                              const pct = item.totalPages > 0 ? (masteredCount / item.totalPages) : 0;
+
+                              return (
+                                <div 
+                                  key={item.id} 
+                                  className="glass-panel hover-scale" 
+                                  style={{ 
+                                    padding: '14px 18px', 
+                                    background: 'white', 
+                                    display: 'flex', 
+                                    gap: '12px', 
+                                    alignItems: 'center', 
+                                    borderRadius: '24px', 
+                                    border: '1px solid #e2e8f0', 
+                                    borderLeft: `5px solid ${gradient.from}`,
+                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
+                                    position: 'relative',
+                                    transition: 'all 0.2s ease',
+                                    minHeight: '92px',
+                                    boxSizing: 'border-box'
+                                  }}
+                                >
+                                  <div style={{ 
+                                    width: '44px', 
+                                    height: '58px', 
+                                    background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`, 
+                                    borderRadius: '6px', 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center', 
+                                    color: gradient.text, 
+                                    boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                                    flexShrink: 0
+                                  }}>
+                                    <BookOpen size={18} color={gradient.text} />
+                                  </div>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <h4 style={{ margin: '0 0 2px 0', fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h4>
+                                    {item.author && <p style={{ margin: '0 0 2px 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>von {item.author}</p>}
+                                    <p style={{ margin: 0, fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700 }}>📖 {item.totalPages || 50} Seiten</p>
+                                    
+                                    {masteredCount > 0 && (
+                                      <div style={{ marginTop: '8px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#64748b', fontWeight: 700, marginBottom: '4px' }}>
+                                          <span>{masteredCount} / {item.totalPages} Seiten geschafft</span>
+                                          <span>{Math.round(pct * 100)}%</span>
+                                        </div>
+                                        <div style={{ width: '100%', height: '5px', borderRadius: '3px', background: '#e2e8f0', overflow: 'hidden' }}>
+                                          <div style={{ width: `${Math.min(100, pct * 100)}%`, height: '100%', background: gradient.from, borderRadius: '3px' }} />
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* RIGHT COLUMN: MEINE ERFOLGE WIDGET */}
