@@ -1887,33 +1887,42 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       overflowY: 'auto'
     }}>
       
-      <div className="loading-pulse" style={{
-        width: '70px',
-        height: '70px',
-        background: '#ffffff',
-        borderRadius: '24px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: '16px',
-        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.05)',
-        border: '1px solid #e2e8f0',
-        overflow: 'hidden'
-      }}>
-        {schoolData?.logo_url ? (
+      {schoolData?.logo_url ? (
+        <div style={{
+          maxHeight: '100px',
+          maxWidth: '320px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: '16px'
+        }}>
           <img 
             src={schoolData.logo_url} 
             alt="Logo" 
             style={{ 
-              width: '100%', 
-              height: '100%', 
-              objectFit: 'contain' 
+              maxHeight: '100px',
+              maxWidth: '100%',
+              objectFit: 'contain'
             }} 
           />
-        ) : (
+        </div>
+      ) : (
+        <div className="loading-pulse" style={{
+          width: '70px',
+          height: '70px',
+          background: '#ffffff',
+          borderRadius: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: '16px',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.05)',
+          border: '1px solid #e2e8f0',
+          overflow: 'hidden'
+        }}>
           <Music size={36} color={schoolData?.primary_color || "#eab308"} />
-        )}
-      </div>
+        </div>
+      )}
 
       <h1 
         onClick={() => {
@@ -1941,7 +1950,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         Campus-Login
       </h1>
       <p style={{ color: '#64748b', textAlign: 'center', fontSize: '13px', marginBottom: '32px', maxWidth: '300px', lineHeight: '1.4', fontWeight: 600 }}>
-        {schoolName ? `für ${schoolName}` : `Halte deinen Ausweis vor die Kamera, um dich einzuloggen.`}
+        {schoolName && !schoolData?.logo_url ? `für ${schoolName}` : `Halte deinen Ausweis vor die Kamera, um dich einzuloggen.`}
       </p>
 
       {/* Main Standard QR-Scanner Card */}
