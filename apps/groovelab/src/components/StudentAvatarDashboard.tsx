@@ -1448,6 +1448,112 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     }
   }, [activeTab, studentId]);
 
+  const handleUseJoker = async (dateStr: string) => {
+    if (!studentId || !studentUser) return;
+    
+    const currentWeek = getISOWeek(new Date());
+    const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
+    const isJokerAvailable = !studentUser?.joker_used_at || lastJokerWeek !== currentWeek;
+    
+    if (!isJokerAvailable) {
+      alert('Du hast deinen Joker für diese Woche bereits verbraucht!');
+      return;
+    }
+
+    if (!window.confirm(`Möchtest du deinen Joker für den ${dateStr} einsetzen, um deinen Streak zu sichern?`)) {
+      return;
+    }
+
+    try {
+      const parts = dateStr.split('.');
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const year = 2000 + parseInt(parts[2], 10);
+      const jokerDate = new Date(year, month, day, 12, 0, 0);
+
+      const { error: userErr } = await supabase
+        .from('users')
+        .update({ joker_used_at: jokerDate.toISOString() })
+        .eq('id', studentId);
+
+      if (userErr) throw userErr;
+
+      const currentStreak = avatar?.streak_flame || 0;
+      const newStreak = currentStreak === 0 ? 1 : currentStreak + 1;
+      
+      const { error: avatarErr } = await supabase
+        .from('avatars')
+        .update({ streak_flame: newStreak })
+        .eq('user_id', studentId);
+
+      if (avatarErr) throw avatarErr;
+
+      await fetchStudentAndAvatar();
+    } catch (err) {
+      console.error('Error using joker:', err);
+      alert('Fehler beim Einsetzen des Jokers. Bitte versuche es erneut.');
+    }
+  };
+
+  const checkAndAutoApplyJoker = async (groupedList: any[]) => {
+    if (!studentId || !studentUser || !avatar) return;
+
+    const currentWeek = getISOWeek(new Date());
+    const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
+    const isJokerAvailable = !studentUser?.joker_used_at || lastJokerWeek !== currentWeek;
+
+    if (!isJokerAvailable) return;
+
+    let firstMissedDayGroup: any = null;
+    for (let i = groupedList.length - 1; i >= 0; i--) {
+      const group = groupedList[i];
+      if (group.isPlaceholder && !group.isToday) {
+        const parts = group.date.split('.');
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const year = 2000 + parseInt(parts[2], 10);
+        const d = new Date(year, month, day);
+        
+        if (getISOWeek(d) === currentWeek) {
+          firstMissedDayGroup = group;
+          break;
+        }
+      }
+    }
+
+    if (firstMissedDayGroup) {
+      console.log('Automatically applying joker to save streak for date:', firstMissedDayGroup.date);
+      try {
+        const parts = firstMissedDayGroup.date.split('.');
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const year = 2000 + parseInt(parts[2], 10);
+        const jokerDate = new Date(year, month, day, 12, 0, 0);
+
+        const { error: userErr } = await supabase
+          .from('users')
+          .update({ joker_used_at: jokerDate.toISOString() })
+          .eq('id', studentId);
+
+        if (userErr) throw userErr;
+
+        const currentStreak = avatar?.streak_flame || 0;
+        const newStreak = currentStreak === 0 ? 1 : currentStreak + 1;
+        
+        const { error: avatarErr } = await supabase
+          .from('avatars')
+          .update({ streak_flame: newStreak })
+          .eq('user_id', studentId);
+
+        if (avatarErr) throw avatarErr;
+
+        await fetchStudentAndAvatar();
+      } catch (err) {
+        console.error('Error auto applying joker:', err);
+      }
+    }
+  };
+
   const handleTabChangeLocal = (tab: string) => {
     setActiveTab(tab);
     if (onTabChange) {
@@ -1596,6 +1702,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       fetchFokusLogs();
     }
   }, [studentId, activeTab]);
+
+  useEffect(() => {
+    if (studentUser && avatar) {
+      const grouped = getGroupedLogs();
+      checkAndAutoApplyJoker(grouped);
+    }
+  }, [studentUser?.id, avatar?.streak_flame, fokusLogs]);
 
   // Campus Cup States
   const [rankingData, setRankingData] = useState<any[]>([]);
@@ -4028,6 +4141,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           </div>
                         );
                       } else {
+                        const currentWeek = getISOWeek(new Date());
+                        const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
+                        const isJokerAvailable = !studentUser?.joker_used_at || lastJokerWeek !== currentWeek;
+
                         return (
                           <div 
                             key={idx}
@@ -4063,11 +4180,37 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               </span>
                             </div>
                             
-                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
-                              <Flame size={iconSize} fill="#ef4444" color="#ef4444" />
-                              <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ef4444' }}>
-                                Kleine Flamme
-                              </span>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+                              {isJokerAvailable && (
+                                <button 
+                                  onClick={() => handleUseJoker(group.date)}
+                                  style={{
+                                    background: '#8b5cf6',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    padding: '4px 10px',
+                                    borderRadius: '8px',
+                                    fontSize: '0.65rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 4px rgba(139, 92, 246, 0.2)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    transition: 'all 0.2s'
+                                  }}
+                                  onMouseOver={(e) => e.currentTarget.style.background = '#7c3aed'}
+                                  onMouseOut={(e) => e.currentTarget.style.background = '#8b5cf6'}
+                                >
+                                  🎯 Joker einsetzen
+                                </button>
+                              )}
+                              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                <Flame size={iconSize} fill="#ef4444" color="#ef4444" />
+                                <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ef4444' }}>
+                                  Kleine Flamme
+                                </span>
+                              </div>
                             </div>
                           </div>
                         );
