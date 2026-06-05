@@ -1015,6 +1015,30 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [avatar, setAvatar] = useState<Avatar | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [timeUntilMidnight, setTimeUntilMidnight] = useState('');
+
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = new Date();
+      const midnight = new Date();
+      midnight.setHours(24, 0, 0, 0); // Next midnight
+      const diffMs = midnight.getTime() - now.getTime();
+      if (diffMs <= 0) {
+        setTimeUntilMidnight('00:00:00');
+        return;
+      }
+      const diffSecs = Math.floor(diffMs / 1000);
+      const hrs = Math.floor(diffSecs / 3600);
+      const mins = Math.floor((diffSecs % 3600) / 60);
+      const secs = diffSecs % 60;
+      setTimeUntilMidnight(`${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`);
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, []);
   
   // Selection Screen State
   const [showSelector, setShowSelector] = useState(false);
@@ -1489,8 +1513,23 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   };
 
   const getGroupedLogs = () => {
-    const groups: Record<string, { date: string, focusSeconds: number, extraSeconds: number, flameLevel: string }> = {};
+    const groups: Record<string, { date: string, focusSeconds: number, extraSeconds: number, flameLevel: string, isPlaceholder?: boolean }> = {};
     
+    // Initialize today as a placeholder
+    const now = new Date();
+    const todayDd = String(now.getDate()).padStart(2, '0');
+    const todayMm = String(now.getMonth() + 1).padStart(2, '0');
+    const todayYy = String(now.getFullYear()).substring(2);
+    const todayDateStr = `${todayDd}.${todayMm}.${todayYy}`;
+    
+    groups[todayDateStr] = {
+      date: todayDateStr,
+      focusSeconds: 0,
+      extraSeconds: 0,
+      flameLevel: getFlameLevelName(avatar?.streak_flame || 0),
+      isPlaceholder: true
+    };
+
     fokusLogs.forEach(log => {
       if (!log.created_at) return;
       
@@ -1508,6 +1547,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           extraSeconds: 0,
           flameLevel: log.flame_level || 'Kleine Flamme'
         };
+      } else if (groups[dateStr].isPlaceholder) {
+        // If it was initialized as a placeholder, clear the placeholder flag since we have real logs
+        groups[dateStr].isPlaceholder = false;
       }
       
       const seconds = log.duration_seconds || ((log.duration_minutes || 0) * 60);
@@ -1521,7 +1563,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       }
     });
     
-    return Object.values(groups);
+    const list = Object.values(groups);
+    // Sort by date descending
+    list.sort((a: any, b: any) => {
+      const parseDateStr = (s: string) => {
+        const parts = s.split('.');
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const year = 2000 + parseInt(parts[2], 10);
+        return new Date(year, month, day).getTime();
+      };
+      return parseDateStr(b.date) - parseDateStr(a.date);
+    });
+    return list;
   };
 
   useEffect(() => {
@@ -3808,6 +3862,64 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   }
 
                   return grouped.map((group, idx) => {
+                    if (group.isPlaceholder) {
+                      return (
+                        <div 
+                          key={idx}
+                          style={{ 
+                            background: 'linear-gradient(135deg, rgba(251, 146, 60, 0.05) 0%, rgba(251, 146, 60, 0.01) 100%)', 
+                            border: '1px dashed rgba(234, 88, 12, 0.35)', 
+                            borderRadius: '16px', 
+                            padding: '12px 14px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px',
+                            borderLeft: '4px solid #ea580c',
+                            boxShadow: '0 2px 8px rgba(234, 88, 12, 0.01)'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '4px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontSize: '0.78rem', fontWeight: 850, color: '#ea580c', fontFamily: 'monospace' }}>
+                                {group.date}
+                              </span>
+                              <span style={{ 
+                                fontSize: '0.58rem', 
+                                fontWeight: 900, 
+                                background: 'rgba(234, 88, 12, 0.08)', 
+                                color: '#ea580c', 
+                                padding: '1px 6px', 
+                                borderRadius: '100px', 
+                                letterSpacing: '0.04em', 
+                                textTransform: 'uppercase' 
+                              }}>
+                                Aktiv
+                              </span>
+                            </div>
+                            {timeUntilMidnight && (
+                              <div style={{ 
+                                fontSize: '0.68rem', 
+                                fontWeight: 800, 
+                                color: '#d97706', 
+                                background: '#fef3c7',
+                                padding: '2px 6px',
+                                borderRadius: '6px',
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '3px', 
+                                fontFamily: 'monospace' 
+                              }}>
+                                <span>⏳ Noch {timeUntilMidnight}</span>
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#4b5563', lineHeight: '1.4' }}>
+                            Sichere dir deinen Übe-Streak! Mach heute Musik zu deiner Pause. 🎵
+                          </div>
+                        </div>
+                      );
+                    }
+
                     const focusMins = Math.round(group.focusSeconds / 60);
                     const extraMins = Math.floor(group.extraSeconds / 60);
                     const extraSecs = group.extraSeconds % 60;
