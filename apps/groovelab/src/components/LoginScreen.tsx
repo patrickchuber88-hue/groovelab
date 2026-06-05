@@ -1715,14 +1715,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           withinHours: true
         });
       } else {
-        console.log('[Login] Geofence check bypassed per academy settings.');
-        setGeoDebug({
-          isWithinAnyRoom: true,
-          userPos: null,
-          schoolCoords: schoolData ? { lat: schoolData.latitude, lng: schoolData.longitude } : null,
-          distToSchool: null,
-          withinHours: true
-        });
+        console.log('[Login] Geofence check bypassed.');
+        setGeoDebug(null);
       }
 
       console.log(`[Login] Scan successful. Geofence match: ${isWithinAnyRoom}`);
@@ -2314,7 +2308,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         position: 'relative',
         backdropFilter: 'blur(30px)',
         WebkitBackdropFilter: 'blur(30px)',
-        transition: 'all 0.5s ease'
+        transition: 'background 0.3s ease, border 0.3s ease, box-shadow 0.3s ease'
       }}>
         <div style={{ fontSize: '11px', fontWeight: 800, color: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.6)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', width: '100%', justifyContent: 'center' }}>
           <Tablet size={14} style={{ color: isGroovelabKiosk ? '#78350f' : '#a7f3d0' }} />
@@ -2812,7 +2806,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
 
       {/* Geofence Diagnostic Panel (Localhost only) */}
-      {isLocalhost && geoDebug && (
+      {isLocalhost && (effectiveStationId || isGroovelabKiosk) && geoDebug && (
         <div style={{ 
           marginTop: '24px', 
           padding: '24px', 

@@ -2661,9 +2661,9 @@ function App() {
       } else if (!userData.is_campus_active && userData.is_groovelab_active) {
         allowedPlatform = 'groovelab';
       } else {
-        // Both active or both inactive, default to campus on initial load, otherwise keep activePlatform/stored value
+        // Both active or both inactive, respect the stored platform, otherwise default to campus
         const storedPlat = localStorage.getItem('groovelab_active_platform') as 'campus' | 'groovelab' | null;
-        allowedPlatform = isInitial ? 'campus' : (storedPlat || 'campus');
+        allowedPlatform = storedPlat || 'campus';
       }
 
       if (isInitial) {
