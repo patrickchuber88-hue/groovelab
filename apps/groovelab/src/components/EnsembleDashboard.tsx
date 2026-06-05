@@ -38,8 +38,6 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState<'band' | 'ensemble'>('band');
-  const [firstStudentId, setFirstStudentId] = useState('');
-  const [firstInstrument, setFirstInstrument] = useState('');
 
   // Assignment states for manual add form
   const [addingMemberTo, setAddingMemberTo] = useState<string | null>(null);
@@ -154,35 +152,19 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
     if (!newName.trim()) return;
 
     try {
-      // 1. Create Ensemble
-      const { data, error } = await supabase
+      // Create Ensemble only specifying Name and Type
+      const { error } = await supabase
         .from('ensembles')
         .insert({
           name: newName.trim(),
           school_id: schoolId,
           type: newType
-        })
-        .select()
-        .single();
+        });
 
       if (error) throw error;
 
-      // 2. Add first member if selected (Schnellzuweisung)
-      if (firstStudentId && firstInstrument.trim()) {
-        const { error: memberErr } = await supabase
-          .from('ensemble_members')
-          .insert({
-            ensemble_id: data.id,
-            student_id: firstStudentId,
-            instrument: firstInstrument.trim()
-          });
-        if (memberErr) throw memberErr;
-      }
-
       setShowCreateModal(false);
       setNewName('');
-      setFirstStudentId('');
-      setFirstInstrument('');
       fetchData();
     } catch (err: any) {
       alert('Fehler beim Erstellen: ' + err.message);
@@ -346,16 +328,6 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
     }
   };
 
-  const handleFirstStudentSelectChange = (studentId: string) => {
-    setFirstStudentId(studentId);
-    const selected = schoolStudents.find(s => s.id === studentId);
-    if (selected && selected.instrument) {
-      setFirstInstrument(selected.instrument.split(',')[0].trim());
-    } else {
-      setFirstInstrument('');
-    }
-  };
-
   // Keyboard Smart Input Handlers
   const handleSmartInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -482,7 +454,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
 
           {/* Ensembles List */}
           {ensembles.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '80px 32px', background: 'white', borderRadius: '32px', border: '2px dashed #e2e8f0', marginTop: '16px' }}>
+            <div style={{ padding: '80px 32px', background: 'white', borderRadius: '32px', border: '2px dashed #e2e8f0', marginTop: '16px', textAlign: 'center' }}>
               <div style={{ fontSize: '3.5rem', marginBottom: '24px' }}>👥</div>
               <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e293b', margin: '0 0 8px 0' }}>Keine Ensembles vorhanden</h3>
               <p style={{ color: '#64748b', margin: 0 }}>
@@ -1220,7 +1192,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
       {/* Creation Modal */}
       {showCreateModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
-          <form onSubmit={handleCreateEnsemble} className="glass-panel" style={{ background: 'white', padding: '32px', borderRadius: '24px', width: '100%', maxWidth: '480px', boxSizing: 'border-box', boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}>
+          <form onSubmit={handleCreateEnsemble} className="glass-panel" style={{ background: 'white', padding: '32px', borderRadius: '24px', width: '100%', maxWidth: '440px', boxSizing: 'border-box', boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}>
             <h3 style={{ fontSize: '1.4rem', fontWeight: 900, color: '#1e293b', margin: '0 0 24px 0' }}>Neues Projekt gründen</h3>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
@@ -1235,7 +1207,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
               />
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '28px' }}>
               <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Typ</label>
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button
@@ -1277,54 +1249,11 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
               </div>
             </div>
 
-            {/* Quick assignment (Schnellzuweisung) inside creation modal */}
-            <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', marginBottom: '28px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  👥 Erstes Mitglied zuweisen
-                </span>
-                {user?.role === 'teacher' && (
-                  <span style={{ color: '#ef4444', fontSize: '0.7rem', fontWeight: 800 }}>Erforderlich (Eigene Schüler)</span>
-                )}
-              </div>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Schüler auswählen</label>
-                  <select
-                    value={firstStudentId}
-                    onChange={(e) => handleFirstStudentSelectChange(e.target.value)}
-                    required={user?.role === 'teacher'}
-                    style={{ padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 600 }}
-                  >
-                    <option value="">-- Schüler wählen --</option>
-                    {assignableStudents.map(s => (
-                      <option key={s.id} value={s.id}>{s.first_name} {s.last_name || ''} ({s.instrument || 'Kein Hauptinstrument'})</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Instrument / Rolle (auto-filled)</label>
-                  <input
-                    type="text"
-                    value={firstInstrument}
-                    onChange={(e) => setFirstInstrument(e.target.value)}
-                    required={!!firstStudentId || user?.role === 'teacher'}
-                    placeholder="z.B. E-Gitarre, Schlagzeug..."
-                    style={{ padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 600 }}
-                  />
-                </div>
-              </div>
-            </div>
-
             <div style={{ display: 'flex', gap: '12px' }}>
               <button
                 type="button"
                 onClick={() => {
                   setShowCreateModal(false);
-                  setFirstStudentId('');
-                  setFirstInstrument('');
                 }}
                 style={{ flex: 1, padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', background: 'transparent', color: '#64748b', fontWeight: 800, cursor: 'pointer' }}
               >
