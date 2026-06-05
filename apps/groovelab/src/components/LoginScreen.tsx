@@ -2754,7 +2754,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                           height: '72px',
                           borderRadius: '16px',
                           border: isSelected
-                            ? `2px solid ${isYellow ? 'rgba(9, 9, 11, 0.15)' : 'rgba(255, 255, 255, 0.25)'}`
+                            ? '1px solid #27272a'
                             : `2px solid ${stationColor}`,
                           background: isSelected 
                             ? stationColor
@@ -2771,7 +2771,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                           gap: '2px',
                           textAlign: 'center',
                           boxShadow: isSelected 
-                            ? `0 0 25px ${stationColor}60, 0 8px 30px ${stationColor}30, 0 4px 12px rgba(0, 0, 0, 0.12)`
+                            ? `0 0 24px ${stationColor}35, 0 0 8px ${stationColor}25, 0 4px 10px rgba(0, 0, 0, 0.08)`
                             : '0 4px 10px rgba(0, 0, 0, 0.05)',
                           outline: 'none',
                           zIndex: isSelected ? 10 : 1,
