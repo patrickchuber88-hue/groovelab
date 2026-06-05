@@ -574,6 +574,27 @@ function MobileBriefingView({
                     <div style={{ fontSize: '0.55rem', color: '#94a3b8' }}>10 Min</div>
                   </div>
                 </div>
+                {/* Joker indicator */}
+                {(() => {
+                  const currentWeek = getISOWeek(new Date());
+                  const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
+                  const isJokerAvailable = !studentUser?.joker_used_at || lastJokerWeek !== currentWeek;
+                  
+                  return (
+                    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem' }}>
+                      <span style={{ color: '#64748b', fontWeight: 650 }}>Wöchentlicher Joker:</span>
+                      <span style={{ 
+                        color: isJokerAvailable ? '#10b981' : '#ef4444', 
+                        fontWeight: 800,
+                        background: isJokerAvailable ? '#ecfdf5' : '#fef2f2',
+                        padding: '2px 8px',
+                        borderRadius: '100px'
+                      }}>
+                        {isJokerAvailable ? '👍 Bereit' : '❌ Verbraucht'}
+                      </span>
+                    </div>
+                  );
+                })()}
               </>
             );
           })()}
@@ -625,7 +646,7 @@ function MobileBriefingView({
                             <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#000000', color: '#ffffff', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Ausfall</span>
                           </div>
                           <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600, marginTop: '2px' }}>
-                            {occ.start_time?.substring(0,5)} <span style={{ color: '#fee2e2' }}>Groovelab</span>
+                            {occ.start_time?.substring(0,5)} <span style={{ color: '#fee2e2' }}>{occ.schedule?.rooms?.name || 'Groovelab'}</span>
                           </div>
                         </div>
 
@@ -694,7 +715,7 @@ function MobileBriefingView({
                             <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#000000', color: '#ffffff', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Verschoben</span>
                           </div>
                           <div style={{ fontSize: '0.75rem', color: 'rgba(120, 53, 15, 0.95)', fontWeight: 600, marginTop: '2px' }}>
-                            {occ.start_time?.substring(0,5)} <span style={{ color: '#b45309' }}>Groovelab</span>
+                            {occ.start_time?.substring(0,5)} <span style={{ color: '#b45309' }}>{occ.schedule?.rooms?.name || 'Groovelab'}</span>
                           </div>
                         </div>
 
@@ -748,7 +769,7 @@ function MobileBriefingView({
                       <div style={{ fontSize: '0.9rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>{occ.start_time?.substring(0,5)} <span style={{ color: '#22c55e' }}>Groovelab</span></div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>{occ.start_time?.substring(0,5)} <span style={{ color: '#22c55e' }}>{occ.schedule?.rooms?.name || 'Groovelab'}</span></div>
                     </div>
                     <button
                       onClick={() => {
@@ -1099,7 +1120,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     try {
       const { data, error } = await supabase
         .from('schedule_occurrences')
-        .select('*, schedule:schedule_id(*), teacher:users!schedule_occurrences_teacher_id_fkey(first_name, last_name)')
+        .select('*, schedule:schedule_id(*, rooms(name)), teacher:users!schedule_occurrences_teacher_id_fkey(first_name, last_name)')
         .eq('student_id', studentId)
         .gte('date', toLocalYYYYMMDD(new Date()))
         .order('date', { ascending: true })
@@ -1136,7 +1157,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
       const { data: occurrences, error: occErr } = await supabase
         .from('schedule_occurrences')
-        .select('*, schedule:schedule_id(*), teacher:users!schedule_occurrences_teacher_id_fkey(first_name, last_name)')
+        .select('*, schedule:schedule_id(*, rooms(name)), teacher:users!schedule_occurrences_teacher_id_fkey(first_name, last_name)')
         .eq('student_id', studentId)
         .gte('date', startStr)
         .lte('date', endStr)
@@ -1145,7 +1166,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
       const { data: schedules, error: schErr } = await supabase
         .from('schedules')
-        .select('*, teacher:users!schedules_teacher_id_fkey(first_name, last_name)')
+        .select('*, teacher:users!schedules_teacher_id_fkey(first_name, last_name), rooms(name)')
         .eq('student_id', studentId);
 
       if (occErr) throw occErr;
@@ -1400,6 +1421,98 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [secondsElapsed, setSecondsElapsed] = useState(0);
   const [selectedTopic, setSelectedTopic] = useState('');
   const [isPhoneFlat, setIsPhoneFlat] = useState(false);
+
+  const [fokusLogs, setFokusLogs] = useState<any[]>([]);
+  const [isExtraTime, setIsExtraTime] = useState(false);
+  const [hasCompletedTargetToday, setHasCompletedTargetToday] = useState(false);
+
+  const getTargetMinutes = (streak: number) => {
+    if (streak >= 9) return 10;
+    if (streak >= 6) return 5;
+    return 3;
+  };
+
+  const getFlameLevelName = (streak: number) => {
+    if (streak >= 9) return 'Helden-Feuer';
+    if (streak >= 6) return 'Mittlere Flamme';
+    return 'Kleine Flamme';
+  };
+
+  const fetchFokusLogs = async () => {
+    if (!studentId) return;
+    try {
+      const { data, error } = await supabase
+        .from('fokus_logs')
+        .select('*')
+        .eq('user_id', studentId)
+        .order('created_at', { ascending: false });
+      if (!error && data) {
+        setFokusLogs(data);
+        
+        // Calculate if target is completed today
+        const todayStr = new Date().toISOString().split('T')[0];
+        const todayLogs = data.filter((log: any) => log.created_at && log.created_at.startsWith(todayStr));
+        const nonExtraMinutes = todayLogs
+          .filter((log: any) => !log.is_extra)
+          .reduce((sum: number, log: any) => sum + (log.duration_minutes || 0), 0);
+        
+        // Fetch current avatar streak
+        const { data: avatarRecord } = await supabase
+          .from('avatars')
+          .select('streak_flame')
+          .eq('user_id', studentId)
+          .maybeSingle();
+        
+        const streak = avatarRecord?.streak_flame || 0;
+        const targetMins = getTargetMinutes(streak);
+        setHasCompletedTargetToday(nonExtraMinutes >= targetMins);
+      }
+    } catch (err) {
+      console.error('Error fetching fokus logs:', err);
+    }
+  };
+
+  const getGroupedLogs = () => {
+    const groups: Record<string, { date: string, focusSeconds: number, extraSeconds: number, flameLevel: string }> = {};
+    
+    fokusLogs.forEach(log => {
+      if (!log.created_at) return;
+      
+      // format date like 06.06.26 (dd.mm.yy)
+      const d = new Date(log.created_at);
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yy = String(d.getFullYear()).substring(2);
+      const dateStr = `${dd}.${mm}.${yy}`;
+      
+      if (!groups[dateStr]) {
+        groups[dateStr] = {
+          date: dateStr,
+          focusSeconds: 0,
+          extraSeconds: 0,
+          flameLevel: log.flame_level || 'Kleine Flamme'
+        };
+      }
+      
+      const seconds = log.duration_seconds || ((log.duration_minutes || 0) * 60);
+      if (log.is_extra) {
+        groups[dateStr].extraSeconds += seconds;
+      } else {
+        groups[dateStr].focusSeconds += seconds;
+      }
+      if (log.flame_level) {
+        groups[dateStr].flameLevel = log.flame_level;
+      }
+    });
+    
+    return Object.values(groups);
+  };
+
+  useEffect(() => {
+    if (studentId) {
+      fetchFokusLogs();
+    }
+  }, [studentId, activeTab]);
 
   // Campus Cup States
   const [rankingData, setRankingData] = useState<any[]>([]);
@@ -1693,10 +1806,25 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       return;
     }
 
+    const streak = avatar?.streak_flame || 0;
+    const targetSeconds = getTargetMinutes(streak) * 60;
+
     // Timer interval
     const interval = setInterval(() => {
       if (isPhoneFlat) {
-        setSecondsElapsed(prev => prev + 1);
+        setSecondsElapsed(prev => {
+          const nextVal = prev + 1;
+          if (!isExtraTime && nextVal >= targetSeconds) {
+            setIsExtraTime(true);
+            playSuccessChime();
+          }
+          return nextVal;
+        });
+      } else {
+        if (!isExtraTime) {
+          // Hard fall to 0 if orientation lost and not in extra time!
+          setSecondsElapsed(0);
+        }
       }
     }, 1000);
 
@@ -1716,11 +1844,18 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       } else {
         if (isPhoneFlat) {
           setIsPhoneFlat(false);
-          // High-pitched warning beep
-          playBeep(880, 200);
-          setTimeout(() => playBeep(880, 200), 250);
-          if (navigator.vibrate) {
-            navigator.vibrate([100, 50, 100]);
+          if (!isExtraTime) {
+            // Hard reset warning sound
+            playBeep(440, 400); 
+            if (navigator.vibrate) {
+              navigator.vibrate([300, 100, 300]);
+            }
+          } else {
+            // Soft pause warning sound
+            playBeep(880, 200);
+            if (navigator.vibrate) {
+              navigator.vibrate([100, 50, 100]);
+            }
           }
         }
       }
@@ -1732,40 +1867,24 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       clearInterval(interval);
       window.removeEventListener('deviceorientation', handleOrientation);
     };
-  }, [sessionActive, isPhoneFlat]);
+  }, [sessionActive, isPhoneFlat, isExtraTime, avatar?.streak_flame]);
 
   const finishPracticeSession = async () => {
     setSessionActive(false);
-    const durationMinutes = Math.max(1, Math.round(secondsElapsed / 60));
+    if (secondsElapsed <= 0) {
+      alert("Du hast noch nicht genug geübt, um die Session zu beenden. 🎸");
+      return;
+    }
 
     try {
-      // 1. Post to API endpoint
-      const response = await fetch('/api/student/finish-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionStorage.getItem('sb-access-token') || ''}`
-        },
-        body: JSON.stringify({
-          studentId,
-          topicName: selectedTopic,
-          durationMinutes
-        })
-      });
-
-      if (response.ok && response.headers.get('content-type')?.includes('application/json')) {
-        const data = await response.json();
-        alert(`Klasse geübt! Du hast +${data.stats.xpAdded} XP erhalten und dein Streak ist bei ${data.stats.streakFlame} Flammen! 🔥`);
-        fetchStudentAndAvatar();
-        fetchStudentProgress();
-        return;
-      }
-
-      // 2. Direct Supabase fallback
       const todayStr = new Date().toISOString().split('T')[0];
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+      const dayBeforeYesterday = new Date();
+      dayBeforeYesterday.setDate(dayBeforeYesterday.getDate() - 2);
+      const dayBeforeYesterdayStr = dayBeforeYesterday.toISOString().split('T')[0];
 
       // Fetch current stats
       const { data: stats } = await supabase
@@ -1774,29 +1893,94 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         .eq('student_id', studentId)
         .maybeSingle();
 
-      let totalFocus = durationMinutes;
-      let monthlyFocus = durationMinutes;
-      let currentXp = durationMinutes * 10;
-      let streakFlame = 1;
+      const streak = avatar?.streak_flame || 0;
+      const targetMins = getTargetMinutes(streak);
+      const targetSeconds = targetMins * 60;
+      const flameLevelName = getFlameLevelName(streak);
+
+      let focusSeconds = 0;
+      let extraSeconds = 0;
+
+      if (hasCompletedTargetToday) {
+        // Entire session is extra time
+        extraSeconds = secondsElapsed;
+      } else {
+        if (secondsElapsed >= targetSeconds) {
+          focusSeconds = targetSeconds;
+          extraSeconds = secondsElapsed - targetSeconds;
+        } else {
+          focusSeconds = secondsElapsed;
+        }
+      }
+
+      // Convert to minutes (at least 1 if we have seconds, or rounded)
+      const focusMinutes = focusSeconds > 0 ? Math.max(1, Math.round(focusSeconds / 60)) : 0;
+      const extraMinutes = extraSeconds > 0 ? Math.round(extraSeconds / 60) : 0;
+      const totalMinutes = Math.max(1, Math.round(secondsElapsed / 60));
+
+      let totalFocus = totalMinutes;
+      let monthlyFocus = totalMinutes;
+      let currentXp = totalMinutes * 10;
+      let streakFlame = streak;
       let lastPracticeDate = null;
 
       if (stats) {
-        totalFocus = (stats.total_focus_minutes || 0) + durationMinutes;
-        monthlyFocus = (stats.monthly_focus_minutes || 0) + durationMinutes;
-        currentXp = (stats.current_xp || 0) + (durationMinutes * 10);
+        totalFocus = (stats.total_focus_minutes || 0) + totalMinutes;
+        monthlyFocus = (stats.monthly_focus_minutes || 0) + totalMinutes;
+        currentXp = (stats.current_xp || 0) + (totalMinutes * 10);
         streakFlame = stats.streak_flame || 0;
         lastPracticeDate = stats.last_practice_date ? String(stats.last_practice_date) : null;
       }
 
-      if (lastPracticeDate === yesterdayStr) {
-        streakFlame += 1;
-      } else if (lastPracticeDate === todayStr) {
-        // Keep same streak
-      } else {
-        streakFlame = 1;
+      // Check if this session completed the target or if target was already completed today
+      const sessionCompletedTarget = !hasCompletedTargetToday && (secondsElapsed >= targetSeconds);
+      let usedJokerThisSession = false;
+      
+      if (sessionCompletedTarget) {
+        if (lastPracticeDate === yesterdayStr) {
+          streakFlame += 1;
+        } else if (lastPracticeDate === todayStr) {
+          // Keep same streak
+        } else {
+          // Check if we can use a joker (1 per week)
+          const currentWeek = getISOWeek(new Date());
+          const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
+          const isJokerAvailable = !studentUser?.joker_used_at || lastJokerWeek !== currentWeek;
+
+          if (lastPracticeDate === dayBeforeYesterdayStr && isJokerAvailable) {
+            streakFlame = streak + 1; // Preserve streak and add today's practice
+            usedJokerThisSession = true;
+          } else {
+            streakFlame = 1;
+          }
+        }
       }
 
-      // Upsert stats
+      // 1. Save focus log for focus time
+      if (focusSeconds > 0) {
+        await supabase.from('fokus_logs').insert({
+          user_id: studentId,
+          duration_minutes: focusMinutes,
+          duration_seconds: focusSeconds,
+          is_extra: false,
+          flame_level: flameLevelName,
+          created_at: new Date().toISOString()
+        });
+      }
+
+      // 2. Save focus log for extra time
+      if (extraSeconds > 0) {
+        await supabase.from('fokus_logs').insert({
+          user_id: studentId,
+          duration_minutes: extraMinutes,
+          duration_seconds: extraSeconds,
+          is_extra: true,
+          flame_level: flameLevelName,
+          created_at: new Date().toISOString()
+        });
+      }
+
+      // 3. Upsert stats
       await supabase.from('student_stats').upsert({
         student_id: studentId,
         total_focus_minutes: totalFocus,
@@ -1807,29 +1991,41 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         updated_at: new Date().toISOString()
       });
 
-      // Log to focus log
-      await supabase.from('fokus_logs').insert({
-        user_id: studentId,
-        duration_minutes: durationMinutes,
-        created_at: new Date().toISOString()
-      });
-
-      // Update avatar
-      const { data: avatar } = await supabase
+      // 4. Update avatar
+      const { data: avatarRecord } = await supabase
         .from('avatars')
         .select('*')
         .eq('user_id', studentId)
         .maybeSingle();
 
-      if (avatar) {
+      if (avatarRecord) {
         await supabase.from('avatars').update({
           xp: currentXp,
           streak_flame: streakFlame,
           last_focus_date: todayStr
-        }).eq('id', avatar.id);
+        }).eq('id', avatarRecord.id);
       }
 
-      alert(`Klasse geübt! Du hast +${durationMinutes * 10} XP erhalten und dein Streak ist bei ${streakFlame} Flammen! 🔥`);
+      // 5. Update user's joker_used_at if consumed
+      if (usedJokerThisSession) {
+        await supabase
+          .from('users')
+          .update({ joker_used_at: new Date().toISOString() })
+          .eq('id', studentId);
+      }
+
+      let successMsg = `Klasse geübt! Du hast +${totalMinutes * 10} XP erhalten! ⚡`;
+      if (sessionCompletedTarget) {
+        if (usedJokerThisSession) {
+          successMsg += ` 🎯 Dein wöchentlicher Joker wurde eingesetzt, um deinen Streak von ${streak} Tagen zu retten! Dein Streak liegt jetzt bei ${streakFlame} Flammen! 🔥`;
+        } else {
+          successMsg += ` Du hast die tägliche Fokuszeit gemeistert! Dein Streak ist bei ${streakFlame} Flammen! 🔥`;
+        }
+      }
+      alert(successMsg);
+
+      setSecondsElapsed(0);
+      setIsExtraTime(false);
       fetchStudentAndAvatar();
       fetchStudentProgress();
 
@@ -1962,6 +2158,34 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       osc.stop(ctx.currentTime + (duration / 1000));
     } catch (e) {
       console.warn("AudioContext warning beep failed:", e);
+    }
+  };
+
+  const playSuccessChime = () => {
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      const ctx = audioContextRef.current;
+      const now = ctx.currentTime;
+      const notes = [261.63, 329.63, 392.00, 523.25]; // C4, E4, G4, C5
+      notes.forEach((freq, index) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + index * 0.15);
+        
+        gain.gain.setValueAtTime(0, now + index * 0.15);
+        gain.gain.linearRampToValueAtTime(0.15, now + index * 0.15 + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + index * 0.15 + 1.2);
+        
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + index * 0.15);
+        osc.stop(now + index * 0.15 + 1.5);
+      });
+    } catch (e) {
+      console.warn("AudioContext success chime failed:", e);
     }
   };
 
@@ -2379,6 +2603,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       setError('Fehler beim Laden des Profils.');
       setBriefingLoading(false);
     } finally {
+      fetchFokusLogs();
       setLoading(false);
     }
   };
@@ -2836,89 +3061,217 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       </div>
 
       {activeTab === 'practice_board' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', position: 'relative' }}>
-          <div style={{
+        <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '24px', alignItems: 'flex-start' }} className="animation-slide-up">
+          
+          {/* Left Pane (2/3 width) - KPIs and Fokus-Timer */}
+          <div style={{ flex: '2 1 500px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            
+            {/* KPI Cards Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '14px' }}>
+              
+              {/* Card 1: XP */}
+              <div style={{ 
+                background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', 
+                borderRadius: '20px', 
+                color: 'white', 
+                padding: '16px', 
+                boxShadow: '0 4px 15px rgba(29, 78, 216, 0.15)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gesammelte XP</span>
+                  <Star size={16} fill="currentColor" />
+                </div>
+                <span style={{ fontSize: '1.4rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }}>{avatar?.xp || 0} XP</span>
+              </div>
+
+              {/* Card 2: Practice Minutes */}
+              <div style={{ 
+                background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', 
+                borderRadius: '20px', 
+                color: 'white', 
+                padding: '16px', 
+                boxShadow: '0 4px 15px rgba(4, 120, 87, 0.15)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Übeminuten</span>
+                  <Clock size={16} />
+                </div>
+                <span style={{ fontSize: '1.4rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }}>{totalFocusMinutes || 0} Min.</span>
+              </div>
+
+              {/* Card 3: Focus Time Today */}
+              <div style={{ 
+                background: 'linear-gradient(135deg, #eab308 0%, #a16207 100%)', 
+                borderRadius: '20px', 
+                color: 'white', 
+                padding: '16px', 
+                boxShadow: '0 4px 15px rgba(161, 98, 7, 0.15)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Fokus Heute</span>
+                  <Activity size={16} />
+                </div>
+                <span style={{ fontSize: '1.4rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }}>{(() => {
+                  const todayStr = new Date().toISOString().split('T')[0];
+                  const todayLogs = fokusLogs.filter(log => log.created_at && log.created_at.startsWith(todayStr));
+                  const totalSecs = todayLogs.reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0);
+                  const finalSecs = totalSecs + (sessionActive ? secondsElapsed : 0);
+                  const m = Math.floor(finalSecs / 60);
+                  const s = finalSecs % 60;
+                  return `${m}:${String(s).padStart(2, '0')} Min`;
+                })()}</span>
+              </div>
+
+              {/* Card 4: Streak-Pfad & Joker */}
+              <div style={{ 
+                background: 'linear-gradient(135deg, #f97316 0%, #c2410c 100%)', 
+                borderRadius: '20px', 
+                color: 'white', 
+                padding: '16px', 
+                boxShadow: '0 4px 15px rgba(194, 65, 12, 0.15)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                minHeight: '100px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Streak-Pfad</span>
+                  <Flame size={16} fill="currentColor" />
+                </div>
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '10px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '1.4rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif", lineHeight: 1.1 }}>
+                      {avatar?.streak_flame || 0} Tage
+                    </span>
+                  </div>
+                  
+                  {(() => {
+                    const currentWeek = getISOWeek(new Date());
+                    const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
+                    const isJokerAvailable = !studentUser?.joker_used_at || lastJokerWeek !== currentWeek;
+                    
+                    return (
+                      <span style={{ 
+                        fontSize: '0.62rem', 
+                        fontWeight: 800, 
+                        background: isJokerAvailable 
+                          ? 'rgba(255, 255, 255, 0.16)' 
+                          : 'rgba(0, 0, 0, 0.2)',
+                        backdropFilter: 'blur(8px)',
+                        WebkitBackdropFilter: 'blur(8px)',
+                        border: isJokerAvailable 
+                          ? '1px solid rgba(255, 255, 255, 0.4)' 
+                          : '1px solid rgba(255, 255, 255, 0.08)',
+                        color: isJokerAvailable ? '#ffffff' : 'rgba(255, 255, 255, 0.45)',
+                        padding: '6px 10px', 
+                        borderRadius: '12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        lineHeight: '1.2',
+                        textAlign: 'center',
+                        boxShadow: isJokerAvailable 
+                          ? '0 4px 12px rgba(0, 0, 0, 0.06), inset 0 1px 1px rgba(255, 255, 255, 0.15)' 
+                          : 'none',
+                        letterSpacing: '0.04em',
+                        textTransform: 'uppercase',
+                        flexShrink: 0
+                      }} title="1 Joker pro Woche verfügbar">
+                        {isJokerAvailable ? (
+                          <>
+                            <span style={{ opacity: 0.8 }}>Joker</span>
+                            <span style={{ fontWeight: 900 }}>Bereit</span>
+                          </>
+                        ) : (
+                          <>
+                            <span style={{ opacity: 0.6 }}>Joker</span>
+                            <span style={{ fontWeight: 900, opacity: 0.8 }}>Verbraucht</span>
+                          </>
+                        )}
+                      </span>
+                    );
+                  })()}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Fokus-Timer Box */}
+            <div style={{
               background: '#ffffff',
               border: '1px solid #e2e8f0',
               borderRadius: '24px',
-              padding: '24px',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.02)',
+              padding: '30px 24px',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.01)',
               display: 'flex',
               flexDirection: 'column',
               gap: '24px',
+              alignItems: 'center',
               position: 'relative'
-            }} className="animation-slide-up">
+            }}>
               {/* Header */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid #f1f5f9', paddingBottom: '14px' }}>
-                <div style={{ background: '#ecfdf5', color: '#10b981', padding: '8px', borderRadius: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', borderBottom: '1px solid #f1f5f9', paddingBottom: '14px' }}>
+                <div style={{ background: '#eff6ff', color: '#3b82f6', padding: '8px', borderRadius: '12px' }}>
                   <Clock size={18} />
                 </div>
                 <div>
-                  <h4 style={{ fontWeight: 800, fontSize: '28px', color: '#1e293b', margin: 0 }}>Übe-Board</h4>
-                  <p style={{ fontSize: '0.7rem', color: '#94a3b8', margin: '2px 0 0 0', fontWeight: 600 }}>Fokusmodus & Gyroskop-Steuerung</p>
+                  <h4 style={{ fontWeight: 850, fontSize: '22px', color: '#1e293b', margin: 0 }}>Fokus-Timer</h4>
+                  <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '2px 0 0 0', fontWeight: 600 }}>
+                    {isExtraTime ? '🏆 Du bist in der Extra-Zeit!' : '📱 Handy flach hinlegen & Fokus halten'}
+                  </p>
                 </div>
               </div>
 
               {!sessionActive ? (
                 /* Timer setup before starting */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '400px', margin: '0 auto', width: '100%' }}>
-                  {/* Missions-Auswahl (Dropdown) */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>
-                      Wähle dein Übe-Thema:
-                    </label>
-                    <select
-                      value={selectedTopic}
-                      onChange={(e) => setSelectedTopic(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '12px 16px',
-                        borderRadius: '14px',
-                        border: '1.5px solid #e2e8f0',
-                        fontSize: '0.9rem',
-                        fontWeight: 700,
-                        backgroundColor: 'white',
-                        outline: 'none'
-                      }}
-                    >
-                      <option value="">-- Thema auswählen --</option>
-                      {progressItems.map((item) => (
-                        <option key={item.id} value={item.topic_name}>
-                          {item.topic_name} {item.is_current_homework ? '🎯 (Hausaufgabe)' : ''}
-                        </option>
-                      ))}
-                      <option value="Allgemeines Üben">Allgemeines Üben 🎸</option>
-                    </select>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '350px', width: '100%', alignItems: 'center' }}>
+                  
+                  {/* Circular visual timer representation (static state) */}
+                  <div style={{ position: 'relative', width: '200px', height: '200px', margin: '10px 0' }}>
+                    <svg width="200" height="200" viewBox="0 0 200 200">
+                      <circle cx="100" cy="100" r="85" fill="none" stroke="#f1f5f9" strokeWidth="12" />
+                      <circle 
+                        cx="100" 
+                        cy="100" 
+                        r="85" 
+                        fill="none" 
+                        stroke="#3b82f6" 
+                        strokeWidth="12" 
+                        strokeDasharray={2 * Math.PI * 85}
+                        strokeDashoffset={2 * Math.PI * 85}
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    <div style={{
+                      position: 'absolute',
+                      inset: 0,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <span style={{ fontSize: '2.4rem', fontWeight: 900, color: '#1e293b' }}>
+                        {String(getTargetMinutes(avatar?.streak_flame || 0)).padStart(2, '0')}:00
+                      </span>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '4px' }}>Ziel Fokuszeit</span>
+                    </div>
                   </div>
 
-                  {/* Circular visual timer representation (static state) */}
-                  <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
-                    <div style={{ position: 'relative', width: '180px', height: '180px' }}>
-                      <svg width="180" height="180" viewBox="0 0 180 180">
-                        <circle cx="90" cy="90" r="76" fill="none" stroke="#f1f5f9" strokeWidth="10" />
-                        <circle 
-                          cx="90" 
-                          cy="90" 
-                          r="76" 
-                          fill="none" 
-                          stroke="#10b981" 
-                          strokeWidth="10" 
-                          strokeDasharray={2 * Math.PI * 76}
-                          strokeDashoffset={2 * Math.PI * 76}
-                          strokeLinecap="round"
-                        />
-                      </svg>
-                      <div style={{
-                        position: 'absolute',
-                        inset: 0,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <span style={{ fontSize: '2rem', fontWeight: 900, color: '#1e293b' }}>00:00</span>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '4px' }}>Detox-Timer</span>
-                      </div>
+                  <div style={{ textAlign: 'center', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px', width: '100%', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Tages-Herausforderung</div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#1e293b', marginTop: '3px' }}>
+                      {getFlameLevelName(avatar?.streak_flame || 0)} ({getTargetMinutes(avatar?.streak_flame || 0)} Min)
                     </div>
                   </div>
 
@@ -2928,7 +3281,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         try {
                           const permission = await (DeviceOrientationEvent as any).requestPermission();
                           if (permission !== 'granted') {
-                            alert('Sensor-Rechte werden für den Detox-Modus benötigt.');
+                            alert('Sensor-Rechte werden für den Fokus-Modus benötigt.');
                             return;
                           }
                         } catch (err) {
@@ -2936,81 +3289,87 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         }
                       }
                       
-                      // Pre-select topic
-                      if (!selectedTopic) {
-                        const hw = progressItems.find(i => i.is_current_homework);
-                        setSelectedTopic(hw ? hw.topic_name : (progressItems[0]?.topic_name || 'Allgemeines Üben'));
-                      }
+                      // Auto-select topic if none selected
+                      setSelectedTopic('Allgemeines Üben');
                       setSecondsElapsed(0);
-                      setSessionActive(true);
                       setIsPhoneFlat(false);
+                      setIsExtraTime(hasCompletedTargetToday);
+                      setSessionActive(true);
                     }}
                     style={{
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      width: '100%',
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
                       color: 'white',
                       border: 'none',
                       padding: '16px',
                       borderRadius: '16px',
                       fontWeight: 900,
-                      fontSize: '0.9rem',
+                      fontSize: '0.92rem',
                       cursor: 'pointer',
-                      boxShadow: '0 4px 15px rgba(16,185,129,0.2)',
+                      boxShadow: '0 4px 15px rgba(59, 130, 246, 0.25)',
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em'
                     }}
                     className="hover-scale"
                   >
-                    🚀 Fokus-Session starten
+                    🚀 Fokus starten
                   </button>
                 </div>
               ) : (
                 /* Timer running / Gyro orientation dashboard */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Fokus-Thema:</div>
-                    <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#0f172a', marginTop: '4px' }}>{selectedTopic}</div>
-                  </div>
-
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%', alignItems: 'center' }}>
+                  
                   {/* Circular animated SVG progress ring */}
-                  <div style={{ display: 'flex', justifyContent: 'center' }}>
-                    <div style={{ position: 'relative', width: '200px', height: '200px' }}>
-                      <svg width="200" height="200" viewBox="0 0 200 200">
-                        <circle cx="100" cy="100" r="85" fill="none" stroke="#f1f5f9" strokeWidth="12" />
-                        <circle 
-                          cx="100" 
-                          cy="100" 
-                          r="85" 
-                          fill="none" 
-                          stroke={isPhoneFlat ? '#10b981' : '#ef4444'} 
-                          strokeWidth="12" 
-                          strokeDasharray={2 * Math.PI * 85}
-                          strokeDashoffset={2 * Math.PI * 85 - (2 * Math.PI * 85 * ((secondsElapsed % 60) / 60))}
-                          strokeLinecap="round"
-                          transform="rotate(-90 100 100)"
-                          style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.3s' }}
-                        />
-                      </svg>
-                      <div style={{
-                        position: 'absolute',
-                        inset: 0,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center'
+                  <div style={{ position: 'relative', width: '200px', height: '200px', filter: isExtraTime ? 'drop-shadow(0 0 10px rgba(16, 185, 129, 0.2))' : 'none' }}>
+                    <svg width="200" height="200" viewBox="0 0 200 200">
+                      <circle cx="100" cy="100" r="85" fill="none" stroke="#f1f5f9" strokeWidth="12" />
+                      <circle 
+                        cx="100" 
+                        cy="100" 
+                        r="85" 
+                        fill="none" 
+                        stroke={isExtraTime ? '#10b981' : (isPhoneFlat ? '#3b82f6' : '#ef4444')} 
+                        strokeWidth="12" 
+                        strokeDasharray={2 * Math.PI * 85}
+                        strokeDashoffset={
+                          isExtraTime 
+                            ? 0 // Full circle in extra time
+                            : 2 * Math.PI * 85 - (2 * Math.PI * 85 * Math.min(1, secondsElapsed / (getTargetMinutes(avatar?.streak_flame || 0) * 60)))
+                        }
+                        strokeLinecap="round"
+                        transform="rotate(-90 100 100)"
+                        style={{ transition: isPhoneFlat ? 'stroke-dashoffset 1s linear, stroke 0.3s' : 'stroke 0.3s' }}
+                      />
+                    </svg>
+                    <div style={{
+                      position: 'absolute',
+                      inset: 0,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <span style={{ fontSize: '2.6rem', fontWeight: 950, color: '#0f172a', fontFamily: 'monospace' }}>
+                        {String(Math.floor(secondsElapsed / 60)).padStart(2, '0')}:
+                        {String(secondsElapsed % 60).padStart(2, '0')}
+                      </span>
+                      <span style={{ 
+                        fontSize: '0.65rem', 
+                        fontWeight: 900, 
+                        color: isExtraTime ? '#10b981' : (isPhoneFlat ? '#3b82f6' : '#ef4444'), 
+                        textTransform: 'uppercase', 
+                        letterSpacing: '0.05em', 
+                        marginTop: '4px' 
                       }}>
-                        <span style={{ fontSize: '2.5rem', fontWeight: 950, color: '#0f172a', fontFamily: 'monospace' }}>
-                          {String(Math.floor(secondsElapsed / 60)).padStart(2, '0')}:
-                          {String(secondsElapsed % 60).padStart(2, '0')}
-                        </span>
-                        <span style={{ fontSize: '0.62rem', fontWeight: 900, color: isPhoneFlat ? '#10b981' : '#ef4444', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '4px' }}>
-                          {isPhoneFlat ? 'Üben Aktiv' : 'Pausiert'}
-                        </span>
-                      </div>
+                        {isExtraTime ? 'Extra-Zeit active 🚀' : (isPhoneFlat ? 'Üben Aktiv' : 'Unterbrochen')}
+                      </span>
                     </div>
                   </div>
 
                   {/* Gyro Sensor feedback */}
                   <div style={{
+                    width: '100%',
+                    maxWidth: '450px',
                     padding: '16px 20px',
                     borderRadius: '16px',
                     background: isPhoneFlat ? '#ecfdf5' : '#fef2f2',
@@ -3027,14 +3386,18 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', opacity: 0.9 }}>Das Handy liegt flach auf dem Display. Der Timer läuft im Hintergrund.</p>
                       </div>
                     ) : (
-                      <div className="animate-pulse">
-                        <strong>🚨 Fokus unterbrochen!</strong>
-                        <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', opacity: 0.9 }}>Lege das Handy wieder auf das Display, um weiterzuüben.</p>
+                      <div className={isExtraTime ? '' : 'animate-pulse'}>
+                        <strong>{isExtraTime ? '⏸️ Session pausiert' : '🚨 Fokus unterbrochen!'}</strong>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', opacity: 0.9 }}>
+                          {isExtraTime 
+                            ? 'Lege das Handy flach hin, um weiter Extra-Minuten zu sammeln.' 
+                            : 'Lege das Handy flach hin! Sonst fällt dein Timer sofort auf 0 zurück.'}
+                        </p>
                       </div>
                     )}
                   </div>
 
-                  {/* Display Down Fullscreen Blackout Overlay */}
+                  {/* Fullscreen AMOLED Black Screen Overlay when Flat */}
                   {sessionActive && isPhoneFlat && (
                     <div 
                       style={{
@@ -3045,22 +3408,22 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: '#18181b',
+                        color: '#1c1917',
                         userSelect: 'none'
                       }}
                     >
                       <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#27272a', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                          Fokus active...
+                        <div style={{ fontSize: '0.8rem', fontWeight: 900, color: '#292524', textTransform: 'uppercase', letterSpacing: '0.15em' }}>
+                          {isExtraTime ? '🔥 Extra-Zeit läuft...' : '⚡ Fokus aktiv...'}
                         </div>
-                        <div style={{ fontSize: '1rem', color: '#18181b', marginTop: '8px' }}>
+                        <div style={{ fontSize: '1.4rem', color: '#1c1917', marginTop: '10px', fontWeight: 800 }}>
                           {String(Math.floor(secondsElapsed / 60)).padStart(2, '0')}:{String(secondsElapsed % 60).padStart(2, '0')}
                         </div>
                       </div>
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', gap: '12px' }}>
+                  <div style={{ display: 'flex', gap: '12px', width: '100%', maxWidth: '350px' }}>
                     <button
                       onClick={finishPracticeSession}
                       style={{
@@ -3077,12 +3440,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         textTransform: 'uppercase'
                       }}
                     >
-                      🏁 Session Beenden
+                      🏁 Beenden
                     </button>
                     <button
                       onClick={() => {
                         if (confirm('Möchtest du diese Session wirklich abbrechen? Der Fortschritt geht verloren.')) {
                           setSessionActive(false);
+                          setIsExtraTime(false);
                         }
                       }}
                       style={{
@@ -3102,6 +3466,99 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 </div>
               )}
             </div>
+
+          </div>
+
+          {/* Right Pane (1/3 width) - Flammen Log-Buch Sidebar */}
+          <div style={{ 
+            flex: '1 1 300px', 
+            background: '#ffffff', 
+            border: '1px solid #e2e8f0', 
+            borderRadius: '24px', 
+            padding: '24px', 
+            boxShadow: '0 4px 20px rgba(0,0,0,0.01)',
+            minWidth: '280px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '18px'
+          }}>
+            {/* Sidebar Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid #f1f5f9', paddingBottom: '14px' }}>
+              <div style={{ background: '#fff7ed', color: '#ea580c', padding: '8px', borderRadius: '12px' }}>
+                <Flame size={18} fill="currentColor" />
+              </div>
+              <div>
+                <h4 style={{ fontWeight: 850, fontSize: '20px', color: '#1e293b', margin: 0 }}>Flammen Log-Buch</h4>
+                <p style={{ fontSize: '0.72rem', color: '#94a3b8', margin: '2px 0 0 0', fontWeight: 600 }}>Tägliche Fokuszeit-Einträge</p>
+              </div>
+            </div>
+
+            {/* List entries */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '500px', overflowY: 'auto', paddingRight: '4px' }}>
+              {(() => {
+                const grouped = getGroupedLogs();
+                if (grouped.length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem', fontStyle: 'italic', padding: '40px 10px' }}>
+                      Noch keine Einträge im Log-Buch vorhanden. Starte deine erste Fokus-Session! 🚀
+                    </div>
+                  );
+                }
+
+                return grouped.map((group, idx) => {
+                  const focusMins = Math.round(group.focusSeconds / 60);
+                  const extraMins = Math.floor(group.extraSeconds / 60);
+                  const extraSecs = group.extraSeconds % 60;
+                  
+                  const textParts = [];
+                  if (group.focusSeconds > 0) {
+                    textParts.push(`Fokuszeit (+${focusMins}m)`);
+                  }
+                  if (group.extraSeconds > 0) {
+                    textParts.push(`+${extraMins}:${String(extraSecs).padStart(2, '0')} (extra)`);
+                  }
+                  const statusText = textParts.join(' - ');
+
+                  return (
+                    <div 
+                      key={idx}
+                      style={{ 
+                        background: '#f8fafc', 
+                        border: '1px solid #e2e8f0', 
+                        borderRadius: '16px', 
+                        padding: '12px 14px',
+                        display: 'flex',
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: '12px',
+                        borderLeft: `4px solid ${group.focusSeconds > 0 ? '#ea580c' : '#10b981'}`
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', whiteSpace: 'nowrap' }}>
+                          {group.date}
+                        </span>
+                        {statusText && (
+                          <span style={{ fontSize: '0.74rem', fontWeight: 650, color: '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            - {statusText}
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
+                        <Flame size={12} fill="#ea580c" color="#ea580c" />
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ea580c' }}>
+                          {group.flameLevel}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+
         </div>
       )}
 
@@ -5185,7 +5642,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#000000', color: '#ffffff', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Ausfall</span>
                                   </div>
                                   <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600, marginTop: '2px' }}>
-                                    {occ.start_time?.substring(0,5)} Uhr <span style={{ color: '#fee2e2' }}>Groovelab</span>
+                                    {occ.start_time?.substring(0,5)} Uhr <span style={{ color: '#fee2e2' }}>{occ.schedule?.rooms?.name || 'Groovelab'}</span>
                                   </div>
                                 </div>
 
@@ -5254,7 +5711,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#000000', color: '#ffffff', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Verschoben</span>
                                   </div>
                                   <div style={{ fontSize: '0.75rem', color: 'rgba(120, 53, 15, 0.95)', fontWeight: 600, marginTop: '2px' }}>
-                                    {occ.start_time?.substring(0,5)} Uhr <span style={{ color: '#b45309' }}>Groovelab</span>
+                                    {occ.start_time?.substring(0,5)} Uhr <span style={{ color: '#b45309' }}>{occ.schedule?.rooms?.name || 'Groovelab'}</span>
                                   </div>
                                 </div>
 
@@ -5308,7 +5765,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               <div style={{ fontSize: '0.9rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
                               </div>
-                              <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>{occ.start_time?.substring(0,5)} <span style={{ color: '#22c55e' }}>Groovelab</span></div>
+                              <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>{occ.start_time?.substring(0,5)} <span style={{ color: '#22c55e' }}>{occ.schedule?.rooms?.name || 'Groovelab'}</span></div>
                             </div>
                             <button
                               onClick={() => {

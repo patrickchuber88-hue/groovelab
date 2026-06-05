@@ -1522,6 +1522,15 @@ if (typeof window !== 'undefined') {
   };
 }
 
+function getInitials(name: string): string {
+  if (!name) return '';
+  const parts = name.trim().split(/[\s\-.]+/);
+  return parts
+    .map(part => part.charAt(0))
+    .join('')
+    .toUpperCase();
+}
+
 function App() {
   const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => sessionStorage.getItem('groovelab_user_id'));
   const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
@@ -5799,7 +5808,7 @@ function App() {
                   <Monitor size={20} /> Briefing
                 </button>
                 <button onClick={() => setActiveStudentTab('practice_board')} className={`sidebar-item ${activeStudentTab === 'practice_board' ? `active ${activePlatform}` : ''}`}>
-                  <Zap size={20} /> Übe-Board
+                  <Zap size={20} /> Übe-Pfad
                 </button>
                 <button onClick={() => setActiveStudentTab('mediathek')} className={`sidebar-item ${activeStudentTab === 'mediathek' ? `active ${activePlatform}` : ''}`}>
                   <Library size={20} /> Mediathek
@@ -6183,17 +6192,24 @@ function App() {
                           <span style={{ fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                             <span style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                               <School size={12} color="#ef4444" />
-                              <span>{school?.name || 'Meine Musikschule'}</span>
+                              <span>
+                                {windowWidth <= 768 
+                                  ? getInitials(school?.name || 'Meine Musikschule') 
+                                  : (school?.name || 'Meine Musikschule')}
+                              </span>
                             </span>
                             <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
                             <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <User size={14} color="#3b82f6" />
                               <span>
-                                {teachers.find(t => t.id === user.teacher_id) 
-                                  ? `${teachers.find(t => t.id === user.teacher_id).first_name} ${teachers.find(t => t.id === user.teacher_id).last_name}` 
-                                  : (teachers.length > 0 
-                                    ? `${teachers[0].first_name} ${teachers[0].last_name}` 
-                                    : 'Patrick Huber')}
+                                {(() => {
+                                  const teacherName = teachers.find(t => t.id === user.teacher_id) 
+                                    ? `${teachers.find(t => t.id === user.teacher_id).first_name} ${teachers.find(t => t.id === user.teacher_id).last_name}` 
+                                    : (teachers.length > 0 
+                                      ? `${teachers[0].first_name} ${teachers[0].last_name}` 
+                                      : 'Patrick Huber');
+                                  return windowWidth <= 768 ? getInitials(teacherName) : teacherName;
+                                })()}
                               </span>
                             </span>
                             <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
@@ -6222,16 +6238,18 @@ function App() {
                             <span style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                               <School size={12} color="#ef4444" />
                               <span>
-                                {school?.name === 'Testlauf' 
-                                  ? 'Testlauf'
-                                  : (school?.name || 'Meine Musikschule')}
+                                {windowWidth <= 768 
+                                  ? getInitials(school?.name === 'Testlauf' ? 'Testlauf' : (school?.name || 'Meine Musikschule')) 
+                                  : (school?.name === 'Testlauf' ? 'Testlauf' : (school?.name || 'Meine Musikschule'))}
                               </span>
                             </span>
                             <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
                             <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <User size={14} color="#3b82f6" />
                               <span>
-                                {`${user.first_name} ${user.last_name}`}
+                                {windowWidth <= 768 
+                                  ? getInitials(`${user.first_name} ${user.last_name}`) 
+                                  : `${user.first_name} ${user.last_name}`}
                               </span>
                             </span>
                           </span>
@@ -6252,13 +6270,19 @@ function App() {
                           <span style={{ fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                             <span style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                               <School size={12} color="#ef4444" />
-                              <span>{school?.name || 'Meine Musikschule'}</span>
+                              <span>
+                                {windowWidth <= 768 
+                                  ? getInitials(school?.name || 'Meine Musikschule') 
+                                  : (school?.name || 'Meine Musikschule')}
+                              </span>
                             </span>
                             <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
                             <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <User size={14} color="#3b82f6" />
                               <span>
-                                {`${user.first_name} ${user.last_name}`} • {user?.role === 'admin' ? 'CAMPUS ADMIN' : 'CAMPUS VERWALTUNG'}
+                                {windowWidth <= 768 
+                                  ? `${getInitials(`${user.first_name} ${user.last_name}`)} • ${user?.role === 'admin' ? 'AD' : 'VW'}`
+                                  : `${user.first_name} ${user.last_name} • ${user?.role === 'admin' ? 'CAMPUS ADMIN' : 'CAMPUS VERWALTUNG'}`}
                               </span>
                             </span>
                           </span>
@@ -10934,8 +10958,8 @@ function App() {
                   <button onClick={() => setActiveStudentTab('briefing')} style={getMobileButtonStyle('briefing', 'campus')} className="hover-scale" title="Briefing">
                     <Monitor size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Briefing</span>}
                   </button>
-                  <button onClick={() => setActiveStudentTab('practice_board')} style={getMobileButtonStyle('practice_board', 'campus')} className="hover-scale" title="Übe-Board">
-                    <Zap size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Übe-Board</span>}
+                  <button onClick={() => setActiveStudentTab('practice_board')} style={getMobileButtonStyle('practice_board', 'campus')} className="hover-scale" title="Übe-Pfad">
+                    <Zap size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Übe-Pfad</span>}
                   </button>
                   <button onClick={() => setActiveStudentTab('mediathek')} style={getMobileButtonStyle('mediathek', 'campus')} className="hover-scale" title="Mediathek">
                     <Library size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Mediathek</span>}
