@@ -1877,7 +1877,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     <div style={{ 
       position: 'fixed',
       inset: 0,
-      backgroundColor: '#34a853', // Solid Campus brand green
+      background: 'radial-gradient(circle at top, #0f766e 0%, #064e3b 100%)', // Premium campus green gradient background
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -1964,17 +1964,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       <div style={{
         width: '100%',
         maxWidth: '420px',
-        background: 'rgba(255, 255, 255, 0.95)',
+        background: 'rgba(255, 255, 255, 0.94)',
         borderRadius: '36px',
         padding: '28px',
-        boxShadow: '0 30px 60px rgba(0, 0, 0, 0.18), 0 2px 10px rgba(0, 0, 0, 0.05)',
+        boxShadow: '0 2px 5px rgba(0, 0, 0, 0.04), 0 30px 80px rgba(6, 78, 59, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
         border: '1px solid rgba(255, 255, 255, 0.7)',
+        borderBottomColor: 'rgba(255, 255, 255, 0.3)',
+        borderRightColor: 'rgba(255, 255, 255, 0.45)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         position: 'relative',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)'
+        backdropFilter: 'blur(25px)',
+        WebkitBackdropFilter: 'blur(25px)'
       }}>
         <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '20px', width: '100%', justifyContent: 'center' }}>
           <Tablet size={14} /> Standard Login über Campus QR-Ausweis
@@ -1983,123 +1985,142 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         <div style={{
           width: '100%',
           aspectRatio: '1/1',
-          borderRadius: '28px',
+          borderRadius: '32px',
           overflow: 'hidden',
-          background: '#000',
+          background: '#ffffff',
           position: 'relative',
-          boxShadow: '0 0 0 4px rgba(0,0,0,0.02)'
+          boxShadow: 'inset 0 3px 10px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.05), 0 16px 36px rgba(0, 0, 0, 0.07)',
+          border: '1px solid #e2e8f0',
+          borderBottomColor: '#cbd5e1', // Skeuomorphic top-down light border
+          padding: '4.5px',
+          boxSizing: 'border-box'
         }}>
-          <CustomQRScanner
-            onScan={(val) => {
-              console.log('[Scanner] Extracted QR value:', val);
-              handleScan(val);
-            }}
-            onError={(err: any) => {
-              console.error('[Scanner] Camera error:', err);
-              const errMsg = err?.message || String(err || '');
-              if (!errMsg.toLowerCase().includes('abort') && !errMsg.toLowerCase().includes('aborted')) {
-                setError(`Kamera-Fehler: ${errMsg}`);
-              }
-            }}
-            paused={loading}
-            facingMode={facingMode}
-          />
-
-          {/* Switch Camera Button */}
-          <button
-            onClick={() => setFacingMode(prev => prev === 'user' ? 'environment' : 'user')}
-            style={{
-              position: 'absolute',
-              top: '16px',
-              right: '16px',
-              zIndex: 15,
-              width: '44px',
-              height: '44px',
-              borderRadius: '50%',
-              background: 'rgba(255, 255, 255, 0.25)',
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255, 255, 255, 0.3)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              color: 'white',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              transition: 'all 0.2s ease',
-              outline: 'none'
-            }}
-            onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.35)'; }}
-            onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)'; }}
-            title="Kamera wechseln"
-          >
-            <RotateCw size={20} />
-          </button>
-
-          {loading && (
+          <div style={{
+            width: '100%',
+            height: '100%',
+            borderRadius: '27.5px',
+            overflow: 'hidden',
+            position: 'relative',
+            background: '#0c0f12'
+          }}>
+            {/* Recessed physical aperture shadow for 3D depth */}
             <div style={{
               position: 'absolute',
               inset: 0,
-              background: 'rgba(255,255,255,0.8)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 10,
-              backdropFilter: 'blur(10px)'
-            }}>
-              <div style={{ width: '40px', height: '40px', border: '4px solid #0f766e', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-            </div>
-          )}
-        </div>
+              boxShadow: 'inset 0 5px 15px rgba(0, 0, 0, 0.4)',
+              borderRadius: '27.5px',
+              pointerEvents: 'none',
+              zIndex: 9
+            }} />
+            <CustomQRScanner
+              onScan={(val) => {
+                console.log('[Scanner] Extracted QR value:', val);
+                handleScan(val);
+              }}
+              onError={(err: any) => {
+                console.error('[Scanner] Camera error:', err);
+                const errMsg = err?.message || String(err || '');
+                if (!errMsg.toLowerCase().includes('abort') && !errMsg.toLowerCase().includes('aborted')) {
+                  setError(`Kamera-Fehler: ${errMsg}`);
+                }
+              }}
+              paused={loading}
+              facingMode={facingMode}
+            />
 
-        {/* iOS-Style QR Image Upload & Ausweis ID Login side-by-side */}
-        <div style={{ display: 'flex', gap: '12px', marginTop: '20px', width: '100%' }}>
-          <div style={{ flex: 1 }}>
-            <label 
-              htmlFor="qr-image-upload"
+            {/* Scanner UI Overlay: Animated scan laser and bounding target corners */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              pointerEvents: 'none',
+              zIndex: 10
+            }}>
+              {/* 4 Corner brackets for scanner target */}
+              <div style={{ position: 'absolute', top: '20px', left: '20px', width: '24px', height: '24px', borderTop: '3px solid #0f766e', borderLeft: '3px solid #0f766e', borderTopLeftRadius: '8px' }} />
+              <div style={{ position: 'absolute', top: '20px', right: '20px', width: '24px', height: '24px', borderTop: '3px solid #0f766e', borderRight: '3px solid #0f766e', borderTopRightRadius: '8px' }} />
+              <div style={{ position: 'absolute', bottom: '20px', left: '20px', width: '24px', height: '24px', borderBottom: '3px solid #0f766e', borderLeft: '3px solid #0f766e', borderBottomLeftRadius: '8px' }} />
+              <div style={{ position: 'absolute', bottom: '20px', right: '20px', width: '24px', height: '24px', borderBottom: '3px solid #0f766e', borderRight: '3px solid #0f766e', borderBottomRightRadius: '8px' }} />
+              
+              {/* Animated Laser line */}
+              <div style={{
+                position: 'absolute',
+                left: 0,
+                width: '100%',
+                height: '80px',
+                background: 'linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0) 100%)',
+                filter: 'blur(6px)',
+                animation: 'scanLaser 4s ease-in-out infinite',
+                pointerEvents: 'none'
+              }} />
+            </div>
+
+            <style dangerouslySetInnerHTML={{__html: `
+              @keyframes scanLaser {
+                0% { top: -20%; }
+                50% { top: 100%; }
+                100% { top: -20%; }
+              }
+            `}} />
+
+            {/* Switch Camera Button */}
+            <button
+              onClick={() => setFacingMode(prev => prev === 'user' ? 'environment' : 'user')}
               style={{
+                position: 'absolute',
+                top: '12px',
+                right: '12px',
+                zIndex: 15,
+                width: '38px',
+                height: '38px',
+                borderRadius: '50%',
+                background: 'rgba(255, 255, 255, 0.25)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '8px',
-                width: '100%',
-                padding: '12px 6px',
-                borderRadius: '16px',
-                background: '#f1f5f9',
-                border: '1px solid #e2e8f0',
-                color: '#334155',
-                fontSize: '13px',
-                fontWeight: 700,
                 cursor: 'pointer',
-                transition: 'all 0.2s',
-                textAlign: 'center',
-                boxSizing: 'border-box',
-                height: '48px'
+                color: 'white',
+                boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
+                transition: 'all 0.2s ease',
+                outline: 'none'
               }}
-              onMouseOver={(e) => { e.currentTarget.style.background = '#e2e8f0'; }}
-              onMouseOut={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
+              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.35)'; }}
+              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)'; }}
+              title="Kamera wechseln"
             >
-              <Upload size={16} color="#0f766e" />
-              Foto hochladen
-            </label>
-            <input 
-              id="qr-image-upload"
-              type="file"
-              accept="image/*"
-              onChange={handleFileUpload}
-              style={{ display: 'none' }}
-            />
-          </div>
+              <RotateCw size={18} />
+            </button>
 
+            {loading && (
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'rgba(255,255,255,0.8)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10,
+                backdropFilter: 'blur(10px)'
+              }}>
+                <div style={{ width: '36px', height: '36px', border: '3px solid #0f766e', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* iOS-Style Ausweis ID Login button */}
+        <div style={{ marginTop: '20px', width: '100%' }}>
           <button 
             onClick={() => setExpandedSection('pin')}
             style={{
-              flex: 1,
+              width: '100%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
-              padding: '12px 6px',
+              padding: '12px 16px',
               borderRadius: '16px',
               background: '#f1f5f9',
               border: '1px solid #e2e8f0',
@@ -2130,10 +2151,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       )}
 
       {/* Kiosk Modus button under the card if available */}
-      {expandedSection === 'none' && schoolData && kioskRooms.length > 0 && (
+      {expandedSection === 'none' && schoolData && kioskRooms.length > 0 && !effectiveStationId && (
         <div style={{ marginTop: '24px' }}>
           <button 
-            onClick={() => setExpandedSection('kiosk')}
+            onClick={() => {
+              localStorage.removeItem('groovelab_station_id');
+              window.location.search = '?kiosk_room_id=setup';
+            }}
             style={{ 
               background: 'rgba(255, 255, 255, 0.12)', 
               border: '1px solid rgba(255, 255, 255, 0.2)', 
@@ -2162,17 +2186,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       <div style={{
         width: '100%',
         maxWidth: '420px',
-        background: 'rgba(255, 255, 255, 0.95)',
+        background: 'rgba(255, 255, 255, 0.94)',
         borderRadius: '36px',
         padding: '28px',
-        boxShadow: '0 30px 60px rgba(0, 0, 0, 0.18), 0 2px 10px rgba(0, 0, 0, 0.05)',
+        boxShadow: '0 2px 5px rgba(0, 0, 0, 0.04), 0 30px 80px rgba(6, 78, 59, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
         border: '1px solid rgba(255, 255, 255, 0.7)',
+        borderBottomColor: 'rgba(255, 255, 255, 0.3)',
+        borderRightColor: 'rgba(255, 255, 255, 0.45)',
         display: 'flex',
         flexDirection: 'column',
         gap: '16px',
         marginTop: '20px',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)'
+        backdropFilter: 'blur(25px)',
+        WebkitBackdropFilter: 'blur(25px)'
       }}>
         <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <User size={14} /> Manueller Zugang über PIN / QR-Token
@@ -2441,8 +2467,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         </div>
       )}
 
-      <div style={{ marginTop: '24px', width: '100%', maxWidth: '360px', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '0 10px' }}>
-        {effectiveStationId ? (
+      {effectiveStationId && (
+        <div style={{ marginTop: '24px', width: '100%', maxWidth: '360px', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '0 10px' }}>
           <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#a7f3d0', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               <Tablet size={14} />
@@ -2464,38 +2490,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               Beenden
             </button>
           </div>
-        ) : (
-          <button 
-            onClick={() => {
-              localStorage.removeItem('groovelab_station_id');
-              window.location.search = '?kiosk_room_id=setup';
-            }}
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '12px', 
-              background: 'rgba(255, 255, 255, 0.12)', 
-              border: '1px solid rgba(255, 255, 255, 0.2)', 
-              padding: '12px 24px', 
-              borderRadius: '20px', 
-              color: '#ffffff', 
-              fontSize: '12px', 
-              fontWeight: 800, 
-              textTransform: 'uppercase', 
-              cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-              transition: 'all 0.2s',
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)'
-            }}
-            onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'; }}
-            onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'; }}
-          >
-            <Tablet size={16} />
-            Kiosk Modus aktivieren
-          </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Legal Footer */}
       <div style={{ 
