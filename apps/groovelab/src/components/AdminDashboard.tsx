@@ -7837,7 +7837,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
   };
 
   const renderSongsTab = () => {
-    const brandColor = '#16a34a';
+    const brandColor = '#eab308';
     const filteredLehrwerke = lehrwerke.filter(item => 
       item.title.toLowerCase().includes(songSearch.toLowerCase()) || 
       (item.author || '').toLowerCase().includes(songSearch.toLowerCase())
@@ -7996,12 +7996,10 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               <div style={{ background: `${brandColor}15`, color: brandColor, padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
                 <Library size={20} />
               </div>
-              <span>Mediathek</span>
+              <span>Songs</span>
             </h2>
             <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '4px 0 0 0', fontWeight: 600 }}>
-              {admin?.role === 'teacher' 
-                ? 'Verwalte deine Songs und Lehrwerke für den Unterricht.' 
-                : 'Verwalte alle Songs und Lehrwerke deiner Musikschule.'}
+              Verwalte deine Songs und deren Instrumentierungen für GrooveLab.
             </p>
           </div>
         </div>
@@ -8010,7 +8008,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         <div style={{ position: 'relative', width: '100%' }}>
           <Search size={18} color="#94a3b8" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
           <input 
-            placeholder="Songs nach Titel/Interpret oder Lehrwerke nach Titel/Autor durchsuchen..." 
+            placeholder="Songs nach Titel/Interpret durchsuchen..." 
             value={songSearch}
             onChange={e => setSongSearch(e.target.value)}
             style={{ 
@@ -8031,7 +8029,7 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
         {/* Two Columns Layout */}
         <div style={{ 
           display: 'grid', 
-          gridTemplateColumns: activePlatform === 'campus' ? 'repeat(auto-fit, minmax(420px, 1fr))' : '1fr', 
+          gridTemplateColumns: '1fr', 
           gap: '30px', 
           alignItems: 'flex-start' 
         }}>
@@ -8043,7 +8041,10 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               </h3>
               <button 
                 type="button"
-                onClick={() => setShowAddSong(!showAddSong)} 
+                onClick={() => {
+                  setShowAddSong(!showAddSong);
+                  setEditingSong(null);
+                }} 
                 style={{ 
                   background: `linear-gradient(135deg, ${brandColor}, ${brandColor}ee)`, 
                   color: '#1e293b', 
@@ -8103,6 +8104,182 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                       </div>
                     </div>
 
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>PDF Ordner / Link</label>
+                        <input placeholder="https://..." value={newSong.pdf_folder_url || ''} onChange={e => setNewSong({...newSong, pdf_folder_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Noten (GP / Link)</label>
+                        <input placeholder="https://..." value={newSong.guitar_pro_url || ''} onChange={e => setNewSong({...newSong, guitar_pro_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Arrangement (Benötigte Instrumente)</label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'center', width: '100%', margin: '4px 0' }}>
+                        {['E-Gitarre', 'E-Bass', 'E-Drums', 'E-Piano', 'Vocals'].map(inst => {
+                          const count = newSong.instrumentation?.[inst] || 0;
+                          const isSelected = count > 0;
+                          return (
+                            <div
+                              key={inst}
+                              onClick={(e) => {
+                                if ((e.target as HTMLElement).closest('button')) return;
+                                const currentInst = { ...newSong.instrumentation };
+                                currentInst[inst] = isSelected ? 0 : 1;
+                                setNewSong({ ...newSong, instrumentation: currentInst });
+                              }}
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '16px 12px',
+                                borderRadius: '20px',
+                                border: isSelected ? '2px solid #eab308' : '1.5px solid #e2e8f0',
+                                background: isSelected 
+                                  ? 'linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)' 
+                                  : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                                width: '120px',
+                                height: '145px',
+                                textAlign: 'center',
+                                gap: '8px',
+                                boxShadow: isSelected 
+                                  ? '0 10px 20px -5px rgba(234, 179, 8, 0.18), 0 6px 6px -6px rgba(234, 179, 8, 0.12)' 
+                                  : '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -2px rgba(0, 0, 0, 0.02)',
+                                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                                cursor: 'pointer',
+                                position: 'relative',
+                                overflow: 'hidden',
+                                boxSizing: 'border-box'
+                              }}
+                              onMouseOver={e => {
+                                if (!isSelected) {
+                                  e.currentTarget.style.borderColor = '#cbd5e1';
+                                  e.currentTarget.style.transform = 'translateY(-2px)';
+                                } else {
+                                  e.currentTarget.style.transform = 'translateY(-2px)';
+                                }
+                              }}
+                              onMouseOut={e => {
+                                if (!isSelected) {
+                                  e.currentTarget.style.borderColor = '#e2e8f0';
+                                  e.currentTarget.style.transform = 'none';
+                                } else {
+                                  e.currentTarget.style.transform = 'none';
+                                }
+                              }}
+                            >
+                              <div style={{
+                                width: '48px',
+                                height: '48px',
+                                borderRadius: '14px',
+                                background: isSelected ? 'white' : '#f1f5f9',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: isSelected ? '#a16207' : '#64748b',
+                                boxShadow: isSelected ? '0 4px 10px rgba(234, 179, 8, 0.15)' : 'inset 0 2px 4px rgba(0,0,0,0.01)',
+                                transition: 'all 0.2s ease',
+                                transform: isSelected ? 'scale(1.05)' : 'none'
+                              }}>
+                                {renderInstrumentIcon(inst, isSelected ? '#a16207' : '#94a3b8', 26)}
+                              </div>
+                              
+                              <span style={{ 
+                                fontSize: '0.72rem', 
+                                fontWeight: 800, 
+                                color: isSelected ? '#a16207' : '#475569',
+                                letterSpacing: '-0.01em'
+                              }}>
+                                {inst}
+                              </span>
+                              
+                              <div style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '8px', 
+                                background: isSelected ? 'rgba(255, 255, 255, 0.7)' : 'rgba(241, 245, 249, 0.7)',
+                                padding: '4px 8px',
+                                borderRadius: '12px',
+                                border: '1px solid',
+                                borderColor: isSelected ? 'rgba(234, 179, 8, 0.2)' : 'rgba(226, 232, 240, 0.5)',
+                                backdropFilter: 'blur(4px)',
+                                transition: 'all 0.2s ease'
+                              }}>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const currentInst = { ...newSong.instrumentation };
+                                    currentInst[inst] = Math.max(0, count - 1);
+                                    setNewSong({ ...newSong, instrumentation: currentInst });
+                                  }}
+                                  style={{
+                                    width: '22px',
+                                    height: '22px',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    background: 'white',
+                                    color: '#475569',
+                                    fontSize: '0.85rem',
+                                    fontWeight: 900,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                    transition: 'all 0.2s ease',
+                                    padding: 0
+                                  }}
+                                >
+                                  -
+                                </button>
+                                <span style={{ 
+                                  fontSize: '0.85rem', 
+                                  fontWeight: 900, 
+                                  color: isSelected ? '#a16207' : '#475569', 
+                                  minWidth: '14px',
+                                  textAlign: 'center'
+                                }}>
+                                  {count}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const currentInst = { ...newSong.instrumentation };
+                                    currentInst[inst] = count + 1;
+                                    setNewSong({ ...newSong, instrumentation: currentInst });
+                                  }}
+                                  style={{
+                                    width: '22px',
+                                    height: '22px',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    background: 'white',
+                                    color: '#475569',
+                                    fontSize: '0.85rem',
+                                    fontWeight: 900,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                    transition: 'all 0.2s ease',
+                                    padding: 0
+                                  }}
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
                     {activePlatform !== 'campus' && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Cloud Link</label>
@@ -8136,8 +8313,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
             )}
 
             {editingSong && (
-              <form onSubmit={handleUpdateSong} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '16px', boxShadow: '0 8px 24px rgba(0,0,0,0.02)' }}>
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0369a1', margin: 0 }}>Song bearbeiten</h4>
+              <form onSubmit={handleUpdateSong} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', background: '#fefdeb', border: '1px solid #fef08a', borderRadius: '16px', boxShadow: '0 8px 24px rgba(0,0,0,0.02)' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#854d0e', margin: 0 }}>Song bearbeiten</h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Interpret</label>
@@ -8146,6 +8323,182 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Titel</label>
                     <input required placeholder="Titel" value={editingSong.title} onChange={e => setEditingSong({...editingSong, title: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>PDF Ordner / Link</label>
+                    <input placeholder="https://..." value={editingSong.pdf_folder_url || ''} onChange={e => setEditingSong({...editingSong, pdf_folder_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Noten (GP / Link)</label>
+                    <input placeholder="https://..." value={editingSong.guitar_pro_url || ''} onChange={e => setEditingSong({...editingSong, guitar_pro_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Arrangement (Benötigte Instrumente)</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'center', width: '100%', margin: '4px 0' }}>
+                    {['E-Gitarre', 'E-Bass', 'E-Drums', 'E-Piano', 'Vocals'].map(inst => {
+                      const count = editingSong.instrumentation?.[inst] || 0;
+                      const isSelected = count > 0;
+                      return (
+                        <div
+                          key={inst}
+                          onClick={(e) => {
+                            if ((e.target as HTMLElement).closest('button')) return;
+                            const currentInst = { ...editingSong.instrumentation };
+                            currentInst[inst] = isSelected ? 0 : 1;
+                            setEditingSong({ ...editingSong, instrumentation: currentInst });
+                          }}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '16px 12px',
+                            borderRadius: '20px',
+                            border: isSelected ? '2px solid #eab308' : '1.5px solid #e2e8f0',
+                            background: isSelected 
+                              ? 'linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)' 
+                              : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                            width: '120px',
+                            height: '145px',
+                            textAlign: 'center',
+                            gap: '8px',
+                            boxShadow: isSelected 
+                              ? '0 10px 20px -5px rgba(234, 179, 8, 0.18), 0 6px 6px -6px rgba(234, 179, 8, 0.12)' 
+                              : '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -2px rgba(0, 0, 0, 0.02)',
+                            transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            boxSizing: 'border-box'
+                          }}
+                          onMouseOver={e => {
+                            if (!isSelected) {
+                              e.currentTarget.style.borderColor = '#cbd5e1';
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                            } else {
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                            }
+                          }}
+                          onMouseOut={e => {
+                            if (!isSelected) {
+                              e.currentTarget.style.borderColor = '#e2e8f0';
+                              e.currentTarget.style.transform = 'none';
+                            } else {
+                              e.currentTarget.style.transform = 'none';
+                            }
+                          }}
+                        >
+                          <div style={{
+                            width: '48px',
+                            height: '48px',
+                            borderRadius: '14px',
+                            background: isSelected ? 'white' : '#f1f5f9',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: isSelected ? '#a16207' : '#64748b',
+                            boxShadow: isSelected ? '0 4px 10px rgba(234, 179, 8, 0.15)' : 'inset 0 2px 4px rgba(0,0,0,0.01)',
+                            transition: 'all 0.2s ease',
+                            transform: isSelected ? 'scale(1.05)' : 'none'
+                          }}>
+                            {renderInstrumentIcon(inst, isSelected ? '#a16207' : '#94a3b8', 26)}
+                          </div>
+                          
+                          <span style={{ 
+                            fontSize: '0.72rem', 
+                            fontWeight: 800, 
+                            color: isSelected ? '#a16207' : '#475569',
+                            letterSpacing: '-0.01em'
+                          }}>
+                            {inst}
+                          </span>
+                          
+                          <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '8px', 
+                            background: isSelected ? 'rgba(255, 255, 255, 0.7)' : 'rgba(241, 245, 249, 0.7)',
+                            padding: '4px 8px',
+                            borderRadius: '12px',
+                            border: '1px solid',
+                            borderColor: isSelected ? 'rgba(234, 179, 8, 0.2)' : 'rgba(226, 232, 240, 0.5)',
+                            backdropFilter: 'blur(4px)',
+                            transition: 'all 0.2s ease'
+                          }}>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const currentInst = { ...editingSong.instrumentation };
+                                currentInst[inst] = Math.max(0, count - 1);
+                                setEditingSong({ ...editingSong, instrumentation: currentInst });
+                              }}
+                              style={{
+                                width: '22px',
+                                height: '22px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: 'white',
+                                color: '#475569',
+                                fontSize: '0.85rem',
+                                fontWeight: 900,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                transition: 'all 0.2s ease',
+                                padding: 0
+                              }}
+                            >
+                              -
+                            </button>
+                            <span style={{ 
+                              fontSize: '0.85rem', 
+                              fontWeight: 900, 
+                              color: isSelected ? '#a16207' : '#475569', 
+                                minWidth: '14px',
+                                textAlign: 'center'
+                            }}>
+                              {count}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const currentInst = { ...editingSong.instrumentation };
+                                currentInst[inst] = count + 1;
+                                setEditingSong({ ...editingSong, instrumentation: currentInst });
+                              }}
+                              style={{
+                                width: '22px',
+                                height: '22px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: 'white',
+                                color: '#475569',
+                                fontSize: '0.85rem',
+                                fontWeight: 900,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                transition: 'all 0.2s ease',
+                                padding: 0
+                              }}
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -8174,9 +8527,19 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                 return (
                   <div key={song.id} className="glass-panel hover-scale" 
                     onClick={() => {
-                      setSelectedSongForDetail(song);
-                      fetchSongAssignments(song.id);
-                      setStudentDetailSearch('');
+                      const inst = song.instrumentation || {};
+                      const norm: any = { 'E-Gitarre': 0, 'E-Bass': 0, 'E-Drums': 0, 'E-Piano': 0, 'Vocals': 0 };
+                      Object.entries(inst).forEach(([k, v]) => {
+                        const lower = k.toLowerCase();
+                        if (lower === 'guitar' || lower === 'e-gitarre') norm['E-Gitarre'] = v;
+                        else if (lower === 'bass' || lower === 'e-bass') norm['E-Bass'] = v;
+                        else if (lower === 'drums' || lower === 'e-drums') norm['E-Drums'] = v;
+                        else if (lower === 'piano' || lower === 'keys' || lower === 'e-piano') norm['E-Piano'] = v;
+                        else if (lower === 'vocals' || lower === 'gesang') norm['Vocals'] = v;
+                        else norm[k] = v;
+                      });
+                      setEditingSong({...song, instrumentation: norm});
+                      setShowAddSong(false);
                     }}
                     style={{ 
                       padding: '14px 18px', 
@@ -8241,21 +8604,6 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
                     </div>
 
                     <div style={{ display: 'flex', gap: '8px', flexShrink: 0, marginLeft: '16px' }}>
-                      <button onClick={(e) => {
-                        e.stopPropagation();
-                        const inst = song.instrumentation || {};
-                        const norm: any = { 'E-Gitarre': 0, 'E-Bass': 0, 'E-Drums': 0, 'E-Piano': 0 };
-                        Object.entries(inst).forEach(([k, v]) => {
-                          const lower = k.toLowerCase();
-                          if (lower === 'guitar' || lower === 'e-gitarre') norm['E-Gitarre'] = v;
-                          else if (lower === 'bass' || lower === 'e-bass') norm['E-Bass'] = v;
-                          else if (lower === 'drums' || lower === 'e-drums') norm['E-Drums'] = v;
-                          else if (lower === 'piano' || lower === 'keys' || lower === 'e-piano') norm['E-Piano'] = v;
-                          else if (lower === 'vocals' || lower === 'gesang') norm['Vocals'] = v;
-                          else norm[k] = v;
-                        });
-                        setEditingSong({...song, instrumentation: norm});
-                      }} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', width: '44px', height: '44px', borderRadius: '12px', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Pencil size={18} /></button>
                       <button onClick={(e) => { e.stopPropagation(); handleDeleteSong(song.id); }} style={{ background: '#fff1f2', border: '1px solid #fecaca', width: '44px', height: '44px', borderRadius: '12px', cursor: 'pointer', color: '#ef4444', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={18} /></button>
                     </div>
                   </div>
@@ -8263,400 +8611,8 @@ export function AdminDashboard({ userId, onLogout, forceTab, onTabChange, onOpen
               })}
             </div>
           </div>
-
-          {/* Right Column: Lehrwerke */}
-          {activePlatform === 'campus' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Library size={16} color={brandColor} /> Lehrwerke ({lehrwerke.length})
-              </h3>
-              <button 
-                type="button"
-                onClick={() => {
-                  setShowAddLehrwerk(!showAddLehrwerk);
-                  setEditingLehrwerk(null);
-                }} 
-                style={{ 
-                  background: `linear-gradient(135deg, ${brandColor}, ${brandColor}ee)`, 
-                  color: 'white', 
-                  border: 'none', 
-                  padding: '6px 12px', 
-                  borderRadius: '10px', 
-                  cursor: 'pointer', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '6px', 
-                  fontSize: '0.75rem', 
-                  fontWeight: 900,
-                  boxShadow: `0 4px 10px -3px ${brandColor}40`,
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                <Plus size={14} strokeWidth={3} /> Lehrwerk hinzufügen
-              </button>
-            </div>
-
-            {showAddLehrwerk && (
-              <form onSubmit={handleAddLehrwerkSubmit} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'white', borderRadius: '16px', border: `1px solid ${brandColor}20`, boxShadow: '0 8px 24px rgba(0,0,0,0.02)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
-                  <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Neues Lehrwerk</h4>
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setBulkModeLehrwerke(false)}
-                      style={{
-                        background: 'none', border: 'none', padding: '4px 8px', fontSize: '0.78rem', fontWeight: !bulkModeLehrwerke ? 800 : 600,
-                        color: !bulkModeLehrwerke ? brandColor : '#64748b', borderBottom: !bulkModeLehrwerke ? `2px solid ${brandColor}` : 'none', cursor: 'pointer', outline: 'none'
-                      }}
-                    >
-                      Einzeln
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setBulkModeLehrwerke(true)}
-                      style={{
-                        background: 'none', border: 'none', padding: '4px 8px', fontSize: '0.78rem', fontWeight: bulkModeLehrwerke ? 800 : 600,
-                        color: bulkModeLehrwerke ? brandColor : '#64748b', borderBottom: bulkModeLehrwerke ? `2px solid ${brandColor}` : 'none', cursor: 'pointer', outline: 'none'
-                      }}
-                    >
-                      Sammel-Onboarding
-                    </button>
-                  </div>
-                </div>
-
-                {!bulkModeLehrwerke ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>Titel</label>
-                      <input required placeholder="z.B. GrooveLab Drums Vol. 2" value={newLehrwerk.title} onChange={e => setNewLehrwerk({...newLehrwerk, title: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>Autor</label>
-                      <input placeholder="z.B. Max Mustermann" value={newLehrwerk.author || ''} onChange={e => setNewLehrwerk({...newLehrwerk, author: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>Seiten</label>
-                      <input type="number" min="1" max="1000" placeholder="50" value={newLehrwerk.totalPages} onChange={e => setNewLehrwerk({...newLehrwerk, totalPages: Number(e.target.value) || 50})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Mehrere Lehrwerke eintragen</label>
-                    <p style={{ margin: 0, fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>Format: Titel - Autor - Seitenzahl (eine Zeile pro Lehrwerk)</p>
-                    <textarea
-                      required
-                      placeholder={`GrooveLab Drums Vol. 2 - Max Mustermann - 50\nGitarrenschule 1 - Hans Müller - 64\nKlavierfibel - Unbekannt - 40`}
-                      value={bulkTextLehrwerke}
-                      onChange={e => setBulkTextLehrwerke(e.target.value)}
-                      style={{
-                        width: '100%', height: '140px', padding: '12px', borderRadius: '10px',
-                        border: '1px solid #e2e8f0', fontSize: '0.85rem', fontWeight: 600, fontFamily: 'monospace',
-                        outline: 'none', resize: 'none'
-                      }}
-                    />
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer' }}>Importieren / Speichern</button>
-                  <button type="button" onClick={() => { setShowAddLehrwerk(false); setBulkModeLehrwerke(false); setBulkTextLehrwerke(''); }} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem' }}>Abbrechen</button>
-                </div>
-              </form>
-            )}
-
-            {editingLehrwerk && (
-              <form onSubmit={handleEditLehrwerkSubmit} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'white', borderRadius: '16px', border: `1px solid ${brandColor}20`, boxShadow: '0 8px 24px rgba(0,0,0,0.02)' }}>
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Lehrwerk bearbeiten</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>Titel</label>
-                    <input required placeholder="z.B. GrooveLab Drums Vol. 2" value={editingLehrwerk.title} onChange={e => setEditingLehrwerk({...editingLehrwerk, title: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>Autor</label>
-                    <input placeholder="z.B. Max Mustermann" value={editingLehrwerk.author || ''} onChange={e => setEditingLehrwerk({...editingLehrwerk, author: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>Seiten</label>
-                    <input type="number" min="1" max="1000" placeholder="50" value={editingLehrwerk.totalPages || 50} onChange={e => setEditingLehrwerk({...editingLehrwerk, totalPages: Number(e.target.value) || 50})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer' }}>Speichern</button>
-                  <button type="button" onClick={() => setEditingLehrwerk(null)} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem' }}>Abbrechen</button>
-                </div>
-              </form>
-            )}
-
-            {/* Lehrwerke List (1 element per line) */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
-              {filteredLehrwerke.map(item => {
-                const gradient = getLehrwerkColor(item.title);
-                return (
-                  <div 
-                    key={item.id} 
-                    className="glass-panel hover-scale" 
-                    onClick={() => {
-                      setSelectedLehrwerkForDetail(item);
-                      setStudentDetailSearch('');
-                    }}
-                    style={{ 
-                      padding: '14px 18px', 
-                      background: 'white', 
-                      display: 'flex', 
-                      gap: '12px', 
-                      alignItems: 'center', 
-                      borderRadius: '24px', 
-                      border: editingLehrwerk?.id === item.id ? `2px solid ${brandColor}` : '1px solid #e2e8f0', 
-                      borderLeft: `5px solid ${gradient.from}`,
-                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
-                      position: 'relative',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      minHeight: '92px',
-                      boxSizing: 'border-box'
-                    }}
-                  >
-                    <div style={{ 
-                      width: '44px', 
-                      height: '58px', 
-                      background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`, 
-                      borderRadius: '6px', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center', 
-                      color: gradient.text, 
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
-                      flexShrink: 0
-                    }}>
-                      <BookOpen size={18} color={gradient.text} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <h4 style={{ margin: '0 0 2px 0', fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h4>
-                      {item.author && <p style={{ margin: '0 0 2px 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>von {item.author}</p>}
-                      <p style={{ margin: 0, fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700 }}>📖 {item.totalPages || 50} Seiten</p>
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                      <button 
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingLehrwerk(item);
-                          setShowAddLehrwerk(false);
-                        }}
-                        style={{ 
-                          background: '#f8fafc', 
-                          border: '1px solid #e2e8f0', 
-                          width: '44px', 
-                          height: '44px', 
-                          borderRadius: '12px', 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center', 
-                          cursor: 'pointer', 
-                          color: '#64748b', 
-                          transition: 'all 0.2s' 
-                        }}
-                      >
-                        <Pencil size={18} />
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteLehrwerk(item.id);
-                        }} 
-                        style={{ 
-                          background: '#fff1f2', 
-                          border: 'none', 
-                          width: '44px', 
-                          height: '44px', 
-                          borderRadius: '12px', 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center', 
-                          cursor: 'pointer', 
-                          color: '#ef4444', 
-                          transition: 'all 0.2s' 
-                        }}
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          )}
         </div>
       </div>
-
-      {/* Right Side: Textbausteine Sidebar */}
-      <div 
-        className="glass-panel" 
-        style={{ 
-          flex: '0 0 260px',
-          width: '260px',
-          minWidth: '240px',
-          background: 'white', 
-          borderRadius: '20px', 
-          border: '1px solid rgba(0, 0, 0, 0.05)', 
-          padding: '24px 16px', 
-          boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: '16px',
-          alignSelf: 'stretch'
-        }}
-      >
-        {/* Title */}
-        <div>
-          <h2 style={{ fontSize: '1.2rem', color: '#18181b', display: 'flex', alignItems: 'center', gap: '6px', margin: 0, fontWeight: 900 }}>
-            <span style={{ background: `${brandColor}15`, color: brandColor, padding: '4px 6px', borderRadius: '6px', display: 'flex', alignItems: 'center', fontSize: '1rem' }}>⚡</span>
-            <span>Schnell-Text</span>
-          </h2>
-          <p style={{ color: '#64748b', fontSize: '0.72rem', margin: '4px 0 0 0', fontWeight: 600 }}>
-            Vorlagen für Hausaufgaben.
-          </p>
-        </div>
-
-        {/* Manage Button */}
-        <button
-          type="button"
-          onClick={() => setShowTextbausteinModal(true)}
-          style={{
-            width: '100%',
-            background: `${brandColor}10`,
-            border: `1px solid ${brandColor}30`,
-            borderRadius: '12px',
-            padding: '10px 12px',
-            fontSize: '0.78rem',
-            fontWeight: 800,
-            color: brandColor,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px',
-            transition: 'all 0.15s'
-          }}
-          className="hover-bg"
-        >
-          <Settings size={14} />
-          <span>Verwalten</span>
-        </button>
-
-        {/* Templates List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, minHeight: 0 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Deine Bausteine</span>
-            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', background: '#f1f5f9', padding: '2px 6px', borderRadius: '9999px' }}>
-              {textbausteine.filter((tb: any) => tb.active).length}
-            </span>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '8px', overflowY: 'auto', flex: 1, maxHeight: '580px', paddingRight: '2px' }}>
-            {textbausteine.filter((tb: any) => tb.active).map((tb: any) => {
-              const parts = tb.label.split(' ');
-              const hasEmoji = parts[0] && /\p{Emoji}/u.test(parts[0]);
-              const emoji = hasEmoji ? parts[0] : '🎵';
-              const name = hasEmoji ? parts.slice(1).join(' ') : tb.label;
-              const isCopied = copiedTbId === tb.id;
-
-              const handleCardClick = () => {
-                if (selectedLehrwerkForDetail && selectedStudentForProgress) {
-                  setNewHomeworkNoteText(prev => prev ? `${prev}\n\n${tb.text}` : tb.text);
-                  setCopiedTbId(tb.id);
-                  setTimeout(() => setCopiedTbId(null), 850);
-                } else if (selectedSongForDetail && selectedStudentForProgress) {
-                  setSongLessonNotes(prev => prev ? `${prev}\n\n${tb.text}` : tb.text);
-                  setCopiedTbId(tb.id);
-                  setTimeout(() => setCopiedTbId(null), 850);
-                } else {
-                  navigator.clipboard.writeText(tb.text);
-                  setCopiedTbId(tb.id);
-                  setTimeout(() => setCopiedTbId(null), 1000);
-                }
-              };
-
-              return (
-                <div 
-                  key={tb.id} 
-                  onClick={handleCardClick}
-                  style={{ 
-                    border: isCopied ? '1.5px solid #22c55e' : '1px solid #e2e8f0', 
-                    borderRadius: '12px', 
-                    padding: '10px 8px', 
-                    background: isCopied ? '#f0fdf4' : 'white',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    textAlign: 'center',
-                    gap: '6px',
-                    opacity: tb.active ? 1 : 0.55,
-                    boxShadow: isCopied ? '0 4px 10px rgba(34, 197, 94, 0.15)' : '0 1px 2px rgba(0,0,0,0.01)',
-                    minHeight: '110px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    transform: isCopied ? 'scale(0.96)' : 'none'
-                  }}
-                  className="hover-scale-mini"
-                >
-                  <span style={{ fontSize: '1.4rem', marginTop: '2px', transform: isCopied ? 'scale(1.15)' : 'none', transition: 'all 0.2s' }}>
-                    {isCopied ? '✅' : emoji}
-                  </span>
-                  
-                  <span style={{ 
-                    fontSize: '0.72rem', 
-                    fontWeight: 800, 
-                    color: isCopied ? '#15803d' : '#1e293b', 
-                    display: '-webkit-box', 
-                    WebkitLineClamp: 2, 
-                    WebkitBoxOrient: 'vertical', 
-                    overflow: 'hidden', 
-                    lineHeight: '1.2', 
-                    height: '2.4em', 
-                    wordBreak: 'break-word',
-                    transition: 'color 0.2s'
-                  }}>
-                    {isCopied ? (selectedLehrwerkForDetail || selectedSongForDetail ? 'Eingefügt! ✓' : 'Kopiert! ✓') : name}
-                  </span>
-
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleTextbausteinActive(tb.id);
-                    }}
-                    style={{
-                      background: tb.active ? '#f0fdf4' : '#f1f5f9',
-                      color: tb.active ? '#16a34a' : '#64748b',
-                      border: tb.active ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                      padding: '3px 8px',
-                      borderRadius: '9999px',
-                      fontSize: '0.62rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '3px',
-                      width: '100%',
-                      justifyContent: 'center',
-                      transition: 'all 0.15s'
-                    }}
-                  >
-                    <span>{tb.active ? '🟢 Aktiv' : '⚪ Inakt.'}</span>
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
     </div>
   );
 };

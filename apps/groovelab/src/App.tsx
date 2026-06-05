@@ -5863,7 +5863,7 @@ function App() {
             ) : activePlatform === 'ensembles' ? (
               <>
                 <button onClick={() => setActiveStudentTab('overview')} className={`sidebar-item ${activeStudentTab === 'overview' ? `active ${activePlatform}` : ''}`}>
-                  <Users size={20} /> Ensemble & Bands
+                  <Users size={20} /> Ensembles & Bands
                 </button>
               </>
             ) : (
@@ -5953,9 +5953,6 @@ function App() {
                 <button onClick={() => setActiveStudentTab('students')} className={`sidebar-item ${activeStudentTab === 'students' ? `active ${activePlatform}` : ''}`}>
                   <Users size={20} /> Schüler
                 </button>
-                <button onClick={() => setActiveStudentTab('songs')} className={`sidebar-item ${activeStudentTab === 'songs' ? `active ${activePlatform}` : ''}`}>
-                  <Library size={20} /> Mediathek
-                </button>
                 <button onClick={() => setActiveStudentTab('rooms')} className={`sidebar-item ${activeStudentTab === 'rooms' ? `active ${activePlatform}` : ''}`}>
                   <Box size={20} /> Räume
                 </button>
@@ -5974,7 +5971,7 @@ function App() {
             ) : activePlatform === 'ensembles' ? (
               <>
                 <button onClick={() => setActiveStudentTab('overview')} className={`sidebar-item ${activeStudentTab === 'overview' ? `active ${activePlatform}` : ''}`}>
-                  <Users size={20} /> Ensemble & Bands
+                  <Users size={20} /> Ensembles & Bands
                 </button>
               </>
             ) : (
@@ -6207,7 +6204,7 @@ function App() {
               }}
             >
               <Users size={15} color={activePlatform === 'ensembles' ? '#ffffff' : '#3b82f6'} />
-              <span>Ensemble & Bands</span>
+              <span>Ensembles & Bands</span>
             </div>
           </div>
 
