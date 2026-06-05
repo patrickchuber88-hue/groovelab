@@ -4299,20 +4299,30 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       return (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                           {masteredSongs.map(item => {
-                            const matchingSong = songs.find(s => s.title.toLowerCase() === item.topic_name.toLowerCase());
+                            const matchingSong = songs.find(s => s.title.toLowerCase() === item.topic_name.toLowerCase() || item.topic_name.toLowerCase().includes(s.title.toLowerCase()));
                             const artist = matchingSong?.artist || 'Unbekannt';
+                            const title = matchingSong?.title || item.topic_name;
+                            const lwColor = getSongColor(title);
+                            const coverBg = `linear-gradient(135deg, ${lwColor.from} 0%, ${lwColor.to} 100%)`;
+
                             return (
                               <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#f0fdf4', padding: '10px 12px', borderRadius: '12px', border: '1px solid #d1fae5' }}>
-                                <div style={{ background: '#d1fae5', color: '#10b981', padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
-                                  <Trophy size={14} fill="currentColor" />
+                                <div style={{
+                                  width: '32px',
+                                  height: '32px',
+                                  background: coverBg,
+                                  borderRadius: '8px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: lwColor.text,
+                                  flexShrink: 0,
+                                  border: '1px solid rgba(0,0,0,0.05)'
+                                }}>
+                                  <Music size={14} />
                                 </div>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#065f46', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    {item.topic_name}
-                                  </div>
-                                  <div style={{ fontSize: '0.65rem', color: '#047857', fontWeight: 650 }}>
-                                    von {artist}
-                                  </div>
+                                <div style={{ flex: 1, minWidth: 0, fontSize: '0.78rem', fontWeight: 800, color: '#065f46', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {artist} - {title}
                                 </div>
                               </div>
                             );
@@ -4322,25 +4332,17 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     })()}
                   </div>
 
-                  {/* Mastered / Active Lehrwerke Section */}
+                  {/* Mastered / Completed Lehrwerke Section */}
                   <div>
                     <h5 style={{ fontSize: '0.72rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      📚 Lehrwerke Fortschritt
+                      📚 Gemeisterte Lehrwerke
                     </h5>
                     {(() => {
                       const studentAssignments = localProgress.filter((p: any) => p.studentId === studentId);
                       const assignedLehrwerke = lehrwerke.filter(book => studentAssignments.some((p: any) => p.lehrwerkId === book.id));
 
-                      if (assignedLehrwerke.length === 0) {
-                        return (
-                          <div style={{ padding: '12px', textAlign: 'center', color: '#94a3b8', fontSize: '0.72rem', fontStyle: 'italic', background: 'rgba(255, 255, 255, 0.4)', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
-                            Keine Lehrwerke zugewiesen.
-                          </div>
-                        );
-                      }
-
-                      // Sort so that completed (100%) come first, then sort by progress percentage descending
-                      const booksWithProgress = assignedLehrwerke.map(book => {
+                      // Filter for 100% completed textbooks
+                      const completedBooks = assignedLehrwerke.map(book => {
                         const assignment = studentAssignments.find((p: any) => p.lehrwerkId === book.id);
                         let masteredCount = 0;
                         if (assignment && assignment.pageStates) {
@@ -4348,30 +4350,41 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         }
                         const pct = book.totalPages > 0 ? (masteredCount / book.totalPages) : 0;
                         return { book, masteredCount, pct };
-                      }).sort((a, b) => b.pct - a.pct);
+                      }).filter(item => item.pct >= 1);
+
+                      if (completedBooks.length === 0) {
+                        return (
+                          <div style={{ padding: '12px', textAlign: 'center', color: '#94a3b8', fontSize: '0.72rem', fontStyle: 'italic', background: 'rgba(255, 255, 255, 0.4)', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                            Noch keine Lehrwerke gemeistert.
+                          </div>
+                        );
+                      }
 
                       return (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          {booksWithProgress.map(({ book, masteredCount, pct }) => {
-                            const isFullyMastered = pct >= 1;
-                            const cardBg = isFullyMastered ? '#f5f3ff' : '#f8fafc';
-                            const cardBorder = isFullyMastered ? '1px solid #ddd6fe' : '1px solid #e2e8f0';
-                            const iconBg = isFullyMastered ? '#ddd6fe' : '#e2e8f0';
-                            const iconColor = isFullyMastered ? '#7c3aed' : '#64748b';
-                            const textThemeColor = isFullyMastered ? '#5b21b6' : '#334155';
+                          {completedBooks.map(({ book }) => {
+                            const gradient = getLehrwerkColor(book.title, lehrwerke);
+                            const cardBg = '#f5f3ff';
+                            const cardBorder = '1px solid #ddd6fe';
 
                             return (
                               <div key={book.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: cardBg, padding: '10px 12px', borderRadius: '12px', border: cardBorder }}>
-                                <div style={{ background: iconBg, color: iconColor, padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
+                                <div style={{
+                                  width: '32px',
+                                  height: '32px',
+                                  background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`,
+                                  borderRadius: '8px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: gradient.text,
+                                  flexShrink: 0,
+                                  border: '1px solid rgba(0,0,0,0.05)'
+                                }}>
                                   <BookOpen size={14} />
                                 </div>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: textThemeColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    {book.title}
-                                  </div>
-                                  <div style={{ fontSize: '0.65rem', color: iconColor, fontWeight: 650 }}>
-                                    {isFullyMastered ? '100% gemeistert! 🎉' : `${masteredCount} / ${book.totalPages} S. (${Math.round(pct * 100)}%)`}
-                                  </div>
+                                <div style={{ flex: 1, minWidth: 0, fontSize: '0.78rem', fontWeight: 800, color: '#5b21b6', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {book.title}
                                 </div>
                               </div>
                             );
