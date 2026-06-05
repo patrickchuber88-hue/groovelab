@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw } from 'lucide-react';
+import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle } from 'lucide-react';
 import { getDistanceFromLatLonInM } from '../utils/geo';
 import jsQR from 'jsqr';
 
@@ -34,8 +34,8 @@ function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQRScanne
         const constraints: MediaStreamConstraints = {
           video: {
             facingMode: facingMode,
-            width: { ideal: 640 },
-            height: { ideal: 640 }
+            width: { ideal: 480 },
+            height: { ideal: 480 }
           },
           audio: false
         };
@@ -92,22 +92,28 @@ function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQRScanne
     }
 
     canvasRef.current = document.createElement('canvas');
+    let lastScanTime = 0;
 
-    const scanFrame = () => {
+    const scanFrame = (timestamp: number) => {
       const video = videoRef.current;
       const canvas = canvasRef.current;
       if (video && canvas && video.readyState === video.HAVE_ENOUGH_DATA) {
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const code = jsQR(imageData.data, imageData.width, imageData.height, {
-            inversionAttempts: 'dontInvert'
-          });
-          if (code && code.data) {
-            onScan(code.data);
+        // Only run jsQR every 150ms to save CPU and battery power
+        if (timestamp - lastScanTime > 150) {
+          lastScanTime = timestamp;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            // Downscale to 320x320 to reduce parsed pixels by 75%+
+            canvas.width = 320;
+            canvas.height = 320;
+            ctx.drawImage(video, 0, 0, 320, 320);
+            const imageData = ctx.getImageData(0, 0, 320, 320);
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+              inversionAttempts: 'dontInvert'
+            });
+            if (code && code.data) {
+              onScan(code.data);
+            }
           }
         }
       }
@@ -253,6 +259,26 @@ const adjustPositions = (stations: any[], containerWidth: number = 364) => {
 const cleanRoomName = (name: string | null | undefined): string => {
   if (!name) return 'Unbenannter Raum';
   return name.replace(/^#\d+\s*[-:]*\s*/, '').trim();
+};
+
+const getStationColor = (name: string | null | undefined, dbColor?: string | null) => {
+  if (!name) return '#64748b';
+  
+  const isStandardIpad = /^ipad\s*\d+/i.test(name);
+  if (!isStandardIpad && dbColor && dbColor !== '#e5e7eb' && dbColor !== '#e2e8f0' && dbColor !== '#cbd5e1' && dbColor !== '#64748b') {
+    return dbColor;
+  }
+
+  const lowerName = name.toLowerCase();
+  if (lowerName.includes('lehrer') || lowerName.includes('teacher')) return '#22c55e'; // Green
+  const matches = name.match(/\d+/g);
+  if (!matches) return '#64748b';
+  const num = parseInt(matches[matches.length - 1]);
+  if (num === 1 || num === 2) return '#ef4444'; // Red
+  if (num === 3 || num === 4) return '#a855f7'; // Purple
+  if (num === 5 || num === 6) return '#3b82f6'; // Blue
+  if (num === 7 || num === 8) return '#eab308'; // Yellow
+  return '#64748b';
 };
 
 export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
@@ -868,6 +894,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [loadingSchool, setLoadingSchool] = useState(false);
   const [signingUp, setSigningUp] = useState(false);
   const [userPos, setUserPos] = useState<{lat: number, lng: number} | null>(null);
+  const [showPermissionHelp, setShowPermissionHelp] = useState(false);
   
 
 
@@ -2487,6 +2514,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 >
                   Kamera aktivieren
                 </button>
+                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '8px', lineHeight: '1.4', maxWidth: '240px' }}>
+                  Wähle bei der Abfrage <strong>„Erlauben“</strong>. <span onClick={() => setShowPermissionHelp(true)} style={{ color: '#a7f3d0', textDecoration: 'underline', cursor: 'pointer', fontWeight: 800 }}>Hilfe</span>
+                </div>
               </div>
             )}
 
@@ -2507,11 +2537,70 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           </div>
         </div>
 
-        {/* iOS-Style Ausweis ID Login button - Hidden in Kiosk Mode */}
-        {!isGroovelabKiosk && (
+        {/* Passwort Anmeldung button for Kiosk Mode inside the card under the camera image */}
+        {isGroovelabKiosk && (
           <div style={{ marginTop: '20px', width: '100%' }}>
             <button 
               onClick={() => setExpandedSection('pin')}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                padding: '12px 16px',
+                borderRadius: '16px',
+                background: 'rgba(0, 0, 0, 0.05)',
+                border: '1px solid rgba(0, 0, 0, 0.1)',
+                color: '#062413',
+                fontSize: '13px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                textAlign: 'center',
+                boxSizing: 'border-box',
+                height: '48px',
+                outline: 'none'
+              }}
+              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.1)'; }}
+              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)'; }}
+            >
+              <KeyRound size={16} color="#78350f" />
+              Passwort Anmeldung
+            </button>
+          </div>
+        )}
+
+        {/* iOS-Style GrooveLab check-in button - Hidden in Kiosk Mode */}
+        {!isGroovelabKiosk && (
+          <div style={{ marginTop: '20px', width: '100%' }}>
+            <button 
+              onClick={() => {
+                if (navigator.geolocation) {
+                  setLoadingLocation(true);
+                  navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                      const currentPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                      setUserPos(currentPos);
+                      console.log('[Kiosk] Geolocation success:', currentPos);
+                      setLoadingLocation(false);
+                      setIsGroovelabKiosk(true);
+                      setIsCameraActive(true);
+                    },
+                    (err) => {
+                      console.warn('[Kiosk] Geolocation failed:', err);
+                      setLoadingLocation(false);
+                      setIsGroovelabKiosk(true); // Fallback: still show kiosk rooms
+                      setIsCameraActive(true);
+                    },
+                    { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 }
+                  );
+                } else {
+                  setIsGroovelabKiosk(true);
+                  setIsCameraActive(true);
+                }
+              }}
+              disabled={loadingLocation}
               style={{
                 width: '100%',
                 display: 'flex',
@@ -2525,18 +2614,28 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 color: '#ffffff',
                 fontSize: '13px',
                 fontWeight: 700,
-                cursor: 'pointer',
+                cursor: loadingLocation ? 'wait' : 'pointer',
                 transition: 'all 0.2s',
                 textAlign: 'center',
                 boxSizing: 'border-box',
                 height: '48px',
-                outline: 'none'
+                outline: 'none',
+                opacity: loadingLocation ? 0.7 : 1
               }}
-              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'; }}
-              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'; }}
+              onMouseOver={(e) => { if (!loadingLocation) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'; }}
+              onMouseOut={(e) => { if (!loadingLocation) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'; }}
             >
-              <KeyRound size={16} color="#a7f3d0" />
-              Passwort Anmeldung
+              {loadingLocation ? (
+                <>
+                  <div style={{ width: '12px', height: '12px', border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                  Standort wird ermittelt...
+                </>
+              ) : (
+                <>
+                  <Tablet size={16} color="#a7f3d0" />
+                  Im GrooveLab anmelden
+                </>
+              )}
             </button>
           </div>
         )}
@@ -2611,7 +2710,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     const isOccupied = activeSessionStationIds.includes(station.id);
                     const posX = station.x;
                     const posY = station.y;
-                    const stationColor = station.color || '#cbd5e1';
+                    const stationColor = getStationColor(station.name, station.color);
 
                     const isSelected = selectedKioskStationId === station.id;
 
@@ -2706,66 +2805,34 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       )
 }
 
-      {/* Kiosk Modus button under the card if available */}
+      {/* Passwort Anmeldung button under the card if available */}
       {expandedSection === 'none' && !isGroovelabKiosk && (
         <div style={{ marginTop: '24px' }}>
           <button 
-            onClick={() => {
-              if (navigator.geolocation) {
-                setLoadingLocation(true);
-                navigator.geolocation.getCurrentPosition(
-                  (pos) => {
-                    const currentPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                    setUserPos(currentPos);
-                    console.log('[Kiosk] Geolocation success:', currentPos);
-                    setLoadingLocation(false);
-                    setIsGroovelabKiosk(true);
-                    setIsCameraActive(true);
-                  },
-                  (err) => {
-                    console.warn('[Kiosk] Geolocation failed:', err);
-                    setLoadingLocation(false);
-                    setIsGroovelabKiosk(true); // Fallback: still show kiosk rooms
-                    setIsCameraActive(true);
-                  },
-                  { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 }
-                );
-              } else {
-                setIsGroovelabKiosk(true);
-                setIsCameraActive(true);
-              }
-            }}
-            disabled={loadingLocation}
+            onClick={() => setExpandedSection('pin')}
             style={{ 
-              background: 'rgba(255, 255, 255, 0.08)', 
-              border: '1px solid rgba(255, 255, 255, 0.15)', 
+              background: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)', 
+              border: isGroovelabKiosk ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(255, 255, 255, 0.15)', 
               padding: '10px 24px',
               borderRadius: '100px',
-              color: '#ffffff', 
+              color: isGroovelabKiosk ? '#062413' : '#ffffff', 
               fontSize: '12px', 
               fontWeight: 800, 
               textTransform: 'uppercase', 
               letterSpacing: '0.05em', 
-              cursor: loadingLocation ? 'wait' : 'pointer', 
+              cursor: 'pointer', 
               transition: 'all 0.2s',
               backdropFilter: 'blur(10px)',
               WebkitBackdropFilter: 'blur(10px)',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              opacity: loadingLocation ? 0.7 : 1
+              gap: '8px'
             }}
-            onMouseOver={(e) => { if (!loadingLocation) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.16)'; }}
-            onMouseOut={(e) => { if (!loadingLocation) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+            onMouseOver={(e) => { e.currentTarget.style.background = isGroovelabKiosk ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.16)'; }}
+            onMouseOut={(e) => { e.currentTarget.style.background = isGroovelabKiosk ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)'; }}
           >
-            {loadingLocation ? (
-              <>
-                <div style={{ width: '12px', height: '12px', border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                Standort wird ermittelt...
-              </>
-            ) : (
-              "Im GrooveLab anmelden"
-            )}
+            <KeyRound size={14} color={isGroovelabKiosk ? '#062413' : '#a7f3d0'} />
+            Passwort Anmeldung
           </button>
         </div>
       )}
@@ -3209,6 +3276,120 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 </>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Permission Help Modal */}
+      {showPermissionHelp && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(9, 9, 11, 0.70)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '24px',
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            background: 'rgba(24, 24, 27, 0.95)',
+            borderRadius: '32px',
+            boxShadow: '0 30px 80px rgba(0, 0, 0, 0.5)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            padding: '32px',
+            maxWidth: '520px',
+            width: '100%',
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px',
+            boxSizing: 'border-box',
+            color: '#ffffff'
+          }}>
+            <button 
+              onClick={() => setShowPermissionHelp(false)} 
+              style={{
+                position: 'absolute',
+                top: '24px',
+                right: '24px',
+                background: 'rgba(255, 255, 255, 0.06)',
+                border: 'none',
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#ffffff',
+                transition: 'all 0.2s'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'}
+              onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'}
+            >
+              <X size={18} />
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(167, 243, 208, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a7f3d0' }}>
+                <HelpCircle size={20} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 900, letterSpacing: '-0.02em', color: '#ffffff' }}>
+                Berechtigungen dauerhaft erlauben
+              </h3>
+            </div>
+
+            <p style={{ margin: 0, fontSize: '13px', color: '#a1a1aa', lineHeight: '1.5' }}>
+              Aus Sicherheitsgründen schützt dein Browser den Zugriff auf Kamera und Standort. Du kannst diesen Zugriff dauerhaft freigeben, damit der Login beim nächsten Mal automatisch klappt:
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Safari / iOS */}
+              <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '16px', borderRadius: '18px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 800, color: '#a7f3d0' }}>
+                   Safari (iPhone, iPad, Mac)
+                </h4>
+                <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '12px', color: '#d4d4d8', lineHeight: '1.6' }}>
+                  <li>Tippe in der Adressleiste links auf das <strong>„aA“</strong>-Symbol oder das Einstellungen-Symbol.</li>
+                  <li>Wähle <strong>„Website-Einstellungen“</strong>.</li>
+                  <li>Setze <strong>Kamera</strong> und <strong>Standort</strong> auf <strong>„Erlauben“</strong>.</li>
+                </ul>
+              </div>
+
+              {/* Google Chrome */}
+              <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '16px', borderRadius: '18px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 800, color: '#facc15' }}>
+                  🌐 Google Chrome (Android, Mac, PC)
+                </h4>
+                <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '12px', color: '#d4d4d8', lineHeight: '1.6' }}>
+                  <li>Klicke in der Adressleiste links auf das <strong>Schieberegler/Schloss-Symbol</strong> neben der Website-Adresse.</li>
+                  <li>Aktiviere dort die Schalter für <strong>Kamera</strong> und <strong>Standort</strong> (auf <strong>„Zulassen“</strong> stellen).</li>
+                </ul>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowPermissionHelp(false)}
+              style={{
+                background: '#a7f3d0',
+                color: '#062413',
+                border: 'none',
+                padding: '14px',
+                borderRadius: '16px',
+                fontWeight: 800,
+                fontSize: '13px',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+              onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
+            >
+              Verstanden
+            </button>
           </div>
         </div>
       )}

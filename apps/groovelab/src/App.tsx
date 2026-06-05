@@ -13,6 +13,7 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { MasterAdminDashboard } from './components/MasterAdminDashboard';
 import { SecretaryDashboard } from './components/SecretaryDashboard';
 import { StudentAvatarDashboard } from './components/StudentAvatarDashboard';
+import { EnsembleDashboard } from './components/EnsembleDashboard';
 import BandProfileContent from './components/BandProfileContent';
 import { ArtistGateway } from './components/ArtistGateway';
 import StudentRadarChart from './components/StudentRadarChart';
@@ -1754,10 +1755,10 @@ function App() {
   const [globalSongs, setGlobalSongs] = useState<any[]>([]);
   const [plannedSlots, setPlannedSlots] = useState<string[]>([]);
   const [globalPlannedSlots, setGlobalPlannedSlots] = useState<any[]>([]);
-  const [activePlatform, setActivePlatformRaw] = useState<'campus' | 'groovelab'>(() => {
+  const [activePlatform, setActivePlatformRaw] = useState<'campus' | 'groovelab' | 'ensembles'>(() => {
     const isCampusDomain = typeof window !== 'undefined' && window.location.hostname.includes('campus');
     const defaultPlat = isCampusDomain ? 'campus' : 'groovelab';
-    return (localStorage.getItem('groovelab_active_platform') as 'campus' | 'groovelab') || defaultPlat;
+    return (localStorage.getItem('groovelab_active_platform') as 'campus' | 'groovelab' | 'ensembles') || defaultPlat;
   });
   const setActivePlatform = React.useCallback((val: any) => {
     React.startTransition(() => {
@@ -1766,9 +1767,12 @@ function App() {
   }, []);
 
   const [activeStudentTab, setActiveStudentTabRaw] = useState<string>(() => {
-    const platform = (localStorage.getItem('groovelab_active_platform') as 'campus' | 'groovelab') || 'groovelab';
+    const platform = (localStorage.getItem('groovelab_active_platform') as any) || 'groovelab';
     if (platform === 'campus') {
       return localStorage.getItem('campus_active_tab') || 'profile';
+    }
+    if (platform === 'ensembles') {
+      return localStorage.getItem('ensembles_active_tab') || 'overview';
     }
     return localStorage.getItem('groovelab_active_tab') || 'profile';
   });
@@ -2411,6 +2415,8 @@ function App() {
   useEffect(() => {
     if (activePlatform === 'campus') {
       // localStorage.setItem('campus_active_tab', activeStudentTab);
+    } else if (activePlatform === 'ensembles') {
+      localStorage.setItem('ensembles_active_tab', activeStudentTab);
     } else {
       localStorage.setItem('groovelab_active_tab', activeStudentTab);
     }
@@ -2425,11 +2431,15 @@ function App() {
     previousPlatform.current = activePlatform;
     
     // Always load the first menu tab when actively switching platforms (Karteikarten)
-    const firstMenuTab = activePlatform === 'campus' 
-      ? (user?.role?.toLowerCase() === 'student' ? 'briefing' : 'live') 
-      : 'live';
+    let firstMenuTab = 'live';
+    if (activePlatform === 'campus') {
+      firstMenuTab = user?.role?.toLowerCase() === 'student' ? 'briefing' : 'live';
+    } else if (activePlatform === 'ensembles') {
+      firstMenuTab = 'overview';
+    }
     setActiveStudentTab(firstMenuTab);
-    localStorage.setItem(activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab', firstMenuTab);
+    const storageKey = activePlatform === 'campus' ? 'campus_active_tab' : (activePlatform === 'ensembles' ? 'ensembles_active_tab' : 'groovelab_active_tab');
+    localStorage.setItem(storageKey, firstMenuTab);
   }, [activePlatform, user?.role]);
 
   // Safety Hook: Enforce that students in the Campus module can NEVER see the GrooveLab Live Lab tab.
@@ -2647,7 +2657,7 @@ function App() {
       // If there is no active session (sessionRes.data is null), they have bypassed the scanner or were checked out.
       // We immediately force logout and wipe their tab state.
       const isStudent = userData.role?.toLowerCase() === 'student';
-      if (isStudent && locationMode === 'lab' && !sessionRes.data) {
+      if (isStudent && locationMode === 'lab' && !sessionRes.data && !sessionRes.error) {
         console.warn('[Dashboard] Student in Lab mode has no active database session! Force logout.');
         setLoading(false);
         handleLogout(false);
@@ -5334,7 +5344,29 @@ function App() {
   }
 
   if (loading || !user) {
-    return null;
+    return (
+      <div style={{ 
+        position: 'fixed', 
+        inset: 0, 
+        background: '#09090b', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        flexDirection: 'column', 
+        gap: '16px' 
+      }}>
+        <div className="animate-spin" style={{ 
+          width: '40px', 
+          height: '40px', 
+          border: '3px solid rgba(255, 255, 255, 0.05)', 
+          borderTopColor: '#facc15', 
+          borderRadius: '50%' 
+        }}></div>
+        <div style={{ fontSize: '14px', fontWeight: 600, color: '#a1a1aa', letterSpacing: '0.05em' }}>
+          Sitzung wird wiederhergestellt...
+        </div>
+      </div>
+    );
   }
 
   // 2.5 MASTER ADMIN PORTAL BYPASS
@@ -5828,6 +5860,12 @@ function App() {
                   )}
                 </button>
               </>
+            ) : activePlatform === 'ensembles' ? (
+              <>
+                <button onClick={() => setActiveStudentTab('overview')} className={`sidebar-item ${activeStudentTab === 'overview' ? `active ${activePlatform}` : ''}`}>
+                  <Users size={20} /> Ensemble & Bands
+                </button>
+              </>
             ) : (
               <>
                 <button onClick={() => setActiveStudentTab('live')} className={`sidebar-item ${activeStudentTab === 'live' ? `active ${activePlatform}` : ''}`} style={{ position: 'relative' }}>
@@ -5931,6 +5969,12 @@ function App() {
                 </button>
                 <button onClick={() => setActiveStudentTab('setup')} className={`sidebar-item ${activeStudentTab === 'setup' ? `active ${activePlatform}` : ''}`}>
                   <Settings size={20} /> Setup
+                </button>
+              </>
+            ) : activePlatform === 'ensembles' ? (
+              <>
+                <button onClick={() => setActiveStudentTab('overview')} className={`sidebar-item ${activeStudentTab === 'overview' ? `active ${activePlatform}` : ''}`}>
+                  <Users size={20} /> Ensemble & Bands
                 </button>
               </>
             ) : (
@@ -6130,6 +6174,41 @@ function App() {
                 <span>GrooveLab</span>
               </div>
             )}
+
+            {/* Ensemble & Bands Tab */}
+            <div 
+              onClick={() => {
+                setActivePlatform('ensembles');
+                setActiveStudentTab('overview');
+                localStorage.setItem('ensembles_active_tab', 'overview');
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: windowWidth <= 1024 ? '10px 14px 8px' : '12px 22px 10px',
+                borderRadius: '12px 12px 0 0',
+                background: activePlatform === 'ensembles' ? '#3b82f6' : 'rgba(59, 130, 246, 0.05)',
+                color: activePlatform === 'ensembles' ? '#ffffff' : '#3b82f6',
+                border: activePlatform === 'ensembles' ? '1px solid #3b82f6' : '1px solid rgba(59, 130, 246, 0.18)',
+                borderBottom: 'none',
+                fontWeight: 750,
+                fontSize: '0.82rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                cursor: 'pointer',
+                zIndex: activePlatform === 'ensembles' ? 2 : 1,
+                transform: activePlatform === 'ensembles' ? 'translateY(1px)' : 'translateY(0)',
+                boxShadow: activePlatform === 'ensembles' ? '0 -4px 16px rgba(59, 130, 246, 0.18)' : 'none',
+                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                height: '44px',
+                boxSizing: 'border-box',
+                fontFamily: "'Plus Jakarta Sans', sans-serif"
+              }}
+            >
+              <Users size={15} color={activePlatform === 'ensembles' ? '#ffffff' : '#3b82f6'} />
+              <span>Ensemble & Bands</span>
+            </div>
           </div>
 
           <div style={{ 
@@ -6399,6 +6478,17 @@ function App() {
         paddingRight: activePlatform === 'campus' ? '0px' : undefined,
         minWidth: 0
       }}>
+        {/* Ensemble & Bands Platform View */}
+        {activePlatform === 'ensembles' && (
+          <ErrorBoundary>
+            <EnsembleDashboard 
+              user={user}
+              schoolId={user.school_id}
+              supabase={supabase}
+            />
+          </ErrorBoundary>
+        )}
+
         {/* Live Lab Tab for Students */}
         {user.role?.toLowerCase() === 'student' && activeStudentTab === 'live' && (
           <ErrorBoundary>
@@ -6412,7 +6502,7 @@ function App() {
                 isSidebarCollapsed={isSidebarCollapsed}
                 setIsSidebarCollapsed={setIsSidebarCollapsed}
                 onSidebarNotificationsChange={setSidebarNotificationsCount}
-                activePlatform={activePlatform}
+                activePlatform={activePlatform as any}
                 onSwitchPlatform={(newPlatform) => {
                   setActivePlatform(newPlatform);
                   setActiveStudentTab(newPlatform === 'campus' ? 'briefing' : 'live');
@@ -7791,7 +7881,7 @@ function App() {
               userId={user.id} 
               onLogout={handleLogout} 
               forceTab={activeStudentTab}
-              activePlatform={activePlatform}
+              activePlatform={activePlatform as any}
               onTabChange={(tabId: any) => setActiveStudentTab(tabId)}
               onOpenBandProfile={(band: any) => {
                 setSelectedBandForProfile(band);
@@ -11199,7 +11289,7 @@ function App() {
             }
             setSelectedStudentProfile(null);
           }}
-          activePlatform={activePlatform}
+          activePlatform={activePlatform as any}
           onSwitchPlatform={(newPlatform) => {
             setActivePlatform(newPlatform);
             setActiveStudentTab(newPlatform === 'campus' ? (user?.role?.toLowerCase() === 'student' ? 'briefing' : 'live') : 'live');
