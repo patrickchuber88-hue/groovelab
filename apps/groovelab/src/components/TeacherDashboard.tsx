@@ -992,7 +992,10 @@ export function TeacherDashboard({
       const isTeacher = teacher?.role?.toLowerCase() === 'teacher' || teacher?.role?.toLowerCase() === 'admin';
       // 1. Global Cleanup & 2. Station Cleanup in parallel
       await Promise.all([
-        supabase.from('sessions').update({ check_out_time: now }).eq('user_id', userId).is('check_out_time', null),
+        supabase.from('sessions').update({ 
+          check_out_time: now,
+          metadata: { is_switching_station: true }
+        }).eq('user_id', userId).is('check_out_time', null),
         (!isTeacher)
           ? supabase.from('sessions').update({ check_out_time: now }).eq('station_id', station.id).is('check_out_time', null)
           : Promise.resolve()

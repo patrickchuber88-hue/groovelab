@@ -2608,7 +2608,7 @@ function App() {
       }, (payload) => {
         // Only logout if check_out_time was set by someone else (e.g. admin or new session)
         // and we are not currently in the process of logging out ourselves
-        if (payload.new.check_out_time && !payload.new.metadata?.is_tab_close) {
+        if (payload.new.check_out_time && !payload.new.metadata?.is_tab_close && !payload.new.metadata?.is_switching_station) {
           handleLogout(false); // Logout but do not try to update DB again
         }
       })
