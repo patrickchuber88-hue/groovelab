@@ -304,7 +304,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [onboardCreatedUser, setOnboardCreatedUser] = useState<any>(null);
   const [onboardIPAddress, setOnboardIPAddress] = useState('unknown');
   const [expandedSection, setExpandedSection] = useState<'none' | 'pin' | 'kiosk'>('none');
-  const [isGroovelabKiosk, setIsGroovelabKiosk] = useState(false);
+  const [isGroovelabKiosk, setIsGroovelabKiosk] = useState(() => !!kioskStationId);
   const [selectedKioskStationId, setSelectedKioskStationId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -882,7 +882,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
   let effectiveStationId = kioskStationId || localStorage.getItem('groovelab_station_id');
   if (effectiveStationId === 'skip') effectiveStationId = null;
-  const loginStationId = isGroovelabKiosk ? selectedKioskStationId : effectiveStationId;
+  const loginStationId = isGroovelabKiosk ? (selectedKioskStationId || effectiveStationId) : null;
 
   useEffect(() => {
     async function loadSchoolInfo() {
@@ -1012,7 +1012,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const finalizeLogin = async (user: any, stationId: string | null, isWithinAnyRoom: boolean, hidePresence = false) => {
     try {
       setLoading(true);
-      sessionStorage.setItem('groovelab_user_id', user.id);
       let finalStationId = null;
       let isHome = false;
 
@@ -1021,34 +1020,44 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
 
 
-      const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
+      const isAdminOrSecretary = user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'secretary';
+      const isTeacher = user.role?.toLowerCase() === 'teacher' || isAdminOrSecretary;
       
       if (!isMaster) {
-        // Enforce activation check (must have at least one active module)
-        if (!user.is_campus_active && !user.is_groovelab_active) {
-          alert("Dein Zugang ist nicht aktiv. Bitte wende dich an deine Musikschule.");
-          await supabase.auth.signOut();
-          setLoading(false);
-          return;
-        }
+        if (!isAdminOrSecretary) {
+          // Enforce activation check (must have at least one active module)
+          if (!user.is_campus_active && !user.is_groovelab_active) {
+            alert("Dein Zugang ist nicht aktiv. Bitte wende dich an deine Musikschule.");
+            await supabase.auth.signOut();
+            setLoading(false);
+            return;
+          }
 
-        // Enforce strict separation: Campus-Login strictly loads Campus, GrooveLab-Login strictly loads GrooveLab
-        if (effectiveStationId || isGroovelabKiosk) {
-          if (!user.is_groovelab_active) {
-            alert("Login verweigert. Dein Benutzerkonto ist nicht für die GrooveLab-Plattform freigeschaltet.");
-            await supabase.auth.signOut();
-            setLoading(false);
-            return;
+          // Enforce strict separation: Campus-Login strictly loads Campus, GrooveLab-Login strictly loads GrooveLab
+          if (isGroovelabKiosk) {
+            if (!user.is_groovelab_active) {
+              alert("Login verweigert. Dein Benutzerkonto ist nicht für die GrooveLab-Plattform freigeschaltet.");
+              await supabase.auth.signOut();
+              setLoading(false);
+              return;
+            }
+            localStorage.setItem('groovelab_active_platform', 'groovelab');
+          } else {
+            if (!user.is_campus_active) {
+              alert("Login verweigert. Dein Benutzerkonto ist nicht für den Campus freigeschaltet.");
+              await supabase.auth.signOut();
+              setLoading(false);
+              return;
+            }
+            localStorage.setItem('groovelab_active_platform', 'campus');
           }
-          localStorage.setItem('groovelab_active_platform', 'groovelab');
         } else {
-          if (!user.is_campus_active) {
-            alert("Login verweigert. Dein Benutzerkonto ist nicht für den Campus freigeschaltet.");
-            await supabase.auth.signOut();
-            setLoading(false);
-            return;
+          // Admins and secretaries bypass activation flags but still set the target platform they logged in from
+          if (isGroovelabKiosk) {
+            localStorage.setItem('groovelab_active_platform', 'groovelab');
+          } else {
+            localStorage.setItem('groovelab_active_platform', 'campus');
           }
-          localStorage.setItem('groovelab_active_platform', 'campus');
         }
 
         // Enforce school matching check for students using component-level schoolData state or userSchool fallback
@@ -1228,6 +1237,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         console.log(`[Login] Home mode detected. No new session created.`);
       }
 
+      sessionStorage.setItem('groovelab_user_id', user.id);
       setLoading(false);
       
       onLogin(user.id, isHome);
@@ -1436,7 +1446,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
       let isWithinAnyRoom = true;
-      const isGroovelabScreen = !!(effectiveStationId || isGroovelabKiosk);
+      const isGroovelabScreen = isGroovelabKiosk;
       const isBypass = !isGroovelabScreen;
 
       if (!isBypass) {
@@ -1519,7 +1529,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           return;
         }
 
-        const isGroovelabScreen = !!(effectiveStationId || isGroovelabKiosk);
+        const isGroovelabScreen = isGroovelabKiosk;
         if (isGroovelabScreen) {
           await finalizeLogin(user, loginStationId, isWithinAnyRoom, false);
         } else {
@@ -1654,7 +1664,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       // 2. Geofence Check (Simpel & Stabil)
       const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
       let isWithinAnyRoom = true;
-      const isGroovelabScreen = !!(effectiveStationId || isGroovelabKiosk);
+      const isGroovelabScreen = isGroovelabKiosk;
       const isBypass = !isGroovelabScreen;
 
       if (!isBypass) {
@@ -1754,7 +1764,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           return;
         }
 
-        const isGroovelabScreen = !!(effectiveStationId || isGroovelabKiosk);
+        const isGroovelabScreen = isGroovelabKiosk;
         if (isGroovelabScreen) {
           await finalizeLogin(user, loginStationId, isWithinAnyRoom, false);
         } else {
@@ -2826,7 +2836,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
 
       {/* Geofence Diagnostic Panel (Localhost only) */}
-      {isLocalhost && (effectiveStationId || isGroovelabKiosk) && geoDebug && (
+      {isLocalhost && isGroovelabKiosk && geoDebug && (
         <div style={{ 
           marginTop: '24px', 
           padding: '24px', 
@@ -3584,7 +3594,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     if (user.is_observer) {
                       await finalizeLogin(user, loginStationId, false, true);
                     } else {
-                      const isGroovelabScreen = !!(effectiveStationId || isGroovelabKiosk);
+                      const isGroovelabScreen = isGroovelabKiosk;
                       if (isGroovelabScreen) {
                         await finalizeLogin(user, loginStationId, pinVerificationIsWithinRoom, false);
                       } else {
@@ -3696,7 +3706,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     if (user.is_observer) {
                       await finalizeLogin(user, loginStationId, false, true);
                     } else {
-                      const isGroovelabScreen = !!(effectiveStationId || isGroovelabKiosk);
+                      const isGroovelabScreen = isGroovelabKiosk;
                       if (isGroovelabScreen) {
                         await finalizeLogin(user, loginStationId, pinVerificationIsWithinRoom, false);
                       } else {
