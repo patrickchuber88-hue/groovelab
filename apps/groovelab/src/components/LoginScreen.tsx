@@ -305,6 +305,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [onboardIPAddress, setOnboardIPAddress] = useState('unknown');
   const [expandedSection, setExpandedSection] = useState<'none' | 'pin' | 'kiosk'>('none');
   const [isGroovelabKiosk, setIsGroovelabKiosk] = useState(false);
+  const [selectedKioskStationId, setSelectedKioskStationId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!kioskMapRef.current) return;
@@ -881,6 +882,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
   let effectiveStationId = kioskStationId || localStorage.getItem('groovelab_station_id');
   if (effectiveStationId === 'skip') effectiveStationId = null;
+  const loginStationId = isGroovelabKiosk ? selectedKioskStationId : effectiveStationId;
 
   useEffect(() => {
     async function loadSchoolInfo() {
@@ -1179,6 +1181,20 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
 
       console.log(`[Login] Final Station ID: ${finalStationId}, isHome: ${isHome}, withinHours: ${withinHours}`);
+
+      // Save station ID to localStorage based on geofence & check-in result
+      const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+      if (activePlatform === 'groovelab') {
+        if (isHome) {
+          localStorage.removeItem('groovelab_station_id');
+        } else {
+          if (finalStationId) {
+            localStorage.setItem('groovelab_station_id', finalStationId);
+          } else {
+            localStorage.setItem('groovelab_station_id', 'skip');
+          }
+        }
+      }
 
       // 2. Session Management (Only for Academy/Lab sessions)
       // 2. Global Cleanup: Always terminate any existing active sessions for THIS USER
@@ -1499,21 +1515,21 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       if (isTeacher) {
         if (user.is_observer) {
-          await finalizeLogin(user, effectiveStationId, false, true);
+          await finalizeLogin(user, loginStationId, false, true);
           return;
         }
 
         const isGroovelabScreen = !!(effectiveStationId || isGroovelabKiosk);
         if (isGroovelabScreen) {
-          await finalizeLogin(user, effectiveStationId, isWithinAnyRoom, false);
+          await finalizeLogin(user, loginStationId, isWithinAnyRoom, false);
         } else {
           // Campus Login strictly bypasses GrooveLab presence check-in
-          await finalizeLogin(user, effectiveStationId, false, true);
+          await finalizeLogin(user, loginStationId, false, true);
         }
         return;
       }
 
-      await finalizeLogin(user, effectiveStationId, isWithinAnyRoom);
+      await finalizeLogin(user, loginStationId, isWithinAnyRoom);
     } catch (err: any) {
       console.error('[Login] PIN login error:', err.message);
       setError(err.message);
@@ -1734,22 +1750,22 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       if (isTeacher) {
         if (user.is_observer) {
           // Hospitanten are always sent to home mode without prompt
-          await finalizeLogin(user, effectiveStationId, false, true);
+          await finalizeLogin(user, loginStationId, false, true);
           return;
         }
 
         const isGroovelabScreen = !!(effectiveStationId || isGroovelabKiosk);
         if (isGroovelabScreen) {
-          await finalizeLogin(user, effectiveStationId, isWithinAnyRoom, false);
+          await finalizeLogin(user, loginStationId, isWithinAnyRoom, false);
         } else {
           // Campus Login strictly bypasses GrooveLab presence check-in
-          await finalizeLogin(user, effectiveStationId, false, true);
+          await finalizeLogin(user, loginStationId, false, true);
         }
         return;
       }
 
       // Automatically finalize based on geofence detection
-      await finalizeLogin(user, effectiveStationId, isWithinAnyRoom);
+      await finalizeLogin(user, loginStationId, isWithinAnyRoom);
     } catch (err: any) {
       console.error('[Login] Scan error:', err.message);
       setError(err.message);
@@ -1762,7 +1778,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     const { user, isWithinAnyRoom } = pendingTeacherUser;
     setShowTeacherChoiceModal(false);
     setPendingTeacherUser(null);
-    await finalizeLogin(user, effectiveStationId, isWithinAnyRoom, hidePresence);
+    await finalizeLogin(user, loginStationId, isWithinAnyRoom, hidePresence);
   };
 
   const [geoDebug, setGeoDebug] = useState<any>(null);
@@ -2587,6 +2603,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     const posY = station.y;
                     const stationColor = station.color || '#cbd5e1';
 
+                    const isSelected = selectedKioskStationId === station.id;
+
                     return (
                       <button
                         key={station.id}
@@ -2595,29 +2613,25 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                           if (isOccupied) {
                             const confirm = window.confirm(`Dieses iPad ist besetzt. Möchtest du die alte Sitzung beenden und dieses iPad übernehmen?`);
                             if (!confirm) return;
-                            // End previous session
-                            await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('station_id', station.id).is('check_out_time', null);
                           }
-                          sessionStorage.removeItem('groovelab_user_id');
-                          localStorage.setItem('groovelab_station_id', station.id);
-                          const parentRoom = kioskRooms.find(r => r.id === station.room_id);
-                          const finalSchoolId = schoolData?.id || parentRoom?.school_id || '';
-                          localStorage.setItem('groovelab_school_id', finalSchoolId);
-                          localStorage.setItem('groovelab_active_platform', 'groovelab');
-                          window.location.reload();
+                          setSelectedKioskStationId(isSelected ? null : station.id);
                         }}
                         style={{
                           position: 'absolute',
                           left: `${posX}%`,
                           top: `${posY}%`,
-                          transform: 'translate(-50%, -50%)',
+                          transform: isSelected ? 'translate(-50%, -50%) scale(1.08)' : 'translate(-50%, -50%)',
                           width: '72px',
                           height: '72px',
                           borderRadius: '16px',
-                          border: isOccupied ? '2px solid #ef4444' : `2px solid ${stationColor}`,
-                          background: isOccupied 
-                            ? 'rgba(239, 68, 68, 0.12)' 
-                            : `${stationColor}15`,
+                          border: isSelected 
+                            ? `3px solid ${schoolData?.primary_color || '#eab308'}`
+                            : (isOccupied ? '2px solid #ef4444' : `2px solid ${stationColor}`),
+                          background: isSelected 
+                            ? `${schoolData?.primary_color || '#eab308'}25`
+                            : (isOccupied 
+                              ? 'rgba(239, 68, 68, 0.12)' 
+                              : `${stationColor}15`),
                           color: isGroovelabKiosk ? '#1e293b' : '#ffffff',
                           cursor: 'pointer',
                           transition: 'all 0.2s ease',
@@ -2627,8 +2641,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                           justifyContent: 'center',
                           gap: '2px',
                           textAlign: 'center',
-                          boxShadow: '0 4px 10px rgba(0, 0, 0, 0.05)',
-                          outline: 'none'
+                          boxShadow: isSelected 
+                            ? `0 0 15px ${schoolData?.primary_color || '#eab308'}40`
+                            : '0 4px 10px rgba(0, 0, 0, 0.05)',
+                          outline: 'none',
+                          zIndex: isSelected ? 10 : 1
                         }}
                         title={`${station.name} (${isOccupied ? 'Besetzt' : 'Frei'})`}
                       >
@@ -2641,12 +2658,15 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                           {station.name}
                         </span>
                         <div style={{ 
-                          width: '5px', 
-                          height: '5px', 
+                          width: '6px', 
+                          height: '6px', 
                           borderRadius: '50%', 
-                          background: isOccupied ? '#ef4444' : '#22c55e',
+                          background: isSelected
+                            ? (schoolData?.primary_color || '#eab308')
+                            : (isOccupied ? '#ef4444' : '#22c55e'),
                           border: '1px solid rgba(255,255,255,0.2)',
-                          marginTop: '2px'
+                          marginTop: '2px',
+                          boxShadow: isSelected ? `0 0 8px ${schoolData?.primary_color || '#eab308'}` : 'none'
                         }} />
                       </button>
                     );
@@ -2849,7 +2869,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 const uid = sessionStorage.getItem('groovelab_user_id');
                 if (uid) {
                    supabase.from('users').select('*, schools(*)').eq('id', uid).single().then(({data}) => {
-                     if (data) finalizeLogin(data, effectiveStationId, true);
+                     if (data) finalizeLogin(data, loginStationId, true);
                    });
                 } else {
                   alert('Bitte erst einmal scannen, damit ich weiß, wer du bist!');
@@ -3562,18 +3582,18 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
                   if (isTeacher) {
                     if (user.is_observer) {
-                      await finalizeLogin(user, effectiveStationId, false, true);
+                      await finalizeLogin(user, loginStationId, false, true);
                     } else {
                       const isGroovelabScreen = !!(effectiveStationId || isGroovelabKiosk);
                       if (isGroovelabScreen) {
-                        await finalizeLogin(user, effectiveStationId, pinVerificationIsWithinRoom, false);
+                        await finalizeLogin(user, loginStationId, pinVerificationIsWithinRoom, false);
                       } else {
                         // Campus Login strictly bypasses GrooveLab presence check-in
-                        await finalizeLogin(user, effectiveStationId, false, true);
+                        await finalizeLogin(user, loginStationId, false, true);
                       }
                     }
                   } else {
-                    await finalizeLogin(user, effectiveStationId, pinVerificationIsWithinRoom);
+                    await finalizeLogin(user, loginStationId, pinVerificationIsWithinRoom);
                   }
                 } catch (err: any) {
                   alert('Fehler beim Einrichten der PIN: ' + err.message);
@@ -3674,18 +3694,18 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
                   if (isTeacher) {
                     if (user.is_observer) {
-                      await finalizeLogin(user, effectiveStationId, false, true);
+                      await finalizeLogin(user, loginStationId, false, true);
                     } else {
                       const isGroovelabScreen = !!(effectiveStationId || isGroovelabKiosk);
                       if (isGroovelabScreen) {
-                        await finalizeLogin(user, effectiveStationId, pinVerificationIsWithinRoom, false);
+                        await finalizeLogin(user, loginStationId, pinVerificationIsWithinRoom, false);
                       } else {
                         // Campus Login strictly bypasses GrooveLab presence check-in
-                        await finalizeLogin(user, effectiveStationId, false, true);
+                        await finalizeLogin(user, loginStationId, false, true);
                       }
                     }
                   } else {
-                    await finalizeLogin(user, effectiveStationId, pinVerificationIsWithinRoom);
+                    await finalizeLogin(user, loginStationId, pinVerificationIsWithinRoom);
                   }
                 } else {
                   alert('Die eingegebene PIN ist nicht korrekt.');
