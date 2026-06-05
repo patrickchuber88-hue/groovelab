@@ -2675,7 +2675,7 @@ function App() {
           setActiveStudentTab(defaultTab);
           localStorage.setItem('campus_active_tab', defaultTab);
         } else {
-          const defaultTab = isStudent && isKioskMode ? 'live' : (isStudent && locationMode === 'home' ? (userData.is_external_vocalist ? 'repertoire' : 'practice') : 'live');
+          const defaultTab = 'live';
           setActiveStudentTab(defaultTab);
           localStorage.setItem('groovelab_active_tab', defaultTab);
         }
@@ -5016,17 +5016,13 @@ function App() {
     sessionStorage.setItem('groovelab_location_mode', mode);
 
     // Default start tab
-    let startTab = 'live';
-    if (userToLogin?.role === 'student') {
-      const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
-      if (activePlatform === 'campus') {
-        startTab = 'briefing';
-      } else {
-        startTab = 'live';
-      }
-    }
+    const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+    const startTab = activePlatform === 'campus' 
+      ? (userToLogin?.role === 'student' ? 'briefing' : 'live')
+      : 'live';
+      
     setActiveStudentTab(startTab);
-    localStorage.setItem('groovelab_active_tab', startTab);
+    localStorage.setItem(activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab', startTab);
 
     // Immediate Heartbeat on Login (non-blocking for instantaneous login transition!)
     supabase
@@ -5048,13 +5044,14 @@ function App() {
 
   useEffect(() => {
     if (user) {
-      if (!localStorage.getItem('groovelab_active_tab')) {
-        const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+      const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+      const storageKey = activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab';
+      if (!localStorage.getItem(storageKey)) {
         const startTab = user.role === 'student' 
           ? (activePlatform === 'campus' ? 'briefing' : 'live') 
           : 'live';
         setActiveStudentTab(startTab);
-        localStorage.setItem('groovelab_active_tab', startTab);
+        localStorage.setItem(storageKey, startTab);
       } else {
         // Auto-correct if teacher/admin somehow has a student-only tab active
         const isTeacherOrAdmin = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
@@ -5063,7 +5060,7 @@ function App() {
           if (studentTabs.includes(activeStudentTab)) {
             const fallbackTab = 'live';
             setActiveStudentTab(fallbackTab);
-            localStorage.setItem('groovelab_active_tab', fallbackTab);
+            localStorage.setItem(storageKey, fallbackTab);
           }
         }
       }
