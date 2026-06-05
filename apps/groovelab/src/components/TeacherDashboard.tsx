@@ -4953,29 +4953,70 @@ export function TeacherDashboard({
 
                             if (widgetState === 'WEEKEND') {
                               return (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    <div style={{ background: '#e8f0fe', color: '#8b5cf6', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                      <Award size={18} />
+                                    <div style={{ 
+                                      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(109, 40, 217, 0.1) 100%)', 
+                                      color: '#8b5cf6', 
+                                      width: '38px', 
+                                      height: '38px', 
+                                      borderRadius: '12px', 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'center',
+                                      boxShadow: '0 2px 8px rgba(139, 92, 246, 0.08)'
+                                    }}>
+                                      <Sparkles size={18} />
                                     </div>
-                                    <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#1e293b' }}>
-                                      Wochenende
-                                    </h4>
+                                    <div>
+                                      <h4 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#1d1d1f', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
+                                        Wochenende
+                                      </h4>
+                                      <div style={{ fontSize: '0.72rem', color: '#86868b', fontWeight: 500, marginTop: '1px' }}>Ruhe & Regeneration</div>
+                                    </div>
                                   </div>
 
                                   {/* Premium Weekend Rest Card */}
                                   <div style={{
-                                    background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
-                                    border: '1.5px solid #ddd6fe',
-                                    borderRadius: '16px',
-                                    padding: '20px 16px',
+                                    background: 'linear-gradient(135deg, rgba(245, 243, 255, 0.25) 0%, rgba(237, 233, 254, 0.05) 100%)',
+                                    border: '1px solid rgba(139, 92, 246, 0.25)',
+                                    borderRadius: '20px',
+                                    padding: '24px 20px',
                                     color: '#6d28d9',
                                     textAlign: 'center',
-                                    boxShadow: '0 4px 12px rgba(109, 40, 217, 0.08)'
+                                    boxShadow: '0 10px 25px -5px rgba(139, 92, 246, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5)',
+                                    position: 'relative',
+                                    overflow: 'hidden'
                                   }}>
-                                    <div style={{ fontSize: '1.25rem', fontWeight: 900, marginBottom: '6px' }}>☀️ Schönes Wochenende! ☀️</div>
-                                    <div style={{ fontSize: '0.85rem', fontWeight: 600, opacity: 0.9, lineHeight: '1.4' }}>
-                                      Genieße deine wohlverdiente Pause! Keine Termine, kein Schulstress. Erhole dich gut und tanke Kraft für neue musikalische Abenteuer in der kommenden Woche.
+                                    {/* Decorative ambient background glow */}
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '-50%',
+                                      left: '-50%',
+                                      width: '200%',
+                                      height: '200%',
+                                      background: 'radial-gradient(circle, rgba(196, 181, 253, 0.15) 0%, transparent 60%)',
+                                      pointerEvents: 'none',
+                                      zIndex: 0
+                                    }} />
+
+                                    <div style={{ position: 'relative', zIndex: 1 }}>
+                                      <div style={{ 
+                                        background: 'linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%)',
+                                        WebkitBackgroundClip: 'text',
+                                        WebkitTextFillColor: 'transparent',
+                                        fontSize: '1.35rem', 
+                                        fontWeight: 950, 
+                                        marginBottom: '10px',
+                                        letterSpacing: '-0.02em',
+                                        display: 'inline-block',
+                                        fontFamily: "'Plus Jakarta Sans', sans-serif"
+                                      }}>
+                                        ☀️ Schönes Wochenende! ☀️
+                                      </div>
+                                      <div style={{ fontSize: '0.86rem', fontWeight: 600, color: '#4b5563', lineHeight: '1.5' }}>
+                                        Genieße deine wohlverdiente Pause! Keine Termine, kein Schulstress. Erhole dich gut und tanke Kraft für neue musikalische Abenteuer in der kommenden Woche.
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
@@ -4983,49 +5024,132 @@ export function TeacherDashboard({
                             }
 
                             return (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                  <div style={{ background: '#fef3c7', color: '#d97706', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <Award size={18} />
+                                  <div style={{ 
+                                    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.1) 100%)', 
+                                    color: '#f59e0b', 
+                                    width: '38px', 
+                                    height: '38px', 
+                                    borderRadius: '12px', 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center',
+                                    boxShadow: '0 2px 8px rgba(245, 158, 11, 0.08)'
+                                  }}>
+                                    <Sparkles size={18} />
                                   </div>
-                                  <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#1e293b' }}>
-                                    Feierabend
-                                  </h4>
+                                  <div>
+                                    <h4 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#1d1d1f', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
+                                      Feierabend
+                                    </h4>
+                                    <div style={{ fontSize: '0.72rem', color: '#86868b', fontWeight: 500, marginTop: '1px' }}>Entspannung & Inspiration</div>
+                                  </div>
                                 </div>
 
                                 {/* Premium Feierabend Wishing Card */}
                                 <div style={{
-                                  background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-                                  border: '1.5px solid #fde68a',
-                                  borderRadius: '16px',
-                                  padding: '16px',
-                                  color: '#92400e',
+                                  background: 'linear-gradient(135deg, rgba(254, 243, 199, 0.2) 0%, rgba(253, 230, 138, 0.05) 100%)',
+                                  border: '1px solid rgba(245, 158, 11, 0.25)',
+                                  borderRadius: '20px',
+                                  padding: '24px 20px',
+                                  color: '#78350f',
                                   textAlign: 'center',
-                                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.08)'
+                                  boxShadow: '0 10px 25px -5px rgba(245, 158, 11, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5)',
+                                  position: 'relative',
+                                  overflow: 'hidden'
                                 }}>
-                                  <div style={{ fontSize: '1.2rem', fontWeight: 900, marginBottom: '4px' }}>✨ Schönen Feierabend! ✨</div>
-                                  <div style={{ fontSize: '0.82rem', fontWeight: 600, opacity: 0.9 }}>
-                                    {dailyWish}
+                                  {/* Decorative ambient background glow */}
+                                  <div style={{
+                                    position: 'absolute',
+                                    top: '-50%',
+                                    left: '-50%',
+                                    width: '200%',
+                                    height: '200%',
+                                    background: 'radial-gradient(circle, rgba(253, 224, 71, 0.15) 0%, transparent 60%)',
+                                    pointerEvents: 'none',
+                                    zIndex: 0
+                                  }} />
+
+                                  <div style={{ position: 'relative', zIndex: 1 }}>
+                                    <div style={{ 
+                                      background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
+                                      WebkitBackgroundClip: 'text',
+                                      WebkitTextFillColor: 'transparent',
+                                      fontSize: '1.35rem', 
+                                      fontWeight: 950, 
+                                      marginBottom: '10px',
+                                      letterSpacing: '-0.02em',
+                                      display: 'inline-block',
+                                      fontFamily: "'Plus Jakarta Sans', sans-serif"
+                                    }}>
+                                      ✨ Schönen Feierabend! ✨
+                                    </div>
+                                    <div style={{ fontSize: '0.86rem', fontWeight: 600, color: '#4b5563', lineHeight: '1.5' }}>
+                                      {dailyWish}
+                                    </div>
                                   </div>
                                 </div>
 
                                 <div style={{ 
                                   borderTop: '1px solid #f1f5f9', 
-                                  paddingTop: '16px',
+                                  paddingTop: '18px',
                                   display: 'flex',
                                   flexDirection: 'column',
-                                  gap: '8px',
-                                  fontStyle: 'italic',
-                                  color: '#475569',
-                                  fontSize: '0.85rem',
-                                  lineHeight: '1.5',
-                                  textAlign: 'center'
+                                  gap: '8px'
                                 }}>
-                                  <span style={{ fontSize: '1.5rem', color: '#cbd5e1', height: '10px', display: 'block', textIndent: '-6px' }}>“</span>
-                                  <span>{dailyItem.text}</span>
-                                  <strong style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, fontStyle: 'normal', marginTop: '4px' }}>
-                                    — {dailyItem.author} ({dailyItem.type === 'joke' ? 'Witz' : 'Zitat'})
-                                  </strong>
+                                  <div style={{
+                                    background: '#f8fafc',
+                                    border: '1px solid #f1f5f9',
+                                    borderRadius: '16px',
+                                    padding: '16px 20px',
+                                    position: 'relative',
+                                    textAlign: 'center'
+                                  }}>
+                                    <span style={{ 
+                                      fontSize: '2rem', 
+                                      color: 'rgba(203, 213, 225, 0.5)', 
+                                      position: 'absolute', 
+                                      top: '6px', 
+                                      left: '12px',
+                                      fontFamily: 'Georgia, serif',
+                                      lineHeight: 1
+                                    }}>“</span>
+                                    <p style={{ 
+                                      margin: 0, 
+                                      fontSize: '0.85rem', 
+                                      color: '#334155', 
+                                      fontStyle: 'italic', 
+                                      lineHeight: '1.5',
+                                      fontWeight: 500,
+                                      padding: '0 10px'
+                                    }}>
+                                      {dailyItem.text}
+                                    </p>
+                                    <div style={{ 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'center', 
+                                      gap: '6px', 
+                                      marginTop: '12px',
+                                      fontSize: '0.74rem',
+                                      color: '#64748b',
+                                      fontWeight: 700
+                                    }}>
+                                      <span style={{ 
+                                        background: dailyItem.type === 'joke' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(99, 102, 241, 0.08)',
+                                        color: dailyItem.type === 'joke' ? '#ef4444' : '#4f46e5',
+                                        padding: '2px 8px',
+                                        borderRadius: '100px',
+                                        fontSize: '0.65rem',
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.04em'
+                                      }}>
+                                        {dailyItem.type === 'joke' ? 'Witz' : 'Zitat'}
+                                      </span>
+                                      <span>— {dailyItem.author}</span>
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
                             );
