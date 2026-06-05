@@ -1905,8 +1905,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             src={schoolData.logo_url} 
             alt="Logo" 
             style={{ 
-              width: '80%', 
-              height: '80%', 
+              width: '100%', 
+              height: '100%', 
               objectFit: 'contain' 
             }} 
           />
