@@ -717,31 +717,50 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         // Subdomain resolution logic
         const getSubdomain = () => {
           let host = window.location.hostname;
+          let sub = null;
           
           // If the hostname ends with the platform's main domain, strip it to isolate the subdomain
           const mainDomains = ['.campus-groovelab.de', '.groovelab.de', '.campus-groovelab.com'];
           for (const domain of mainDomains) {
             if (host.endsWith(domain)) {
-              return host.substring(0, host.length - domain.length);
+              sub = host.substring(0, host.length - domain.length);
+              break;
             }
           }
           
-          const parts = host.split('.');
-          if (parts.length >= 3) {
-            const first = parts[0];
-            if (first !== 'www' && first !== 'admin' && first !== 'campus-groovelab') {
-              return first;
+          if (!sub) {
+            const parts = host.split('.');
+            if (parts.length >= 3) {
+              const first = parts[0];
+              if (first !== 'www' && first !== 'admin' && first !== 'campus-groovelab') {
+                sub = first;
+              }
+            } else if (parts.length === 2 && parts[1] === 'localhost') {
+              sub = parts[0];
             }
-          } else if (parts.length === 2 && parts[1] === 'localhost') {
-            return parts[0];
           }
           
-          // Check query parameters as fallback (useful for local localhost dev bypass)
-          const urlParams = new URLSearchParams(window.location.search);
-          const schoolParam = urlParams.get('school') || urlParams.get('subdomain');
-          if (schoolParam) {
-            return schoolParam;
+          if (!sub) {
+            // Check query parameters as fallback (useful for local localhost dev bypass)
+            const urlParams = new URLSearchParams(window.location.search);
+            sub = urlParams.get('school') || urlParams.get('subdomain');
           }
+          
+          if (sub) {
+            const cleanSub = sub.toLowerCase().trim();
+            // Map variants of musaek / muasek subdomain to the correct 'musaek-bad-saeckingen' slug
+            const musaekVariants = [
+              'musaek', 
+              'muasek', 
+              'muasek-bad-saeckingen', 
+              'musaek-bad-saeckingen'
+            ];
+            if (musaekVariants.includes(cleanSub)) {
+              return 'musaek-bad-saeckingen';
+            }
+            return cleanSub;
+          }
+          
           return null;
         };
 
