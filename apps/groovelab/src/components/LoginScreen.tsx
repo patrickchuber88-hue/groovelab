@@ -1897,9 +1897,22 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         justifyContent: 'center',
         marginBottom: '16px',
         boxShadow: '0 10px 30px rgba(0, 0, 0, 0.05)',
-        border: '1px solid #e2e8f0'
+        border: '1px solid #e2e8f0',
+        overflow: 'hidden'
       }}>
-        <Music size={36} color={schoolData?.primary_color || "#eab308"} />
+        {schoolData?.logo_url ? (
+          <img 
+            src={schoolData.logo_url} 
+            alt="Logo" 
+            style={{ 
+              width: '80%', 
+              height: '80%', 
+              objectFit: 'contain' 
+            }} 
+          />
+        ) : (
+          <Music size={36} color={schoolData?.primary_color || "#eab308"} />
+        )}
       </div>
 
       <h1 
