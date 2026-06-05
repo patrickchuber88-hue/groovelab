@@ -6487,7 +6487,7 @@ function App() {
         )}
 
         {/* Live Lab Tab for Students */}
-        {user.role?.toLowerCase() === 'student' && activeStudentTab === 'live' && (
+        {user.role?.toLowerCase() === 'student' && activePlatform !== 'ensembles' && activeStudentTab === 'live' && (
           <ErrorBoundary>
             <div className="animation-slide-up" style={{ width: '100%', padding: '24px 16px 16px 16px', display: 'flex', flexDirection: 'column', flex: 1, height: '100%' }}>
               <TeacherDashboard 
@@ -7871,7 +7871,7 @@ function App() {
       )}
 
         {/* Admin/Teacher Section Tabs (Unified) */}
-        {((user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'teacher')) && ['live', 'schedule', 'students', 'team', 'rooms', 'songs', 'stats', 'gallery', 'setup', 'bands', showMissionsFeature ? 'missions' : ''].includes(activeStudentTab) && (
+        {((user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'teacher')) && activePlatform !== 'ensembles' && ['live', 'schedule', 'students', 'team', 'rooms', 'songs', 'stats', 'gallery', 'setup', 'bands', showMissionsFeature ? 'missions' : ''].includes(activeStudentTab) && (
           <ErrorBoundary key={`${activePlatform}-${activeStudentTab}`}>
             <AdminDashboard 
               key={activePlatform}
