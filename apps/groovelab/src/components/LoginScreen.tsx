@@ -2757,7 +2757,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                             ? '1px solid #27272a'
                             : `2px solid ${stationColor}`,
                           background: isSelected 
-                            ? stationColor
+                            ? `linear-gradient(180deg, ${stationColor} 0%, color-mix(in srgb, ${stationColor} 96%, #000000 4%) 100%)`
                             : `${stationColor}15`,
                           color: isSelected
                             ? (isYellow ? '#09090b' : '#ffffff')
@@ -2771,7 +2771,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                           gap: '2px',
                           textAlign: 'center',
                           boxShadow: isSelected 
-                            ? `0 0 24px ${stationColor}35, 0 0 8px ${stationColor}25, 0 4px 10px rgba(0, 0, 0, 0.08)`
+                            ? `inset 0 1.5px 0 rgba(255, 255, 255, ${isYellow ? '0.18' : '0.12'}), inset 0 -1px 0 rgba(0, 0, 0, 0.05), 0 0 16px ${stationColor}20, 0 4px 10px rgba(0, 0, 0, 0.08)`
                             : '0 4px 10px rgba(0, 0, 0, 0.05)',
                           outline: 'none',
                           zIndex: isSelected ? 10 : 1,
