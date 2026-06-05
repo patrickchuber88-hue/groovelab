@@ -2671,7 +2671,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               type="button" 
               onClick={() => {
                 setIsGroovelabKiosk(false);
-                setIsCameraActive(false);
               }} 
               style={{ background: 'none', border: 'none', color: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.4)' : 'rgba(255, 255, 255, 0.4)', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', marginTop: '12px', cursor: 'pointer', alignSelf: 'center' }}
             >
