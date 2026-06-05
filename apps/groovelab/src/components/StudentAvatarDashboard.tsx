@@ -3883,6 +3883,16 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                     const isToday = group.date === todayDateStr;
                     
+                    const jokerDateStr = (() => {
+                      if (!studentUser?.joker_used_at) return null;
+                      const jd = new Date(studentUser.joker_used_at);
+                      const dd = String(jd.getDate()).padStart(2, '0');
+                      const mm = String(jd.getMonth() + 1).padStart(2, '0');
+                      const yy = String(jd.getFullYear()).substring(2);
+                      return `${dd}.${mm}.${yy}`;
+                    })();
+                    const isJokerDay = jokerDateStr === group.date;
+                    
                     const getTargetSeconds = (flame: string) => {
                       if (flame === 'Helden-Feuer') return 10 * 60;
                       if (flame === 'Mittlere Flamme') return 5 * 60;
@@ -3902,6 +3912,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     let borderLeftColor = '#e2e8f0';
                     if (hasMastered) {
                       borderLeftColor = '#10b981'; // Green (Mastered)
+                    } else if (isJokerDay) {
+                      borderLeftColor = '#8b5cf6'; // Purple (Joker Day)
                     } else if (isToday) {
                       borderLeftColor = '#eab308'; // Yellow (Active)
                     } else {
@@ -3966,6 +3978,53 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 </span>
                               </div>
                             )}
+                          </div>
+                        );
+                      } else if (isJokerDay) {
+                        return (
+                          <div 
+                            key={idx}
+                            style={{ 
+                              background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.03) 0%, rgba(139, 92, 246, 0.01) 100%)', 
+                              border: '1px dashed rgba(139, 92, 246, 0.25)', 
+                              borderRadius: '16px', 
+                              padding: '12px 14px',
+                              display: 'flex',
+                              flexDirection: 'row',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              gap: '12px',
+                              borderLeft: `4px solid ${borderLeftColor}`,
+                              boxShadow: '0 2px 8px rgba(139, 92, 246, 0.01)'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
+                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#8b5cf6', fontFamily: 'monospace' }}>
+                                {group.date}
+                              </span>
+                              <span style={{ 
+                                fontSize: '0.58rem', 
+                                fontWeight: 900, 
+                                background: 'rgba(139, 92, 246, 0.08)', 
+                                color: '#8b5cf6', 
+                                padding: '1px 6px', 
+                                borderRadius: '100px', 
+                                letterSpacing: '0.04em', 
+                                textTransform: 'uppercase' 
+                              }}>
+                                Joker eingesetzt
+                              </span>
+                              <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#4b5563', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                - Streak gerettet! 🎯
+                              </span>
+                            </div>
+                            
+                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
+                              <Flame size={iconSize} fill="#8b5cf6" color="#8b5cf6" />
+                              <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#8b5cf6' }}>
+                                Joker
+                              </span>
+                            </div>
                           </div>
                         );
                       } else {
