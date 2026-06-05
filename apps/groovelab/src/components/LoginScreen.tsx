@@ -1583,7 +1583,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         return;
       }
 
-      await finalizeLogin(user, loginStationId, isWithinAnyRoom);
+      if (isBypass) {
+        await finalizeLogin(user, loginStationId, false);
+      } else {
+        await finalizeLogin(user, loginStationId, isWithinAnyRoom);
+      }
     } catch (err: any) {
       console.error('[Login] PIN login error:', err.message);
       setError(err.message);
@@ -1818,8 +1822,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         return;
       }
 
-      // Automatically finalize based on geofence detection
-      await finalizeLogin(user, loginStationId, isWithinAnyRoom);
+      if (isBypass) {
+        await finalizeLogin(user, loginStationId, false);
+      } else {
+        await finalizeLogin(user, loginStationId, isWithinAnyRoom);
+      }
     } catch (err: any) {
       console.error('[Login] Scan error:', err.message);
       setError(err.message);
