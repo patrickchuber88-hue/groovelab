@@ -2325,8 +2325,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           highlights.push({
             studentName: `${student.first_name} ${student.last_name}`,
             emoji: '🏆',
-            title: 'Monats-Meilenstein',
-            text: `Hat diesen Monat den Song "${(sk.songs as any)?.title || 'Song'}" komplett gemeistert!`
+            title: 'Meilenstein',
+            text: `Hat heute den Song "${(sk.songs as any)?.title || 'Song'}" gemeistert!`
           });
         });
       });
@@ -4443,7 +4443,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     <span>✨</span> Helden-Momente
                   </h3>
                   <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '4px 0 20px 0', fontWeight: 600 }}>
-                    Besondere Meilensteine und Fleiß-Highlights deiner Mitschüler aus dem aktuellen Monat.
+                    Besondere Highlights deiner Mitschüler aus diesem Monat.
                   </p>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
