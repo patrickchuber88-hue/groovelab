@@ -1515,11 +1515,20 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const getGroupedLogs = () => {
     const groups: Record<string, { date: string, focusSeconds: number, extraSeconds: number, flameLevel: string, isPlaceholder?: boolean }> = {};
     
-    // Initialize placeholders for the last 7 days
+    // Initialize placeholders for the last 7 days starting from user creation date
     const now = new Date();
+    const creationDate = studentUser?.created_at ? new Date(studentUser.created_at) : null;
+    const startOfCreation = creationDate ? new Date(creationDate.getFullYear(), creationDate.getMonth(), creationDate.getDate()) : null;
+
     for (let i = 0; i < 7; i++) {
       const d = new Date();
       d.setDate(now.getDate() - i);
+      const startOfD = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+      if (startOfCreation && startOfD < startOfCreation) {
+        continue;
+      }
+
       const dd = String(d.getDate()).padStart(2, '0');
       const mm = String(d.getMonth() + 1).padStart(2, '0');
       const yy = String(d.getFullYear()).substring(2);
