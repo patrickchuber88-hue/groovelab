@@ -3564,63 +3564,158 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 ];
 
                 return (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }} className="animation-fade-in">
-                    {monthsList.map(item => {
-                      const logsForMonth = fokusLogs.filter(log => {
-                        if (!log.created_at) return false;
-                        const logDate = new Date(log.created_at);
-                        return logDate.getMonth() === item.month && logDate.getFullYear() === item.year;
-                      });
-                      let totalSecs = logsForMonth.reduce((sum, log) => {
-                        return sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60));
-                      }, 0);
-                      
-                      if (sessionActive && secondsElapsed > 0 && item.month === now.getMonth() && item.year === now.getFullYear()) {
-                        totalSecs += secondsElapsed;
-                      }
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }} className="animation-fade-in">
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                      {monthsList.map(item => {
+                        const logsForMonth = fokusLogs.filter(log => {
+                          if (!log.created_at) return false;
+                          const logDate = new Date(log.created_at);
+                          return logDate.getMonth() === item.month && logDate.getFullYear() === item.year;
+                        });
+                        let totalSecs = logsForMonth.reduce((sum, log) => {
+                          return sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60));
+                        }, 0);
+                        
+                        if (sessionActive && secondsElapsed > 0 && item.month === now.getMonth() && item.year === now.getFullYear()) {
+                          totalSecs += secondsElapsed;
+                        }
 
-                      const minutes = Math.round(totalSecs / 60);
-                      const isActive = minutes > 0;
+                        const minutes = Math.round(totalSecs / 60);
+                        
+                        // Heatmap Style Calculation
+                        let bg = '#f8fafc';
+                        let border = '1px solid #e2e8f0';
+                        let labelColor = '#94a3b8';
+                        let textColor = '#64748b';
+                        let numColor = '#1e293b';
+                        let shadow = 'none';
 
-                      return (
-                        <div 
-                          key={`${item.month}-${item.year}`}
-                          style={{
-                            background: isActive ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' : '#f8fafc',
-                            border: isActive ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                            borderRadius: '14px',
-                            padding: '10px 4px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '3px',
-                            minHeight: '64px',
-                            textAlign: 'center',
-                            boxShadow: isActive ? '0 2px 6px rgba(22, 163, 74, 0.08)' : 'none',
-                            transition: 'all 0.2s ease'
-                          }}
-                        >
-                          <span style={{ 
-                            fontSize: '0.62rem', 
-                            fontWeight: 800, 
-                            color: isActive ? '#15803d' : '#94a3b8',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.04em'
-                          }}>
-                            {item.label}
-                          </span>
-                          <span style={{ 
-                            fontSize: '0.85rem', 
-                            fontWeight: 900, 
-                            color: isActive ? '#166534' : '#64748b' 
-                          }}>
-                            {minutes}
-                            <span style={{ fontSize: '0.6rem', fontWeight: 700, marginLeft: '1px', color: isActive ? '#15803d' : '#94a3b8' }}>m</span>
-                          </span>
-                        </div>
-                      );
-                    })}
+                        if (minutes > 0) {
+                          if (minutes <= 15) {
+                            // Level 1: ultra light green
+                            bg = 'linear-gradient(135deg, #f0fdf4 0%, #e6fbf0 100%)';
+                            border = '1px solid #dcfce7';
+                            labelColor = '#166534';
+                            textColor = '#15803d';
+                            numColor = '#166534';
+                            shadow = '0 2px 6px rgba(22, 163, 74, 0.04)';
+                          } else if (minutes <= 60) {
+                            // Level 2: soft green
+                            bg = 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)';
+                            border = '1px solid #bbf7d0';
+                            labelColor = '#14532d';
+                            textColor = '#166534';
+                            numColor = '#14532d';
+                            shadow = '0 3px 8px rgba(22, 163, 74, 0.07)';
+                          } else if (minutes <= 180) {
+                            // Level 3: medium green
+                            bg = 'linear-gradient(135deg, #bbf7d0 0%, #86efac 100%)';
+                            border = '1px solid #86efac';
+                            labelColor = '#14532d';
+                            textColor = '#14532d';
+                            numColor = '#14532d';
+                            shadow = '0 4px 12px rgba(22, 163, 74, 0.12)';
+                          } else {
+                            // Level 4 (Master): Solid emerald jewel
+                            bg = 'linear-gradient(135deg, #10b981 0%, #047857 100%)';
+                            border = '1px solid #059669';
+                            labelColor = 'rgba(255, 255, 255, 0.8)';
+                            textColor = 'rgba(255, 255, 255, 0.9)';
+                            numColor = '#ffffff';
+                            shadow = '0 6px 15px rgba(16, 185, 129, 0.25)';
+                          }
+                        }
+
+                        return (
+                          <div 
+                            key={`${item.month}-${item.year}`}
+                            style={{
+                              background: bg,
+                              border: border,
+                              borderRadius: '16px',
+                              padding: '12px 4px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '3px',
+                              minHeight: '66px',
+                              textAlign: 'center',
+                              boxShadow: shadow,
+                              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                              cursor: 'default'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                              if (minutes > 0) {
+                                e.currentTarget.style.boxShadow = shadow.replace(/0\.\d+/, '0.3');
+                              } else {
+                                e.currentTarget.style.boxShadow = '0 4px 10px rgba(0,0,0,0.04)';
+                                e.currentTarget.style.borderColor = '#cbd5e1';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'translateY(0px)';
+                              e.currentTarget.style.boxShadow = shadow;
+                              e.currentTarget.style.borderColor = border.split(' ')[2];
+                            }}
+                          >
+                            <span style={{ 
+                              fontSize: '0.62rem', 
+                              fontWeight: 800, 
+                              color: labelColor,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em'
+                            }}>
+                              {item.label}
+                            </span>
+                            <span style={{ 
+                              fontSize: '0.9rem', 
+                              fontWeight: 900, 
+                              color: numColor,
+                              fontFamily: "'Urbanist', sans-serif"
+                            }}>
+                              {minutes}
+                              <span style={{ fontSize: '0.6rem', fontWeight: 700, marginLeft: '1px', color: textColor }}>m</span>
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Heatmap Legend */}
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center', 
+                      marginTop: '4px', 
+                      padding: '8px 10px',
+                      background: '#f8fafc',
+                      borderRadius: '12px',
+                      border: '1px solid #f1f5f9',
+                      fontSize: '0.58rem', 
+                      color: '#94a3b8', 
+                      fontWeight: 700
+                    }}>
+                      <span style={{ textTransform: 'uppercase', letterSpacing: '0.02em' }}>Heatmap:</span>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f8fafc', border: '1px solid #e2e8f0' }} /> 0m
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e6fbf0', border: '1px solid #dcfce7' }} /> &lt;15m
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#bbf7d0', border: '1px solid #bbf7d0' }} /> &lt;1h
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#86efac', border: '1px solid #86efac' }} /> &lt;3h
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981' }} /> 3h+
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 );
               })()
