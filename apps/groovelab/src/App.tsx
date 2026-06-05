@@ -2609,7 +2609,11 @@ function App() {
         // Only logout if check_out_time was set by someone else (e.g. admin or new session)
         // and we are not currently in the process of logging out ourselves
         if (payload.new.check_out_time && !payload.new.metadata?.is_tab_close && !payload.new.metadata?.is_switching_station) {
-          handleLogout(false); // Logout but do not try to update DB again
+          if (isKioskMode) {
+            handleLogout(false); // Logout but do not try to update DB again
+          } else {
+            setSession(null); // Personal device: just reset session to show the check-in overlay
+          }
         }
       })
       .subscribe();
@@ -2617,7 +2621,7 @@ function App() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [session?.id, user?.role]);
+  }, [session?.id, user?.role, isKioskMode]);
 
   // Periodic Geolocation Check (Auto Checkout if outside Geofence) - Disabled per user request
   useEffect(() => {
@@ -2655,13 +2659,18 @@ function App() {
       // STRICT DB SESSION VERIFICATION (Closing the backdoor):
       // If a student is in GrooveLab (Lab) mode, they MUST have an active checked-in session in the database.
       // If there is no active session (sessionRes.data is null), they have bypassed the scanner or were checked out.
-      // We immediately force logout and wipe their tab state.
+      // If this is a Kiosk device, we immediately force logout and wipe their tab state.
+      // On personal devices, we remain logged in so the check-in frosted glass overlay can be shown.
       const isStudent = userData.role?.toLowerCase() === 'student';
       if (isStudent && locationMode === 'lab' && !sessionRes.data && !sessionRes.error) {
-        console.warn('[Dashboard] Student in Lab mode has no active database session! Force logout.');
-        setLoading(false);
-        handleLogout(false);
-        return;
+        if (isKioskMode) {
+          console.warn('[Dashboard] Student in Lab mode on Kiosk has no active database session! Force logout.');
+          setLoading(false);
+          handleLogout(false);
+          return;
+        } else {
+          console.log('[Dashboard] Student in Lab mode on Personal Device has no active session. Remain logged in.');
+        }
       }
 
       // Determine what platform the user is allowed to access and what is default:

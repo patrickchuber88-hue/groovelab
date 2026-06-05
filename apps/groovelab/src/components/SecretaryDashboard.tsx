@@ -951,6 +951,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
   const [selectedStudentForDetail, setSelectedStudentForDetail] = useState<any>(null);
   const [tickets, setTickets] = useState<any[]>([]);
+  const [schoolEvents, setSchoolEvents] = useState<any[]>([]);
+  const [showAddEventModal, setShowAddEventModal] = useState<boolean>(false);
+  const [newEventTitle, setNewEventTitle] = useState<string>('');
+  const [newEventDesc, setNewEventDesc] = useState<string>('');
+  const [newEventTarget, setNewEventTarget] = useState<'all' | 'students' | 'teachers'>('all');
   const [manageTeacher, setManageTeacher] = useState<any | null>(null);
   const [selectedCrisisTeacherId, setSelectedCrisisTeacherId] = useState<string | null>(null);
   const [activeContextMenu, setActiveContextMenu] = useState<string | null>(null);
@@ -1769,6 +1774,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         .eq('school_id', schoolId)
         .order('name');
       setCooperations(cooperationsData || []);
+
+      // Fetch campus announcements (school events)
+      const { data: annData, error: annErr } = await supabase
+        .from('campus_announcements')
+        .select('*')
+        .eq('school_id', schoolId)
+        .order('created_at', { ascending: false });
+
+      if (!annErr && annData) {
+        setSchoolEvents(annData);
+      } else {
+        setSchoolEvents([]);
+      }
 
     } catch (err: any) {
       console.error('Error fetching secretary dashboard data:', err);
@@ -6248,23 +6266,124 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 {/* LEFT COLUMN: MAIN CONTENT AREA */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                   
-                  {/* GLASS DASHBOARD GREETING HEADER */}
-                  <div style={{
-                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
-                    backdropFilter: 'blur(24px) saturate(1.8)',
-                    WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
-                    border: '1px solid rgba(255, 255, 255, 0.5)',
-                    borderRadius: '24px',
-                    display: 'flex',
-                    alignItems: 'stretch',
-                    justifyContent: 'space-between',
-                    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
-                    transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                    width: '100%',
-                    minHeight: '130px',
-                    boxSizing: 'border-box',
-                    overflow: 'hidden'
-                  }}>
+                  {/* 4 GAMIFIED CARD METRICS ROW (KPIs) */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                    
+                    {/* Card 1: Raumauslastung (Blue Gradient) */}
+                    <div style={{
+                      position: 'relative', overflow: 'hidden',
+                      background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white',
+                      borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.3)',
+                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
+                      padding: '16px', boxSizing: 'border-box',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }} className="hover-scale">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Raumauslastung Heute</span>
+                        <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
+                          <DoorOpen size={13} color="white" />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                        <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{roomOccupancyRate}</span>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>% ({todayAllocations.length} Slots)</span>
+                      </div>
+                    </div>
+
+                    {/* Card 2: Aktivierungsquote (Emerald Gradient) */}
+                    <div style={{
+                      position: 'relative', overflow: 'hidden',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white',
+                      borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.3)',
+                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
+                      padding: '16px', boxSizing: 'border-box',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }} className="hover-scale">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Schüler-Aktivierung</span>
+                        <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
+                          <UserCheck size={13} color="white" />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                        <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{activationRate}</span>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>% ({activeStudentsCount} / {totalStudentsCount})</span>
+                      </div>
+                    </div>
+
+                    {/* Card 3: Konflikte (Amber/Orange Gradient) */}
+                    <div style={{
+                      position: 'relative', overflow: 'hidden',
+                      background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: 'white',
+                      borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(234, 179, 8, 0.35)',
+                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
+                      padding: '16px', boxSizing: 'border-box',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }} className="hover-scale">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Terminkonflikte</span>
+                        <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
+                          <ShieldAlert size={13} color="white" />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                        <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
+                          {scheduleConflicts.length}
+                        </span>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>
+                          {scheduleConflicts.length === 0 ? 'System-Prüfung stabil' : 'Konflikte gefunden'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Card 4: Krankmeldungen (Red Gradient) */}
+                    <div style={{
+                      position: 'relative', overflow: 'hidden',
+                      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: 'white',
+                      borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.3)',
+                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
+                      padding: '16px', boxSizing: 'border-box',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }} className="hover-scale">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Krankmeldungen</span>
+                        <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
+                          <UserX size={13} color="white" />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                        <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
+                          {activeSickTeachers.length}
+                        </span>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>
+                          {activeSickTeachers.length === 1 ? 'Lehrkraft krank' : 'Lehrkräfte krank'}
+                        </span>
+                      </div>
+                    </div>
+
+                  </div>
+                    
+                    {/* GLASS DASHBOARD GREETING HEADER */}
+                    <div style={{
+                      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
+                      backdropFilter: 'blur(24px) saturate(1.8)',
+                      WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
+                      border: '1px solid rgba(255, 255, 255, 0.5)',
+                      borderRadius: '24px',
+                      display: 'flex',
+                      alignItems: 'stretch',
+                      justifyContent: 'space-between',
+                      boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+                      transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                      width: '100%',
+                      minHeight: '130px',
+                      boxSizing: 'border-box',
+                      overflow: 'hidden'
+                    }}>
                     <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
                       {/* Full Height Graphic on the left */}
                       <div style={{
@@ -6328,12 +6447,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           lineHeight: 1.15
                         }}>
                           Hallo, <span style={{ 
-                            color: '#ef4444', 
+                            color: '#ea860c', 
                             fontWeight: 900,
                             letterSpacing: '-0.01em',
                             display: 'inline-flex',
                             alignItems: 'center'
-                          }}>Zentrale</span>! 
+                          }}>{currentUserProfile?.first_name || 'Zentrale'}</span>! 
                           <span className="inline-block animate-bounce" style={{ marginLeft: '4px' }}>
                             👋
                           </span>
@@ -6343,107 +6462,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         </p>
                       </div>
                     </div>
-                  </div>
-
-                  {/* 4 GAMIFIED CARD METRICS ROW (KPIs) */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                    
-                    {/* Card 1: Raumauslastung (Blue Gradient) */}
-                    <div style={{
-                      position: 'relative', overflow: 'hidden',
-                      background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', color: 'white',
-                      borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.3)',
-                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
-                      padding: '16px', boxSizing: 'border-box',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)'
-                    }} className="hover-scale">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Raumauslastung Heute</span>
-                        <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
-                          <DoorOpen size={13} color="white" />
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                        <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{roomOccupancyRate}</span>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>% ({todayAllocations.length} Slots)</span>
-                      </div>
-                    </div>
-
-                    {/* Card 2: Aktivierungsquote (Emerald Gradient) */}
-                    <div style={{
-                      position: 'relative', overflow: 'hidden',
-                      background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', color: 'white',
-                      borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.3)',
-                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
-                      padding: '16px', boxSizing: 'border-box',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)'
-                    }} className="hover-scale">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Schüler-Aktivierung</span>
-                        <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
-                          <UserCheck size={13} color="white" />
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                        <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{activationRate}</span>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>% ({activeStudentsCount} / {totalStudentsCount})</span>
-                      </div>
-                    </div>
-
-                    {/* Card 3: Konflikte (Amber/Orange Gradient) */}
-                    <div style={{
-                      position: 'relative', overflow: 'hidden',
-                      background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)', color: 'white',
-                      borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(245, 158, 11, 0.3)',
-                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
-                      padding: '16px', boxSizing: 'border-box',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)'
-                    }} className="hover-scale">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Terminkonflikte</span>
-                        <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
-                          <ShieldAlert size={13} color="white" />
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                        <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
-                          {scheduleConflicts.length}
-                        </span>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>
-                          {scheduleConflicts.length === 0 ? 'System-Prüfung stabil' : 'Konflikte gefunden'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Card 4: Krankmeldungen (Red Gradient) */}
-                    <div style={{
-                      position: 'relative', overflow: 'hidden',
-                      background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)', color: 'white',
-                      borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.3)',
-                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
-                      padding: '16px', boxSizing: 'border-box',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)'
-                    }} className="hover-scale">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Krankmeldungen</span>
-                        <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
-                          <UserX size={13} color="white" />
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                        <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
-                          {activeSickTeachers.length}
-                        </span>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>
-                          {activeSickTeachers.length === 1 ? 'Lehrkraft krank' : 'Lehrkräfte krank'}
-                        </span>
-                      </div>
-                    </div>
-
                   </div>
 
                   {/* WIDGET: Systemische Terminkonflikte */}
@@ -6627,217 +6645,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     </div>
                   </div>
 
-                  {/* WIDGET: Raumauslastung Details */}
-                  <div style={{
-                    background: '#ffffff',
-                    borderRadius: '24px',
-                    padding: '24px',
-                    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
-                    border: '1px solid rgba(0, 0, 0, 0.05)'
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ background: '#e0e7ff', color: '#4f46e5', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <DoorOpen size={16} />
-                        </div>
-                        <div>
-                          <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                            Raumauslastung &amp; Belegung
-                          </h3>
-                          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                            Details für den heutigen Tag
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      {rooms.length === 0 ? (
-                        <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8', fontStyle: 'italic', fontSize: '0.85rem' }}>
-                          Keine Räume im System erfasst.
-                        </div>
-                      ) : (
-                        rooms.map(room => {
-                          const roomAlloc = todayAllocations.filter(a => a.roomId === room.id);
-                          const roomOccupiedRate = Math.round((roomAlloc.length / 8) * 100);
-                          return (
-                            <div key={room.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '14px', borderRadius: '16px', background: 'rgba(248, 250, 252, 0.6)', border: '1px solid rgba(0, 0, 0, 0.03)' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
-                                  🚪 {room.name} {room.floor ? `(${room.floor})` : ''}
-                                </span>
-                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: roomOccupiedRate > 75 ? '#ef4444' : roomOccupiedRate > 30 ? '#f59e0b' : '#10b981' }}>
-                                  {roomOccupiedRate}% ({roomAlloc.length} / 8 Slots)
-                                </span>
-                              </div>
-                              <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '100px', overflow: 'hidden' }}>
-                                <div style={{
-                                  height: '100%',
-                                  width: `${Math.min(100, roomOccupiedRate)}%`,
-                                  background: roomOccupiedRate > 75 ? '#ef4444' : roomOccupiedRate > 30 ? '#f59e0b' : '#10b981',
-                                  borderRadius: '100px',
-                                  transition: 'width 0.5s'
-                                }} />
-                              </div>
-                              {roomAlloc.length > 0 && (
-                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
-                                  {roomAlloc.map((alloc, idx) => (
-                                    <span key={idx} style={{ fontSize: '0.65rem', background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.05)', padding: '4px 8px', borderRadius: '8px', color: '#475569', fontWeight: 650, boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                                      ⏱️ {alloc.startTime} - {userMap[alloc.teacherId]?.split(' ')[0] || 'Lehrer'}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-
                 </div>
 
                 {/* RIGHT COLUMN: SIDEBAR */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                   
-                  {/* WIDGET: Schultermine */}
-                  <div style={{
-                    background: '#ffffff',
-                    borderRadius: '24px',
-                    padding: '24px',
-                    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
-                    border: '1px solid rgba(0, 0, 0, 0.05)'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                      <div style={{ background: '#fef3c7', color: '#d97706', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Calendar size={16} color="#fbbf24" />
-                      </div>
-                      <div>
-                        <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                          Schultermine
-                        </h3>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                          Wichtige Termine der Musikschule
-                        </span>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {[
-                        { date: '12. Juni 2026', time: '10:00 Uhr', title: '👥 Lehrkräfte-Konferenz', desc: 'Dienstbesprechung & Stundenplan-Update (Konferenzraum)' },
-                        { date: '18. Juni 2026', time: '15:30 Uhr', title: '🎹 Klassenvorspiel Klavier', desc: 'Klasse von Fr. Meier (Saal 1)' },
-                        { date: '20. Juni 2026', time: '17:00 Uhr', title: '🎸 GrooveLab Sommerkonzert 2026', desc: 'Schüler-Bands Live-Auftritt (Aula Hauptgebäude)' },
-                        { date: '01. Juli 2026', time: 'Ganztägig', title: '☀️ Beginn der Sommerferien', desc: 'Kein regulärer Unterricht (Schließzeit beachten)' }
-                      ].map((evt, idx) => (
-                        <div key={idx} style={{
-                          padding: '12px 16px',
-                          borderRadius: '16px',
-                          border: '1px solid rgba(245, 158, 11, 0.1)',
-                          background: 'rgba(245, 158, 11, 0.03)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '4px'
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <strong style={{ fontSize: '0.82rem', color: '#1e293b', fontWeight: 750 }}>
-                              {evt.title}
-                            </strong>
-                            <span style={{ fontSize: '0.68rem', background: 'rgba(245, 158, 11, 0.1)', color: '#d97706', padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>
-                              {evt.date}
-                            </span>
-                          </div>
-                          <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: 1.3 }}>
-                            {evt.desc}
-                          </span>
-                          <span style={{ fontSize: '0.66rem', color: '#a1a1aa', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            ⏱️ {evt.time}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* WIDGET: Schüler-Aktivierungsquote */}
-                  <div style={{
-                    background: '#ffffff',
-                    borderRadius: '24px',
-                    padding: '24px',
-                    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
-                    border: '1px solid rgba(0, 0, 0, 0.05)'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                      <div style={{ background: '#d1fae5', color: '#059669', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <UserCheck size={16} />
-                      </div>
-                      <div>
-                        <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                          Aktivierungsquote
-                        </h3>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                          Schüler-Onboarding Status
-                        </span>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600 }}>Erfolgreich Aktiviert</span>
-                        <span style={{ fontSize: '0.8rem', color: '#1e293b', fontWeight: 800 }}>{activeStudentsCount} / {totalStudentsCount} Profile</span>
-                      </div>
-                      
-                      <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '100px', overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${activationRate}%`, background: 'linear-gradient(90deg, #10b981 0%, #34d399 100%)', borderRadius: '100px' }} />
-                      </div>
-                      
-                      {/* Heutige Aktivierungen */}
-                      <div style={{ marginTop: '8px' }}>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '8px', paddingLeft: '2px' }}>
-                          Heutige Aktivierungen ({(() => {
-                            const d = new Date();
-                            const localTodayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                            return students.filter(s => s.is_pin_activated && (s.updated_at?.startsWith(localTodayStr) || s.created_at?.startsWith(localTodayStr))).length;
-                          })()}):
-                        </span>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '140px', overflowY: 'auto', paddingRight: '4px' }}>
-                          {(() => {
-                            const d = new Date();
-                            const localTodayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                            const todayList = students.filter(s => s.is_pin_activated && (s.updated_at?.startsWith(localTodayStr) || s.created_at?.startsWith(localTodayStr)));
-                            if (todayList.length === 0) {
-                              return (
-                                <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontStyle: 'italic', paddingLeft: '2px' }}>
-                                  Heute noch keine Aktivierungen erfolgt.
-                                  </span>
-                              );
-                            }
-                            return todayList.slice(0, 5).map(s => (
-                              <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'rgba(16, 185, 129, 0.04)', border: '1px solid rgba(16, 185, 129, 0.08)', borderRadius: '12px' }}>
-                                <span style={{ fontSize: '0.74rem', color: '#065f46', fontWeight: 650 }}>{s.first_name} {s.last_name}</span>
-                                <span style={{ fontSize: '0.62rem', background: '#d1fae5', color: '#065f46', padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>
-                                  Aktiv ✔
-                                </span>
-                              </div>
-                            ));
-                          })()}
-                          {(() => {
-                            const d = new Date();
-                            const localTodayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                            const todayCount = students.filter(s => s.is_pin_activated && (s.updated_at?.startsWith(localTodayStr) || s.created_at?.startsWith(localTodayStr))).length;
-                            if (todayCount > 5) {
-                              return (
-                                <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontStyle: 'italic', textAlign: 'center', display: 'block', marginTop: '4px' }}>
-                                  und {todayCount - 5} weitere...
-                                </span>
-                              );
-                            }
-                            return null;
-                          })()}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* WIDGET: Heutige Krankmeldungen */}
+                  {/* WIDGET: Heutige Krankmeldungen / Lehrer-Präsenz & Status */}
                   <div style={{
                     background: '#ffffff',
                     borderRadius: '24px',
@@ -6900,6 +6713,184 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         })}
                       </div>
                     )}
+                  </div>
+
+                  {/* WIDGET: Schultermine */}
+                  <div style={{
+                    background: '#ffffff',
+                    borderRadius: '24px',
+                    padding: '24px',
+                    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
+                    border: '1px solid rgba(0, 0, 0, 0.05)'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ background: '#fef3c7', color: '#d97706', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Calendar size={16} color="#fbbf24" />
+                        </div>
+                        <div>
+                          <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                            Schultermine
+                          </h3>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                            Wichtige Termine der Musikschule
+                          </span>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => setShowAddEventModal(!showAddEventModal)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#d97706',
+                          fontSize: '0.75rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        {showAddEventModal ? 'Schließen' : '＋ Neu'}
+                      </button>
+                    </div>
+
+                    {showAddEventModal && (
+                      <form onSubmit={async (e) => {
+                        e.preventDefault();
+                        if (!newEventTitle.trim() || !newEventDesc.trim()) return;
+                        try {
+                          const { error } = await supabase
+                            .from('campus_announcements')
+                            .insert({
+                              school_id: schoolId,
+                              user_id: userId,
+                              title: newEventTitle,
+                              message: newEventDesc,
+                              target_type: newEventTarget
+                            });
+                          if (!error) {
+                            setNewEventTitle('');
+                            setNewEventDesc('');
+                            setShowAddEventModal(false);
+                            fetchDashboardData();
+                          }
+                        } catch (err) {
+                          console.error(err);
+                        }
+                      }} style={{
+                        background: 'rgba(245, 158, 11, 0.02)',
+                        border: '1px dashed rgba(245, 158, 11, 0.2)',
+                        padding: '12px',
+                        borderRadius: '16px',
+                        marginBottom: '12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px'
+                      }}>
+                        <input 
+                          placeholder="Termin Titel..." 
+                          value={newEventTitle} 
+                          onChange={(e) => setNewEventTitle(e.target.value)}
+                          required
+                          style={{
+                            padding: '8px 12px',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(0,0,0,0.08)',
+                            fontSize: '0.8rem',
+                            fontFamily: 'inherit'
+                          }}
+                        />
+                        <textarea 
+                          placeholder="Beschreibung (z.B. Uhrzeit, Ort)..." 
+                          value={newEventDesc} 
+                          onChange={(e) => setNewEventDesc(e.target.value)}
+                          required
+                          style={{
+                            padding: '8px 12px',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(0,0,0,0.08)',
+                            fontSize: '0.8rem',
+                            minHeight: '60px',
+                            resize: 'vertical',
+                            fontFamily: 'inherit'
+                          }}
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <select 
+                            value={newEventTarget} 
+                            onChange={(e: any) => setNewEventTarget(e.target.value)}
+                            style={{
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              border: '1px solid rgba(0,0,0,0.08)',
+                              fontSize: '0.7rem',
+                              background: '#fff'
+                            }}
+                          >
+                            <option value="all">Sichtbar für alle</option>
+                            <option value="teachers">Nur Lehrkräfte</option>
+                            <option value="students">Nur Schüler</option>
+                          </select>
+                          <button type="submit" style={{
+                            background: '#d97706',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '6px 12px',
+                            fontSize: '0.72rem',
+                            fontWeight: 800,
+                            cursor: 'pointer'
+                          }}>Speichern</button>
+                        </div>
+                      </form>
+                    )}
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {schoolEvents.length === 0 ? (
+                        <div style={{
+                          background: 'rgba(245, 158, 11, 0.04)',
+                          border: '1px solid rgba(245, 158, 11, 0.1)',
+                          color: '#d97706',
+                          borderRadius: '16px',
+                          padding: '16px',
+                          textAlign: 'center'
+                        }}>
+                          <strong style={{ display: 'block', fontSize: '0.82rem', fontWeight: 800 }}>Keine Schultermine erfasst</strong>
+                          <span style={{ fontSize: '0.72rem', opacity: 0.9 }}>
+                            Erstelle eine Campus-Mitteilung, um hier Termine oder Ankündigungen anzuzeigen.
+                          </span>
+                        </div>
+                      ) : (
+                        schoolEvents.slice(0, 6).map((evt) => {
+                          const dateObj = new Date(evt.created_at);
+                          const formattedDate = dateObj.toLocaleDateString('de-DE', { day: 'numeric', month: 'short', year: 'numeric' });
+                          return (
+                            <div key={evt.id} style={{
+                              padding: '12px 16px',
+                              borderRadius: '16px',
+                              border: '1px solid rgba(245, 158, 11, 0.1)',
+                              background: 'rgba(245, 158, 11, 0.03)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '4px'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                                <strong style={{ fontSize: '0.82rem', color: '#1e293b', fontWeight: 750 }}>
+                                  {evt.title}
+                                </strong>
+                                <span style={{ fontSize: '0.68rem', background: 'rgba(245, 158, 11, 0.1)', color: '#d97706', padding: '2px 8px', borderRadius: '6px', fontWeight: 800, flexShrink: 0 }}>
+                                  {formattedDate}
+                                </span>
+                              </div>
+                              <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: 1.3 }}>
+                                {evt.message}
+                              </span>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
                   </div>
 
                 </div>
