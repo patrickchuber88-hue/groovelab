@@ -4258,7 +4258,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           </div>
                           
                           <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
-                            <Flame size={iconSize} fill="#ffffff" color="#ffffff" />
+                            <Flame size={iconSize} fill="#ef4444" color="#ef4444" />
                             <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ffffff' }}>
                               {group.flameLevel}
                             </span>
