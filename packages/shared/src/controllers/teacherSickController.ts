@@ -45,13 +45,28 @@ export async function reportSickHandler(req: Request, res: Response): Promise<vo
       .from('users')
       .update({ 
         sick_until: sickUntilDate || null,
-        sick_start: sickStartVal
+        sick_start: sickUntilDate ? sickStartVal : null
       })
       .eq('id', teacherId);
 
     if (userUpdateError) {
       res.status(500).json({ error: 'Failed to update user profile.', details: userUpdateError.message });
       return;
+    }
+
+    // Compute sickness duration if we are ending the sick leave
+    let daysDiff = 0;
+    let formattedStartDate = '';
+    let formattedEndDate = '';
+    if (!sickUntilDate && teacher.sick_start) {
+      const startD = new Date(teacher.sick_start);
+      const endD = new Date();
+      startD.setHours(0, 0, 0, 0);
+      endD.setHours(0, 0, 0, 0);
+      daysDiff = Math.round((endD.getTime() - startD.getTime()) / (24 * 3600 * 1000)) + 1;
+      if (daysDiff < 1) daysDiff = 1;
+      formattedStartDate = startD.toLocaleDateString('de-DE');
+      formattedEndDate = endD.toLocaleDateString('de-DE');
     }
 
     // 2. Fetch all teacher's schedules
@@ -154,19 +169,29 @@ export async function reportSickHandler(req: Request, res: Response): Promise<vo
         .insert(notificationsToInsert);
     }
 
-    // Delete future crisis notifications if sickness shortened or ended
+    // Delete/update future crisis notifications if sickness shortened or ended
     if (datesToDeleteNotifs.length > 0) {
-      await supabase
-        .from('crisis_notifications')
-        .delete()
-        .eq('teacher_id', teacherId)
-        .in('slot_start_datetime', datesToDeleteNotifs);
+      if (!sickUntilDate) {
+        // Update matching notifications to is_reinstated = true and status = 'UNREAD'
+        await supabase
+          .from('crisis_notifications')
+          .update({ is_reinstated: true, status: 'UNREAD' })
+          .eq('teacher_id', teacherId)
+          .in('slot_start_datetime', datesToDeleteNotifs);
+      } else {
+        await supabase
+          .from('crisis_notifications')
+          .delete()
+          .eq('teacher_id', teacherId)
+          .in('slot_start_datetime', datesToDeleteNotifs);
+      }
     }
 
     // Insert alert for Secretary Cockpit (Krisen-Dashboard)
     let alertMessage = '';
     if (!sickUntilDate) {
-      alertMessage = `🟢 GESUNDMELDUNG: Lehrkraft ${teacher.first_name} ${teacher.last_name} hat sich wieder gesundgemeldet. Alle zukünftigen Ausfälle wurden storniert.`;
+      const durationStr = daysDiff > 0 ? ` (Krankheitsdauer: vom ${formattedStartDate} bis zum ${formattedEndDate}, ${daysDiff} ${daysDiff === 1 ? 'Tag' : 'Tage'})` : '';
+      alertMessage = `🟢 GESUNDMELDUNG: Lehrkraft ${teacher.first_name} ${teacher.last_name} hat sich wieder gesundgemeldet.${durationStr}`;
     } else if (prevSickUntilStr && sickUntilDate !== prevSickUntilStr.substring(0, 10)) {
       alertMessage = `🚨 KRANKHEITS-ANPASSUNG: Lehrkraft ${teacher.first_name} ${teacher.last_name} hat den Krankmeldungszeitraum auf den ${new Date(sickUntilDate).toLocaleDateString('de-DE')} geändert.`;
     } else {

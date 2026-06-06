@@ -1339,6 +1339,9 @@ export function TeacherDashboard({
     }
   };
 
+  // 4-week maximum: longer absences must be entered by administration
+  const MAX_SELF_REPORT_DAYS = 28;
+
   const handleReportSick = async () => {
     if (!sickUntilDate) {
       alert('Bitte wähle ein bis-Datum aus.');
@@ -1346,6 +1349,19 @@ export function TeacherDashboard({
     }
     if (!sickStartDate) {
       alert('Bitte wähle ein von-Datum aus.');
+      return;
+    }
+
+    // Check if sick period exceeds 4 weeks
+    const startD = new Date(sickStartDate);
+    const untilD = new Date(sickUntilDate);
+    startD.setHours(0, 0, 0, 0);
+    untilD.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((untilD.getTime() - startD.getTime()) / (24 * 3600 * 1000)) + 1;
+    if (diffDays > MAX_SELF_REPORT_DAYS) {
+      alert(
+        `⚠️ Krankmeldungen von mehr als 4 Wochen (${diffDays} Tage) können nicht selbst eingetragen werden.\n\nBitte wende dich an die Verwaltung, damit diese die Krankmeldung für dich hinterlegt. Es gilt keine 30-Tage-Sperre für Verwaltungseinträge.`
+      );
       return;
     }
 
@@ -1606,7 +1622,7 @@ export function TeacherDashboard({
 
       const { data: profile, error: profileErr } = await supabase
         .from('users')
-        .select('school_id, first_name, last_name')
+        .select('school_id, first_name, last_name, sick_start, sick_until')
         .eq('id', userId)
         .single();
 
@@ -1614,12 +1630,27 @@ export function TeacherDashboard({
         throw new Error('Teacher profile not found.');
       }
 
-      // 1. Shorten sick_until to the current date instead of null
-      const todayStr = new Date().toISOString().substring(0, 10);
+      // Compute sickness duration before resetting
+      let daysDiff = 0;
+      let formattedStartDate = '';
+      let formattedEndDate = '';
+      if (profile.sick_start) {
+        const startD = new Date(profile.sick_start);
+        const endD = new Date();
+        startD.setHours(0, 0, 0, 0);
+        endD.setHours(0, 0, 0, 0);
+        daysDiff = Math.round((endD.getTime() - startD.getTime()) / (24 * 3600 * 1000)) + 1;
+        if (daysDiff < 1) daysDiff = 1;
+        formattedStartDate = startD.toLocaleDateString('de-DE');
+        formattedEndDate = endD.toLocaleDateString('de-DE');
+      }
+
+      // 1. Reset sick_until and sick_start to null to return to regular mode
       const { error: userErr } = await supabase
         .from('users')
         .update({ 
-          sick_until: todayStr
+          sick_until: null,
+          sick_start: null
         })
         .eq('id', userId);
 
@@ -1698,17 +1729,18 @@ export function TeacherDashboard({
           .eq('status', 'canceled_by_teacher_sick');
       }
 
-      // Delete future crisis notifications
+      // Instead of deleting future notifications, mark them as reinstated so students get notified
       if (datesToDeleteNotifs.length > 0) {
         await supabase
           .from('crisis_notifications')
-          .delete()
+          .update({ is_reinstated: true, status: 'UNREAD' })
           .eq('teacher_id', userId)
           .in('slot_start_datetime', datesToDeleteNotifs);
       }
 
-      // Add healthy notice to system alerts
-      const alertMessage = `🍏 LEHRKRAFT GESUND: Lehrkraft ${profile.first_name} ${profile.last_name} hat sich wieder gesund gemeldet.`;
+      // Add healthy notice to system alerts with logged duration
+      const durationStr = daysDiff > 0 ? ` (Krankheitsdauer: vom ${formattedStartDate} bis zum ${formattedEndDate}, ${daysDiff} ${daysDiff === 1 ? 'Tag' : 'Tage'})` : '';
+      const alertMessage = `🍏 LEHRKRAFT GESUND: Lehrkraft ${profile.first_name} ${profile.last_name} hat sich wieder gesund gemeldet.${durationStr}`;
       await supabase
         .from('system_alerts')
         .insert({
@@ -4718,6 +4750,69 @@ export function TeacherDashboard({
                       </div>
                     </div>
                   )}
+                  {/* Sick-week note banner in Briefing Board */}
+                  {teacher?.sick_until && (() => {
+                    const todayLocal = new Date();
+                    todayLocal.setHours(0, 0, 0, 0);
+                    const sickUntilLocal = new Date(teacher.sick_until);
+                    sickUntilLocal.setHours(23, 59, 59, 999);
+                    const sickStartLocal = teacher.sick_start ? new Date(teacher.sick_start) : todayLocal;
+                    sickStartLocal.setHours(0, 0, 0, 0);
+                    // Show banner if today is within sick period
+                    if (todayLocal >= sickStartLocal && todayLocal <= sickUntilLocal) {
+                      const endStr = sickUntilLocal.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+                      return (
+                        <div style={{
+                          background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(255, 255, 255, 0.97) 100%)',
+                          backdropFilter: 'blur(12px)',
+                          WebkitBackdropFilter: 'blur(12px)',
+                          border: '1.5px solid rgba(239, 68, 68, 0.2)',
+                          padding: '16px 20px',
+                          borderRadius: '16px',
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '14px',
+                          boxShadow: '0 4px 16px rgba(239, 68, 68, 0.06)'
+                        }}>
+                          <div style={{
+                            background: 'rgba(239, 68, 68, 0.1)',
+                            border: '1.5px solid rgba(239, 68, 68, 0.15)',
+                            color: '#dc2626',
+                            padding: '8px',
+                            borderRadius: '10px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}>
+                            <span style={{ fontSize: '1.1rem' }}>🤒</span>
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                              <span style={{
+                                fontSize: '0.6rem',
+                                fontWeight: 900,
+                                color: '#dc2626',
+                                background: 'rgba(239, 68, 68, 0.1)',
+                                padding: '2px 6px',
+                                borderRadius: '5px',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.05em'
+                              }}>Krankmeldung aktiv</span>
+                              <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.01em' }}>
+                                Kein Unterricht diese Woche
+                              </h4>
+                            </div>
+                            <p style={{ margin: 0, fontSize: '0.78rem', color: '#7f1d1d', fontWeight: 600, lineHeight: 1.4 }}>
+                              Du bist bis einschließlich <strong>{endStr}</strong> krankgemeldet. Alle betroffenen Schüler wurden benachrichtigt.
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+
                   {/* Bypass banner */}
                   {teacher?.sick_until && bypassSickView && (
                     <div style={{
@@ -4807,77 +4902,7 @@ export function TeacherDashboard({
                         </p>
                       </div>
 
-                      {/* Care List: notified students */}
-                      <div style={{
-                        background: 'white',
-                        border: '1px solid #f1f5f9',
-                        borderRadius: '20px',
-                        padding: '24px',
-                        boxShadow: '0 4px 20px rgba(0,0,0,0.02)'
-                      }}>
-                        <h3 style={{
-                          margin: '0 0 16px 0',
-                          fontSize: '1.05rem',
-                          fontWeight: 800,
-                          color: '#1e293b',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px'
-                        }}>
-                          <span>🕊️</span>
-                          <span>Für deine Beruhigung: Status deiner Schüler</span>
-                        </h3>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          {briefingData?.timeline && briefingData.timeline.filter((s: any) => s.student).length > 0 ? (
-                            briefingData.timeline
-                              .filter((s: any) => s.student)
-                              .map((slot: any, idx: number) => {
-                                const isCanceled = slot.status === 'canceled_by_teacher_sick' || slot.status === 'teacher_sick';
-                                return (
-                                  <div 
-                                    key={idx}
-                                    style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'space-between',
-                                      padding: '12px 16px',
-                                      borderRadius: '12px',
-                                      background: isCanceled ? '#fff5f5' : '#f8fafc',
-                                      border: isCanceled ? '1px solid #fee2e2' : '1px solid #e2e8f0',
-                                      transition: 'all 0.2s'
-                                    }}
-                                  >
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                      <span style={{ fontSize: '0.8rem', fontWeight: 800, color: isCanceled ? '#ef4444' : '#64748b', background: isCanceled ? '#fee2e2' : '#e2e8f0', padding: '3px 8px', borderRadius: '6px' }}>
-                                        {slot.timeSlot} Uhr
-                                      </span>
-                                      <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#334155' }}>
-                                        {slot.student.name}
-                                      </span>
-                                    </div>
-
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                      {isCanceled ? (
-                                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#b91c1c', background: '#fecdd3', padding: '4px 10px', borderRadius: '100px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                          <span>✉️</span> Benachrichtigt (Entfall)
-                                        </span>
-                                      ) : (
-                                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#047857', background: '#d1fae5', padding: '4px 10px', borderRadius: '100px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                          <span>✓</span> Regulär / Erledigt
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })
-                          ) : (
-                            <div style={{ padding: '24px', textAlign: 'center', color: '#64748b', fontSize: '0.85rem', fontWeight: 600 }}>
-                              Heute stehen keine weiteren Termine in deinem Stundenplan.
-                            </div>
-                          )}
-                        </div>
-                      </div>
 
                       {/* Actions */}
                       <div style={{
@@ -6879,26 +6904,28 @@ export function TeacherDashboard({
                           }}
                           disabled={reportingSick}
                           style={{
-                            background: '#ffffff',
-                            color: '#166534',
-                            border: '1.5px solid #16a34a',
-                            padding: '6px 14px',
+                            background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                            color: '#ffffff',
+                            border: 'none',
+                            padding: '8px 16px',
                             borderRadius: '10px',
-                            fontWeight: 700,
+                            fontWeight: 800,
                             fontSize: '0.75rem',
-                            cursor: 'pointer',
+                            cursor: reportingSick ? 'not-allowed' : 'pointer',
                             transition: 'all 0.2s',
-                            width: 'fit-content',
-                            boxShadow: '0 2px 6px rgba(22, 163, 74, 0.1)',
-                            marginTop: '4px',
+                            width: '100%',
+                            boxShadow: '0 4px 12px rgba(22, 163, 74, 0.35)',
+                            marginTop: '6px',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '6px'
+                            justifyContent: 'center',
+                            gap: '6px',
+                            opacity: reportingSick ? 0.7 : 1
                           }}
                           className="hover-scale"
                         >
                           <Check size={14} strokeWidth={3} />
-                          Wieder gesund melden
+                          ☀️ Wieder gesund melden
                         </button>
                       </div>
                     )}
@@ -7065,24 +7092,27 @@ export function TeacherDashboard({
                               onClick={handleEndSick}
                               disabled={reportingSick}
                               style={{
-                                background: '#ffffff',
-                                color: '#166534',
-                                border: '1.5px solid #16a34a',
-                                padding: '10px 14px',
+                                background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                                color: '#ffffff',
+                                border: 'none',
+                                padding: '12px 14px',
                                 borderRadius: '12px',
-                                fontWeight: 700,
-                                fontSize: '0.78rem',
-                                cursor: 'pointer',
+                                fontWeight: 800,
+                                fontSize: '0.82rem',
+                                cursor: reportingSick ? 'not-allowed' : 'pointer',
                                 transition: 'all 0.2s',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                gap: '6px'
+                                gap: '8px',
+                                boxShadow: '0 6px 18px rgba(22, 163, 74, 0.4)',
+                                opacity: reportingSick ? 0.7 : 1,
+                                letterSpacing: '-0.01em'
                               }}
                               className="hover-scale"
                             >
                               <Check size={16} strokeWidth={3} />
-                              Wieder gesund melden
+                              ☀️ Wieder gesund melden
                             </button>
                           )}
                         </div>

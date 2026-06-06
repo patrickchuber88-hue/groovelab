@@ -1142,7 +1142,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
         // Direct Client-Side Supabase fallback
         const { data: profile, error: profileErr } = await supabase
           .from('users')
-          .select('school_id, first_name, last_name')
+          .select('school_id, first_name, last_name, sick_start, sick_until')
           .eq('id', userId)
           .single();
 
@@ -1150,12 +1150,27 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
           throw new Error('Teacher profile not found.');
         }
 
-        // 1. Shorten sick_until to the current date instead of null
-        const todayStr = new Date().toISOString().substring(0, 10);
+        // Compute sickness duration before resetting
+        let daysDiff = 0;
+        let formattedStartDate = '';
+        let formattedEndDate = '';
+        if (profile.sick_start) {
+          const startD = new Date(profile.sick_start);
+          const endD = new Date();
+          startD.setHours(0, 0, 0, 0);
+          endD.setHours(0, 0, 0, 0);
+          daysDiff = Math.round((endD.getTime() - startD.getTime()) / (24 * 3600 * 1000)) + 1;
+          if (daysDiff < 1) daysDiff = 1;
+          formattedStartDate = startD.toLocaleDateString('de-DE');
+          formattedEndDate = endD.toLocaleDateString('de-DE');
+        }
+
+        // 1. Reset sick_until and sick_start to null to return to regular mode
         const { error: userErr } = await supabase
           .from('users')
           .update({ 
-            sick_until: todayStr
+            sick_until: null,
+            sick_start: null
           })
           .eq('id', userId);
 
@@ -1208,24 +1223,25 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
             .eq('status', 'canceled_by_teacher_sick');
         }
 
-        // Delete future crisis notifications
+        // Instead of deleting future notifications, mark them as reinstated so students get notified
         if (datesToDeleteNotifs.length > 0) {
           await supabase
             .from('crisis_notifications')
-            .delete()
+            .update({ is_reinstated: true, status: 'UNREAD' })
             .eq('teacher_id', userId)
             .in('slot_start_datetime', datesToDeleteNotifs);
         }
 
-        // Add Secretary alarm ticket
-        const alertMessage = `🟢 GESUNDMELDUNG: Lehrkraft ${profile.first_name} ${profile.last_name} hat sich wieder gesundgemeldet. Alle zukünftigen Ausfälle wurden storniert.`;
+        // Add Secretary alarm ticket with logged duration
+        const durationStr = daysDiff > 0 ? ` (Krankheitsdauer: vom ${formattedStartDate} bis zum ${formattedEndDate}, ${daysDiff} ${daysDiff === 1 ? 'Tag' : 'Tage'})` : '';
+        const alertMessage = `🍏 LEHRKRAFT GESUND: Lehrkraft ${profile.first_name} ${profile.last_name} hat sich wieder gesund gemeldet.${durationStr}`;
 
         await supabase
           .from('system_alerts')
           .insert({
             school_id: profile.school_id,
             teacher_id: userId,
-            type: 'Teacher Illness Alert',
+            type: 'Teacher Healthy Alert',
             message: alertMessage,
             resolved: false
           });
