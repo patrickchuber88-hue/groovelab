@@ -1614,16 +1614,12 @@ export function TeacherDashboard({
         throw new Error('Teacher profile not found.');
       }
 
-      const today = new Date();
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
-
-      // 1. Shorten user sick_until to yesterday's date
+      // 1. Shorten sick_until to the current date instead of null
+      const todayStr = new Date().toISOString().substring(0, 10);
       const { error: userErr } = await supabase
         .from('users')
         .update({ 
-          sick_until: yesterdayStr
+          sick_until: todayStr
         })
         .eq('id', userId);
 
@@ -1725,6 +1721,7 @@ export function TeacherDashboard({
 
       alert('Erfolgreich gesundgemeldet! Zukünftige Stundenplandaten wurden wieder aktiviert.');
       setSickUntilDate('');
+      const today = new Date();
       setSickStartDate(today.toISOString().substring(0, 10));
       // Refresh teacher profile without page reload
       const { data: updatedTeacher } = await supabase
@@ -2003,12 +2000,6 @@ export function TeacherDashboard({
   const [showCustomStart, setShowCustomStart] = useState(false);
   const [reportingSick, setReportingSick] = useState(false);
   const [bypassSickView, setBypassSickView] = useState(false);
-  const isCurrentlySick = useMemo(() => {
-    if (!teacher?.sick_until) return false;
-    const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    return teacher.sick_until.substring(0, 10) >= todayStr;
-  }, [teacher?.sick_until]);
   const [sickSuccessShown, setSickSuccessShown] = useState(false);
   const [sickNotifModal, setSickNotifModal] = useState<{ notifs: any[]; sickUntilDateStr: string } | null>(null);
   const [crisisNotifications, setCrisisNotifications] = useState<any[]>([]);
@@ -4728,7 +4719,7 @@ export function TeacherDashboard({
                     </div>
                   )}
                   {/* Bypass banner */}
-                  {isCurrentlySick && bypassSickView && (
+                  {teacher?.sick_until && bypassSickView && (
                     <div style={{
                       background: 'rgba(239, 68, 68, 0.08)',
                       backdropFilter: 'blur(20px) saturate(190%)',
@@ -4767,7 +4758,7 @@ export function TeacherDashboard({
                     </div>
                   )}
 
-                  {isCurrentlySick && !bypassSickView ? (
+                  {teacher?.sick_until && !bypassSickView ? (
                     <div style={{
                       display: 'flex',
                       flexDirection: 'column',
@@ -4945,7 +4936,7 @@ export function TeacherDashboard({
                   ) : (
                     <>
                       {/* Gamified KPI Cards row */}
-                      {(!isCurrentlySick || bypassSickView) && (
+                      {(!teacher?.sick_until || bypassSickView) && (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
 
                       {/* Card 1: Heutige Schüler (Blue-purple matching Level XP) */}
@@ -5042,7 +5033,7 @@ export function TeacherDashboard({
                     {/* LEFT COLUMN: Greeting Banner & Schüler Notizen */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: '1 1 350px', minWidth: '300px' }}>
                       {/* Premium Greeting Banner with Avatar & Wave Design */}
-                      {(!isCurrentlySick || bypassSickView) && (
+                      {(!teacher?.sick_until || bypassSickView) && (
                         <div style={{
                           background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
                           backdropFilter: 'blur(24px) saturate(1.8)',
@@ -5146,7 +5137,7 @@ export function TeacherDashboard({
  
  
  
-                      {(!isCurrentlySick || bypassSickView) && !isFreeDay && !isWeekend && (
+                      {(!teacher?.sick_until || bypassSickView) && !isFreeDay && !isWeekend && (
                         <div className="google-card" style={{ 
                           width: '100%', 
                           flex: 1,
@@ -6063,7 +6054,7 @@ export function TeacherDashboard({
                     </div>
 
                     {/* RIGHT COLUMN: TAGESPLAN */}
-                    {isCurrentlySick && !bypassSickView ? (
+                    {teacher?.sick_until && !bypassSickView ? (
                       <div style={{
                         flex: '1.2 1 450px',
                         minWidth: '300px',
@@ -6818,11 +6809,11 @@ export function TeacherDashboard({
                           color: '#7f1d1d',
                           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
                         }}>
-                          {isCurrentlySick ? 'Krankmeldungs-Status' : 'Krankmelden'}
+                          {teacher?.sick_until ? 'Krankmeldungs-Status' : 'Krankmelden'}
                         </h3>
                       </div>
                       
-                      {!isSickWidgetExpanded && !isCurrentlySick && (
+                      {!isSickWidgetExpanded && !teacher?.sick_until && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -6861,7 +6852,7 @@ export function TeacherDashboard({
                         />
                       )}
 
-                      {isCurrentlySick && !isSickWidgetExpanded && (
+                      {teacher?.sick_until && !isSickWidgetExpanded && (
                         <ChevronDown 
                           size={16} 
                           color="#b91c1c"
@@ -6874,7 +6865,7 @@ export function TeacherDashboard({
                       )}
                     </div>
 
-                    {isCurrentlySick && !isSickWidgetExpanded && (
+                    {teacher?.sick_until && !isSickWidgetExpanded && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '32px', marginTop: '6px' }}>
                         <div style={{ fontSize: '0.75rem', color: '#b91c1c', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                           <span style={{ color: '#dc2626', fontWeight: 650 }}>Von: {teacher.sick_start ? new Date(teacher.sick_start).toLocaleDateString('de-DE') : 'Sofort'}</span>
@@ -6914,7 +6905,7 @@ export function TeacherDashboard({
 
                     {isSickWidgetExpanded && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingTop: '8px', borderTop: '1px solid #fecaca' }}>
-                        {isCurrentlySick ? (
+                        {teacher?.sick_until ? (
                           <div style={{ fontSize: '0.78rem', color: '#7f1d1d', fontWeight: 550, lineHeight: 1.4, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                             <div>Zeitraum der Krankmeldung:</div>
                             <div style={{ fontSize: '0.8rem', color: '#991b1b', fontWeight: 600 }}>
@@ -6933,7 +6924,7 @@ export function TeacherDashboard({
                         {!showCustomStart ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                             <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                              {isCurrentlySick ? 'Krankmeldung anpassen (bis):' : 'Krank bis einschließlich:'}
+                              {teacher?.sick_until ? 'Krankmeldung anpassen (bis):' : 'Krank bis einschließlich:'}
                             </label>
                             <input 
                               type="date"
@@ -7069,7 +7060,7 @@ export function TeacherDashboard({
                             {reportingSick ? 'Speichert...' : teacher?.sick_until ? 'Zeitraum anpassen' : 'Krankmeldung absenden'}
                           </button>
 
-                          {isCurrentlySick && (
+                          {teacher?.sick_until && (
                             <button
                               onClick={handleEndSick}
                               disabled={reportingSick}
@@ -7282,7 +7273,7 @@ export function TeacherDashboard({
                 </div>
               )}
 
-              {(!isCurrentlySick || bypassSickView) && (
+              {(!teacher?.sick_until || bypassSickView) && (
                 <>
                   {/* INFOS DER VERWALTUNG */}
                   <div style={{ 
