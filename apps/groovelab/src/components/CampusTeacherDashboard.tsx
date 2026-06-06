@@ -35,7 +35,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
   const [school, setSchool] = useState<any>(null);
 
   // Board 1: Tageskompass & Meisterwerk
-  const [todaySchedules, setTodaySchedules] = useState<any[]>([]);
+  const [rawTodaySchedules, setRawTodaySchedules] = useState<any[]>([]);
   const [selectedStudentForDoc, setSelectedStudentForDoc] = useState<any>(null);
   const [docModalOpen, setDocModalOpen] = useState(false);
   const [docHistory, setDocHistory] = useState<any[]>([]);
@@ -53,7 +53,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
   const [copiedLink, setCopiedLink] = useState(false);
 
   // Board 3: Mein Stundenplan
-  const [weekSchedules, setWeekSchedules] = useState<any[]>([]);
+  const [rawWeekSchedules, setRawWeekSchedules] = useState<any[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
   const [studentAvailabilities, setStudentAvailabilities] = useState<any[]>([]);
   const [draggedScheduleId, setDraggedScheduleId] = useState<string | null>(null);
@@ -71,7 +71,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
   const [newBreakLabel, setNewBreakLabel] = useState('');
 
   // Board 6: Räume Overview & Bookings
-  const [allSchoolSchedules, setAllSchoolSchedules] = useState<any[]>([]);
+  const [rawAllSchoolSchedules, setRawAllSchoolSchedules] = useState<any[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<any>(null);
   const [favoriteRoomId, setFavoriteRoomId] = useState<string | null>(() => localStorage.getItem(`groovelab_favorite_room_id_${userId}`));
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
@@ -82,6 +82,180 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
 
   // Loading States
   const [loading, setLoading] = useState(true);
+
+  // Holidays state
+  const [holidays, setHolidays] = useState<{ start: string, end: string, name: string }[]>([]);
+
+  const parseICSDate = (icsDateStr: string): Date => {
+    const cleanStr = icsDateStr.includes(':') ? icsDateStr.split(':')[1] : icsDateStr;
+    const year = parseInt(cleanStr.substring(0, 4));
+    const month = parseInt(cleanStr.substring(4, 6)) - 1;
+    const day = parseInt(cleanStr.substring(6, 8));
+
+    if (cleanStr.includes('T')) {
+      const hour = parseInt(cleanStr.substring(9, 11));
+      const min = parseInt(cleanStr.substring(11, 13));
+      const sec = parseInt(cleanStr.substring(13, 15));
+      return new Date(Date.UTC(year, month, day, hour, min, sec));
+    }
+    return new Date(year, month, day);
+  };
+
+  const parseICS = (icsText: string): any[] => {
+    const events: any[] = [];
+    const lines = icsText.split(/\r?\n/);
+    let currentEvent: any = null;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line === 'BEGIN:VEVENT') {
+        currentEvent = {};
+      } else if (line === 'END:VEVENT' && currentEvent) {
+        if (currentEvent.summary && currentEvent.dtstart) {
+          events.push(currentEvent);
+        }
+        currentEvent = null;
+      } else if (currentEvent) {
+        const colonIdx = line.indexOf(':');
+        if (colonIdx !== -1) {
+          const key = line.substring(0, colonIdx);
+          const value = line.substring(colonIdx + 1);
+
+          if (key.startsWith('SUMMARY')) {
+            currentEvent.summary = value;
+          } else if (key.startsWith('DESCRIPTION')) {
+            currentEvent.description = value.replace(/\\n/g, '\n');
+          } else if (key.startsWith('DTSTART')) {
+            currentEvent.dtstart = parseICSDate(value);
+          } else if (key.startsWith('DTEND')) {
+            currentEvent.dtend = parseICSDate(value);
+          } else if (key.startsWith('LOCATION')) {
+            currentEvent.location = value;
+          }
+        }
+      }
+    }
+    return events;
+  };
+
+  const loadHolidays = async (url: string) => {
+    try {
+      let text = '';
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error();
+        text = await res.text();
+      } catch (corsErr) {
+        const proxies = [
+          `https://corsproxy.io/?${url}`,
+          `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`
+        ];
+
+        let success = false;
+        for (const proxyUrl of proxies) {
+          try {
+            const res = await fetch(proxyUrl);
+            if (!res.ok) continue;
+            if (proxyUrl.includes('allorigins')) {
+              const json = await res.json();
+              text = json.contents;
+            } else {
+              text = await res.text();
+            }
+            if (text && text.includes('BEGIN:VCALENDAR')) {
+              success = true;
+              break;
+            }
+          } catch (e) {
+            console.warn(e);
+          }
+        }
+        if (!success) return;
+      }
+
+      if (!text) return;
+
+      const events = parseICS(text);
+      const holidayRanges = events
+        .filter(ev => {
+          const summary = (ev.summary || '').toLowerCase();
+          return summary.includes('ferien') || summary.includes('feiertag') || summary.includes('schulfrei');
+        })
+        .map(ev => {
+          const toYYYYMMDD = (d: Date) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+          };
+          
+          let end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
+          if (ev.dtend && !ev.dtend.toISOString().includes('T')) {
+            end.setDate(end.getDate() - 1);
+          }
+          
+          return {
+            start: toYYYYMMDD(ev.dtstart),
+            end: toYYYYMMDD(end),
+            name: ev.summary || 'Ferien'
+          };
+        });
+
+      setHolidays(holidayRanges);
+    } catch (err) {
+      console.error('Error loading holidays in CampusTeacherDashboard:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (school?.calendar_url) {
+      loadHolidays(school.calendar_url);
+    }
+  }, [school?.calendar_url]);
+
+  const currentWeekMonday = useMemo(() => {
+    const today = new Date();
+    const currentDay = today.getDay() || 7;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - currentDay + 1);
+    monday.setHours(0, 0, 0, 0);
+    return monday;
+  }, []);
+
+  const getSchedDateStr = (dayOfWeek: number) => {
+    const d = new Date(currentWeekMonday);
+    d.setDate(currentWeekMonday.getDate() + (dayOfWeek - 1));
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dayVal = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dayVal}`;
+  };
+
+  const isTodayHoliday = useMemo(() => {
+    const todayStr = new Date().toISOString().substring(0, 10);
+    return holidays.find(h => todayStr >= h.start && todayStr <= h.end);
+  }, [holidays]);
+
+  const todaySchedules = useMemo(() => {
+    if (isTodayHoliday) return [];
+    return rawTodaySchedules;
+  }, [rawTodaySchedules, isTodayHoliday]);
+
+  const weekSchedules = useMemo(() => {
+    return rawWeekSchedules.filter((s: any) => {
+      const dateStr = getSchedDateStr(s.day_of_week);
+      const isHoliday = holidays.some(h => dateStr >= h.start && dateStr <= h.end);
+      return !isHoliday;
+    });
+  }, [rawWeekSchedules, holidays, currentWeekMonday]);
+
+  const allSchoolSchedules = useMemo(() => {
+    return rawAllSchoolSchedules.filter((s: any) => {
+      const dateStr = getSchedDateStr(s.day_of_week);
+      const isHoliday = holidays.some(h => dateStr >= h.start && dateStr <= h.end);
+      return !isHoliday;
+    });
+  }, [rawAllSchoolSchedules, holidays, currentWeekMonday]);
 
   // Clock Ticker for Live Slot Highlight
   const [currentTimeStr, setCurrentTimeStr] = useState('');
@@ -279,12 +453,12 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
       };
     });
 
-    setWeekSchedules(mappedSchedData);
+    setRawWeekSchedules(mappedSchedData);
 
     // Filter today's slots
     const todayWeekday = currentDay;
     const todaySlots = mappedSchedData.filter(s => s.day_of_week === todayWeekday);
-    setTodaySchedules(todaySlots);
+    setRawTodaySchedules(todaySlots);
 
     // 5. Fetch all school schedules for Room Board
     const { data: allSchedData } = await supabase
@@ -379,7 +553,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
       }
     });
 
-    setAllSchoolSchedules([...staticBookings, ...dynamicBookings]);
+    setRawAllSchoolSchedules([...staticBookings, ...dynamicBookings]);
 
     await fetchNotifications(teacherId);
   };
@@ -1350,6 +1524,21 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
 
       {/* Main Board Viewport */}
       <main className="flex-1 flex flex-col min-w-0 bg-slate-950 overflow-y-auto">
+        {/* Holiday Banner */}
+        {isTodayHoliday && (
+          <div className="mx-8 mt-6 p-6 bg-gradient-to-r from-emerald-900/40 to-slate-900/40 border border-emerald-500/20 rounded-3xl flex items-center gap-4 shadow-xl backdrop-blur-md relative overflow-hidden animate-fade-in">
+            <div className="absolute right-0 bottom-0 text-7xl opacity-10 pointer-events-none select-none">🌴</div>
+            <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-2xl">
+              <span style={{ fontSize: '1.5rem' }}>🌴</span>
+            </div>
+            <div>
+              <h2 className="text-base font-black text-white">Schulfreie Zeit: {isTodayHoliday.name}</h2>
+              <p className="text-slate-400 text-xs mt-1 font-semibold">
+                Vom {new Date(isTodayHoliday.start).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})} bis zum {new Date(isTodayHoliday.end).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})} findet kein regulärer Unterricht statt. Genieße die Ferien!
+              </p>
+            </div>
+          </div>
+        )}
         {/* Thin accent line matching the CAMPUS tab label color (#34a853) */}
         <div style={{ height: '3px', background: '#34a853', width: '100%', flexShrink: 0 }} />
         {/* Board 1: TAGESKOMPASS */}

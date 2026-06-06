@@ -215,15 +215,33 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         }
       }
 
-      const parsed = parseICS(text).map((ev: any, index: number) => ({
-        id: `subscribed-${index}`,
-        title: ev.summary || 'Abonnierter Termin',
-        description: ev.description || '',
-        event_date: ev.dtstart ? ev.dtstart.toISOString().substring(0, 10) : '',
-        start_time: ev.dtstart ? ev.dtstart.toTimeString().substring(0, 5) : '00:00',
-        category: 'Schultermin',
-        is_subscribed: true
-      }));
+      const parsed = parseICS(text).map((ev: any, index: number) => {
+        const title = ev.summary || 'Abonnierter Termin';
+        const isHoliday = title.toLowerCase().includes('ferien') || title.toLowerCase().includes('feiertag') || title.toLowerCase().includes('schulfrei');
+        
+        let end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
+        if (ev.dtend && !ev.dtend.toISOString().includes('T')) {
+          end.setDate(end.getDate() - 1);
+        }
+        
+        const toYYYYMMDD = (d: Date) => {
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          return `${y}-${m}-${day}`;
+        };
+
+        return {
+          id: `subscribed-${index}`,
+          title: title,
+          description: ev.description || '',
+          event_date: ev.dtstart ? ev.dtstart.toISOString().substring(0, 10) : '',
+          event_end_date: toYYYYMMDD(end),
+          start_time: ev.dtstart ? ev.dtstart.toTimeString().substring(0, 5) : '00:00',
+          category: isHoliday ? 'Ferien' : 'Schultermin',
+          is_subscribed: true
+        };
+      });
 
       setSubscribedEvents(parsed);
     } catch (err) {
@@ -513,7 +531,17 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     const todayStr = new Date().toISOString().substring(0, 10);
     const nowTimeStr = new Date().toTimeString().substring(0, 8);
 
+    // Filter out holiday lessons
+    const holidayRanges = subscribedEvents.filter(ev => ev.category === 'Ferien');
+
     return lessons.filter(occ => {
+      const isHoliday = holidayRanges.some(h => {
+        const start = h.event_date;
+        const end = h.event_end_date || h.event_date;
+        return occ.date >= start && occ.date <= end;
+      });
+      if (isHoliday) return false;
+
       const isPast = occ.date < todayStr || (occ.date === todayStr && occ.start_time < nowTimeStr);
       return lessonTab === 'upcoming' ? !isPast : isPast;
     });
@@ -856,7 +884,15 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               let catColor = '#3b82f6';
               let catBg = '#eff6ff';
 
-              if (ev.category === 'Konzert') {
+              const isHolidayEvent = ev.category === 'Ferien' || ev.category === 'Feiertag' || (ev.title || '').toLowerCase().includes('ferien') || (ev.title || '').toLowerCase().includes('feiertag');
+
+              if (ev.category === 'Ferien') {
+                catColor = '#10b981';
+                catBg = '#d1fae5';
+              } else if (ev.category === 'Feiertag') {
+                catColor = '#d97706';
+                catBg = '#fef3c7';
+              } else if (ev.category === 'Konzert') {
                 catColor = '#a855f7';
                 catBg = '#f3e8ff';
               } else if (ev.category === 'Klassenvorspiel') {
@@ -878,9 +914,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     flexDirection: 'column',
                     padding: '16px',
                     borderRadius: '18px',
-                    background: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 4px 14px rgba(0,0,0,0.02)',
+                    background: isHolidayEvent ? 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)' : '#ffffff',
+                    border: isHolidayEvent ? '1.5px solid #a7f3d0' : '1px solid #e2e8f0',
+                    boxShadow: isHolidayEvent ? '0 4px 14px rgba(16, 185, 129, 0.04)' : '0 4px 14px rgba(0,0,0,0.02)',
                     transition: 'all 0.25s',
                     position: 'relative'
                   }}
@@ -918,8 +954,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   </div>
 
                   {/* Title */}
-                  <h4 style={{ margin: '0 0 6px 0', fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                    {ev.title}
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: '1.05rem', fontWeight: 800, color: isHolidayEvent ? '#065f46' : '#0f172a', fontFamily: 'Urbanist' }}>
+                    {isHolidayEvent ? '🌴 ' : ''}{ev.title}
                   </h4>
 
                   {/* Description */}

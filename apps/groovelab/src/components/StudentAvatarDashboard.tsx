@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, 
@@ -1054,13 +1054,173 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [submittingSelection, setSubmittingSelection] = useState(false);
 
   // Daily Briefing State
-  const [briefingData, setBriefingData] = useState<any>(null);
+  const [rawBriefingData, setRawBriefingData] = useState<any>(null);
   const [briefingLoading, setBriefingLoading] = useState(true);
-  const [scheduleOccurrences, setScheduleOccurrences] = useState<any[]>([]);
+  const [rawScheduleOccurrences, setRawScheduleOccurrences] = useState<any[]>([]);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
-  const [schoolYearOccurrences, setSchoolYearOccurrences] = useState<any[]>([]);
+  const [rawSchoolYearOccurrences, setRawSchoolYearOccurrences] = useState<any[]>([]);
   const [loadingSchoolYearSchedule, setLoadingSchoolYearSchedule] = useState(false);
   const [appointmentFilter, setAppointmentFilter] = useState<'all' | 'upcoming' | 'past'>('upcoming');
+
+  const [holidays, setHolidays] = useState<{ start: string, end: string, name: string }[]>([]);
+
+  const parseICSDate = (icsDateStr: string): Date => {
+    const cleanStr = icsDateStr.includes(':') ? icsDateStr.split(':')[1] : icsDateStr;
+    const year = parseInt(cleanStr.substring(0, 4));
+    const month = parseInt(cleanStr.substring(4, 6)) - 1;
+    const day = parseInt(cleanStr.substring(6, 8));
+
+    if (cleanStr.includes('T')) {
+      const hour = parseInt(cleanStr.substring(9, 11));
+      const min = parseInt(cleanStr.substring(11, 13));
+      const sec = parseInt(cleanStr.substring(13, 15));
+      return new Date(Date.UTC(year, month, day, hour, min, sec));
+    }
+    return new Date(year, month, day);
+  };
+
+  const parseICS = (icsText: string): any[] => {
+    const events: any[] = [];
+    const lines = icsText.split(/\r?\n/);
+    let currentEvent: any = null;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line === 'BEGIN:VEVENT') {
+        currentEvent = {};
+      } else if (line === 'END:VEVENT' && currentEvent) {
+        if (currentEvent.summary && currentEvent.dtstart) {
+          events.push(currentEvent);
+        }
+        currentEvent = null;
+      } else if (currentEvent) {
+        const colonIdx = line.indexOf(':');
+        if (colonIdx !== -1) {
+          const key = line.substring(0, colonIdx);
+          const value = line.substring(colonIdx + 1);
+
+          if (key.startsWith('SUMMARY')) {
+            currentEvent.summary = value;
+          } else if (key.startsWith('DESCRIPTION')) {
+            currentEvent.description = value.replace(/\\n/g, '\n');
+          } else if (key.startsWith('DTSTART')) {
+            currentEvent.dtstart = parseICSDate(value);
+          } else if (key.startsWith('DTEND')) {
+            currentEvent.dtend = parseICSDate(value);
+          } else if (key.startsWith('LOCATION')) {
+            currentEvent.location = value;
+          }
+        }
+      }
+    }
+    return events;
+  };
+
+  const loadHolidays = async (url: string) => {
+    try {
+      let text = '';
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error();
+        text = await res.text();
+      } catch (corsErr) {
+        const proxies = [
+          `https://corsproxy.io/?${url}`,
+          `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`
+        ];
+
+        let success = false;
+        for (const proxyUrl of proxies) {
+          try {
+            const res = await fetch(proxyUrl);
+            if (!res.ok) continue;
+            if (proxyUrl.includes('allorigins')) {
+              const json = await res.json();
+              text = json.contents;
+            } else {
+              text = await res.text();
+            }
+            if (text && text.includes('BEGIN:VCALENDAR')) {
+              success = true;
+              break;
+            }
+          } catch (e) {
+            console.warn(e);
+          }
+        }
+        if (!success) return;
+      }
+
+      if (!text) return;
+
+      const events = parseICS(text);
+      const holidayRanges = events
+        .filter(ev => {
+          const summary = (ev.summary || '').toLowerCase();
+          return summary.includes('ferien') || summary.includes('feiertag') || summary.includes('schulfrei');
+        })
+        .map(ev => {
+          const toYYYYMMDD = (d: Date) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+          };
+          
+          let end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
+          if (ev.dtend && !ev.dtend.toISOString().includes('T')) {
+            end.setDate(end.getDate() - 1);
+          }
+          
+          return {
+            start: toYYYYMMDD(ev.dtstart),
+            end: toYYYYMMDD(end),
+            name: ev.summary || 'Ferien'
+          };
+        });
+
+      setHolidays(holidayRanges);
+    } catch (err) {
+      console.error('Error loading holidays in StudentAvatarDashboard:', err);
+    }
+  };
+
+  useEffect(() => {
+    const calendarUrl = studentUser?.schools?.calendar_url;
+    if (calendarUrl) {
+      loadHolidays(calendarUrl);
+    }
+  }, [studentUser?.schools?.calendar_url]);
+
+  const scheduleOccurrences = useMemo<any[]>(() => {
+    return rawScheduleOccurrences.filter((occ: any) => {
+      const isHoliday = holidays.some(h => occ.date >= h.start && occ.date <= h.end);
+      return !isHoliday;
+    });
+  }, [rawScheduleOccurrences, holidays]);
+
+  const schoolYearOccurrences = useMemo<any[]>(() => {
+    return rawSchoolYearOccurrences.filter((occ: any) => {
+      const isHoliday = holidays.some(h => occ.date >= h.start && occ.date <= h.end);
+      return !isHoliday;
+    });
+  }, [rawSchoolYearOccurrences, holidays]);
+
+  const isTodayHoliday = useMemo(() => {
+    const todayStr = toLocalYYYYMMDD(new Date());
+    return holidays.find(h => todayStr >= h.start && todayStr <= h.end);
+  }, [holidays]);
+
+  const briefingData = useMemo(() => {
+    if (!rawBriefingData) return null;
+    if (isTodayHoliday) {
+      return {
+        ...rawBriefingData,
+        todayLesson: null
+      };
+    }
+    return rawBriefingData;
+  }, [rawBriefingData, isTodayHoliday]);
 
   // Direct Chat states inside appointment popup (Shoutbox)
   const [showAppointmentChat, setShowAppointmentChat] = useState(false);
@@ -1175,7 +1335,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         .order('start_time', { ascending: true });
       
       if (!error && data) {
-        setScheduleOccurrences(data);
+        setRawScheduleOccurrences(data);
       }
     } catch (err) {
       console.error(err);
@@ -1280,7 +1440,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         return (a.start_time || '').localeCompare(b.start_time || '');
       });
 
-      setSchoolYearOccurrences(allMergedOccurrences);
+      setRawSchoolYearOccurrences(allMergedOccurrences);
     } catch (err) {
       console.error('Error fetching school year schedule:', err);
     } finally {
@@ -2686,7 +2846,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         if (resp.ok) {
           const bd = await resp.json();
           if (bd && bd.success) {
-            setBriefingData(bd);
+            setRawBriefingData(bd);
           }
         } else {
           throw new Error('API offline');
@@ -2752,7 +2912,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             const milestoneTarget = 50;
             const remainingXp = milestoneTarget - (currentXp % milestoneTarget);
 
-            setBriefingData({
+            setRawBriefingData({
               success: true,
               allowMessagesGlobal: allowMessages,
               todayLesson,
@@ -3189,6 +3349,46 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
   return (
     <div style={{ fontFamily: '"Outfit", "Inter", sans-serif', maxWidth: '100%', margin: '0 auto', width: '100%', paddingTop: '24px' }}>
+      
+      {/* Holiday Banner */}
+      {isTodayHoliday && (
+        <div style={{
+          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+          color: '#ffffff',
+          padding: '16px 24px',
+          borderRadius: '20px',
+          marginBottom: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '16px',
+          boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.3)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          <div style={{
+            position: 'absolute',
+            right: '-10px',
+            bottom: '-20px',
+            fontSize: '5rem',
+            opacity: 0.15,
+            transform: 'rotate(-15deg)',
+            userSelect: 'none',
+            pointerEvents: 'none'
+          }}>
+            🌴
+          </div>
+          <span style={{ fontSize: '1.8rem' }}>🌴</span>
+          <div style={{ flex: 1 }}>
+            <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, letterSpacing: '-0.02em', fontFamily: 'Urbanist' }}>
+              Schulfreie Zeit: {isTodayHoliday.name}
+            </h4>
+            <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', opacity: 0.9, fontWeight: 600 }}>
+              Vom {new Date(isTodayHoliday.start).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})} bis zum {new Date(isTodayHoliday.end).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})} findet kein regulärer Unterricht statt. Genieße die Ferien!
+            </p>
+          </div>
+        </div>
+      )}
       
       {/* Top Tab Switcher - Removed per user request */}
       <div style={{ display: 'none', gap: '8px', background: '#f1f3f4', padding: '6px', borderRadius: '100px', marginBottom: '24px' }}>

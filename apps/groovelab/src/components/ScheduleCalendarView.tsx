@@ -60,6 +60,151 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
   const [loading, setLoading] = useState(true);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [editOccState, setEditOccState] = useState<{ id: string, date: string, start_time: string } | null>(null);
+
+  const [calendarUrl, setCalendarUrl] = useState<string>('');
+  const [holidays, setHolidays] = useState<{ start: string, end: string, name: string }[]>([]);
+
+  const parseICSDate = (icsDateStr: string): Date => {
+    const cleanStr = icsDateStr.includes(':') ? icsDateStr.split(':')[1] : icsDateStr;
+    const year = parseInt(cleanStr.substring(0, 4));
+    const month = parseInt(cleanStr.substring(4, 6)) - 1;
+    const day = parseInt(cleanStr.substring(6, 8));
+
+    if (cleanStr.includes('T')) {
+      const hour = parseInt(cleanStr.substring(9, 11));
+      const min = parseInt(cleanStr.substring(11, 13));
+      const sec = parseInt(cleanStr.substring(13, 15));
+      return new Date(Date.UTC(year, month, day, hour, min, sec));
+    }
+    return new Date(year, month, day);
+  };
+
+  const parseICS = (icsText: string): any[] => {
+    const events: any[] = [];
+    const lines = icsText.split(/\r?\n/);
+    let currentEvent: any = null;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line === 'BEGIN:VEVENT') {
+        currentEvent = {};
+      } else if (line === 'END:VEVENT' && currentEvent) {
+        if (currentEvent.summary && currentEvent.dtstart) {
+          events.push(currentEvent);
+        }
+        currentEvent = null;
+      } else if (currentEvent) {
+        const colonIdx = line.indexOf(':');
+        if (colonIdx !== -1) {
+          const key = line.substring(0, colonIdx);
+          const value = line.substring(colonIdx + 1);
+
+          if (key.startsWith('SUMMARY')) {
+            currentEvent.summary = value;
+          } else if (key.startsWith('DESCRIPTION')) {
+            currentEvent.description = value.replace(/\\n/g, '\n');
+          } else if (key.startsWith('DTSTART')) {
+            currentEvent.dtstart = parseICSDate(value);
+          } else if (key.startsWith('DTEND')) {
+            currentEvent.dtend = parseICSDate(value);
+          } else if (key.startsWith('LOCATION')) {
+            currentEvent.location = value;
+          }
+        }
+      }
+    }
+    return events;
+  };
+
+  const loadHolidays = async (url: string) => {
+    try {
+      let text = '';
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error();
+        text = await res.text();
+      } catch (corsErr) {
+        const proxies = [
+          `https://corsproxy.io/?${url}`,
+          `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`
+        ];
+
+        let success = false;
+        for (const proxyUrl of proxies) {
+          try {
+            const res = await fetch(proxyUrl);
+            if (!res.ok) continue;
+            if (proxyUrl.includes('allorigins')) {
+              const json = await res.json();
+              text = json.contents;
+            } else {
+              text = await res.text();
+            }
+            if (text && text.includes('BEGIN:VCALENDAR')) {
+              success = true;
+              break;
+            }
+          } catch (e) {
+            console.warn(e);
+          }
+        }
+        if (!success) return;
+      }
+
+      if (!text) return;
+
+      const events = parseICS(text);
+      const holidayRanges = events
+        .filter(ev => {
+          const summary = (ev.summary || '').toLowerCase();
+          return summary.includes('ferien') || summary.includes('feiertag') || summary.includes('schulfrei');
+        })
+        .map(ev => {
+          const toYYYYMMDD = (d: Date) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+          };
+          
+          let end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
+          if (ev.dtend && !ev.dtend.toISOString().includes('T')) {
+            end.setDate(end.getDate() - 1);
+          }
+          
+          return {
+            start: toYYYYMMDD(ev.dtstart),
+            end: toYYYYMMDD(end),
+            name: ev.summary || 'Ferien'
+          };
+        });
+
+      setHolidays(holidayRanges);
+    } catch (err) {
+      console.error('Error loading holidays:', err);
+    }
+  };
+
+  useEffect(() => {
+    const fetchSchoolCalendarSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('schools')
+          .select('calendar_url')
+          .eq('id', schoolId)
+          .single();
+        
+        if (error) throw error;
+        if (data?.calendar_url) {
+          setCalendarUrl(data.calendar_url);
+          loadHolidays(data.calendar_url);
+        }
+      } catch (err) {
+        console.error('Error fetching calendar settings in ScheduleCalendarView:', err);
+      }
+    };
+    fetchSchoolCalendarSettings();
+  }, [schoolId]);
   
   // State for cancelled swap confirmation flow
   const [swapConfirmState, setSwapConfirmState] = useState<{
@@ -391,7 +536,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
 
   useEffect(() => {
     loadOccurrences();
-  }, [weekStart.getTime(), userId, JSON.stringify(boards)]);
+  }, [weekStart.getTime(), userId, JSON.stringify(boards), holidays]);
 
   useEffect(() => {
     if (!userId) return;
@@ -627,7 +772,13 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
       }
       fetchedData = [...fetchedData, ...projectedData];
 
-      setBaseOccurrences(fetchedData);
+      // Filter out regular schedule items if they fall during holidays
+      const filteredFromHolidays = fetchedData.filter(occ => {
+        const isHoliday = holidays.some(h => occ.date >= h.start && occ.date <= h.end);
+        return !isHoliday;
+      });
+
+      setBaseOccurrences(filteredFromHolidays);
     } catch (err) {
       console.error('Error loading occurrences:', err);
     } finally {
@@ -1304,6 +1455,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
             .filter(o => o.date === dateStr)
             .sort((a, b) => a.start_time.localeCompare(b.start_time));
           const dayName = dayDate.toLocaleDateString('de-DE', { weekday: 'long' });
+          const activeHoliday = holidays.find(h => dateStr >= h.start && dateStr <= h.end);
 
           const nativeOccs = dayOccurrences.filter(o => {
             const isBreak = !o.student_id;
@@ -1385,6 +1537,34 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                 onDrop={(e) => handleDropOnDay(e, dateStr, dayBaselineMinutes)}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', height: `${columnHeight}px`, minHeight: `${columnHeight}px` }}
               >
+                {activeHoliday && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '0',
+                    left: '0',
+                    right: '0',
+                    bottom: '0',
+                    background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                    border: '1.5px dashed #cbd5e1',
+                    borderRadius: '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '12px',
+                    textAlign: 'center',
+                    gap: '6px',
+                    zIndex: 5
+                  }}>
+                    <span style={{ fontSize: '1.5rem' }}>🌴</span>
+                    <strong style={{ fontSize: '0.78rem', fontWeight: 900, color: '#475569', fontFamily: 'Urbanist', wordBreak: 'break-word' }}>
+                      {activeHoliday.name}
+                    </strong>
+                    <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 700 }}>
+                      Kein regulärer Unterricht
+                    </span>
+                  </div>
+                )}
                 {markers.map(m => (
                   <div 
                     key={m.hour} 

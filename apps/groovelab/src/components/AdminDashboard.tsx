@@ -222,6 +222,7 @@ export function AdminDashboard({
   const [teachers, setTeachers] = useState<any[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<any[]>([]);
+  const [holidays, setHolidays] = useState<{ start: string, end: string, name: string }[]>([]);
   const [scheduleOccurrences, setScheduleOccurrences] = useState<any[]>([]);
   const [stations, setStations] = useState<any[]>([]);
   const [songs, setSongs] = useState<any[]>([]);
@@ -395,6 +396,134 @@ export function AdminDashboard({
 
     return rooms.filter((r: any) => roomIds.has(r.id));
   }, [rooms, schedules, campusBookings, userId, admin]);
+
+  const parseICSDate = (icsDateStr: string): Date => {
+    const cleanStr = icsDateStr.includes(':') ? icsDateStr.split(':')[1] : icsDateStr;
+    const year = parseInt(cleanStr.substring(0, 4));
+    const month = parseInt(cleanStr.substring(4, 6)) - 1;
+    const day = parseInt(cleanStr.substring(6, 8));
+
+    if (cleanStr.includes('T')) {
+      const hour = parseInt(cleanStr.substring(9, 11));
+      const min = parseInt(cleanStr.substring(11, 13));
+      const sec = parseInt(cleanStr.substring(13, 15));
+      return new Date(Date.UTC(year, month, day, hour, min, sec));
+    }
+    return new Date(year, month, day);
+  };
+
+  const parseICS = (icsText: string): any[] => {
+    const events: any[] = [];
+    const lines = icsText.split(/\r?\n/);
+    let currentEvent: any = null;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line === 'BEGIN:VEVENT') {
+        currentEvent = {};
+      } else if (line === 'END:VEVENT' && currentEvent) {
+        if (currentEvent.summary && currentEvent.dtstart) {
+          events.push(currentEvent);
+        }
+        currentEvent = null;
+      } else if (currentEvent) {
+        const colonIdx = line.indexOf(':');
+        if (colonIdx !== -1) {
+          const key = line.substring(0, colonIdx);
+          const value = line.substring(colonIdx + 1);
+
+          if (key.startsWith('SUMMARY')) {
+            currentEvent.summary = value;
+          } else if (key.startsWith('DESCRIPTION')) {
+            currentEvent.description = value.replace(/\\n/g, '\n');
+          } else if (key.startsWith('DTSTART')) {
+            currentEvent.dtstart = parseICSDate(value);
+          } else if (key.startsWith('DTEND')) {
+            currentEvent.dtend = parseICSDate(value);
+          } else if (key.startsWith('LOCATION')) {
+            currentEvent.location = value;
+          }
+        }
+      }
+    }
+    return events;
+  };
+
+  const loadHolidays = async (url: string) => {
+    try {
+      let text = '';
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error();
+        text = await res.text();
+      } catch (corsErr) {
+        const proxies = [
+          `https://corsproxy.io/?${url}`,
+          `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`
+        ];
+
+        let success = false;
+        for (const proxyUrl of proxies) {
+          try {
+            const res = await fetch(proxyUrl);
+            if (!res.ok) continue;
+            if (proxyUrl.includes('allorigins')) {
+              const json = await res.json();
+              text = json.contents;
+            } else {
+              text = await res.text();
+            }
+            if (text && text.includes('BEGIN:VCALENDAR')) {
+              success = true;
+              break;
+            }
+          } catch (e) {
+            console.warn(e);
+          }
+        }
+        if (!success) return;
+      }
+
+      if (!text) return;
+
+      const events = parseICS(text);
+      const holidayRanges = events
+        .filter(ev => {
+          const summary = (ev.summary || '').toLowerCase();
+          return summary.includes('ferien') || summary.includes('feiertag') || summary.includes('schulfrei');
+        })
+        .map(ev => {
+          const toYYYYMMDD = (d: Date) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+          };
+          
+          let end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
+          if (ev.dtend && !ev.dtend.toISOString().includes('T')) {
+            end.setDate(end.getDate() - 1);
+          }
+          
+          return {
+            start: toYYYYMMDD(ev.dtstart),
+            end: toYYYYMMDD(end),
+            name: ev.summary || 'Ferien'
+          };
+        });
+
+      setHolidays(holidayRanges);
+    } catch (err) {
+      console.error('Error loading holidays in AdminDashboard:', err);
+    }
+  };
+
+  useEffect(() => {
+    const calendarUrl = admin?.schools?.calendar_url;
+    if (calendarUrl) {
+      loadHolidays(calendarUrl);
+    }
+  }, [admin?.schools?.calendar_url]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -5284,6 +5413,22 @@ export function AdminDashboard({
       const mondayOfSelectedWeek = new Date(currentSelectedDate.setDate(diffToMon));
       mondayOfSelectedWeek.setHours(0,0,0,0);
 
+      const targetDate = new Date(mondayOfSelectedWeek);
+      targetDate.setDate(mondayOfSelectedWeek.getDate() + dayIdx);
+      const toYYYYMMDD = (d: Date) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      };
+      const targetDateStr = toYYYYMMDD(targetDate);
+
+      // Check if day falls inside any holiday
+      const activeHoliday = holidays.find(h => targetDateStr >= h.start && targetDateStr <= h.end);
+      if (activeHoliday) {
+        return []; // Remove all schedules and bookings during holidays
+      }
+
       const sundayOfSelectedWeek = new Date(mondayOfSelectedWeek);
       sundayOfSelectedWeek.setDate(mondayOfSelectedWeek.getDate() + 6);
       sundayOfSelectedWeek.setHours(23,59,59,999);
@@ -5394,14 +5539,14 @@ export function AdminDashboard({
       });
 
       // 3. Dynamic rescheduled occurrences
-      const targetDate = new Date(mondayOfSelectedWeek);
-      targetDate.setDate(mondayOfSelectedWeek.getDate() + dayIdx);
-      const targetDateStr = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`;
+      const targetReschedDate = new Date(mondayOfSelectedWeek);
+      targetReschedDate.setDate(mondayOfSelectedWeek.getDate() + dayIdx);
+      const targetReschedDateStr = `${targetReschedDate.getFullYear()}-${String(targetReschedDate.getMonth() + 1).padStart(2, '0')}-${String(targetReschedDate.getDate()).padStart(2, '0')}`;
 
       const dynamicForSlot = scheduleOccurrences.filter((occ: any) => {
         const roomId = occ.schedules?.room_id || null;
         if (roomId !== selectedRoom.id) return false;
-        if (occ.date !== targetDateStr) return false;
+        if (occ.date !== targetReschedDateStr) return false;
 
         if (occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick') {
           return false;
