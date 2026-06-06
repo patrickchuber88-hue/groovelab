@@ -50,6 +50,7 @@ interface CampusEvent {
   title: string;
   description?: string;
   event_date: string;
+  event_end_date?: string;
   start_time: string;
   end_time?: string;
   category: string; // 'Klassenvorspiel', 'Konzert', 'Probe', 'Sonstiges'
@@ -506,6 +507,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         title: ev.title,
         description: ev.description || '',
         event_date: ev.event_date,
+        event_end_date: ev.event_end_date || ev.event_date,
         start_time: ev.start_time.substring(0, 5),
         category: ev.category,
         is_subscribed: false,
@@ -520,8 +522,14 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       return true;
     });
 
+    // Only show upcoming events including today or events whose period extends to/beyond today
+    const upcomingEventsOnly = filteredByCategory.filter(ev => {
+      const end = ev.event_end_date || ev.event_date;
+      return end >= todayStr;
+    });
+
     // Only show future/recent events (sort chronologically)
-    return filteredByCategory.sort((a, b) => {
+    return upcomingEventsOnly.sort((a, b) => {
       if (a.event_date !== b.event_date) return a.event_date.localeCompare(b.event_date);
       return a.start_time.localeCompare(b.start_time);
     });
@@ -542,6 +550,13 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         return occ.date >= start && occ.date <= end;
       });
       if (isHoliday) return false;
+
+      // For teachers, only show changes and cancellations
+      if (role === 'teacher') {
+        const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
+        const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
+        if (!isCanceled && !isRescheduled) return false;
+      }
 
       const isPast = occ.date < todayStr || (occ.date === todayStr && occ.start_time < nowTimeStr);
       return lessonTab === 'upcoming' ? !isPast : isPast;
@@ -589,10 +604,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         {/* Title */}
         <div>
           <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <CalendarDays size={18} color={brandColor} /> Unterrichtstermine
+            <CalendarDays size={18} color={brandColor} /> {role === 'teacher' ? 'Terminänderungen & Ausfälle' : 'Unterrichtstermine'}
           </h3>
           <p style={{ color: '#64748b', fontSize: '0.78rem', margin: '4px 0 0 0', fontWeight: 550 }}>
-            Deine persönlichen Stundenplandaten
+            {role === 'teacher' ? 'Verschobene oder abgesagte Unterrichtstermine' : 'Deine persönlichen Stundenplandaten'}
           </p>
         </div>
 

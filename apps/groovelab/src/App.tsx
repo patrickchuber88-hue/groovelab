@@ -10283,8 +10283,8 @@ function App() {
         </Suspense>
       )}
 
-      {/* Help FAB (Only for students in Lab Mode with active station) */}
-      {user && user.role === 'student' && locationMode === 'lab' && session?.station_id && (
+      {/* Help FAB (Only for logged-in students in Lab Mode with active station on the Groovelab platform) */}
+      {user && activePlatform === 'groovelab' && user.role === 'student' && locationMode === 'lab' && session?.station_id && (
         <div className="fab-container">
           <button 
             className="fab-button" 
