@@ -61,7 +61,9 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
   const [dragOverSlotKey, setDragOverSlotKey] = useState<string | null>(null);
 
   // Board 4: Krankheits-Bypass
+  const [sickStartDate, setSickStartDate] = useState('');
   const [sickUntilDate, setSickUntilDate] = useState('');
+  const [showCustomStart, setShowCustomStart] = useState(false);
   const [reportingSick, setReportingSick] = useState(false);
 
   // Board 5: Mein Setup
@@ -385,6 +387,13 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
           setSickUntilDate(tData.sick_until.substring(0, 10));
         } else {
           setSickUntilDate('');
+        }
+        if (tData.sick_start) {
+          setSickStartDate(tData.sick_start.substring(0, 10));
+        } else {
+          const todayD = new Date();
+          const localTodayStr = `${todayD.getFullYear()}-${String(todayD.getMonth() + 1).padStart(2, '0')}-${String(todayD.getDate()).padStart(2, '0')}`;
+          setSickStartDate(localTodayStr);
         }
 
         // Load Setup and dependent lists
@@ -929,13 +938,15 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
   // Board 4: Illness Bypass
   const handleReportSick = async () => {
     if (!sickUntilDate) {
-      alert('Bitte wähle ein Datum aus.');
+      alert('Bitte wähle ein bis-Datum aus.');
+      return;
+    }
+    if (!sickStartDate) {
+      alert('Bitte wähle ein von-Datum aus.');
       return;
     }
 
-    const confirmMsg = teacher?.sick_until
-      ? `Möchtest du deine Krankmeldung wirklich auf den ${new Date(sickUntilDate).toLocaleDateString('de-DE')} anpassen?`
-      : `Möchtest du dich wirklich bis zum ${new Date(sickUntilDate).toLocaleDateString('de-DE')} krankmelden?`;
+    const confirmMsg = `Möchtest du dich wirklich vom ${new Date(sickStartDate).toLocaleDateString('de-DE')} bis zum ${new Date(sickUntilDate).toLocaleDateString('de-DE')} krankmelden?`;
 
     if (!confirm(confirmMsg)) return;
 
@@ -946,7 +957,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
       const resp = await fetch('/api/teacher/report-sick', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teacherId: userId, sickUntilDate })
+        body: JSON.stringify({ teacherId: userId, sickUntilDate, sickStartDate })
       });
 
       if (resp.ok) {
@@ -966,7 +977,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
         const prevSickUntilStr = profile.sick_until;
         const todayD = new Date();
         const localTodayStr = `${todayD.getFullYear()}-${String(todayD.getMonth() + 1).padStart(2, '0')}-${String(todayD.getDate()).padStart(2, '0')}`;
-        const sickStartVal = profile.sick_start || localTodayStr;
+        const sickStartVal = sickStartDate || profile.sick_start || localTodayStr;
 
         // 1. Update user table
         const { error: userErr } = await supabase
@@ -1223,6 +1234,9 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
       }
 
       setSickUntilDate('');
+      const todayD = new Date();
+      const localTodayStr = `${todayD.getFullYear()}-${String(todayD.getMonth() + 1).padStart(2, '0')}-${String(todayD.getDate()).padStart(2, '0')}`;
+      setSickStartDate(localTodayStr);
 
       // Reload teacher profile and refresh data
       const { data: updatedTeacher } = await supabase
@@ -2129,34 +2143,80 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                   fontWeight: 600,
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '8px'
+                  gap: '6px'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#f87171', fontWeight: 800, textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.1em' }}>
                     <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></span> status: AKTIV KRANKGEMELDET
                   </div>
-                  Du bist aktuell krankgemeldet bis einschließlich:
-                  <strong className="text-white text-lg font-bold">
-                    {new Date(teacher.sick_until).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
-                  </strong>
+                  <div className="text-white text-sm font-semibold mt-1">
+                    Krankgemeldet vom {teacher.sick_start ? new Date(teacher.sick_start).toLocaleDateString('de-DE') : 'Sofort'} bis {new Date(teacher.sick_until).toLocaleDateString('de-DE')}
+                  </div>
                 </div>
               ) : (
                 <p className="text-sm text-slate-300 font-medium leading-relaxed">
-                  Falls du dich krankmelden musst, wähle bitte das voraussichtliche Enddatum aus. Alle heute betroffenen Stundenplandaten werden automatisch storniert und als Krankheitsausfall rot markiert. Zudem wird ein Alarmticket an das Krisen-Dashboard der Verwaltung gesendet.
+                  Falls du dich krankmelden musst, wähle bitte das voraussichtliche Start- und Enddatum aus. Alle in diesem Zeitraum betroffenen Stundenplandaten werden automatisch storniert und als Krankheitsausfall rot markiert. Zudem wird ein Alarmticket an das Krisen-Dashboard der Verwaltung gesendet.
                 </p>
               )}
 
               <div className="space-y-4 pt-2">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                    {teacher?.sick_until ? 'Krankmeldung anpassen (bis einschließlich):' : 'Krank bis einschließlich:'}
-                  </label>
-                  <input
-                    type="date"
-                    value={sickUntilDate}
-                    onChange={(e) => setSickUntilDate(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-red-500 font-semibold"
-                  />
-                </div>
+                {!showCustomStart ? (
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                      {teacher?.sick_until ? 'Krankmeldung anpassen (bis einschließlich):' : 'Krank bis einschließlich:'}
+                    </label>
+                    <input
+                      type="date"
+                      value={sickUntilDate}
+                      onChange={(e) => setSickUntilDate(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-red-500 font-semibold"
+                      style={{ colorScheme: 'dark' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomStart(true)}
+                      className="text-xs text-red-400 hover:text-red-300 font-bold underline transition duration-200 mt-1 flex items-center gap-1.5"
+                    >
+                      <Calendar size={14} />
+                      Anderes Startdatum wählen (Standard: Heute)
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                      Krankmeldungs-Zeitraum:
+                    </label>
+                    <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white font-semibold">
+                      <span className="text-slate-400 text-xs font-black uppercase tracking-wider">von</span>
+                      <input
+                        type="date"
+                        value={sickStartDate}
+                        onChange={(e) => setSickStartDate(e.target.value)}
+                        className="bg-transparent border-none text-white focus:outline-none w-full font-semibold"
+                        style={{ colorScheme: 'dark' }}
+                      />
+                      <span className="text-slate-400 text-xs font-black uppercase tracking-wider">- bis</span>
+                      <input
+                        type="date"
+                        value={sickUntilDate}
+                        onChange={(e) => setSickUntilDate(e.target.value)}
+                        className="bg-transparent border-none text-white focus:outline-none w-full font-semibold"
+                        style={{ colorScheme: 'dark' }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCustomStart(false);
+                        const todayD = new Date();
+                        const localTodayStr = `${todayD.getFullYear()}-${String(todayD.getMonth() + 1).padStart(2, '0')}-${String(todayD.getDate()).padStart(2, '0')}`;
+                        setSickStartDate(localTodayStr);
+                      }}
+                      className="text-xs text-slate-400 hover:text-slate-300 font-bold underline transition duration-200 mt-1 block"
+                    >
+                      Standard-Startdatum verwenden (Heute)
+                    </button>
+                  </div>
+                )}
 
                 <div className="flex flex-col gap-3">
                   <button
@@ -2171,9 +2231,10 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                     <button
                       onClick={handleEndSick}
                       disabled={reportingSick}
-                      className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 text-white font-black text-sm uppercase tracking-widest rounded-xl transition duration-200 shadow-lg shadow-emerald-900/20"
+                      className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 text-white font-black text-sm uppercase tracking-widest rounded-xl transition duration-200 shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"
                     >
-                      {reportingSick ? 'Gesundmelden...' : 'Krankmeldung beenden (Wieder gesund)'}
+                      <Check size={18} />
+                      {reportingSick ? 'Gesundmelden...' : 'Wieder gesund melden'}
                     </button>
                   )}
                 </div>

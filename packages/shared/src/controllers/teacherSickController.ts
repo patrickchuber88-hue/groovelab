@@ -13,7 +13,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
  */
 export async function reportSickHandler(req: Request, res: Response): Promise<void> {
   try {
-    const { teacherId, sickUntilDate } = req.body;
+    const { teacherId, sickUntilDate, sickStartDate } = req.body;
 
     if (!teacherId) {
       res.status(400).json({ error: 'teacherId is required.' });
@@ -23,7 +23,7 @@ export async function reportSickHandler(req: Request, res: Response): Promise<vo
     // 1. Fetch teacher details to see previous sick_until status
     const { data: teacher, error: teacherError } = await supabase
       .from('users')
-      .select('id, first_name, last_name, school_id, sick_until')
+      .select('id, first_name, last_name, school_id, sick_until, sick_start')
       .eq('id', teacherId)
       .single();
 
@@ -33,11 +33,20 @@ export async function reportSickHandler(req: Request, res: Response): Promise<vo
     }
 
     const prevSickUntilStr = teacher.sick_until;
+    let sickStartVal: string | null = null;
+    if (sickUntilDate) {
+      const todayD = new Date();
+      const localTodayStr = `${todayD.getFullYear()}-${String(todayD.getMonth() + 1).padStart(2, '0')}-${String(todayD.getDate()).padStart(2, '0')}`;
+      sickStartVal = sickStartDate || teacher.sick_start || localTodayStr;
+    }
     
-    // Update teacher's sick_until column
+    // Update teacher's sick_until and sick_start columns
     const { error: userUpdateError } = await supabase
       .from('users')
-      .update({ sick_until: sickUntilDate || null })
+      .update({ 
+        sick_until: sickUntilDate || null,
+        sick_start: sickStartVal
+      })
       .eq('id', teacherId);
 
     if (userUpdateError) {

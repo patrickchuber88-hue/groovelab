@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
@@ -1341,13 +1341,15 @@ export function TeacherDashboard({
 
   const handleReportSick = async () => {
     if (!sickUntilDate) {
-      alert('Bitte wähle ein Datum aus.');
+      alert('Bitte wähle ein bis-Datum aus.');
+      return;
+    }
+    if (!sickStartDate) {
+      alert('Bitte wähle ein von-Datum aus.');
       return;
     }
 
-    const confirmMsg = teacher?.sick_until
-      ? `Möchtest du deine Krankmeldung wirklich auf den ${new Date(sickUntilDate).toLocaleDateString('de-DE')} anpassen?`
-      : `Möchtest du dich wirklich bis zum ${new Date(sickUntilDate).toLocaleDateString('de-DE')} krankmelden?`;
+    const confirmMsg = `Möchtest du dich wirklich vom ${new Date(sickStartDate).toLocaleDateString('de-DE')} bis zum ${new Date(sickUntilDate).toLocaleDateString('de-DE')} krankmelden?`;
 
     if (!confirm(confirmMsg)) return;
 
@@ -1368,7 +1370,7 @@ export function TeacherDashboard({
       const prevSickUntilStr = profile.sick_until;
       const todayD = new Date();
       const localTodayStr = `${todayD.getFullYear()}-${String(todayD.getMonth() + 1).padStart(2, '0')}-${String(todayD.getDate()).padStart(2, '0')}`;
-      const sickStartVal = profile.sick_start || localTodayStr;
+      const sickStartVal = sickStartDate || profile.sick_start || localTodayStr;
 
       // 1. Update user table
       const { error: userErr } = await supabase
@@ -1384,7 +1386,7 @@ export function TeacherDashboard({
       // 2. Fetch weekly schedules
       const { data: schedules, error: schedError } = await supabase
         .from('schedules')
-        .select('*')
+        .select('*, student:users!schedules_student_id_fkey(id, first_name, last_name)')
         .eq('teacher_id', userId);
 
       if (schedError) throw schedError;
@@ -1392,7 +1394,7 @@ export function TeacherDashboard({
       // 2b. Fetch one-off schedule occurrences (for rescheduled slots)
       const { data: occurrences, error: occError } = await supabase
         .from('schedule_occurrences')
-        .select('*')
+        .select('*, student:users!schedule_occurrences_student_id_fkey(id, first_name, last_name)')
         .eq('teacher_id', userId);
 
       if (occError) throw occError;
@@ -1439,11 +1441,15 @@ export function TeacherDashboard({
               if (sched.student_id) {
                 const notifKey = `${startDateTime.toISOString()}-${sched.student_id}`;
                 if (!existingNotifsSet.has(notifKey)) {
+                  const student = sched.student || allStudents.find(s => s.id === sched.student_id);
+                  const studentName = student ? `${student.first_name} ${student.last_name}` : null;
                   notificationsToInsert.push({
                     teacher_id: userId,
                     student_id: sched.student_id,
                     slot_start_datetime: startDateTime.toISOString(),
-                    status: 'UNREAD'
+                    status: 'UNREAD',
+                    duration: sched.duration || 30,
+                    student_name: studentName
                   });
                 }
               }
@@ -1472,11 +1478,17 @@ export function TeacherDashboard({
             if (occ.student_id) {
               const notifKey = `${startDateTime.toISOString()}-${occ.student_id}`;
               if (!existingNotifsSet.has(notifKey)) {
+                const student = occ.student || allStudents.find(s => s.id === occ.student_id);
+                const studentName = student ? `${student.first_name} ${student.last_name}` : null;
+                const matchingSched = (schedules || []).find(s => s.id === occ.schedule_id);
+                const durationVal = occ.duration || matchingSched?.duration || 30;
                 notificationsToInsert.push({
                   teacher_id: userId,
                   student_id: occ.student_id,
                   slot_start_datetime: startDateTime.toISOString(),
-                  status: 'UNREAD'
+                  status: 'UNREAD',
+                  duration: durationVal,
+                  student_name: studentName
                 });
               }
             }
@@ -1523,9 +1535,15 @@ export function TeacherDashboard({
 
       // Insert new crisis notifications
       if (notificationsToInsert.length > 0) {
+        const toInsert = notificationsToInsert.map(n => ({
+          teacher_id: n.teacher_id,
+          student_id: n.student_id,
+          slot_start_datetime: n.slot_start_datetime,
+          status: n.status
+        }));
         await supabase
           .from('crisis_notifications')
-          .insert(notificationsToInsert);
+          .insert(toInsert);
       }
 
       // Delete future crisis notifications
@@ -1702,6 +1720,9 @@ export function TeacherDashboard({
         });
 
       alert('Erfolgreich gesundgemeldet! Zukünftige Stundenplandaten wurden wieder aktiviert.');
+      setSickUntilDate('');
+      const today = new Date();
+      setSickStartDate(today.toISOString().substring(0, 10));
       // Refresh teacher profile without page reload
       const { data: updatedTeacher } = await supabase
         .from('users')
@@ -1962,6 +1983,10 @@ export function TeacherDashboard({
     }
     return false;
   });
+  const [sickStartDate, setSickStartDate] = useState<string>(() => {
+    const today = new Date();
+    return today.toISOString().substring(0, 10);
+  });
   const [sickUntilDate, setSickUntilDate] = useState<string>(() => {
     const saved = localStorage.getItem('selected_sick_date');
     if (saved) {
@@ -1972,10 +1997,13 @@ export function TeacherDashboard({
     tomorrow.setDate(tomorrow.getDate() + 1);
     return tomorrow.toISOString().substring(0, 10);
   });
+  const [showCustomStart, setShowCustomStart] = useState(false);
   const [reportingSick, setReportingSick] = useState(false);
   const [bypassSickView, setBypassSickView] = useState(false);
   const [sickSuccessShown, setSickSuccessShown] = useState(false);
   const [sickNotifModal, setSickNotifModal] = useState<{ notifs: any[]; sickUntilDateStr: string } | null>(null);
+  const [crisisNotifications, setCrisisNotifications] = useState<any[]>([]);
+  const [isCrisisWidgetExpanded, setIsCrisisWidgetExpanded] = useState(false);
   const [adminFeedbackRequests, setAdminFeedbackRequests] = useState<any[]>([]);
   const [adminFeedbackResponses, setAdminFeedbackResponses] = useState<any[]>([]);
   const [campusFeedAnnouncements, setCampusFeedAnnouncements] = useState<any[]>([]);
@@ -2961,11 +2989,19 @@ export function TeacherDashboard({
       })
       .subscribe();
 
+    const channelCrisis = supabase
+      .channel('realtime_teacher_crisis')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'crisis_notifications' }, () => {
+        debouncedFetchData();
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channelSessions);
       supabase.removeChannel(channelHelp);
       supabase.removeChannel(channelSkills);
       supabase.removeChannel(channelBands);
+      supabase.removeChannel(channelCrisis);
       if (debounceTimer) clearTimeout(debounceTimer);
     };
   }, [userId, activePlatform, selectedRoomId, locationMode]);
@@ -3045,7 +3081,8 @@ export function TeacherDashboard({
           helpRes,
           formingBandsRes,
           wallRes,
-          occRes
+          occRes,
+          crisisRes
         ] = await Promise.all([
           Promise.resolve(supabase.from('rooms').select('*').eq('school_id', tData.school_id).eq('is_groovelab_active', true).order('sort_order', { ascending: true })).catch(e => ({ data: [], error: e })),
           Promise.resolve(supabase.from('user_availability').select('*')).catch(e => ({ data: [], error: e })),
@@ -3059,7 +3096,8 @@ export function TeacherDashboard({
             : Promise.resolve({ data: null, error: null })).catch(e => ({ data: [], error: e })),
           Promise.resolve(supabase.from('bands').select('*, band_members(*, profiles:users(id, first_name, last_name, photo_url, created_at, birth_date)), songs(*), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, last_name, photo_url, created_at, birth_date)))').eq('school_id', tData.school_id).in('status', ['forming', 'active'])).catch(e => ({ data: [], error: e })),
           Promise.resolve(wallSongsQuery).catch(e => ({ data: [], error: e })),
-          Promise.resolve(supabase.from('band_song_slots').select('user_id, band_songs(song_id)')).catch(e => ({ data: [], error: e }))
+          Promise.resolve(supabase.from('band_song_slots').select('user_id, band_songs(song_id)')).catch(e => ({ data: [], error: e })),
+          Promise.resolve(supabase.from('crisis_notifications').select('*, student:users!crisis_notifications_student_id_fkey(id, first_name, last_name)').eq('teacher_id', userId).gte('slot_start_datetime', new Date(Date.now() - 24 * 60 * 60 * 1000 * 7).toISOString()).order('slot_start_datetime', { ascending: true })).catch(e => ({ data: [], error: e }))
         ]);
 
         const rData = rRes.data;
@@ -3075,6 +3113,9 @@ export function TeacherDashboard({
         const wallData = wallRes.data;
         const wallErr = wallRes.error;
         const occupiedSlots = occRes.data;
+        const crisisData = crisisRes.data;
+
+        setCrisisNotifications(crisisData || []);
 
         setRooms(rData || []);
         setAvailabilities(avData || []);
@@ -4741,7 +4782,7 @@ export function TeacherDashboard({
                         overflow: 'hidden',
                         boxShadow: '0 10px 30px -5px rgba(251, 113, 133, 0.15)'
                       }}>
-                        <div style={{ fontSize: '3rem', marginBottom: '12px' }}>🩹</div>
+                        <Heart size={48} color="#be123c" fill="#be123c" style={{ margin: '0 auto 12px auto' }} />
                         <h2 style={{
                           margin: '0 0 8px 0',
                           fontSize: '1.8rem',
@@ -6718,7 +6759,7 @@ export function TeacherDashboard({
                           color: '#7f1d1d',
                           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
                         }}>
-                          Status & Abmeldung
+                          {teacher?.sick_until ? 'Krankmeldungs-Status' : 'Krankmelden'}
                         </h3>
                       </div>
                       
@@ -6775,8 +6816,11 @@ export function TeacherDashboard({
                     </div>
 
                     {teacher?.sick_until && !isSickWidgetExpanded && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '32px', marginTop: '6px' }}>
-                        <div style={{ fontSize: '0.78rem', color: '#dc2626', fontWeight: 700 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '32px', marginTop: '6px' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: 650 }}>
+                          Von: {teacher.sick_start ? new Date(teacher.sick_start).toLocaleDateString('de-DE') : 'Sofort'}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#b91c1c', fontWeight: 800 }}>
                           Bis: {new Date(teacher.sick_until).toLocaleDateString('de-DE')}
                         </div>
                         <button
@@ -6796,7 +6840,8 @@ export function TeacherDashboard({
                             cursor: 'pointer',
                             transition: 'all 0.2s',
                             width: 'fit-content',
-                            boxShadow: '0 2px 6px rgba(22, 163, 74, 0.1)'
+                            boxShadow: '0 2px 6px rgba(22, 163, 74, 0.1)',
+                            marginTop: '4px'
                           }}
                           className="hover-scale"
                         >
@@ -6808,10 +6853,13 @@ export function TeacherDashboard({
                     {isSickWidgetExpanded && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingTop: '8px', borderTop: '1px solid #fecaca' }}>
                         {teacher?.sick_until ? (
-                          <div style={{ fontSize: '0.78rem', color: '#7f1d1d', fontWeight: 550, lineHeight: 1.4 }}>
-                            Du bist aktuell krankgemeldet bis einschließlich:
-                            <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#b91c1c', marginTop: '4px' }}>
-                              {new Date(teacher.sick_until).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
+                          <div style={{ fontSize: '0.78rem', color: '#7f1d1d', fontWeight: 550, lineHeight: 1.4, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <div>Zeitraum der Krankmeldung:</div>
+                            <div style={{ fontSize: '0.8rem', color: '#991b1b', fontWeight: 600 }}>
+                              Von: <strong style={{ color: '#000' }}>{teacher.sick_start ? new Date(teacher.sick_start).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Sofort'}</strong>
+                            </div>
+                            <div style={{ fontSize: '0.85rem', color: '#991b1b', fontWeight: 600 }}>
+                              Bis: <strong style={{ color: '#b91c1c', fontWeight: 800 }}>{new Date(teacher.sick_until).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}</strong>
                             </div>
                           </div>
                         ) : (
@@ -6820,28 +6868,121 @@ export function TeacherDashboard({
                           </p>
                         )}
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            {teacher?.sick_until ? 'Zeitraum anpassen (bis):' : 'Krank bis einschließlich:'}
-                          </label>
-                          <input 
-                            type="date"
-                            value={sickUntilDate}
-                            onChange={(e) => setSickUntilDate(e.target.value)}
-                            style={{
-                              width: '100%',
+                        {!showCustomStart ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              {teacher?.sick_until ? 'Krankmeldung anpassen (bis):' : 'Krank bis einschließlich:'}
+                            </label>
+                            <input 
+                              type="date"
+                              value={sickUntilDate}
+                              onChange={(e) => setSickUntilDate(e.target.value)}
+                              style={{
+                                width: '100%',
+                                padding: '8px 12px',
+                                borderRadius: '12px',
+                                border: '1px solid #fca5a5',
+                                background: '#fff',
+                                fontSize: '0.8rem',
+                                fontFamily: 'inherit',
+                                outline: 'none',
+                                color: '#7f1d1d',
+                                boxSizing: 'border-box'
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowCustomStart(true)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#be123c',
+                                textDecoration: 'underline',
+                                cursor: 'pointer',
+                                fontSize: '0.68rem',
+                                fontWeight: 700,
+                                textAlign: 'left',
+                                padding: '2px 0 0 0',
+                                width: 'fit-content',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <Calendar size={12} color="#be123c" />
+                              Startdatum anpassen (Standard: Heute)
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              Krankmeldungs-Zeitraum:
+                            </label>
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
                               padding: '8px 12px',
                               borderRadius: '12px',
                               border: '1px solid #fca5a5',
                               background: '#fff',
                               fontSize: '0.8rem',
-                              fontFamily: 'inherit',
-                              outline: 'none',
                               color: '#7f1d1d',
                               boxSizing: 'border-box'
-                            }}
-                          />
-                        </div>
+                            }}>
+                              <span style={{ color: '#991b1b', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase' }}>von</span>
+                              <input 
+                                type="date"
+                                value={sickStartDate}
+                                onChange={(e) => setSickStartDate(e.target.value)}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  outline: 'none',
+                                  width: '100%',
+                                  color: '#7f1d1d',
+                                  fontFamily: 'inherit'
+                                }}
+                              />
+                              <span style={{ color: '#991b1b', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase' }}>- bis</span>
+                              <input 
+                                type="date"
+                                value={sickUntilDate}
+                                onChange={(e) => setSickUntilDate(e.target.value)}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  outline: 'none',
+                                  width: '100%',
+                                  color: '#7f1d1d',
+                                  fontFamily: 'inherit'
+                                }}
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowCustomStart(false);
+                                const today = new Date();
+                                setSickStartDate(today.toISOString().substring(0, 10));
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#64748b',
+                                textDecoration: 'underline',
+                                cursor: 'pointer',
+                                fontSize: '0.68rem',
+                                fontWeight: 700,
+                                textAlign: 'left',
+                                padding: '2px 0 0 0',
+                                width: 'fit-content'
+                              }}
+                            >
+                              Standard-Startdatum verwenden (Heute)
+                            </button>
+                          </div>
+                        )}
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
                           <button
@@ -6892,6 +7033,8 @@ export function TeacherDashboard({
                   </>
                 )}
               </div>
+
+
 
               {myBookings.length > 0 && (
                 <div style={{ 
@@ -10346,7 +10489,18 @@ export function TeacherDashboard({
                 {sickNotifModal.notifs.map((n, i) => {
                   const dt = new Date(n.slot_start_datetime);
                   const dateStr = dt.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
-                  const timeStr = dt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                  
+                  const durationMinutes = n.duration || 30;
+                  const dtEnd = new Date(dt.getTime() + durationMinutes * 60 * 1000);
+                  const timeStrStart = dt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                  const timeStrEnd = dtEnd.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                  const timeStrRange = `${timeStrStart} - ${timeStrEnd} Uhr`;
+
+                  const studentName = n.student_name || (() => {
+                    const student = allStudents.find(s => s.id === n.student_id);
+                    return student ? `${student.first_name} ${student.last_name}` : `Schüler: ${n.student_id?.substring(0, 8)}…`;
+                  })();
+
                   return (
                     <div
                       key={i}
@@ -10369,11 +10523,17 @@ export function TeacherDashboard({
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 800, fontSize: '0.82rem', color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                          Schüler ID: {n.student_id?.substring(0, 8)}…
+                          {studentName}
                         </div>
-                        <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px', display: 'flex', gap: '8px' }}>
-                          <span>📅 {dateStr}</span>
-                          <span>🕒 {timeStr} Uhr</span>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Calendar size={13} style={{ color: '#64748b' }} />
+                            {dateStr}
+                          </span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Clock size={13} style={{ color: '#64748b' }} />
+                            {timeStrRange}
+                          </span>
                         </div>
                       </div>
                       <span style={{
