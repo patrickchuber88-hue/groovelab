@@ -87,7 +87,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const [formDate, setFormDate] = useState('');
   const [formStartTime, setFormStartTime] = useState('');
   const [formEndTime, setFormEndTime] = useState('');
-  const [formCategory, setFormCategory] = useState('Klassenvorspiel');
+  const [formCategory, setFormCategory] = useState('Sonstiges');
   const [formDescription, setFormDescription] = useState('');
   const [formIsPublic, setFormIsPublic] = useState(false);
   const [submittingForm, setSubmittingForm] = useState(false);
@@ -468,7 +468,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       setFormDate('');
       setFormStartTime('');
       setFormEndTime('');
-      setFormCategory('Klassenvorspiel');
+      setFormCategory('Sonstiges');
       setFormDescription('');
       setFormIsPublic(false);
 
@@ -1307,8 +1307,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 }}
               />
             </div>
-          </div>
-          {/* Category Switch */}
+          </div>          {/* Category Switch */}
           <div>
             <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
               Kategorie *
@@ -1321,47 +1320,38 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               gap: '4px',
               border: '1px solid #e2e8f0'
             }}>
-              <button
-                type="button"
-                onClick={() => setFormCategory('Klassenvorspiel')}
-                style={{
-                  flex: 1,
-                  border: 'none',
-                  background: formCategory === 'Klassenvorspiel' ? '#ffffff' : 'transparent',
-                  color: formCategory === 'Klassenvorspiel' ? '#0f172a' : '#64748b',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  fontWeight: 800,
-                  fontSize: '0.75rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  boxShadow: formCategory === 'Klassenvorspiel' ? '0 2px 4px rgba(0,0,0,0.04)' : 'none'
-                }}
-              >
-                Klassenvorspiel
-              </button>
-              <button
-                type="button"
-                onClick={() => setFormCategory('Schultermin')}
-                style={{
-                  flex: 1,
-                  border: 'none',
-                  background: formCategory === 'Schultermin' ? '#ffffff' : 'transparent',
-                  color: formCategory === 'Schultermin' ? '#0f172a' : '#64748b',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  fontWeight: 800,
-                  fontSize: '0.75rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  boxShadow: formCategory === 'Schultermin' ? '0 2px 4px rgba(0,0,0,0.04)' : 'none'
-                }}
-              >
-                Schultermin
-              </button>
+              {[
+                { id: 'Konzert', label: 'Konzert' },
+                { id: 'Probe', label: 'Probe' },
+                { id: 'Sonstiges', label: 'Sonstiges' }
+              ].map(cat => {
+                const isSelected = formCategory === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setFormCategory(cat.id)}
+                    style={{
+                      flex: 1,
+                      border: 'none',
+                      background: isSelected ? '#ffffff' : 'transparent',
+                      color: isSelected ? '#0f172a' : '#64748b',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      fontWeight: 800,
+                      fontSize: '0.72rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      boxShadow: isSelected ? '0 2px 4px rgba(0,0,0,0.04)' : 'none',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    {cat.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
-          {/* Description */}
           <div>
             <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
               Beschreibung
