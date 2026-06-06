@@ -5137,7 +5137,7 @@ export function TeacherDashboard({
  
  
  
-                      {(!teacher?.sick_until || bypassSickView) && !isFreeDay && (
+                      {(!teacher?.sick_until || bypassSickView) && !isFreeDay && !isWeekend && (
                         <div className="google-card" style={{ 
                           width: '100%', 
                           flex: 1,
@@ -6636,51 +6636,101 @@ export function TeacherDashboard({
                             );
                           });
                         })() : (
-                          <div style={{
-                            background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                            borderRadius: '16px',
-                            padding: '32px 20px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '12px',
-                            border: '1px dashed #cbd5e1',
-                            boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.6)',
-                            textAlign: 'center',
-                            marginTop: '8px',
-                            position: 'relative',
-                            overflow: 'hidden'
-                          }}>
-                            {/* Decorative element */}
-                            <div style={{ position: 'absolute', top: '-10px', right: '-10px', opacity: 0.05, transform: 'rotate(15deg)' }}>
-                              <Sparkles size={100} color="#0b57d0" />
-                            </div>
+                          <div 
+                            className="hover-scale"
+                            style={{
+                              background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 50%, #f5f3ff 100%)',
+                              borderRadius: '24px',
+                              padding: '44px 28px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '16px',
+                              border: '1px solid rgba(99, 102, 241, 0.15)',
+                              boxShadow: '0 20px 40px -15px rgba(99, 102, 241, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
+                              textAlign: 'center',
+                              marginTop: '12px',
+                              position: 'relative',
+                              overflow: 'hidden',
+                              transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                            }}
+                          >
+                            {/* Decorative ambient background glows */}
+                            <div style={{
+                              position: 'absolute',
+                              top: '-20%',
+                              right: '-20%',
+                              width: '60%',
+                              height: '60%',
+                              background: 'radial-gradient(circle, rgba(167, 139, 250, 0.18) 0%, transparent 70%)',
+                              pointerEvents: 'none',
+                              zIndex: 0
+                            }} />
+                            <div style={{
+                              position: 'absolute',
+                              bottom: '-20%',
+                              left: '-20%',
+                              width: '60%',
+                              height: '60%',
+                              background: 'radial-gradient(circle, rgba(129, 140, 248, 0.12) 0%, transparent 70%)',
+                              pointerEvents: 'none',
+                              zIndex: 0
+                            }} />
                             
                             <div style={{ 
-                              width: '56px', height: '56px', 
-                              background: 'linear-gradient(135deg, #e0e7ff 0%, #dbeafe 100%)', 
-                              borderRadius: '50%', 
+                              width: '64px', height: '64px', 
+                              background: 'linear-gradient(135deg, #818cf8 0%, #4f46e5 100%)', 
+                              borderRadius: '18px', 
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              boxShadow: '0 8px 16px rgba(59, 130, 246, 0.12)',
+                              boxShadow: '0 12px 24px -6px rgba(79, 70, 229, 0.3)',
                               position: 'relative',
-                              zIndex: 2
+                              zIndex: 2,
+                              transform: 'rotate(-5deg)'
                             }}>
-                              <Sparkles size={28} color="#3b82f6" />
+                              <Sparkles size={30} color="#ffffff" />
                             </div>
+                            
                             <div style={{ position: 'relative', zIndex: 2 }}>
-                              <h4 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
+                              <h4 style={{ 
+                                margin: 0, 
+                                fontSize: '1.4rem', 
+                                fontWeight: 950, 
+                                background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                fontFamily: "'Plus Jakarta Sans', sans-serif", 
+                                letterSpacing: '-0.02em',
+                                marginBottom: '6px'
+                              }}>
                                 {(() => {
                                   const day = new Date().getDay();
                                   return (day === 0 || day === 6) ? 'Schönes Wochenende! 🎉' : 'Freier Tag!';
                                 })()}
                               </h4>
-                              <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#64748b', fontWeight: 600, maxWidth: '250px', lineHeight: 1.5 }}>
+                              <p style={{ 
+                                margin: '0 auto 10px auto', 
+                                fontSize: '0.82rem', 
+                                color: '#4f46e5', 
+                                fontWeight: 800, 
+                                letterSpacing: '0.04em',
+                                textTransform: 'uppercase'
+                              }}>
+                                Ruhe & Regeneration
+                              </p>
+                              <p style={{ 
+                                margin: 0, 
+                                fontSize: '0.88rem', 
+                                color: '#4b5563', 
+                                fontWeight: 550, 
+                                maxWidth: '300px', 
+                                lineHeight: 1.55 
+                              }}>
                                 {(() => {
                                   const day = new Date().getDay();
                                   return (day === 0 || day === 6)
-                                    ? 'Genieße die unterrichtsfreie Zeit und erhole dich gut.'
-                                    : 'Heute stehen keine Unterrichte an. Zeit zum Durchatmen und Energie tanken.';
+                                    ? 'Genieße deine unterrichtsfreie Zeit, lass die Instrumente ruhen und erhole dich gut.'
+                                    : 'Heute stehen keine Unterrichte an. Zeit zum Durchatmen, Entspannen und Kraft sammeln.';
                                 })()}
                               </p>
                             </div>
