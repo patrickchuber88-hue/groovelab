@@ -2720,6 +2720,35 @@ function App() {
         setIsSchoolPaused(false);
       }
 
+      // Bypass heavy Stage 2 queries for staff (teacher/admin/secretary) since they use AdminDashboard/SecretaryDashboard
+      // which fetch their own data, so these queries are duplicate and completely wasted.
+      const isStaff = userData.role?.toLowerCase() === 'teacher' || 
+                      userData.role?.toLowerCase() === 'admin' || 
+                      userData.role?.toLowerCase() === 'secretary';
+
+      if (isStaff) {
+        console.log('[Dashboard] Staff user detected. Bypassing heavy Stage 2 student queries for instant load.');
+        setUser(userData);
+        setSession(sessionRes.data);
+        
+        // Align locationMode for teachers
+        if (sessionRes.data) {
+          setLocationMode('lab');
+          sessionStorage.setItem('groovelab_location_mode', 'lab');
+        } else {
+          setLocationMode('home');
+          sessionStorage.setItem('groovelab_location_mode', 'home');
+        }
+        
+        // Fetch active student count in background (non-blocking)
+        if (schoolId) {
+          fetchActiveStudentCount(schoolId).catch(err => console.error('Error fetching student count:', err));
+        }
+        
+        setLoading(false);
+        return;
+      }
+
       const bandIds = (membershipsRes?.data || []).map((m: any) => m.bands?.id).filter(Boolean);
 
       // Stage 2: Fetch all detailed boards, library, school bands, teachers, active session metrics in a single parallel block
