@@ -773,10 +773,15 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
       }
       fetchedData = [...fetchedData, ...projectedData];
 
-      // Filter out regular schedule items if they fall during holidays
+      // Filter out regular schedule items if they fall during holidays,
+      // but keep explicitly saved/rescheduled database occurrences (not mock or vacant)
       const filteredFromHolidays = fetchedData.filter(occ => {
         const isHoliday = holidays.some(h => occ.date >= h.start && occ.date <= h.end);
-        return !isHoliday;
+        if (isHoliday) {
+          const isMockOrVacant = occ.id.startsWith('mock-') || occ.id.startsWith('vacant-');
+          return !isMockOrVacant;
+        }
+        return true;
       });
 
       setBaseOccurrences(filteredFromHolidays);

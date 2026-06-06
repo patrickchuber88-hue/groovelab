@@ -1197,14 +1197,22 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const scheduleOccurrences = useMemo<any[]>(() => {
     return rawScheduleOccurrences.filter((occ: any) => {
       const isHoliday = holidays.some(h => occ.date >= h.start && occ.date <= h.end);
-      return !isHoliday;
+      if (isHoliday) {
+        const isMockOrVacant = occ.id.startsWith?.('mock-') || occ.id.startsWith?.('vacant-');
+        return !isMockOrVacant;
+      }
+      return true;
     });
   }, [rawScheduleOccurrences, holidays]);
 
   const schoolYearOccurrences = useMemo<any[]>(() => {
     return rawSchoolYearOccurrences.filter((occ: any) => {
       const isHoliday = holidays.some(h => occ.date >= h.start && occ.date <= h.end);
-      return !isHoliday;
+      if (isHoliday) {
+        const isMockOrVacant = occ.id.startsWith?.('mock-') || occ.id.startsWith?.('vacant-');
+        return !isMockOrVacant;
+      }
+      return true;
     });
   }, [rawSchoolYearOccurrences, holidays]);
 

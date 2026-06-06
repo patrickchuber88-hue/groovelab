@@ -1855,12 +1855,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         throw new Error('Lehrerprofil nicht gefunden.');
       }
 
-      // 1. Clear user sick columns
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+
+      // 1. Shorten user sick_until to yesterday's date
       const { error: userErr } = await supabase
         .from('users')
         .update({ 
-          sick_until: null,
-          sick_start: null
+          sick_until: yesterdayStr
         })
         .eq('id', teacherId);
 

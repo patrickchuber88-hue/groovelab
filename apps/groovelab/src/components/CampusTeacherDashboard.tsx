@@ -33,6 +33,12 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
 
   // Teacher Profile Data
   const [teacher, setTeacher] = useState<any>(null);
+  const isCurrentlySick = useMemo(() => {
+    if (!teacher?.sick_until) return false;
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    return teacher.sick_until.substring(0, 10) >= todayStr;
+  }, [teacher?.sick_until]);
   const [school, setSchool] = useState<any>(null);
 
   // Board 1: Tageskompass & Meisterwerk
@@ -1150,12 +1156,16 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
           throw new Error('Teacher profile not found.');
         }
 
-        // 1. Clear user sick_until and sick_start columns
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+
+        // 1. Shorten user sick_until to yesterday's date
         const { error: userErr } = await supabase
           .from('users')
           .update({ 
-            sick_until: null,
-            sick_start: null
+            sick_until: yesterdayStr
           })
           .eq('id', userId);
 
@@ -2125,14 +2135,14 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
           <div className="p-8 max-w-lg w-full mx-auto space-y-6">
             <div className="bg-red-950/10 border border-red-900/35 rounded-3xl p-8 space-y-6">
               <div className="flex items-center gap-4 text-red-400">
-                <AlertTriangle size={36} className={teacher?.sick_until ? 'animate-pulse' : ''} />
+                <AlertTriangle size={36} className={isCurrentlySick ? 'animate-pulse' : ''} />
                 <div>
                   <h1 className="text-2xl font-black text-white">Krankheits-Bypass</h1>
                   <p className="text-xs font-bold uppercase tracking-wider text-red-400/90 mt-0.5">Notfall-Bypass-Schalter</p>
                 </div>
               </div>
 
-              {teacher?.sick_until ? (
+              {isCurrentlySick ? (
                 <div style={{
                   background: 'rgba(239, 68, 68, 0.1)',
                   border: '1.5px solid #ef4444',
@@ -2162,7 +2172,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                 {!showCustomStart ? (
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                      {teacher?.sick_until ? 'Krankmeldung anpassen (bis einschließlich):' : 'Krank bis einschließlich:'}
+                      {isCurrentlySick ? 'Krankmeldung anpassen (bis einschließlich):' : 'Krank bis einschließlich:'}
                     </label>
                     <input
                       type="date"
@@ -2224,10 +2234,10 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                     disabled={reportingSick}
                     className="w-full py-4 bg-red-600 hover:bg-red-500 disabled:bg-red-800 text-white font-black text-sm uppercase tracking-widest rounded-xl transition duration-200 shadow-lg shadow-red-900/35"
                   >
-                    {reportingSick ? 'Aktualisiere...' : teacher?.sick_until ? 'Krankmeldungszeitraum anpassen' : 'Krankheit offiziell melden'}
+                    {reportingSick ? 'Aktualisiere...' : isCurrentlySick ? 'Krankmeldungszeitraum anpassen' : 'Krankheit offiziell melden'}
                   </button>
 
-                  {teacher?.sick_until && (
+                  {isCurrentlySick && (
                     <button
                       onClick={handleEndSick}
                       disabled={reportingSick}
