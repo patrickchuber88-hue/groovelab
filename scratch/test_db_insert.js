@@ -6,17 +6,19 @@ const url = env.match(/VITE_SUPABASE_URL=(.*)/)[1].trim();
 const key = env.match(/VITE_SUPABASE_ANON_KEY=(.*)/)[1].trim();
 const supabase = createClient(url, key);
 
-async function run() {
+async function test() {
+  console.log("Supabase URL:", url);
+  // Let's query schedule_occurrences
   const { data, error } = await supabase
-    .from('schedules')
+    .from('schedule_occurrences')
     .select('*')
     .limit(5);
   
   if (error) {
-    console.error("SELECT FROM schedules FAILED:", error);
+    console.error("Error fetching occurrences:", error);
   } else {
-    console.log("SELECT FROM schedules SUCCEEDED:", data);
+    console.log("Fetched occurrences:", data);
   }
 }
 
-run();
+test();

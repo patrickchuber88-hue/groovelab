@@ -4,19 +4,5 @@ import fs from 'fs'
 const env = fs.readFileSync('/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/.env.local', 'utf-8');
 const url = env.match(/VITE_SUPABASE_URL=(.*)/)[1].trim();
 const key = env.match(/VITE_SUPABASE_ANON_KEY=(.*)/)[1].trim();
-const supabase = createClient(url, key);
-
-async function run() {
-  const { data, error } = await supabase
-    .from('schedules')
-    .select('*')
-    .limit(5);
-  
-  if (error) {
-    console.error("SELECT FROM schedules FAILED:", error);
-  } else {
-    console.log("SELECT FROM schedules SUCCEEDED:", data);
-  }
-}
-
-run();
+// Using service role to bypass RLS, or we can use SSH to query directly
+console.log("Supabase URL:", url);
