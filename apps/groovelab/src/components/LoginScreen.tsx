@@ -1256,32 +1256,36 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       // 2. Session Management (Only for Academy/Lab sessions)
       // 2. Global Cleanup & Station Cleanup in parallel
-      await Promise.all([
-        supabase.from('sessions').update({ check_out_time: now }).eq('user_id', user.id).is('check_out_time', null),
-        (!isHome && finalStationId && !isTeacher)
-          ? supabase.from('sessions').update({ check_out_time: now }).eq('station_id', finalStationId).is('check_out_time', null)
-          : Promise.resolve()
-      ]);
-      if (!isHome) {
-        const { data: sess, error: sessErr } = await supabase
-          .from('sessions')
-          .insert({
-            user_id: user.id,
-            station_id: finalStationId,
-            gps_verified: true,
-            check_in_time: now
-          })
-          .select()
-          .single();
+      if (!isCampus) {
+        await Promise.all([
+          supabase.from('sessions').update({ check_out_time: now }).eq('user_id', user.id).is('check_out_time', null),
+          (!isHome && finalStationId && !isTeacher)
+            ? supabase.from('sessions').update({ check_out_time: now }).eq('station_id', finalStationId).is('check_out_time', null)
+            : Promise.resolve()
+        ]);
+        if (!isHome) {
+          const { data: sess, error: sessErr } = await supabase
+            .from('sessions')
+            .insert({
+              user_id: user.id,
+              station_id: finalStationId,
+              gps_verified: true,
+              check_in_time: now
+            })
+            .select()
+            .single();
 
-        if (sessErr) {
-          console.error('[Login] Error creating session:', sessErr);
-          alert('Fehler beim Erstellen der Sitzung: ' + sessErr.message);
+          if (sessErr) {
+            console.error('[Login] Error creating session:', sessErr);
+            alert('Fehler beim Erstellen der Sitzung: ' + sessErr.message);
+          } else {
+            console.log('[Login] Session created successfully:', sess.id);
+          }
         } else {
-          console.log('[Login] Session created successfully:', sess.id);
+          console.log(`[Login] Home mode detected. No new session created.`);
         }
       } else {
-        console.log(`[Login] Home mode detected. No new session created.`);
+        console.log('[Login] Campus login: Bypassing session cleanup and creation.');
       }
 
       sessionStorage.setItem('groovelab_user_id', user.id);
@@ -1332,6 +1336,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
   // Fetch rooms and stations for the Kiosk activator when schoolData is resolved (or query all active if not set yet)
   useEffect(() => {
+    if (!isGroovelabKiosk) return;
     async function fetchKioskData() {
       try {
         setLoadingKioskData(true);
