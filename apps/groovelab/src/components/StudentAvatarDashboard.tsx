@@ -3957,7 +3957,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     }}
                     className="hover-scale"
                   >
-                    🚀 Fokus starten
+                    <Play size={16} fill="white" />
+                    <span>Fokus starten</span>
                   </button>
                 </div>
               ) : (
@@ -4018,16 +4019,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         {String(Math.floor(secondsElapsed / 60)).padStart(2, '0')}:
                         {String(secondsElapsed % 60).padStart(2, '0')}
                       </span>
-                      <span style={{ 
-                        fontSize: '0.62rem', 
-                        fontWeight: 800, 
-                        color: isExtraTime ? '#10b981' : (isPhoneFlat ? '#2563eb' : '#dc2626'), 
-                        textTransform: 'uppercase', 
-                        letterSpacing: '0.08em', 
-                        marginTop: '6px' 
-                      }}>
-                        {isExtraTime ? 'Extra-Zeit active 🚀' : (isPhoneFlat ? 'Üben Aktiv' : 'Unterbrochen')}
-                      </span>
+                        {isExtraTime ? (
+                          <>
+                            <Zap size={11} fill="currentColor" style={{ animation: 'pulse 1.5s infinite' }} />
+                            <span>Extra-Zeit aktiv</span>
+                          </>
+                        ) : (
+                          isPhoneFlat ? 'Üben Aktiv' : 'Unterbrochen'
+                        )}
                     </div>
                   </div>
 
@@ -4050,12 +4049,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   }}>
                     {isPhoneFlat ? (
                       <div>
-                        <strong style={{ fontSize: '0.95rem', fontWeight: 800, display: 'block', marginBottom: '3px' }}>Perfekte Lage! 📱</strong>
+                        <strong style={{ fontSize: '0.95rem', fontWeight: 800, display: 'block', marginBottom: '3px' }}>Perfekte Lage!</strong>
                         <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>Das Handy liegt mit dem Display nach unten. Der Timer läuft im Hintergrund.</span>
                       </div>
                     ) : (
                       <div className={isExtraTime ? '' : 'animate-pulse'}>
-                        <strong style={{ fontSize: '0.95rem', fontWeight: 800, display: 'block', marginBottom: '3px' }}>{isExtraTime ? '⏸️ Session pausiert' : '🚨 Fokus unterbrochen!'}</strong>
+                        <strong style={{ fontSize: '0.95rem', fontWeight: 800, display: 'block', marginBottom: '3px' }}>{isExtraTime ? 'Session pausiert' : 'Fokus unterbrochen!'}</strong>
                         <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>
                           {isExtraTime 
                             ? 'Lege das Handy mit dem Display nach unten hin, um weiter Extra-Minuten zu sammeln.' 
@@ -4082,7 +4081,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     >
                       <div style={{ textAlign: 'center' }}>
                         <div style={{ fontSize: '0.8rem', fontWeight: 900, color: '#292524', textTransform: 'uppercase', letterSpacing: '0.15em' }}>
-                          {isExtraTime ? '🔥 Extra-Zeit läuft...' : '⚡ Fokus aktiv...'}
+                          {isExtraTime ? 'Extra-Zeit läuft...' : 'Fokus aktiv...'}
                         </div>
                         <div style={{ fontSize: '1.4rem', color: '#1c1917', marginTop: '10px', fontWeight: 800 }}>
                           {String(Math.floor(secondsElapsed / 60)).padStart(2, '0')}:{String(secondsElapsed % 60).padStart(2, '0')}
