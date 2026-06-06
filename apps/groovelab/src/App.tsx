@@ -148,24 +148,18 @@ const StudioAvatar = React.memo(({ src, style, className, user, userId, onClick,
     if (targetUser) {
       const role = (targetUser.role || '').toLowerCase();
       if (role === 'student') {
-        const studentInstrument = resolvedInstrument || 'Allgemein';
-        const inst = studentInstrument.toLowerCase().trim();
-        if (inst.includes('guitar') || inst.includes('gitarre')) {
-          if (targetUser.photo_url && (targetUser.photo_url.includes('egitarre_avatar') || targetUser.photo_url.includes('gitarre_avatar_new'))) {
-            displaySrc = targetUser.photo_url;
-          } else {
-            displaySrc = '/avatars/gitarre_avatar_new.png';
-          }
+        if (targetUser.photo_url && targetUser.photo_url.includes('_avatar')) {
+          displaySrc = targetUser.photo_url;
         } else {
-          displaySrc = getInstrumentAvatarUrl(studentInstrument);
+          displaySrc = getInstrumentAvatarUrl(resolvedInstrument || targetUser.instrument);
         }
       } else if (role === 'teacher' || role === 'admin') {
         displaySrc = getInstrumentAvatarUrl(targetUser.instrument);
       }
     } else {
-      if (src && (src.includes('egitarre_avatar') || src.includes('gitarre_avatar_new'))) {
+      if (src && src.includes('_avatar')) {
         displaySrc = src;
-      } else if (src && !src.includes('_avatar.png') && !src.includes('avatar_ghost')) {
+      } else {
         displaySrc = '/avatars/gitarre_avatar_new.png';
       }
     }

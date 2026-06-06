@@ -1805,9 +1805,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [secondsElapsed, setSecondsElapsed] = useState(0);
   const [selectedTopic, setSelectedTopic] = useState('');
   const [isPhoneFlat, setIsPhoneFlat] = useState(false);
+  const isPhoneFlatRef = useRef(isPhoneFlat);
+
+  useEffect(() => {
+    isPhoneFlatRef.current = isPhoneFlat;
+  }, [isPhoneFlat]);
 
   const [fokusLogs, setFokusLogs] = useState<any[]>([]);
   const [isExtraTime, setIsExtraTime] = useState(false);
+  const isExtraTimeRef = useRef(isExtraTime);
+
+  useEffect(() => {
+    isExtraTimeRef.current = isExtraTime;
+  }, [isExtraTime]);
   const [hasCompletedTargetToday, setHasCompletedTargetToday] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<'logbook' | 'stats'>('logbook');
 
@@ -2286,20 +2296,48 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     const streak = avatar?.streak_flame || 0;
     const targetSeconds = getTargetMinutes(streak) * 60;
 
+    let isOrientedFlat = false;
+    let isMoving = false;
+    let motionTimeout: any = null;
+
+    const updateFlatState = (newFlatState: boolean) => {
+      if (newFlatState === isPhoneFlatRef.current) return;
+      
+      setIsPhoneFlat(newFlatState);
+      
+      if (!newFlatState) {
+        if (!isExtraTimeRef.current) {
+          // Hard reset warning sound
+          playBeep(440, 400); 
+          if (navigator.vibrate) {
+            navigator.vibrate([300, 100, 300]);
+          }
+        } else {
+          // Soft pause warning sound
+          playBeep(880, 200);
+          if (navigator.vibrate) {
+            navigator.vibrate([100, 50, 100]);
+          }
+        }
+      }
+    };
+
     // Timer interval
     const interval = setInterval(() => {
-      if (isPhoneFlat) {
+      const isNowFlat = isOrientedFlat && !isMoving && !document.hidden;
+      updateFlatState(isNowFlat);
+
+      if (isNowFlat) {
         setSecondsElapsed(prev => {
           const nextVal = prev + 1;
-          if (!isExtraTime && nextVal >= targetSeconds) {
+          if (!isExtraTimeRef.current && nextVal >= targetSeconds) {
             setIsExtraTime(true);
             playSuccessChime();
           }
           return nextVal;
         });
       } else {
-        if (!isExtraTime) {
-          // Hard fall to 0 if orientation lost and not in extra time!
+        if (!isExtraTimeRef.current) {
           setSecondsElapsed(0);
         }
       }
@@ -2310,41 +2348,51 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       const beta = e.beta || 0;
       const gamma = e.gamma || 0;
 
-      // Phone is flat if beta and gamma are near 0 or 180 (within 15 deg threshold)
-      const flat = (Math.abs(beta) < 15 && Math.abs(gamma) < 15) || 
-                   (Math.abs(Math.abs(beta) - 180) < 15 && Math.abs(gamma) < 15);
+      // STRICT FACE-DOWN: screen must face the table/surface.
+      // When face-down, beta is near 180 (or -180) and gamma is near 0.
+      const faceDown = (Math.abs(Math.abs(beta) - 180) < 15 && Math.abs(gamma) < 15);
+      isOrientedFlat = faceDown;
+    };
 
-      if (flat) {
-        if (!isPhoneFlat) {
-          setIsPhoneFlat(true);
-        }
-      } else {
-        if (isPhoneFlat) {
-          setIsPhoneFlat(false);
-          if (!isExtraTime) {
-            // Hard reset warning sound
-            playBeep(440, 400); 
-            if (navigator.vibrate) {
-              navigator.vibrate([300, 100, 300]);
-            }
-          } else {
-            // Soft pause warning sound
-            playBeep(880, 200);
-            if (navigator.vibrate) {
-              navigator.vibrate([100, 50, 100]);
-            }
-          }
-        }
+    // Motion event handler
+    const handleMotion = (e: DeviceMotionEvent) => {
+      const acc = e.acceleration;
+      if (!acc) return;
+      const x = acc.x || 0;
+      const y = acc.y || 0;
+      const z = acc.z || 0;
+      const magnitude = Math.sqrt(x * x + y * y + z * z);
+      
+      // Threshold 0.3 m/s^2 detects slight hand shake or screen taps
+      if (magnitude > 0.3) {
+        isMoving = true;
+        if (motionTimeout) clearTimeout(motionTimeout);
+        motionTimeout = setTimeout(() => {
+          isMoving = false;
+        }, 1500);
+      }
+    };
+
+    // Page Visibility listener
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        isOrientedFlat = false;
+        updateFlatState(false);
       }
     };
 
     window.addEventListener('deviceorientation', handleOrientation);
+    window.addEventListener('devicemotion', handleMotion);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       clearInterval(interval);
+      if (motionTimeout) clearTimeout(motionTimeout);
       window.removeEventListener('deviceorientation', handleOrientation);
+      window.removeEventListener('devicemotion', handleMotion);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [sessionActive, isPhoneFlat, isExtraTime, avatar?.streak_flame]);
+  }, [sessionActive, avatar?.streak_flame]);
 
   const finishPracticeSession = async () => {
     setSessionActive(false);
@@ -3789,7 +3837,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     ) : (
                       <>
                         <Smartphone size={13} style={{ color: '#3b82f6', flexShrink: 0 }} />
-                        <span>Handy flach hinlegen & Fokus halten</span>
+                        <span>Handy mit dem Display nach unten hinlegen</span>
                       </>
                     )}
                   </p>
@@ -3946,15 +3994,15 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     {isPhoneFlat ? (
                       <div>
                         <strong>Perfekte Lage! 📱</strong>
-                        <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', opacity: 0.9 }}>Das Handy liegt flach auf dem Display. Der Timer läuft im Hintergrund.</p>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', opacity: 0.9 }}>Das Handy liegt mit dem Display nach unten. Der Timer läuft im Hintergrund.</p>
                       </div>
                     ) : (
                       <div className={isExtraTime ? '' : 'animate-pulse'}>
                         <strong>{isExtraTime ? '⏸️ Session pausiert' : '🚨 Fokus unterbrochen!'}</strong>
                         <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', opacity: 0.9 }}>
                           {isExtraTime 
-                            ? 'Lege das Handy flach hin, um weiter Extra-Minuten zu sammeln.' 
-                            : 'Lege das Handy flach hin! Sonst fällt dein Timer sofort auf 0 zurück.'}
+                            ? 'Lege das Handy mit dem Display nach unten hin, um weiter Extra-Minuten zu sammeln.' 
+                            : 'Lege das Handy mit dem Display nach unten hin! Sonst fällt dein Timer sofort auf 0 zurück.'}
                         </p>
                       </div>
                     )}
@@ -5819,19 +5867,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   }} />
                   <img 
                     src={
-                      studentUser?.photo_url && (
-                        studentUser.photo_url.includes('avatar') || 
-                        studentUser.photo_url.includes('gitarre') || 
-                        studentUser.photo_url.includes('bass') || 
-                        studentUser.photo_url.includes('drum') || 
-                        studentUser.photo_url.includes('piano') || 
-                        studentUser.photo_url.includes('klavier') || 
-                        studentUser.photo_url.includes('vocal') || 
-                        studentUser.photo_url.includes('trompete') || 
-                        studentUser.photo_url.includes('cello') || 
-                        studentUser.photo_url.includes('geige') || 
-                        studentUser.photo_url.includes('sax')
-                      )
+                      studentUser?.photo_url && studentUser.photo_url.includes('_avatar')
                         ? studentUser.photo_url
                         : getInstrumentAvatarUrl(studentUser?.resolved_instrument || studentUser?.instrument)
                     } 
@@ -7493,11 +7529,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             }}>
               <img 
                 src={
-                  studentUser.photo_url && (studentUser.photo_url.includes('egitarre_avatar') || studentUser.photo_url.includes('gitarre_avatar_new'))
+                  studentUser.photo_url && studentUser.photo_url.includes('_avatar')
                     ? studentUser.photo_url
-                    : ((studentUser.resolved_instrument || studentUser.instrument || '').toLowerCase().trim().includes('guitar') || (studentUser.resolved_instrument || studentUser.instrument || '').toLowerCase().trim().includes('gitarre'))
-                      ? '/avatars/gitarre_avatar_new.png'
-                      : getInstrumentAvatarUrl(studentUser.resolved_instrument || studentUser.instrument)
+                    : getInstrumentAvatarUrl(studentUser.resolved_instrument || studentUser.instrument)
                 } 
                 alt="" 
                 style={{ width: '95%', height: '95%', objectFit: 'contain' }} 
@@ -8537,7 +8571,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               </h2>
               
               <p style={{ color: '#a1a1aa', fontSize: '0.9rem', lineHeight: '1.5', fontWeight: 500 }}>
-                Der Timer ist eingefroren. Lege das Smartphone flach auf das Display, um den Fokusmodus fortzusetzen.
+                Der Timer ist eingefroren. Lege das Smartphone mit dem Display nach unten hin, um den Fokusmodus fortzusetzen.
               </p>
               
               <div style={{ fontSize: '3rem', fontWeight: 900, color: 'white', fontFamily: 'monospace', margin: '8px 0' }}>

@@ -6271,8 +6271,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   <span>{schoolName || 'Meine Musikschule'}</span>
                 </span>
                 <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
-                <span style={{ color: '#ea860c', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <User size={14} color="#ea860c" />
+                <span style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <User size={14} color="#ef4444" />
                   <span>
                     {currentUserProfile ? `${currentUserProfile.first_name} ${currentUserProfile.last_name}` : 'Verwaltung'}
                   </span>
@@ -6618,7 +6618,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           lineHeight: 1.15
                         }}>
                           Hallo, <span style={{ 
-                            color: '#ea860c', 
+                            color: '#ef4444', 
                             fontWeight: 900,
                             letterSpacing: '-0.01em',
                             display: 'inline-flex',
