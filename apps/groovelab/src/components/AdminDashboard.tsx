@@ -241,7 +241,7 @@ export function AdminDashboard({
   const [studentMissionsMap, setStudentMissionsMap] = useState<Record<string, any>>({});
   const [missionsActiveSubTab, setMissionsActiveSubTab] = useState<'assignments' | 'templates' | 'approvals'>('assignments');
   const tabStorageKey = activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab';
-  const [activeTab, setActiveTab] = useState<string>(() => localStorage.getItem(activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab') || forceTab || 'live');
+  const [activeTab, setActiveTab] = useState<string>(() => forceTab || localStorage.getItem(activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab') || 'live');
   const [mediathekTab, setMediathekTab] = useState<'songs' | 'lehrwerke'>('songs');
   const [lehrwerke, setLehrwerke] = useState<any[]>([]);
   const [showAddLehrwerk, setShowAddLehrwerk] = useState(false);
@@ -11287,7 +11287,7 @@ export function AdminDashboard({
       )}
 
       {activeTab === 'live' && renderLiveTab()}
-      {activeTab === 'schedule' && <ScheduleBoard schoolId={admin.school_id} userId={userId} />}
+      {activeTab === 'schedule' && admin && <ScheduleBoard schoolId={admin.school_id} userId={userId} />}
       {activeTab === 'events' && (
         <CampusEventsBoard 
           userId={userId}

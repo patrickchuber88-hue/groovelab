@@ -5076,14 +5076,16 @@ function App() {
     }, 50);
   };
 
+  // Dedicated hook for active tab initialization, persistence and role-based correction
   useEffect(() => {
     if (user) {
-      const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
-      const storageKey = activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab';
-      if (!localStorage.getItem(storageKey)) {
+      const storageKey = activePlatform === 'campus' ? 'campus_active_tab' : (activePlatform === 'ensembles' ? 'ensembles_active_tab' : 'groovelab_active_tab');
+      const storedTab = localStorage.getItem(storageKey);
+      if (!storedTab) {
         const startTab = user.role === 'student' 
           ? (activePlatform === 'campus' ? 'briefing' : 'live') 
           : 'live';
+        console.log('[Tab Sync] No tab stored in localStorage. Fallback to start tab:', startTab);
         setActiveStudentTab(startTab);
         localStorage.setItem(storageKey, startTab);
       } else {
@@ -5093,12 +5095,16 @@ function App() {
           const studentTabs = ['briefing', 'practice_board', 'mediathek', 'practice', 'library', 'repertoire', 'matching'];
           if (studentTabs.includes(activeStudentTab)) {
             const fallbackTab = 'live';
+            console.log('[Tab Sync] Auto-correcting student-only tab for teacher/admin to fallback:', fallbackTab);
             setActiveStudentTab(fallbackTab);
             localStorage.setItem(storageKey, fallbackTab);
           }
         }
       }
     }
+  }, [user?.role, activePlatform, activeStudentTab]);
+
+  useEffect(() => {
     let debounceCountTimer: any = null;
     const debouncedFetchActiveStudentCount = (schoolId: string) => {
       if (debounceCountTimer) clearTimeout(debounceCountTimer);

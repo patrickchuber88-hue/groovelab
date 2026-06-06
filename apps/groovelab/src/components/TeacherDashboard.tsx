@@ -364,7 +364,15 @@ const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, 
       )}
     </div>
   );
-}, (prev, next) => prev.src === next.src);
+}, (prev, next) => {
+  return prev.src === next.src &&
+         prev.userId === next.userId &&
+         prev.activePlatform === next.activePlatform &&
+         prev.user?.id === next.user?.id &&
+         prev.user?.photo_url === next.user?.photo_url &&
+         prev.user?.role === next.user?.role &&
+         prev.user?.instrument === next.user?.instrument;
+});
 
 const getStationColor = (name: string | null | undefined, dbColor?: string | null) => {
   if (!name) return '#64748b';
@@ -664,15 +672,15 @@ const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform }: { 
         justifyContent: 'center',
         boxShadow: '0 10px 30px rgba(0,0,0,0.03)'
       }}>
-        {coaches.map((c, idx) => {
-          const total = coaches.length;
+        {coaches.filter(Boolean).map((c, idx) => {
+          const total = coaches.filter(Boolean).length;
           const offset = total > 1 ? (idx - (total - 1) / 2) * 54 : 0;
           const verticalOffset = total > 1 ? (idx % 2 === 0 ? -12 : 12) : 0;
           const labelAbove = total > 1 && idx % 2 === 0;
           return (
             <div 
-              key={c.id} 
-              onClick={() => onProfileSelect(c.users)}
+              key={c.id || idx} 
+              onClick={() => c.users && onProfileSelect(c.users)}
               style={{ 
                 position: 'absolute',
                 transform: `translate(${offset}px, ${verticalOffset}px)`,
@@ -694,13 +702,21 @@ const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform }: { 
             </div>
           );
         })}
-        {coaches.length === 0 && <div style={{ color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 700 }}>Bereit</div>}
+        {coaches.filter(Boolean).length === 0 && <div style={{ color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 700 }}>Bereit</div>}
       </div>
     </div>
   );
 }, (prev, next) => {
-  if (prev.coaches.length !== next.coaches.length) return false;
-  return prev.coaches.every((c, i) => c.id === next.coaches[i].id && c.users?.photo_url === next.coaches[i].users?.photo_url);
+  const prevCoaches = (prev.coaches || []).filter(Boolean);
+  const nextCoaches = (next.coaches || []).filter(Boolean);
+  if (prevCoaches.length !== nextCoaches.length) return false;
+  return prevCoaches.every((c, i) => {
+    const nextCoach = nextCoaches[i];
+    if (!nextCoach) return false;
+    return c.id === nextCoach.id && 
+           c.users?.photo_url === nextCoach.users?.photo_url &&
+           c.session?.id === nextCoach.session?.id;
+  });
 });
 
 interface TeacherDashboardProps {
@@ -851,7 +867,24 @@ export function TeacherDashboard({
         s.room_id === selectedRoomId && 
         ((s.name || '').toLowerCase().includes('lehrer') || (s.name || '').toLowerCase().includes('teacher'))
       );
-      const targetStationId = lehrerStation ? lehrerStation.id : null;
+      let targetStationId = lehrerStation ? lehrerStation.id : null;
+
+      // Defensive: If not found in memory, query DB directly to get the station ID
+      if (!targetStationId && selectedRoomId) {
+        console.log('[Teacher Check-in] Lehrer station not found in memory, querying database directly...');
+        const { data: dbStations } = await supabase
+          .from('stations')
+          .select('id, name')
+          .eq('room_id', selectedRoomId);
+        
+        const dbLehrer = (dbStations || []).find(s => 
+          (s.name || '').toLowerCase().includes('lehrer') || (s.name || '').toLowerCase().includes('teacher')
+        );
+        if (dbLehrer) {
+          targetStationId = dbLehrer.id;
+          console.log('[Teacher Check-in] Found Lehrer station in DB:', targetStationId);
+        }
+      }
 
       // 2. Insert session associated with Lehrer iPad station if found
       const { data: sessData, error: sessErr } = await supabase
@@ -3085,20 +3118,37 @@ export function TeacherDashboard({
         const isHomeMode = (locationMode || sessionStorage.getItem('groovelab_location_mode')) === 'home';
         
         const activeCoaches = (allCoaches || []).filter(c => {
+          if (!c) return false;
           if (c.is_observer) return false; // Hospitanten are never shown in Live Lab
           if (c.id === userId) return false; // Handled separately below to guarantee inclusion
-          return trulyActive.some(s => s.user_id === c.id);
+          return trulyActive.some(s => s && s.user_id === c.id);
         });
 
-        // Defensively guarantee the logged-in teacher is included when they are active in the lab
-        const isCurrentTeacher = tData?.role?.toLowerCase() === 'teacher' || tData?.role?.toLowerCase() === 'admin';
-        if (isCurrentTeacher && !hidePresence && !isHomeMode) {
-          if (!activeCoaches.some(c => c.id === userId)) {
+        // Defensively guarantee the logged-in teacher/staff/admin/secretary is included when they are active in the lab
+        const isCurrentTeacher = tData?.role?.toLowerCase() === 'teacher' || 
+                                 tData?.role?.toLowerCase() === 'admin' || 
+                                 tData?.role?.toLowerCase() === 'secretary' ||
+                                 locationMode === 'lab' ||
+                                 sessionStorage.getItem('groovelab_location_mode') === 'lab';
+        const isCurrentlyCheckedIn = locationMode === 'lab' || 
+                                     sessionStorage.getItem('groovelab_location_mode') === 'lab' || 
+                                     trulyActive.some(s => s && s.user_id === userId);
+
+        if (isCurrentTeacher && tData && !hidePresence && isCurrentlyCheckedIn) {
+          if (!activeCoaches.some(c => c && c.id === userId)) {
             activeCoaches.unshift(tData);
           }
         }
 
-        setCoaches(activeCoaches.map(c => ({ id: c.id, users: c, session: trulyActive.find(s => s.user_id === c.id) })));
+        setCoaches(
+          activeCoaches
+            .filter(Boolean)
+            .map(c => ({ 
+              id: c.id, 
+              users: c, 
+              session: trulyActive.find(s => s && s.user_id === c.id) 
+            }))
+        );
 
         // 5. Challenges
         const filteredSubs = (subData || []).filter((s: any) => (Array.isArray(s.users) ? s.users[0] : s.users)?.school_id === tData.school_id);
