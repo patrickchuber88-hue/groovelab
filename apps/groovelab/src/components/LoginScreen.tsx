@@ -1182,15 +1182,17 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         }
       }
 
-      // 1. Determine finalStationId and lookup teacher station if needed
-      if (isTeacher) {
+      const isCampus = !isGroovelabKiosk;
+      
+      // 1. Determine finalStationId and lookup teacher station if needed (only for GrooveLab kiosks)
+      if (isTeacher && !isCampus) {
         const schoolId = user.school_id || (Array.isArray(user.schools) ? user.schools[0]?.id : user.schools?.id);
         const { data: tStations } = await supabase
           .from('stations')
           .select('id, room_id, name, rooms!inner(school_id)')
           .eq('name', 'Lehrer iPad')
           .eq('rooms.school_id', schoolId);
-
+ 
         if (tStations && tStations.length > 0) {
           let matchedStation = null;
           if (stationId) {
@@ -1204,7 +1206,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           finalStationId = null;
         }
       } else {
-        if (stationId) {
+        if (stationId && !isCampus) {
           const { data: curStation } = await supabase.from('stations').select('name').eq('id', stationId).maybeSingle();
           const stationName = curStation?.name?.toLowerCase() || '';
           if (stationName.includes('lehrer') || stationName.includes('teacher')) {
@@ -1219,12 +1221,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           finalStationId = null;
         }
       }
-
+ 
       // Geofence check
-      // For teachers, we only force Home mode if they explicitly chose to hide presence. We bypass the physical geofence check.
-      const shouldForceHome = isTeacher ? hidePresence : (!isWithinAnyRoom);
+      // For Campus logins, we always bypass geofencing and sessions (force isHome = true).
+      // For GrooveLab kiosk logins, we only force Home mode if teachers chose to hide presence or users are outside geofence.
+      const shouldForceHome = isCampus || (isTeacher ? hidePresence : (!isWithinAnyRoom));
       if (shouldForceHome) {
-        console.log(`[Login] Outside geofence or hiding presence. Forcing Home mode.`);
+        console.log(`[Login] Outside geofence, Campus platform or hiding presence. Forcing Home mode.`);
         isHome = true;
         finalStationId = null;
       }
