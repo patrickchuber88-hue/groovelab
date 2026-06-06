@@ -9,7 +9,8 @@ import {
   CheckCircle,
   X,
   Send,
-  Trash2
+  Trash2,
+  Palmtree
 } from 'lucide-react';
 
 interface ScheduleOccurrence {
@@ -1556,7 +1557,9 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                     gap: '6px',
                     zIndex: 5
                   }}>
-                    <span style={{ fontSize: '1.5rem' }}>🌴</span>
+                    <div style={{ color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(16, 185, 129, 0.08)', border: '1.5px solid rgba(16, 185, 129, 0.12)', padding: '8px', borderRadius: '12px' }}>
+                      <Palmtree size={20} strokeWidth={2.2} />
+                    </div>
                     <strong style={{ fontSize: '0.78rem', fontWeight: 900, color: '#475569', fontFamily: 'Urbanist', wordBreak: 'break-word' }}>
                       {activeHoliday.name}
                     </strong>

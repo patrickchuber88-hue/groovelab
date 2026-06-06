@@ -17,7 +17,8 @@ import {
   Info, 
   CalendarDays,
   ChevronRight,
-  MessageSquare
+  MessageSquare,
+  Palmtree
 } from 'lucide-react';
 
 interface CampusEventsBoardProps {
@@ -954,8 +955,13 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   </div>
 
                   {/* Title */}
-                  <h4 style={{ margin: '0 0 6px 0', fontSize: '1.05rem', fontWeight: 800, color: isHolidayEvent ? '#065f46' : '#0f172a', fontFamily: 'Urbanist' }}>
-                    {isHolidayEvent ? '🌴 ' : ''}{ev.title}
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: '1.05rem', fontWeight: 800, color: isHolidayEvent ? '#065f46' : '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {isHolidayEvent && (
+                      <span style={{ color: '#059669', display: 'inline-flex', alignItems: 'center' }}>
+                        <Palmtree size={16} strokeWidth={2.5} />
+                      </span>
+                    )}
+                    {ev.title}
                   </h4>
 
                   {/* Description */}
