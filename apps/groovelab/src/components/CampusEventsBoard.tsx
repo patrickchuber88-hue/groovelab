@@ -87,7 +87,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const [formDate, setFormDate] = useState('');
   const [formStartTime, setFormStartTime] = useState('');
   const [formEndTime, setFormEndTime] = useState('');
-  const [formCategory, setFormCategory] = useState('Sonstiges');
+  const [formCategory, setFormCategory] = useState('Klassenvorspiel');
   const [formDescription, setFormDescription] = useState('');
   const [formIsPublic, setFormIsPublic] = useState(false);
   const [submittingForm, setSubmittingForm] = useState(false);
@@ -468,7 +468,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       setFormDate('');
       setFormStartTime('');
       setFormEndTime('');
-      setFormCategory('Sonstiges');
+      setFormCategory('Klassenvorspiel');
       setFormDescription('');
       setFormIsPublic(false);
 
@@ -1330,9 +1330,6 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               }}
             >
               <option value="Klassenvorspiel">Klassenvorspiel</option>
-              <option value="Konzert">Konzert</option>
-              <option value="Probe">Probe</option>
-              <option value="Sonstiges">Sonstiges / Konferenz</option>
             </select>
           </div>
 
