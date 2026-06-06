@@ -3827,7 +3827,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               {/* Header */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px', width: '100%', borderBottom: '1px solid rgba(241, 245, 249, 0.6)', paddingBottom: '18px' }}>
                 <div style={{ 
-                  background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', 
+                  background: '#eff6ff', 
                   color: '#2563eb', 
                   padding: '10px', 
                   borderRadius: '16px',
@@ -8643,12 +8643,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 width: '80px', 
                 height: '80px', 
                 borderRadius: '24px', 
-                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.05) 100%)', 
-                border: '1px solid rgba(239, 68, 68, 0.3)', 
+                background: 'rgba(239, 68, 68, 0.1)', 
+                border: '1px solid rgba(239, 68, 68, 0.2)', 
                 display: 'flex', 
                 alignItems: 'center', 
                 justifyContent: 'center',
-                boxShadow: '0 0 20px rgba(239, 68, 68, 0.15)'
+                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.05)'
               }}>
                 <Smartphone size={38} color="#ef4444" className="animate-bounce" />
               </div>
