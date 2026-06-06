@@ -1181,23 +1181,12 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             display: 'flex',
             flexDirection: 'column',
             gap: '6px',
-            marginTop: '8px'
+            marginTop: '8px',
+            alignItems: 'center',
+            justifyContent: 'center'
           }}>
-            <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
-              🔗 Synchronisierter iCal Kalender
-            </span>
-            <span 
-              title={calendarUrl}
-              style={{ 
-                fontSize: '0.72rem', 
-                color: '#475569', 
-                fontWeight: 600,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}
-            >
-              {calendarUrl}
+            <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em', textAlign: 'center' }}>
+              🔗 SYNCHRONISIERTER ICAL KALENDER &amp; EIGENE TERMINE
             </span>
           </div>
         )}
