@@ -5174,14 +5174,8 @@ function App() {
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Immediate "Offline" signal when closing tab
-    // We set last_seen to a past date so the dashboard catches it immediately.
-    // Other open tabs will overwrite this with their own heartbeat within 30s.
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+    const handleBeforeUnload = () => {
       if (user?.id) {
-        e.preventDefault();
-        e.returnValue = 'Möchtest du dich wirklich abmelden oder die Seite verlassen?';
-        
         const pastDate = new Date(Date.now() - 10 * 60000).toISOString();
         const body = JSON.stringify({ last_seen: pastDate });
         const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/users?id=eq.${user.id}`;
@@ -5198,7 +5192,6 @@ function App() {
           body,
           keepalive: true
         });
-        return e.returnValue;
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
