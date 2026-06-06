@@ -5874,7 +5874,7 @@ function App() {
                   <Library size={20} /> Mediathek
                 </button>
                 <button onClick={() => setActiveStudentTab('events')} className={`sidebar-item ${activeStudentTab === 'events' ? `active ${activePlatform}` : ''}`}>
-                  <Calendar size={20} /> Events
+                  <Calendar size={20} /> Termine
                 </button>
                 <button onClick={() => setActiveStudentTab('campus_cup')} className={`sidebar-item ${activeStudentTab === 'campus_cup' ? `active ${activePlatform}` : ''}`}>
                   <Trophy size={20} /> Performance & Highlights
@@ -5974,7 +5974,7 @@ function App() {
                   <Calendar size={20} /> Stundenplan
                 </button>
                 <button onClick={() => setActiveStudentTab('events')} className={`sidebar-item ${activeStudentTab === 'events' ? `active ${activePlatform}` : ''}`}>
-                  <Calendar size={20} /> Events
+                  <Calendar size={20} /> Termine
                 </button>
                 <button onClick={() => setActiveStudentTab('messages')} className={`sidebar-item ${activeStudentTab === 'messages' ? `active ${activePlatform}` : ''}`} style={{ position: 'relative' }}>
                   <Mail size={20} /> Nachrichten
@@ -11109,8 +11109,8 @@ function App() {
                   <button onClick={() => setActiveStudentTab('mediathek')} style={getMobileButtonStyle('mediathek', 'campus')} className="hover-scale" title="Mediathek">
                     <Library size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Mediathek</span>}
                   </button>
-                  <button onClick={() => setActiveStudentTab('events')} style={getMobileButtonStyle('events', 'campus')} className="hover-scale" title="Events">
-                    <Calendar size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Events</span>}
+                  <button onClick={() => setActiveStudentTab('events')} style={getMobileButtonStyle('events', 'campus')} className="hover-scale" title="Termine">
+                    <Calendar size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Termine</span>}
                   </button>
                   <button onClick={() => setActiveStudentTab('campus_cup')} style={getMobileButtonStyle('campus_cup', 'campus')} className="hover-scale" title="Performance & Highlights">
                     <Trophy size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Performance & Highlights</span>}

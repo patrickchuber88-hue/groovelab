@@ -17,6 +17,7 @@ import {
   Info, 
   CalendarDays,
   ChevronRight,
+  ChevronDown,
   MessageSquare,
   Palmtree
 } from 'lucide-react';
@@ -62,6 +63,9 @@ interface CampusEvent {
 export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor }: CampusEventsBoardProps) {
   // Tabs for Column 1 (My Lessons)
   const [lessonTab, setLessonTab] = useState<'upcoming' | 'past'>('upcoming');
+
+  // Expanded/Collapsed months state for Column 1
+  const [expandedMonths, setExpandedMonths] = useState<Record<string, boolean>>({});
 
   // Filter for Column 2 (School / Subscribed Events Timeline)
   const [eventFilter, setEventFilter] = useState<'all' | 'subscribed' | 'custom'>('all');
@@ -140,8 +144,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           } else if (key.startsWith('DESCRIPTION')) {
             currentEvent.description = value.replace(/\\n/g, '\n');
           } else if (key.startsWith('DTSTART')) {
+            currentEvent.rawStart = value;
             currentEvent.dtstart = parseICSDate(value);
           } else if (key.startsWith('DTEND')) {
+            currentEvent.rawEnd = value;
             currentEvent.dtend = parseICSDate(value);
           } else if (key.startsWith('LOCATION')) {
             currentEvent.location = value;
@@ -221,8 +227,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         const title = ev.summary || 'Abonnierter Termin';
         const isHoliday = title.toLowerCase().includes('ferien') || title.toLowerCase().includes('feiertag') || title.toLowerCase().includes('schulfrei');
         
+        const isAllDay = ev.rawEnd && !ev.rawEnd.includes('T');
         let end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
-        if (ev.dtend && !ev.dtend.toISOString().includes('T')) {
+        if (ev.dtend && isAllDay) {
           end.setDate(end.getDate() - 1);
         }
         
@@ -237,7 +244,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           id: `subscribed-${index}`,
           title: title,
           description: ev.description || '',
-          event_date: ev.dtstart ? ev.dtstart.toISOString().substring(0, 10) : '',
+          event_date: ev.dtstart ? toYYYYMMDD(ev.dtstart) : '',
           event_end_date: toYYYYMMDD(end),
           start_time: ev.dtstart ? ev.dtstart.toTimeString().substring(0, 5) : '00:00',
           category: isHoliday ? 'Ferien' : 'Schultermin',
@@ -465,7 +472,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       setFormDescription('');
       setFormIsPublic(false);
 
-      alert('Event erfolgreich angelegt! 🎉');
+      alert('Termin erfolgreich angelegt! 🎉');
     } catch (err: any) {
       alert('Fehler beim Anlegen: ' + err.message);
     } finally {
@@ -475,7 +482,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
   // Delete event handler
   const handleDeleteEvent = async (id: string) => {
-    if (!confirm('Möchtest du dieses Event wirklich löschen?')) return;
+    if (!confirm('Möchtest du diesen Termin wirklich löschen?')) return;
 
     try {
       const { error } = await supabase
@@ -551,12 +558,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       });
       if (isHoliday) return false;
 
-      // For teachers, only show changes and cancellations
-      if (role === 'teacher') {
-        const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
-        const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
-        if (!isCanceled && !isRescheduled) return false;
-      }
+
 
       const isPast = occ.date < todayStr || (occ.date === todayStr && occ.start_time < nowTimeStr);
       return lessonTab === 'upcoming' ? !isPast : isPast;
@@ -566,14 +568,30 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   // Helpers for formatting
   const formatDateGerman = (dateStr: string) => {
     if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}.${parts[1]}.${parts[0]}`;
+    }
     const d = new Date(dateStr);
     return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
   const formatWeekday = (dateStr: string) => {
     if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      return d.toLocaleDateString('de-DE', { weekday: 'short' });
+    }
     const d = new Date(dateStr);
     return d.toLocaleDateString('de-DE', { weekday: 'short' });
+  };
+
+  const getMonthLabel = (monthKey: string) => {
+    if (!monthKey) return '';
+    const [year, month] = monthKey.split('-');
+    const d = new Date(parseInt(year), parseInt(month) - 1, 1);
+    return d.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
   };
 
   return (
@@ -604,10 +622,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         {/* Title */}
         <div>
           <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <CalendarDays size={18} color={brandColor} /> {role === 'teacher' ? 'Terminänderungen & Ausfälle' : 'Unterrichtstermine'}
+            <CalendarDays size={18} color={brandColor} /> Unterrichtstermine
           </h3>
           <p style={{ color: '#64748b', fontSize: '0.78rem', margin: '4px 0 0 0', fontWeight: 550 }}>
-            {role === 'teacher' ? 'Verschobene oder abgesagte Unterrichtstermine' : 'Deine persönlichen Stundenplandaten'}
+            Deine persönlichen Stundenplandaten
           </p>
         </div>
 
@@ -667,127 +685,198 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             <div style={{ textAlign: 'center', padding: '40px 20px', border: '1.5px dashed #e2e8f0', borderRadius: '16px', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>
               Keine Termine vorhanden.
             </div>
-          ) : (
-            getFilteredLessons().map((occ) => {
-              const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
-              const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
-              
-              // Formatting styles based on requirements:
-              // - regular: clean background with green dot right.
-              // - rescheduled: entire row yellow.
-              // - canceled: entire row red.
-              let rowBg = '#ffffff';
-              let rowBorder = '1px solid #e2e8f0';
-              let textColor = '#0f172a';
-              let subColor = '#64748b';
-
-              if (isCanceled) {
-                rowBg = '#fef2f2';
-                rowBorder = '1px solid #fee2e2';
-                textColor = '#991b1b';
-                subColor = '#ef4444';
-              } else if (isRescheduled) {
-                rowBg = '#fffbeb';
-                rowBorder = '1px solid #fef3c7';
-                textColor = '#92400e';
-                subColor = '#d97706';
+          ) : (() => {
+            const grouped: Record<string, any[]> = {};
+            const list = getFilteredLessons();
+            list.forEach(occ => {
+              const monthKey = occ.date.substring(0, 7); // "YYYY-MM"
+              if (!grouped[monthKey]) {
+                grouped[monthKey] = [];
               }
+              grouped[monthKey].push(occ);
+            });
 
-              const opponentName = role === 'student'
-                ? `Lehrkraft: ${occ.teacher?.first_name || 'Lehrer'} ${occ.teacher?.last_name || ''}`
-                : `Schüler: ${occ.student?.first_name || 'Schüler'} ${occ.student?.last_name || ''}`;
+            const monthKeys = Object.keys(grouped);
+            const currentMonthKey = new Date().toISOString().substring(0, 7);
+            monthKeys.sort((a, b) => {
+              if (a === currentMonthKey) return -1;
+              if (b === currentMonthKey) return 1;
+              if (lessonTab === 'past') {
+                return b.localeCompare(a);
+              }
+              return a.localeCompare(b);
+            });
+
+            return monthKeys.map((monthKey, idx) => {
+              const occs = grouped[monthKey];
+              const isExpanded = expandedMonths[monthKey] !== undefined 
+                ? expandedMonths[monthKey] 
+                : (monthKey === currentMonthKey || idx === 0);
 
               return (
-                <div 
-                  key={occ.id}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '12px 14px',
-                    borderRadius: '14px',
-                    background: rowBg,
-                    border: rowBorder,
-                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.01)',
-                    transition: 'all 0.2s',
-                    gap: '12px',
-                    boxSizing: 'border-box'
-                  }}
-                  className="hover-scale-subtle"
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                    {/* Date Block */}
-                    <div style={{
+                <div key={monthKey} style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '8px' }}>
+                  {/* Collapsible Month Header */}
+                  <div 
+                    onClick={() => setExpandedMonths(prev => ({ ...prev, [monthKey]: !isExpanded }))}
+                    style={{
                       display: 'flex',
-                      flexDirection: 'column',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      background: isCanceled ? '#fee2e2' : isRescheduled ? '#fef3c7' : '#f8fafc',
-                      borderRadius: '8px',
-                      padding: '4px',
-                      width: '38px',
-                      height: '38px',
-                      border: '1px solid rgba(0,0,0,0.03)',
-                      flexShrink: 0
-                    }}>
-                      <span style={{ fontSize: '0.55rem', fontWeight: 900, textTransform: 'uppercase', color: subColor, lineHeight: 1 }}>
-                        {formatWeekday(occ.date)}
-                      </span>
-                      <span style={{ fontSize: '1rem', fontWeight: 900, color: textColor, lineHeight: 1, marginTop: '2px', fontFamily: 'monospace' }}>
-                        {occ.date.substring(8, 10)}
-                      </span>
-                    </div>
-
-                    {/* Lesson Details */}
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {opponentName}
-                        </span>
-                      </div>
-                      
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: subColor, fontWeight: 700, marginTop: '1px' }}>
-                        <span>⏱️ {occ.start_time.substring(0, 5)} Uhr</span>
-                        <span>• {occ.duration} Min</span>
-                        {occ.schedule?.room && (
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            • 📍 {occ.schedule.room}
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                      justifyContent: 'space-between',
+                      padding: '10px 14px',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      userSelect: 'none',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.01)'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = '#f8fafc'}
+                  >
+                    <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {isExpanded ? <ChevronDown size={15} color="#64748b" /> : <ChevronRight size={15} color="#64748b" />}
+                      {getMonthLabel(monthKey)}
+                    </span>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 900, color: brandColor, background: `${brandColor}15`, padding: '2px 8px', borderRadius: '6px' }}>
+                      {occs.length} {occs.length === 1 ? 'Termin' : 'Termine'}
+                    </span>
                   </div>
 
-                  {/* Right Status (Green Dot for regular, or specific label/actions) */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                    {!isCanceled && !isRescheduled ? (
-                      // Regular - Green dot
-                      <div 
-                        title="Regulärer Termin"
-                        style={{
-                          width: '10px',
-                          height: '10px',
-                          borderRadius: '50%',
-                          background: '#22c55e',
-                          border: '2px solid #ffffff',
-                          boxShadow: '0 0 6px rgba(34, 197, 94, 0.4)'
-                        }} 
-                      />
-                    ) : isCanceled ? (
-                      <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', color: '#ef4444', background: '#fee2e2', padding: '2px 6px', borderRadius: '6px' }}>
-                        Ausfall
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', color: '#d97706', background: '#fef3c7', padding: '2px 6px', borderRadius: '6px' }}>
-                        Verschoben
-                      </span>
-                    )}
-                  </div>
+                  {/* Month Events List */}
+                  {isExpanded && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '2px' }}>
+                      {occs.map((occ) => {
+                        const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
+                        const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
+                        
+                        let rowBg = '#ffffff';
+                        let rowBorder = '1px solid #e2e8f0';
+                        let textColor = '#0f172a';
+                        let subColor = '#64748b';
+
+                        if (isCanceled) {
+                          rowBg = '#fef2f2';
+                          rowBorder = '1px solid #fee2e2';
+                          textColor = '#991b1b';
+                          subColor = '#ef4444';
+                        } else if (isRescheduled) {
+                          rowBg = '#fffbeb';
+                          rowBorder = '1px solid #fef3c7';
+                          textColor = '#92400e';
+                          subColor = '#d97706';
+                        }
+
+                        const opponentName = role === 'student'
+                          ? `Lehrkraft: ${occ.teacher?.first_name || 'Lehrer'} ${occ.teacher?.last_name || ''}`
+                          : `Schüler: ${occ.student?.first_name || 'Schüler'} ${occ.student?.last_name || ''}`;
+
+                        return (
+                          <div 
+                            key={occ.id}
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '12px 14px',
+                              borderRadius: '14px',
+                              background: rowBg,
+                              border: rowBorder,
+                              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.01)',
+                              transition: 'all 0.2s',
+                              gap: '12px',
+                              boxSizing: 'border-box'
+                            }}
+                            className="hover-scale-subtle"
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                              {/* Date Block */}
+                              <div style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: isCanceled ? '#fee2e2' : isRescheduled ? '#fef3c7' : '#f8fafc',
+                                borderRadius: '8px',
+                                padding: '4px',
+                                width: '38px',
+                                height: '38px',
+                                border: '1px solid rgba(0,0,0,0.03)',
+                                flexShrink: 0
+                              }}>
+                                <span style={{ fontSize: '0.55rem', fontWeight: 900, textTransform: 'uppercase', color: subColor, lineHeight: 1 }}>
+                                  {formatWeekday(occ.date)}
+                                </span>
+                                <span style={{ fontSize: '1rem', fontWeight: 900, color: textColor, lineHeight: 1, marginTop: '2px', fontFamily: 'monospace' }}>
+                                  {occ.date.substring(8, 10)}
+                                </span>
+                              </div>
+
+                              {/* Lesson Details */}
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {opponentName}
+                                  </span>
+                                </div>
+                                
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.72rem', color: subColor, fontWeight: 700, marginTop: '1px' }}>
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <Calendar size={12} /> {formatDateGerman(occ.date)}
+                                  </span>
+                                  <span>•</span>
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <Clock size={12} /> {occ.start_time.substring(0, 5)} Uhr
+                                  </span>
+                                  <span>•</span>
+                                  <span>{occ.duration} Min</span>
+                                  {occ.schedule?.room && (
+                                    <>
+                                      <span>•</span>
+                                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        <MapPin size={12} /> {occ.schedule.room}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Right Status */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                              {!isCanceled && !isRescheduled ? (
+                                <div 
+                                  title="Regulärer Termin"
+                                  style={{
+                                    width: '10px',
+                                    height: '10px',
+                                    borderRadius: '50%',
+                                    background: '#22c55e',
+                                    border: '2px solid #ffffff',
+                                    boxShadow: '0 0 6px rgba(34, 197, 94, 0.4)'
+                                  }} 
+                                />
+                              ) : isCanceled ? (
+                                <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', color: '#ef4444', background: '#fee2e2', padding: '2px 6px', borderRadius: '6px' }}>
+                                  Ausfall
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', color: '#d97706', background: '#fef3c7', padding: '2px 6px', borderRadius: '6px' }}>
+                                  Verschoben
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
-            })
-          )}
+            });
+          })()
+          }
         </div>
       </div>
 
@@ -884,11 +973,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', paddingRight: '2px' }}>
           {loadingEvents || loadingCalendar ? (
             <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>
-              Events werden geladen...
+              Termine werden geladen...
             </div>
           ) : getMergedTimelineEvents().length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 20px', border: '1.5px dashed #e2e8f0', borderRadius: '16px', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>
-              Keine Events eingetragen.
+              Keine Termine eingetragen.
             </div>
           ) : (
             getMergedTimelineEvents().map((ev: any) => {
@@ -931,94 +1020,46 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     padding: '16px',
                     borderRadius: '18px',
                     background: isHolidayEvent ? 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)' : '#ffffff',
-                    border: isHolidayEvent ? '1.5px solid #a7f3d0' : '1px solid #e2e8f0',
-                    boxShadow: isHolidayEvent ? '0 4px 14px rgba(16, 185, 129, 0.04)' : '0 4px 14px rgba(0,0,0,0.02)',
-                    transition: 'all 0.25s',
+                    border: isHolidayEvent ? '1px solid #a7f3d0' : '1px solid #e2e8f0',
+                    borderLeft: `4px solid ${isHolidayEvent ? '#10b981' : catColor}`,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.015)',
+                    transition: 'all 0.2s ease',
                     position: 'relative'
                   }}
                   className="hover-scale-subtle"
                 >
-                  {/* Category and Source Badge */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <span style={{
-                      fontSize: '0.62rem',
-                      fontWeight: 900,
-                      color: catColor,
-                      background: catBg,
-                      padding: '3px 8px',
-                      borderRadius: '6px',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.04em'
-                    }}>
-                      {ev.category}
-                    </span>
-
-                    <span style={{
-                      fontSize: '0.6rem',
-                      fontWeight: 800,
-                      color: isSubscribed ? '#475569' : '#0369a1',
-                      background: isSubscribed ? '#f1f5f9' : '#e0f2fe',
-                      padding: '2px 8px',
-                      borderRadius: '6px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}>
-                      {isSubscribed ? <Globe size={10} /> : <Lock size={10} />}
-                      {isSubscribed ? 'Abonniert (iCal)' : 'Eigener Termin'}
-                    </span>
-                  </div>
-
-                  {/* Title */}
-                  <h4 style={{ margin: '0 0 6px 0', fontSize: '1.05rem', fontWeight: 800, color: isHolidayEvent ? '#065f46' : '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {isHolidayEvent && (
-                      <span style={{ color: '#059669', display: 'inline-flex', alignItems: 'center' }}>
-                        <Palmtree size={16} strokeWidth={2.5} />
-                      </span>
-                    )}
-                    {ev.title}
-                  </h4>
-
-                  {/* Description */}
-                  {ev.description && (
-                    <p style={{ margin: '0 0 12px 0', fontSize: '0.78rem', color: '#64748b', lineHeight: 1.4, fontWeight: 500 }}>
-                      {ev.description}
-                    </p>
-                  )}
-
-                  {/* Date and Time Footer */}
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginTop: 'auto',
-                    borderTop: '1px solid #f1f5f9',
-                    paddingTop: '10px'
-                  }}>
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  {/* Top header line: Badges & Trash icon */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                       <span style={{
-                        fontSize: '0.72rem',
+                        fontSize: '0.62rem',
+                        fontWeight: 900,
+                        color: catColor,
+                        background: catBg,
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em'
+                      }}>
+                        {ev.category}
+                      </span>
+
+                      <span style={{
+                        fontSize: '0.6rem',
                         fontWeight: 800,
-                        color: '#334155',
+                        color: isSubscribed ? '#475569' : '#0369a1',
+                        background: isSubscribed ? '#f1f5f9' : '#e0f2fe',
+                        padding: '3px 8px',
+                        borderRadius: '6px',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '4px'
                       }}>
-                        📅 {formatDateGerman(ev.event_date)}
-                      </span>
-                      <span style={{
-                        fontSize: '0.72rem',
-                        fontWeight: 800,
-                        color: '#64748b',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}>
-                        <Clock size={12} /> {ev.start_time} Uhr
+                        {isSubscribed ? <Globe size={10} /> : <Lock size={10} />}
+                        {isSubscribed ? 'Abonniert (iCal)' : 'Eigener Termin'}
                       </span>
                     </div>
 
-                    {/* Delete option if it is user's custom event */}
                     {!isSubscribed && isMyEvent && (
                       <button
                         onClick={() => handleDeleteEvent(ev.id)}
@@ -1038,10 +1079,47 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                         onMouseOut={e => e.currentTarget.style.background = 'transparent'}
                         title="Termin löschen"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={13} />
                       </button>
                     )}
                   </div>
+
+                  {/* Title & Date line */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: isHolidayEvent ? '#065f46' : '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '6px', flex: 1, textAlign: 'left', lineHeight: 1.3 }}>
+                      {isHolidayEvent && (
+                        <span style={{ color: '#059669', display: 'inline-flex', alignItems: 'center' }}>
+                          <Palmtree size={15} strokeWidth={2.5} />
+                        </span>
+                      )}
+                      {ev.title}
+                    </h4>
+                    <span style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      color: isHolidayEvent ? '#047857' : '#475569',
+                      background: isHolidayEvent ? '#d1fae5' : '#f1f5f9',
+                      padding: '4px 8px',
+                      borderRadius: '8px',
+                      whiteSpace: 'nowrap',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      marginTop: '2px',
+                      flexShrink: 0
+                    }}>
+                      <Calendar size={12} /> {ev.event_end_date && ev.event_end_date !== ev.event_date 
+                        ? `von ${formatDateGerman(ev.event_date)} - bis ${formatDateGerman(ev.event_end_date)}` 
+                        : formatDateGerman(ev.event_date)}
+                    </span>
+                  </div>
+
+                  {/* Description */}
+                  {ev.description && (
+                    <p style={{ margin: '8px 0 0 0', fontSize: '0.78rem', color: '#64748b', lineHeight: 1.4, fontWeight: 500 }}>
+                      {ev.description}
+                    </p>
+                  )}
                 </div>
               );
             })
@@ -1077,7 +1155,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           {/* Title */}
           <div>
             <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-              Titel des Events *
+              Titel des Termins *
             </label>
             <input
               type="text"
@@ -1186,10 +1264,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 boxSizing: 'border-box'
               }}
             >
-              <option value="Klassenvorspiel">🎹 Klassenvorspiel</option>
-              <option value="Konzert">🎤 Konzert</option>
-              <option value="Probe">🎸 Probe</option>
-              <option value="Sonstiges">📅 Sonstiges / Konferenz</option>
+              <option value="Klassenvorspiel">Klassenvorspiel</option>
+              <option value="Konzert">Konzert</option>
+              <option value="Probe">Probe</option>
+              <option value="Sonstiges">Sonstiges / Konferenz</option>
             </select>
           </div>
 
@@ -1261,7 +1339,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               opacity: submittingForm ? 0.7 : 1
             }}
           >
-            {submittingForm ? 'Speichert...' : '+ Event anlegen'}
+            {submittingForm ? 'Speichert...' : '+ Termin anlegen'}
           </button>
         </form>
 

@@ -46,6 +46,91 @@ const getInstrumentAvatarUrl = (instrument: string | null | undefined): string =
   return '/avatars/gitarre_avatar_new.png';
 };
 
+const STUDENT_AVATARS = [
+  // E-Gitarre
+  { id: 'student_boy_guitar_1', label: 'E-Gitarre (Boy Black)', url: '/avatars/student_boy_black_guitar.png', category: 'E-Gitarre' },
+  { id: 'student_girl_guitar_1', label: 'E-Gitarre (Girl Blonde)', url: '/avatars/student_girl_blonde_guitar.png', category: 'E-Gitarre' },
+  { id: 'student_boy_blonde_guitar', label: 'E-Gitarre (Boy Blonde)', url: '/avatars/student_boy_blonde_guitar.png', category: 'E-Gitarre' },
+  { id: 'student_girl_black_guitar', label: 'E-Gitarre (Girl Black)', url: '/avatars/student_girl_black_guitar.png', category: 'E-Gitarre' },
+  { id: 'student_eguitar_alt', label: 'E-Gitarre (Hero)', url: '/avatars/student_eguitar_1.png', category: 'E-Gitarre' },
+  { id: 'student_teen_boy_guitar_1', label: 'E-Gitarre (Teen Boy)', url: '/avatars/student_teen_boy_guitar_1.png', category: 'E-Gitarre' },
+  { id: 'student_teen_boy_guitar_2', label: 'E-Gitarre (Teen Boy 2)', url: '/avatars/student_teen_boy_guitar_2.png', category: 'E-Gitarre' },
+  { id: 'bandstyle_boy_eguitar', label: 'Band E-Gitarre (Boy)', url: '/avatars/bandstyle_boy_eguitar.png', category: 'E-Gitarre' },
+  { id: 'bandstyle_girl_eguitar', label: 'Band E-Gitarre (Girl)', url: '/avatars/bandstyle_girl_eguitar.png', category: 'E-Gitarre' },
+  { id: 'teen_boy_eguitar_realistic', label: 'E-Gitarre (Realistic Boy)', url: '/avatars/teen_boy_eguitar_realistic.png', category: 'E-Gitarre' },
+  { id: 'teen_girl_eguitar_focused', label: 'E-Gitarre (Focused Girl)', url: '/avatars/teen_girl_eguitar_focused.png', category: 'E-Gitarre' },
+  { id: 'teen_boy_eguitar_17', label: 'E-Gitarre (Hero Boy)', url: '/avatars/teen_boy_eguitar_17.png', category: 'E-Gitarre' },
+  { id: 'teen_boy_acoustic_guitar', label: 'Akustik-Gitarre (Boy)', url: '/avatars/teen_boy_acoustic_guitar.png', category: 'E-Gitarre' },
+  { id: 'teen_girl_acoustic_guitar', label: 'Akustik-Gitarre (Girl)', url: '/avatars/teen_girl_acoustic_guitar.png', category: 'E-Gitarre' },
+  { id: 'avatar_boy_guitar', label: 'Klassen-Gitarre (Boy)', url: '/avatar_boy_guitar.jpg', category: 'E-Gitarre' },
+  { id: 'avatar_girl_guitar', label: 'Klassen-Gitarre (Girl)', url: '/avatar_girl_guitar.jpg', category: 'E-Gitarre' },
+  { id: 'avatar_gitarre', label: 'Gitarre (Icon)', url: '/avatars/gitarre_avatar_new.png', category: 'E-Gitarre' },
+  { id: 'avatar_egitarre', label: 'E-Gitarre (Icon)', url: '/avatars/egitarre_avatar.png', category: 'E-Gitarre' },
+
+  // E-Piano / Keyboard
+  { id: 'student_boy_piano_1', label: 'E-Piano (Boy)', url: '/avatars/student_boy_black_piano.png', category: 'E-Piano' },
+  { id: 'student_girl_piano_1', label: 'E-Piano (Girl)', url: '/avatars/student_girl_black_piano.png', category: 'E-Piano' },
+  { id: 'student_piano_alt', label: 'E-Piano (Hero)', url: '/avatars/student_piano_1.png', category: 'E-Piano' },
+  { id: 'student_boy_piano_2', label: 'E-Piano (Boy 2)', url: '/avatars/student_boy_piano_2.png', category: 'E-Piano' },
+  { id: 'student_girl_piano_2', label: 'E-Piano (Girl 2)', url: '/avatars/student_girl_piano_2.png', category: 'E-Piano' },
+  { id: 'student_girl_lightbrown_piano', label: 'E-Piano (Girl Lightbrown)', url: '/avatars/student_girl_lightbrown_piano.png', category: 'E-Piano' },
+  { id: 'student_boy_lightbrown_piano', label: 'E-Piano (Boy Lightbrown)', url: '/avatars/student_boy_lightbrown_piano.png', category: 'E-Piano' },
+  { id: 'student_boy_keyboard_1', label: 'Keyboard (Boy)', url: '/avatars/student_boy_keyboard_1.png', category: 'E-Piano' },
+  { id: 'student_boy_producer_1', label: 'Keyboard-Producer (Boy)', url: '/avatars/student_boy_producer_1.png', category: 'E-Piano' },
+  { id: 'student_tech_1', label: 'Keyboard-Tech (Hero)', url: '/avatars/student_tech_1.png', category: 'E-Piano' },
+  { id: 'bandstyle_boy_epiano', label: 'Band E-Piano (Boy)', url: '/avatars/bandstyle_boy_epiano.png', category: 'E-Piano' },
+  { id: 'bandstyle_girl_epiano', label: 'Band E-Piano (Girl)', url: '/avatars/bandstyle_girl_epiano.png', category: 'E-Piano' },
+  { id: 'avatar_boy_piano', label: 'Klassen-Piano (Boy)', url: '/avatar_boy_piano.jpg', category: 'E-Piano' },
+  { id: 'avatar_girl_piano', label: 'Klassen-Piano (Girl)', url: '/avatar_girl_piano.jpg', category: 'E-Piano' },
+  { id: 'avatar_piano', label: 'E-Piano (Icon)', url: '/avatars/klavier_avatar_new.png', category: 'E-Piano' },
+
+  // E-Drums
+  { id: 'student_boy_drums_1', label: 'E-Drum (Boy Black)', url: '/avatars/student_boy_black_drums.png', category: 'E-Drum' },
+  { id: 'student_girl_drums_1', label: 'E-Drum (Girl Blonde)', url: '/avatars/student_girl_blonde_drums.png', category: 'E-Drum' },
+  { id: 'student_boy_blonde_drums', label: 'E-Drum (Boy Blonde)', url: '/avatars/student_boy_blonde_drums.png', category: 'E-Drum' },
+  { id: 'student_girl_black_drums', label: 'E-Drum (Girl Black)', url: '/avatars/student_girl_black_drums.png', category: 'E-Drum' },
+  { id: 'student_drums_alt', label: 'E-Drum (Hero)', url: '/avatars/student_drums_1.png', category: 'E-Drum' },
+  { id: 'student_teen_boy_drums_1', label: 'E-Drum (Teen Boy)', url: '/avatars/student_teen_boy_drums_1.png', category: 'E-Drum' },
+  { id: 'student_boy_drums_2', label: 'E-Drum (Boy 2)', url: '/avatars/student_boy_drums_2.png', category: 'E-Drum' },
+  { id: 'student_girl_drums_2', label: 'E-Drum (Girl 2)', url: '/avatars/student_girl_drums_2.png', category: 'E-Drum' },
+  { id: 'student_boy_drums_3', label: 'E-Drum (Boy 3)', url: '/avatars/student_boy_drums_3.png', category: 'E-Drum' },
+  { id: 'student_girl_drums_3', label: 'E-Drum (Girl 3)', url: '/avatars/student_girl_drums_3.png', category: 'E-Drum' },
+  { id: 'bandstyle_boy_edrums', label: 'Band E-Drum (Boy)', url: '/avatars/bandstyle_boy_edrums.png', category: 'E-Drum' },
+  { id: 'bandstyle_girl_edrums', label: 'Band E-Drum (Girl)', url: '/avatars/bandstyle_girl_edrums.png', category: 'E-Drum' },
+  { id: 'teen_boy_edrums_realistic', label: 'E-Drum (Realistic Boy)', url: '/avatars/teen_boy_edrums_realistic.png', category: 'E-Drum' },
+  { id: 'avatar_boy_drums', label: 'Klassen-Drums (Boy)', url: '/avatar_boy_drums.jpg', category: 'E-Drum' },
+  { id: 'avatar_girl_drums', label: 'Klassen-Drums (Girl)', url: '/avatar_girl_drums.jpg', category: 'E-Drum' },
+  { id: 'avatar_drums', label: 'Schlagzeug (Icon)', url: '/avatars/schlagzeug_avatar.png', category: 'E-Drum' },
+
+  // E-Bass
+  { id: 'student_boy_bass_1', label: 'E-Bass (Boy Black)', url: '/avatars/student_boy_black_bass.png', category: 'E-Bass' },
+  { id: 'student_girl_bass_1', label: 'E-Bass (Girl Black)', url: '/avatars/student_girl_black_bass.png', category: 'E-Bass' },
+  { id: 'student_bass_alt', label: 'E-Bass (Hero)', url: '/avatars/student_bass_1.png', category: 'E-Bass' },
+  { id: 'student_teen_boy_bass_1', label: 'E-Bass (Teen Boy)', url: '/avatars/student_teen_boy_bass_1.png', category: 'E-Bass' },
+  { id: 'student_boy_ebass_1', label: 'E-Bass (Boy 1)', url: '/avatars/student_boy_ebass_1.png', category: 'E-Bass' },
+  { id: 'student_girl_ebass_1', label: 'E-Bass (Girl 1)', url: '/avatars/student_girl_ebass_1.png', category: 'E-Bass' },
+  { id: 'bandstyle_boy_ebass', label: 'Band E-Bass (Boy)', url: '/avatars/bandstyle_boy_ebass.png', category: 'E-Bass' },
+  { id: 'bandstyle_girl_ebass', label: 'Band E-Bass (Girl)', url: '/avatars/bandstyle_girl_ebass.png', category: 'E-Bass' },
+  { id: 'teen_boy_ebass_realistic', label: 'E-Bass (Realistic Boy)', url: '/avatars/teen_boy_ebass_realistic.png', category: 'E-Bass' },
+  { id: 'avatar_boy_bass', label: 'Klassen-Bass (Boy)', url: '/avatar_boy_bass.jpg', category: 'E-Bass' },
+  { id: 'avatar_girl_bass', label: 'Klassen-Bass (Girl)', url: '/avatar_girl_bass.jpg', category: 'E-Bass' },
+  { id: 'avatar_ebass', label: 'E-Bass (Icon)', url: '/avatars/ebass_avatar.png', category: 'E-Bass' },
+
+  // Gesang
+  { id: 'student_boy_vocals_1', label: 'Gesang (Boy Red)', url: '/avatars/student_boy_red_vocals.png', category: 'Gesang' },
+  { id: 'student_girl_vocals_1', label: 'Gesang (Girl Red)', url: '/avatars/student_girl_red_vocals.png', category: 'Gesang' },
+  { id: 'student_boy_vocals_new', label: 'Gesang (Boy 1)', url: '/avatars/student_boy_vocals_1.png', category: 'Gesang' },
+  { id: 'student_girl_vocals_new', label: 'Gesang (Girl 1)', url: '/avatars/student_girl_vocals_1.png', category: 'Gesang' },
+  { id: 'student_vocals_alt', label: 'Gesang (Hero)', url: '/avatars/student_vocals_1.png', category: 'Gesang' },
+  { id: 'avatar_vocals', label: 'Gesang (Icon)', url: '/avatars/gesang_avatar.png', category: 'Gesang' },
+
+  // Allgemein / Sonstige
+  { id: 'avatar_boy_general', label: 'Klassen-Schüler (Boy)', url: '/avatar_boy.jpg', category: 'Alle' },
+  { id: 'avatar_girl_general', label: 'Klassen-Schülerin (Girl)', url: '/avatar_girl.jpg', category: 'Alle' },
+  { id: 'avatar_boy_comic_general', label: 'Comic Schüler (Boy)', url: '/avatar_boy_1777237224310.png', category: 'Alle' },
+  { id: 'avatar_girl_comic_general', label: 'Comic Schülerin (Girl)', url: '/avatar_girl_1777237237899.png', category: 'Alle' }
+];
+
 interface StudentAvatarDashboardProps {
   studentId: string;
   parentActiveTab?: string;
@@ -1010,6 +1095,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [editingProfile, setEditingProfile] = useState<any>(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const [studentSchedules, setStudentSchedules] = useState<any[]>([]);
+  const [avatarCategoryFilter, setAvatarCategoryFilter] = useState<string>('Alle');
 
   const [isAppUser, setIsAppUser] = useState(false);
   const [isPremiumUser, setIsPremiumUser] = useState(false);
@@ -7761,6 +7847,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             <button 
               onClick={() => {
                 setEditingProfile({ ...studentUser });
+                setAvatarCategoryFilter('Alle');
                 setShowEditProfile(true);
               }} 
               style={{ 
@@ -8032,45 +8119,101 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     />
                   </div>
 
-                  {editingProfile.instrument && (editingProfile.instrument.toLowerCase().includes('guitar') || editingProfile.instrument.toLowerCase().includes('gitarre')) && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '4px' }}>
-                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block' }}>Profilbild (Avatar)</label>
-                      <div style={{ display: 'flex', gap: '20px' }}>
-                        {[
-                          { id: 'gitarre', label: 'Akustische Gitarre (Standard)', url: '/avatars/gitarre_avatar_new.png' },
-                          { id: 'egitarre', label: 'E-Gitarre', url: '/avatars/egitarre_avatar.png' }
-                        ].map((avatarItem) => {
-                          const isSelected = editingProfile.photo_url === avatarItem.url || (!editingProfile.photo_url && avatarItem.id === 'gitarre');
-                          return (
-                            <button
-                              key={avatarItem.id}
-                              type="button"
-                              onClick={() => setEditingProfile((prev: any) => ({ ...prev, photo_url: avatarItem.url }))}
-                              style={{
-                                flex: 1,
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: '10px',
-                                padding: '16px',
-                                borderRadius: '20px',
-                                border: `3px solid ${isSelected ? '#34a853' : '#f1f5f9'}`,
-                                background: isSelected ? 'rgba(52, 168, 83, 0.04)' : 'white',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                outline: 'none'
-                              }}
-                            >
-                              <div style={{ width: '80px', height: '80px', borderRadius: '20px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                                <img src={avatarItem.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={avatarItem.label} />
-                              </div>
-                              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: isSelected ? '#1e293b' : '#64748b' }}>{avatarItem.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '4px' }}>
+                    <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block' }}>Profilbild wählen (Avatar)</label>
+                    
+                    {/* Category Filter Tabs */}
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                      {['Alle', 'E-Gitarre', 'E-Piano', 'E-Drum', 'E-Bass', 'Gesang'].map(cat => {
+                        const isCatSelected = avatarCategoryFilter === cat;
+                        return (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => setAvatarCategoryFilter(cat)}
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: '10px',
+                              fontSize: '0.75rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              border: `1.5px solid ${isCatSelected ? '#34a853' : '#e2e8f0'}`,
+                              background: isCatSelected ? '#34a853' : 'white',
+                              color: isCatSelected ? 'white' : '#64748b',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            {cat}
+                          </button>
+                        );
+                      })}
                     </div>
-                  )}
+
+                    {/* Scrollable Grid of Avatars */}
+                    <div style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))', 
+                      gap: '12px', 
+                      maxHeight: '220px', 
+                      overflowY: 'auto',
+                      padding: '8px',
+                      background: '#f8fafc',
+                      borderRadius: '16px',
+                      border: '1px solid #e2e8f0'
+                    }}>
+                      {STUDENT_AVATARS.filter(av => avatarCategoryFilter === 'Alle' || av.category === avatarCategoryFilter).map((avatarItem) => {
+                        const isSelected = editingProfile.photo_url === avatarItem.url;
+                        return (
+                          <button
+                            key={avatarItem.id}
+                            type="button"
+                            onClick={() => setEditingProfile((prev: any) => ({ ...prev, photo_url: avatarItem.url }))}
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '8px',
+                              borderRadius: '12px',
+                              border: `2.5px solid ${isSelected ? '#34a853' : 'transparent'}`,
+                              background: isSelected ? 'white' : 'transparent',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s',
+                              outline: 'none',
+                              boxShadow: isSelected ? '0 4px 10px rgba(52, 168, 83, 0.15)' : 'none'
+                            }}
+                          >
+                            <div style={{ 
+                              width: '56px', 
+                              height: '56px', 
+                              borderRadius: '10px', 
+                              overflow: 'hidden', 
+                              boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
+                              background: 'white',
+                              border: '1px solid #e2e8f0',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}>
+                              <img src={avatarItem.url} style={{ width: '90%', height: '90%', objectFit: 'contain' }} alt={avatarItem.label} />
+                            </div>
+                            <span style={{ 
+                              fontSize: '0.62rem', 
+                              fontWeight: 750, 
+                              color: isSelected ? '#1e293b' : '#64748b',
+                              textAlign: 'center',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              width: '100%'
+                            }} title={avatarItem.label}>
+                              {avatarItem.label.split(' (')[0]}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
 
                 <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
