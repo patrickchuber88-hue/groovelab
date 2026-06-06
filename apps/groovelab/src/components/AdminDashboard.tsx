@@ -11,6 +11,7 @@ import { renderInstrumentIcon } from '../utils/instruments';
 import { StudentDetailModal } from './StudentDetailModal';
 import { ScheduleBoard } from './ScheduleBoard';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
+import { CampusEventsBoard } from './CampusEventsBoard';
 
 const cleanRoomName = (name: string | null | undefined): string => {
   if (!name) return 'Unbenannter Raum';
@@ -11142,6 +11143,15 @@ export function AdminDashboard({
 
       {activeTab === 'live' && renderLiveTab()}
       {activeTab === 'schedule' && <ScheduleBoard schoolId={admin.school_id} userId={userId} />}
+      {activeTab === 'events' && (
+        <CampusEventsBoard 
+          userId={userId}
+          role={admin?.role || 'teacher'}
+          schoolId={admin?.school_id || ''}
+          supabase={supabase}
+          brandColor={brandColor}
+        />
+      )}
       {activeTab === 'bands' && renderBandsTab()}
       {activeTab === 'students' && renderStudentsTab()}
       {activeTab === 'team' && renderTeachersTab()}

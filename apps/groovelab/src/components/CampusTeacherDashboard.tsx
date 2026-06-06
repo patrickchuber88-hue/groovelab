@@ -780,7 +780,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
         // Direct Client-Side Supabase fallback
         const { data: profile, error: profileErr } = await supabase
           .from('users')
-          .select('school_id, first_name, last_name, sick_until')
+          .select('school_id, first_name, last_name, sick_start, sick_until')
           .eq('id', userId)
           .single();
 
@@ -789,11 +789,17 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
         }
 
         const prevSickUntilStr = profile.sick_until;
+        const todayD = new Date();
+        const localTodayStr = `${todayD.getFullYear()}-${String(todayD.getMonth() + 1).padStart(2, '0')}-${String(todayD.getDate()).padStart(2, '0')}`;
+        const sickStartVal = profile.sick_start || localTodayStr;
 
         // 1. Update user table
         const { error: userErr } = await supabase
           .from('users')
-          .update({ sick_until: sickUntilDate })
+          .update({ 
+            sick_until: sickUntilDate,
+            sick_start: sickStartVal
+          })
           .eq('id', userId);
 
         if (userErr) throw userErr;
@@ -958,10 +964,13 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
           throw new Error('Teacher profile not found.');
         }
 
-        // 1. Clear user sick_until column
+        // 1. Clear user sick_until and sick_start columns
         const { error: userErr } = await supabase
           .from('users')
-          .update({ sick_until: null })
+          .update({ 
+            sick_until: null,
+            sick_start: null
+          })
           .eq('id', userId);
 
         if (userErr) throw userErr;

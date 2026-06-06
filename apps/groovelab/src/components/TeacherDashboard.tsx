@@ -1324,7 +1324,7 @@ export function TeacherDashboard({
       // Direct Client-Side Supabase logic matching CampusTeacherDashboard
       const { data: profile, error: profileErr } = await supabase
         .from('users')
-        .select('school_id, first_name, last_name, sick_until')
+        .select('school_id, first_name, last_name, sick_start, sick_until')
         .eq('id', userId)
         .single();
 
@@ -1333,11 +1333,17 @@ export function TeacherDashboard({
       }
 
       const prevSickUntilStr = profile.sick_until;
+      const todayD = new Date();
+      const localTodayStr = `${todayD.getFullYear()}-${String(todayD.getMonth() + 1).padStart(2, '0')}-${String(todayD.getDate()).padStart(2, '0')}`;
+      const sickStartVal = profile.sick_start || localTodayStr;
 
       // 1. Update user table
       const { error: userErr } = await supabase
         .from('users')
-        .update({ sick_until: sickUntilDate })
+        .update({ 
+          sick_until: sickUntilDate,
+          sick_start: sickStartVal
+        })
         .eq('id', userId);
 
       if (userErr) throw userErr;
@@ -1513,13 +1519,26 @@ export function TeacherDashboard({
           resolved: false
         });
 
+      // Refresh teacher profile without page reload
+      const { data: updatedTeacher } = await supabase
+        .from('users')
+        .select('*, schools(*)')
+        .eq('id', userId)
+        .single();
+      if (updatedTeacher) setTeacher(updatedTeacher);
+
+      // Open notification modal showing affected students
+      setSickNotifModal({
+        notifs: notificationsToInsert,
+        sickUntilDateStr: sickUntilDate,
+      });
+
       setSickSuccessShown(true);
       setIsSickWidgetExpanded(false);
       setTicker(t => t + 1);
       setTimeout(() => {
         setSickSuccessShown(false);
-        window.location.reload();
-      }, 800);
+      }, 2500);
     } catch (err) {
       console.error(err);
       alert('Fehler bei der Krankheitsmeldung.');
@@ -1544,10 +1563,13 @@ export function TeacherDashboard({
         throw new Error('Teacher profile not found.');
       }
 
-      // 1. Clear user sick_until column
+      // 1. Clear user sick_until and sick_start columns
       const { error: userErr } = await supabase
         .from('users')
-        .update({ sick_until: null })
+        .update({ 
+          sick_until: null,
+          sick_start: null
+        })
         .eq('id', userId);
 
       if (userErr) throw userErr;
@@ -1647,8 +1669,14 @@ export function TeacherDashboard({
         });
 
       alert('Erfolgreich gesundgemeldet! Zukünftige Stundenplandaten wurden wieder aktiviert.');
+      // Refresh teacher profile without page reload
+      const { data: updatedTeacher } = await supabase
+        .from('users')
+        .select('*, schools(*)')
+        .eq('id', userId)
+        .single();
+      if (updatedTeacher) setTeacher(updatedTeacher);
       setTicker(t => t + 1);
-      window.location.reload();
     } catch (err) {
       console.error(err);
       alert('Fehler bei der Gesundmeldung.');
@@ -1765,7 +1793,9 @@ export function TeacherDashboard({
     return tomorrow.toISOString().substring(0, 10);
   });
   const [reportingSick, setReportingSick] = useState(false);
+  const [bypassSickView, setBypassSickView] = useState(false);
   const [sickSuccessShown, setSickSuccessShown] = useState(false);
+  const [sickNotifModal, setSickNotifModal] = useState<{ notifs: any[]; sickUntilDateStr: string } | null>(null);
   const [adminFeedbackRequests, setAdminFeedbackRequests] = useState<any[]>([]);
   const [adminFeedbackResponses, setAdminFeedbackResponses] = useState<any[]>([]);
   const [campusFeedAnnouncements, setCampusFeedAnnouncements] = useState<any[]>([]);
@@ -4388,9 +4418,226 @@ export function TeacherDashboard({
                 <div style={{ padding: '60px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Briefing wird geladen...</div>
               ) : briefingData ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  {/* Gamified KPI Cards row */}
-                  {!teacher?.sick_until && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                  {/* Bypass banner */}
+                  {teacher?.sick_until && bypassSickView && (
+                    <div style={{
+                      background: 'rgba(239, 68, 68, 0.08)',
+                      backdropFilter: 'blur(20px) saturate(190%)',
+                      border: '1.5px solid rgba(239, 68, 68, 0.2)',
+                      borderRadius: '16px',
+                      padding: '12px 20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                      boxShadow: '0 4px 12px rgba(239, 68, 68, 0.05)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#b91c1c', fontSize: '0.85rem', fontWeight: 700 }}>
+                        <span style={{ fontSize: '1.1rem' }}>🩹</span>
+                        <span>Du befindest dich im Krank-Modus (Bypass aktiv). Deine Schüler sehen den Krank-Status.</span>
+                      </div>
+                      <button 
+                        onClick={() => setBypassSickView(false)}
+                        style={{
+                          background: '#ff3b30',
+                          color: '#ffffff',
+                          border: 'none',
+                          padding: '6px 14px',
+                          borderRadius: '8px',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 8px rgba(255, 59, 48, 0.2)',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseOver={e => e.currentTarget.style.background = '#e03126'}
+                        onMouseOut={e => e.currentTarget.style.background = '#ff3b30'}
+                      >
+                        Zurück zur Krank-Ansicht
+                      </button>
+                    </div>
+                  )}
+
+                  {teacher?.sick_until && !bypassSickView ? (
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '24px',
+                      background: 'rgba(255, 255, 255, 0.45)',
+                      backdropFilter: 'blur(24px) saturate(190%)',
+                      border: '1px solid rgba(255, 255, 255, 0.5)',
+                      borderRadius: '24px',
+                      padding: '32px',
+                      boxShadow: '0 8px 32px rgba(0,0,0,0.03)',
+                      boxSizing: 'border-box'
+                    }}>
+                      {/* Hero Section */}
+                      <div style={{
+                        background: 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 50%, #fecdd3 100%)',
+                        border: '1px solid rgba(251, 113, 133, 0.2)',
+                        borderRadius: '20px',
+                        padding: '32px',
+                        textAlign: 'center',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        boxShadow: '0 10px 30px -5px rgba(251, 113, 133, 0.15)'
+                      }}>
+                        <div style={{ fontSize: '3rem', marginBottom: '12px' }}>🩹</div>
+                        <h2 style={{
+                          margin: '0 0 8px 0',
+                          fontSize: '1.8rem',
+                          fontWeight: 900,
+                          color: '#9f1239',
+                          fontFamily: "'Plus Jakarta Sans', sans-serif",
+                          letterSpacing: '-0.02em'
+                        }}>
+                          Gute Besserung, {teacher?.first_name || 'Patrick'}!
+                        </h2>
+                        <p style={{
+                          margin: 0,
+                          fontSize: '0.95rem',
+                          color: '#be123c',
+                          fontWeight: 600,
+                          lineHeight: 1.6,
+                          maxWidth: '540px',
+                          marginLeft: 'auto',
+                          marginRight: 'auto'
+                        }}>
+                          Deine Gesundheit steht an erster Stelle. Ruh dich aus – wir haben den Krankheits-Modus für dich aktiviert. Alle deine betroffenen Schüler wurden automatisch informiert.
+                        </p>
+                      </div>
+
+                      {/* Care List: notified students */}
+                      <div style={{
+                        background: 'white',
+                        border: '1px solid #f1f5f9',
+                        borderRadius: '20px',
+                        padding: '24px',
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.02)'
+                      }}>
+                        <h3 style={{
+                          margin: '0 0 16px 0',
+                          fontSize: '1.05rem',
+                          fontWeight: 800,
+                          color: '#1e293b',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}>
+                          <span>🕊️</span>
+                          <span>Für deine Beruhigung: Status deiner Schüler</span>
+                        </h3>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          {briefingData?.timeline && briefingData.timeline.filter((s: any) => s.student).length > 0 ? (
+                            briefingData.timeline
+                              .filter((s: any) => s.student)
+                              .map((slot: any, idx: number) => {
+                                const isCanceled = slot.status === 'canceled_by_teacher_sick' || slot.status === 'teacher_sick';
+                                return (
+                                  <div 
+                                    key={idx}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      padding: '12px 16px',
+                                      borderRadius: '12px',
+                                      background: isCanceled ? '#fff5f5' : '#f8fafc',
+                                      border: isCanceled ? '1px solid #fee2e2' : '1px solid #e2e8f0',
+                                      transition: 'all 0.2s'
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                      <span style={{ fontSize: '0.8rem', fontWeight: 800, color: isCanceled ? '#ef4444' : '#64748b', background: isCanceled ? '#fee2e2' : '#e2e8f0', padding: '3px 8px', borderRadius: '6px' }}>
+                                        {slot.timeSlot} Uhr
+                                      </span>
+                                      <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#334155' }}>
+                                        {slot.student.name}
+                                      </span>
+                                    </div>
+
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      {isCanceled ? (
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#b91c1c', background: '#fecdd3', padding: '4px 10px', borderRadius: '100px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                          <span>✉️</span> Benachrichtigt (Entfall)
+                                        </span>
+                                      ) : (
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#047857', background: '#d1fae5', padding: '4px 10px', borderRadius: '100px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                          <span>✓</span> Regulär / Erledigt
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })
+                          ) : (
+                            <div style={{ padding: '24px', textAlign: 'center', color: '#64748b', fontSize: '0.85rem', fontWeight: 600 }}>
+                              Heute stehen keine weiteren Termine in deinem Stundenplan.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '16px',
+                        marginTop: '8px'
+                      }}>
+                        <button
+                          onClick={() => setBypassSickView(true)}
+                          style={{
+                            background: 'transparent',
+                            color: '#475569',
+                            border: '1px solid #cbd5e1',
+                            padding: '12px 24px',
+                            borderRadius: '12px',
+                            fontSize: '0.9rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseOver={e => {
+                            e.currentTarget.style.background = '#f1f5f9';
+                            e.currentTarget.style.borderColor = '#94a3b8';
+                          }}
+                          onMouseOut={e => {
+                            e.currentTarget.style.background = 'transparent';
+                            e.currentTarget.style.borderColor = '#cbd5e1';
+                          }}
+                        >
+                          Briefing Board ansehen
+                        </button>
+
+                        <button
+                          onClick={handleEndSick}
+                          style={{
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            color: 'white',
+                            border: 'none',
+                            padding: '12px 28px',
+                            borderRadius: '12px',
+                            fontSize: '0.9rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseOver={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+                          onMouseOut={e => e.currentTarget.style.transform = 'none'}
+                        >
+                          Ich bin wieder gesund ☀️
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Gamified KPI Cards row */}
+                      {(!teacher?.sick_until || bypassSickView) && (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
 
                       {/* Card 1: Heutige Schüler (Blue-purple matching Level XP) */}
                       <div style={{
@@ -4486,7 +4733,7 @@ export function TeacherDashboard({
                     {/* LEFT COLUMN: Greeting Banner & Schüler Notizen */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: '1 1 350px', minWidth: '300px' }}>
                       {/* Premium Greeting Banner with Avatar & Wave Design */}
-                      {!teacher?.sick_until && (
+                      {(!teacher?.sick_until || bypassSickView) && (
                         <div style={{
                           background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
                           backdropFilter: 'blur(24px) saturate(1.8)',
@@ -4590,7 +4837,7 @@ export function TeacherDashboard({
  
  
  
-                      {!teacher?.sick_until && !isFreeDay && (
+                      {(!teacher?.sick_until || bypassSickView) && !isFreeDay && (
                         <div className="google-card" style={{ 
                           width: '100%', 
                           flex: 1,
@@ -5507,7 +5754,7 @@ export function TeacherDashboard({
                     </div>
 
                     {/* RIGHT COLUMN: TAGESPLAN */}
-                    {teacher?.sick_until ? (
+                    {teacher?.sick_until && !bypassSickView ? (
                       <div style={{
                         flex: '1.2 1 450px',
                         minWidth: '300px',
@@ -6144,12 +6391,14 @@ export function TeacherDashboard({
                       </div>
                     </div>
                   )}
-                </div>
+                  </div>
+                </>
+              )}
               </div>
             ) : (
-                <div style={{ padding: '40px', textAlign: 'center', color: '#ef4444' }}>Fehler beim Laden des Briefings.</div>
-              )}
-            </div>
+              <div style={{ padding: '40px', textAlign: 'center', color: '#ef4444' }}>Fehler beim Laden des Briefings.</div>
+            )}
+          </div>
 
             {/* briefing-right-sidebar */}
             <aside style={{ 
@@ -6564,7 +6813,7 @@ export function TeacherDashboard({
                 </div>
               )}
 
-              {!teacher?.sick_until && (
+              {(!teacher?.sick_until || bypassSickView) && (
                 <>
                   {/* INFOS DER VERWALTUNG */}
                   <div style={{ 
@@ -9748,7 +9997,159 @@ export function TeacherDashboard({
                 <p style={{ color: '#64748b', fontWeight: 600 }}>Es gibt aktuell keine ausstehenden Challenges.</p>
               </div>
             )}
+          </div>
+        </div>
+      )}
 
+      {/* ── KRANKMELDUNGS-BESTÄTIGUNG MODAL ── */}
+      {sickNotifModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '24px',
+          }}
+          onClick={() => setSickNotifModal(null)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'white', borderRadius: '28px',
+              padding: '32px', width: '100%', maxWidth: '540px',
+              maxHeight: '80vh', overflow: 'hidden',
+              display: 'flex', flexDirection: 'column', gap: '20px',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.2)',
+            }}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+              <div style={{
+                background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                borderRadius: '16px', padding: '12px', flexShrink: 0,
+                boxShadow: '0 6px 20px rgba(239,68,68,0.3)',
+              }}>
+                <AlertTriangle size={22} color="white" />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  Krankmeldung registriert
+                </h2>
+                <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                  Gemeldet bis einschließlich{' '}
+                  <strong style={{ color: '#ef4444' }}>
+                    {new Date(sickNotifModal.sickUntilDateStr).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+                  </strong>
+                </p>
+              </div>
+              <button
+                onClick={() => setSickNotifModal(null)}
+                style={{
+                  background: '#f1f5f9', border: 'none', borderRadius: '10px',
+                  padding: '8px', cursor: 'pointer', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <X size={16} color="#64748b" />
+              </button>
+            </div>
+
+            {/* Status bar */}
+            <div style={{
+              background: sickNotifModal.notifs.length > 0 ? '#fff5f5' : '#f0fdf4',
+              border: `1.5px solid ${sickNotifModal.notifs.length > 0 ? '#fecaca' : '#bbf7d0'}`,
+              borderRadius: '16px', padding: '14px 16px',
+              display: 'flex', alignItems: 'center', gap: '12px',
+            }}>
+              <span style={{ fontSize: '1.5rem' }}>
+                {sickNotifModal.notifs.length > 0 ? '🔔' : '🎉'}
+              </span>
+              <div>
+                <strong style={{ fontSize: '0.85rem', color: '#0f172a', display: 'block', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  {sickNotifModal.notifs.length > 0
+                    ? `${sickNotifModal.notifs.length} Schüler werden benachrichtigt`
+                    : 'Keine Stunden betroffen'}
+                </strong>
+                <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                  {sickNotifModal.notifs.length > 0
+                    ? 'Die Verwaltung sieht alle Fälle im Krisen-Dashboard und informiert die Schüler.'
+                    : 'Für diesen Zeitraum gibt es keine geplanten Stunden.'}
+                </span>
+              </div>
+            </div>
+
+            {/* Affected student list */}
+            {sickNotifModal.notifs.length > 0 && (
+              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <p style={{ margin: 0, fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Betroffene Stunden ({sickNotifModal.notifs.length})
+                </p>
+                {sickNotifModal.notifs.map((n, i) => {
+                  const dt = new Date(n.slot_start_datetime);
+                  const dateStr = dt.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+                  const timeStr = dt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                  return (
+                    <div
+                      key={i}
+                      style={{
+                        background: '#f8fafc', border: '1.5px solid #e2e8f0',
+                        borderLeft: '4px solid #ef4444',
+                        borderRadius: '14px', padding: '12px 14px',
+                        display: 'flex', alignItems: 'center', gap: '12px',
+                      }}
+                    >
+                      <div style={{
+                        width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
+                        background: 'linear-gradient(135deg, #fef2f2, #fee2e2)',
+                        border: '2px solid #fecaca',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '0.85rem', fontWeight: 800, color: '#dc2626',
+                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                      }}>
+                        {String(i + 1).padStart(2, '0')}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 800, fontSize: '0.82rem', color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                          Schüler ID: {n.student_id?.substring(0, 8)}…
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px', display: 'flex', gap: '8px' }}>
+                          <span>📅 {dateStr}</span>
+                          <span>🕒 {timeStr} Uhr</span>
+                        </div>
+                      </div>
+                      <span style={{
+                        fontSize: '0.65rem', fontWeight: 800, padding: '3px 10px',
+                        borderRadius: '100px', background: '#fef2f2', color: '#dc2626',
+                        border: '1px solid #fecaca', whiteSpace: 'nowrap',
+                      }}>Storno</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Info + close button */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{
+                background: '#eff6ff', border: '1px solid #bfdbfe',
+                borderRadius: '12px', padding: '10px 14px',
+                fontSize: '0.72rem', color: '#3b82f6', lineHeight: 1.5,
+              }}>
+                ℹ️ Die <strong>Verwaltung</strong> wurde automatisch alarmiert. Im Krisen-Dashboard können alle Fälle eingesehen und als <em>"Informiert"</em> markiert werden.
+              </div>
+              <button
+                onClick={() => setSickNotifModal(null)}
+                style={{
+                  background: 'linear-gradient(135deg, #0f172a, #1e293b)',
+                  color: 'white', border: 'none', borderRadius: '14px',
+                  padding: '14px', fontWeight: 900, fontSize: '0.85rem',
+                  cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif",
+                  boxShadow: '0 4px 16px rgba(15,23,42,0.2)',
+                }}
+              >
+                ✓ Verstanden — Zurück zum Briefing
+              </button>
+            </div>
           </div>
         </div>
       )}

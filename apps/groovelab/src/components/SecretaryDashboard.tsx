@@ -1152,6 +1152,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [limitsEnabled, setLimitsEnabled] = useState<boolean>(false);
   const [logoUrl, setLogoUrl] = useState<string>('');
+  const [calendarUrl, setCalendarUrl] = useState<string>('');
   
   // Tokens & Settings
   const [kioskToken, setKioskToken] = useState<string>('');
@@ -1403,7 +1404,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       // Fetch school settings
       const { data: schoolData, error: schoolErr } = await supabase
         .from('schools')
-        .select('name, logo_url, primary_color, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota')
+        .select('name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota')
         .eq('id', schoolId)
         .single();
 
@@ -1412,6 +1413,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         setSchoolName(schoolData.name);
         setEditColor(schoolData.primary_color || '#1a73e8');
         setLogoUrl(schoolData.logo_url || '');
+        setCalendarUrl(schoolData.calendar_url || '');
         setKioskToken(schoolData.groovelab_kiosk_token || '');
         setCampusToken(schoolData.campus_login_token || '');
         setAllowMessagesGlobal(schoolData.allow_messages_global ?? true);
@@ -1838,6 +1840,132 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     }
   };
 
+  const handleEndSickOnBehalf = async (teacherId: string, teacherName: string) => {
+    try {
+      const confirmOk = window.confirm(`Möchten Sie ${teacherName} wirklich gesund melden? Alle betroffenen zukünftigen Stunden werden reaktiviert.`);
+      if (!confirmOk) return;
+
+      const { data: profile, error: profileErr } = await supabase
+        .from('users')
+        .select('school_id')
+        .eq('id', teacherId)
+        .single();
+
+      if (profileErr || !profile) {
+        throw new Error('Lehrerprofil nicht gefunden.');
+      }
+
+      // 1. Clear user sick columns
+      const { error: userErr } = await supabase
+        .from('users')
+        .update({ 
+          sick_until: null,
+          sick_start: null
+        })
+        .eq('id', teacherId);
+
+      if (userErr) throw userErr;
+
+      // 2. Fetch weekly schedules
+      const { data: schedules, error: schedError } = await supabase
+        .from('schedules')
+        .select('*')
+        .eq('teacher_id', teacherId);
+
+      if (schedError) throw schedError;
+
+      // 3. Fetch occurrences
+      const { data: occurrences } = await supabase
+        .from('schedule_occurrences')
+        .select('*')
+        .eq('teacher_id', teacherId);
+
+      const now = new Date();
+      const todayStart = new Date(now);
+      todayStart.setHours(0, 0, 0, 0);
+
+      const maxDate = new Date(now);
+      maxDate.setDate(maxDate.getDate() + 30); // 30 days window
+
+      const currentDate = new Date(todayStart);
+      const scheduleIdsToRestore = new Set<string>();
+      const datesToDeleteNotifs: string[] = [];
+
+      while (currentDate <= maxDate) {
+        const rawDay = currentDate.getDay();
+        const currentDayOfWeek = rawDay === 0 ? 7 : rawDay;
+        const daySchedules = (schedules || []).filter(s => s.day_of_week === currentDayOfWeek);
+
+        daySchedules.forEach(sched => {
+          const [hours, minutes] = (sched.time_slot || '00:00').split(':').map(Number);
+          const startDateTime = new Date(currentDate);
+          startDateTime.setHours(hours, minutes, 0, 0);
+
+          if (startDateTime >= now) {
+            scheduleIdsToRestore.add(sched.id);
+            datesToDeleteNotifs.push(startDateTime.toISOString());
+          }
+        });
+
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+
+      const occurrenceIdsToRestore = new Set<string>();
+      (occurrences || []).forEach(occ => {
+        const startDateTime = new Date(`${occ.date}T${occ.start_time}`);
+        if (startDateTime >= now) {
+          occurrenceIdsToRestore.add(occ.id);
+          datesToDeleteNotifs.push(startDateTime.toISOString());
+        }
+      });
+
+      // Restore schedules
+      if (scheduleIdsToRestore.size > 0) {
+        await supabase
+          .from('schedules')
+          .update({ status: 'approved' })
+          .in('id', Array.from(scheduleIdsToRestore))
+          .eq('status', 'canceled_by_teacher_sick');
+      }
+
+      // Restore occurrences
+      if (occurrenceIdsToRestore.size > 0) {
+        await supabase
+          .from('schedule_occurrences')
+          .update({ status: 'rescheduled_confirmed' })
+          .in('id', Array.from(occurrenceIdsToRestore))
+          .eq('status', 'canceled_by_teacher_sick');
+      }
+
+      // Delete future notifications
+      if (datesToDeleteNotifs.length > 0) {
+        await supabase
+          .from('crisis_notifications')
+          .delete()
+          .eq('teacher_id', teacherId)
+          .in('slot_start_datetime', datesToDeleteNotifs);
+      }
+
+      // Add healthy alert
+      const alertMessage = `🍏 LEHRKRAFT GESUND (Verwaltung): Lehrkraft ${teacherName} wurde durch die Verwaltung wieder gesund gemeldet.`;
+      await supabase
+        .from('system_alerts')
+        .insert({
+          school_id: profile.school_id,
+          teacher_id: teacherId,
+          type: 'Teacher Healthy Alert',
+          message: alertMessage,
+          resolved: false
+        });
+
+      alert('Erfolgreich gesundgemeldet! Zukünftige Stundenplandaten wurden wieder aktiviert.');
+      fetchDashboardData();
+    } catch (err: any) {
+      console.error(err);
+      alert('Fehler bei der Gesundmeldung: ' + err.message);
+    }
+  };
+
   const handleBulkTeacherImport = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!bulkTxtInput.trim()) {
@@ -2096,6 +2224,26 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       if (error) throw error;
       setPendingUserQuota(userQuota);
       alert(`Erfolgreich! Dein gewünschtes Kontingent von ${userQuota} Usern wurde für den nächsten Monat vorgemerkt und kann bis zum Monatsende geändert werden.`);
+      fetchDashboardData();
+    } catch (err: any) {
+      alert('Fehler beim Speichern: ' + err.message);
+    }
+  };
+
+  const handleSaveBrandingAndCalendar = async () => {
+    try {
+      const { error } = await supabase
+        .from('schools')
+        .update({
+          name: schoolName,
+          primary_color: editColor,
+          logo_url: logoUrl || null,
+          calendar_url: calendarUrl || null
+        })
+        .eq('id', schoolId);
+
+      if (error) throw error;
+      alert('Branding- und Kalendereinstellungen erfolgreich gespeichert! 🎨🔗');
       fetchDashboardData();
     } catch (err: any) {
       alert('Fehler beim Speichern: ' + err.message);
@@ -6971,96 +7119,110 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             const dateStr = new Date(t.slot_start_datetime).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' });
 
             const urgencyMeta = {
-              RED:    { leftBar: '#ef4444', bg: '#fff5f5', border: '#fecaca', badge: '#ef4444', badgeText: 'white', badgeLabel: '⚡ Sofort', dot: '#ef4444' },
-              YELLOW: { leftBar: '#f59e0b', bg: '#fffbeb', border: '#fde68a', badge: '#f59e0b', badgeText: 'white', badgeLabel: '⏳ Ungelesen', dot: '#f59e0b' },
-              GREEN:  { leftBar: '#10b981', bg: '#f0fdf4', border: '#bbf7d0', badge: '#10b981', badgeText: 'white', badgeLabel: '✓ Informiert', dot: '#10b981' },
+              RED:    { leftBar: '#ef4444', bg: 'linear-gradient(135deg, rgba(254, 242, 242, 0.75) 0%, rgba(254, 226, 226, 0.45) 100%)', border: 'rgba(239, 68, 68, 0.25)', badge: '#ef4444', badgeText: 'white', badgeLabel: '🚨 Akuter Ausfall', dot: '#ef4444' },
+              YELLOW: { leftBar: '#f59e0b', bg: 'linear-gradient(135deg, rgba(255, 251, 235, 0.75) 0%, rgba(254, 243, 199, 0.45) 100%)', border: 'rgba(245, 158, 11, 0.25)', badge: '#f59e0b', badgeText: 'white', badgeLabel: '⏳ Ausstehend', dot: '#f59e0b' },
+              GREEN:  { leftBar: '#10b981', bg: 'linear-gradient(135deg, rgba(240, 253, 244, 0.75) 0%, rgba(220, 252, 231, 0.45) 100%)', border: 'rgba(16, 185, 129, 0.25)', badge: '#10b981', badgeText: 'white', badgeLabel: '✓ Informiert', dot: '#10b981' },
             };
             const m = urgencyMeta[urgency] || urgencyMeta['GREEN'];
 
             return (
               <div key={t.id} style={{
                 background: m.bg,
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
                 border: `1px solid ${m.border}`,
-                borderLeft: `4px solid ${m.leftBar}`,
-                borderRadius: '16px',
-                padding: '16px 20px',
+                borderLeft: `5px solid ${m.leftBar}`,
+                borderRadius: '20px',
+                padding: '18px 22px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '16px',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-              }}>
-                {/* Status dot */}
+                gap: '18px',
+                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: '0 8px 32px rgba(15, 23, 42, 0.03)',
+              }} className="hover-scale">
+                {/* Status dot with pulsing effect for acute issues */}
                 <div style={{
                   width: '10px', height: '10px', borderRadius: '50%',
                   background: m.dot, flexShrink: 0,
-                  boxShadow: urgency === 'RED' ? `0 0 0 4px rgba(239,68,68,0.2)` : 'none',
-                }} />
+                  position: 'relative',
+                  boxShadow: urgency === 'RED' ? '0 0 10px rgba(239,68,68,0.6)' : 'none',
+                }}>
+                  {urgency === 'RED' && (
+                    <div style={{
+                      position: 'absolute', inset: -4, borderRadius: '50%',
+                      border: '2px solid #ef4444', animation: 'ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite'
+                    }} />
+                  )}
+                </div>
 
                 {/* Main info */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                       {studentName}
                     </span>
                     <span style={{
-                      fontSize: '0.65rem', fontWeight: 700, background: '#e2e8f0',
-                      color: '#475569', padding: '2px 8px', borderRadius: '100px',
+                      fontSize: '0.68rem', fontWeight: 800, background: 'rgba(15, 23, 42, 0.06)',
+                      color: '#475569', padding: '3px 10px', borderRadius: '100px',
+                      backdropFilter: 'blur(4px)'
                     }}>{subject}</span>
                   </div>
-                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600 }}>
                       <span>📅</span> {dateStr}
                     </span>
-                    <span style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600 }}>
                       <span>🕒</span> {timeStr} Uhr
                     </span>
-                    <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
-                      Lehrk.: <strong style={{ color: '#475569' }}>{teacherName}</strong>
+                    <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                      Lehrkraft: <strong style={{ color: '#0f172a', fontWeight: 700 }}>{teacherName}</strong>
                     </span>
                   </div>
                 </div>
 
                 {/* Badge */}
                 <span style={{
-                  padding: '5px 12px', borderRadius: '100px', flexShrink: 0,
-                  fontSize: '0.7rem', fontWeight: 800, whiteSpace: 'nowrap',
+                  padding: '6px 14px', borderRadius: '100px', flexShrink: 0,
+                  fontSize: '0.72rem', fontWeight: 900, whiteSpace: 'nowrap',
                   background: m.badge, color: m.badgeText,
-                  boxShadow: `0 2px 8px ${m.badge}40`,
+                  boxShadow: `0 4px 14px ${m.badge}35`,
                 }}>{m.badgeLabel}</span>
 
                 {/* Action buttons – only in live mode */}
                 {crisisTabMode === 'live' && (
-                  <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                     {t.status !== 'READ' && (
                       <button
                         onClick={() => handleMarkAsNotified(t.id)}
                         style={{
-                          display: 'flex', alignItems: 'center', gap: '5px',
-                          background: '#f0fdf4', border: '1.5px solid #bbf7d0',
-                          color: '#059669', borderRadius: '10px', padding: '7px 12px',
-                          fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
-                          transition: 'all 0.15s', fontFamily: "'Plus Jakarta Sans', sans-serif",
+                          display: 'flex', alignItems: 'center', gap: '6px',
+                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          border: 'none',
+                          color: 'white', borderRadius: '12px', padding: '8px 14px',
+                          fontSize: '0.75rem', fontWeight: 900, cursor: 'pointer',
+                          boxShadow: '0 4px 12px rgba(16,185,129,0.2)',
+                          transition: 'all 0.2s', fontFamily: "'Plus Jakarta Sans', sans-serif",
                         }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#dcfce7'; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f0fdf4'; }}
+                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(16,185,129,0.3)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(16,185,129,0.2)'; }}
                       >
-                        <CheckCircle size={13} /> Informiert
+                        <CheckCircle size={14} /> Informiert
                       </button>
                     )}
                     <button
                       onClick={() => handleArchiveCrisisTicket(t.id)}
                       style={{
-                        display: 'flex', alignItems: 'center', gap: '5px',
-                        background: '#f8fafc', border: '1.5px solid #e2e8f0',
-                        color: '#94a3b8', borderRadius: '10px', padding: '7px 12px',
-                        fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
-                        transition: 'all 0.15s', fontFamily: "'Plus Jakarta Sans', sans-serif",
+                        display: 'flex', alignItems: 'center', gap: '6px',
+                        background: 'white', border: '1.5px solid #e2e8f0',
+                        color: '#64748b', borderRadius: '12px', padding: '8px 14px',
+                        fontSize: '0.75rem', fontWeight: 900, cursor: 'pointer',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                        transition: 'all 0.2s', fontFamily: "'Plus Jakarta Sans', sans-serif",
                       }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f1f5f9'; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f8fafc'; }}
+                      onMouseEnter={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.color = '#0f172a'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.color = '#64748b'; }}
                     >
-                      <X size={13} /> Archivieren
+                      <X size={14} /> Archivieren
                     </button>
                   </div>
                 )}
@@ -7076,97 +7238,101 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 {/* KPI 1: Aktive Ausfälle */}
                 <div style={{
                   background: unreadCount > 0
-                    ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
-                    : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  color: 'white', borderRadius: '20px', padding: '20px',
+                    ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(220, 38, 38, 0.95) 100%)'
+                    : 'linear-gradient(135deg, rgba(16, 185, 129, 0.95) 0%, rgba(5, 150, 105, 0.95) 100%)',
+                  color: 'white', borderRadius: '24px', padding: '22px',
                   display: 'flex', flexDirection: 'column', gap: '8px',
                   boxShadow: unreadCount > 0
-                    ? '0 10px 25px -5px rgba(239,68,68,0.35)'
-                    : '0 10px 25px -5px rgba(16,185,129,0.25)',
-                  border: '1px solid rgba(255,255,255,0.15)',
+                    ? '0 12px 30px -5px rgba(239,68,68,0.4)'
+                    : '0 12px 30px -5px rgba(16,185,129,0.3)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  backdropFilter: 'blur(20px)',
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.85 }}>
-                      Offene Fälle
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.85 }}>
+                      Offene Ausfälle
                     </span>
-                    <div style={{ background: 'rgba(255,255,255,0.2)', padding: '5px', borderRadius: '8px' }}>
-                      <ShieldAlert size={13} color="white" />
+                    <div style={{ background: 'rgba(255,255,255,0.2)', padding: '6px', borderRadius: '10px' }}>
+                      <ShieldAlert size={15} color="white" />
                     </div>
                   </div>
-                  <div style={{ fontSize: '2rem', fontWeight: 950, letterSpacing: '-0.02em', lineHeight: 1 }}>
+                  <div style={{ fontSize: '2.2rem', fontWeight: 950, letterSpacing: '-0.02em', lineHeight: 1, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                     {unreadCount}
                   </div>
-                  <span style={{ fontSize: '0.68rem', opacity: 0.8 }}>
-                    {unreadCount === 0 ? 'Alles in Ordnung' : 'Benachrichtigung ausstehend'}
+                  <span style={{ fontSize: '0.72rem', opacity: 0.85, fontWeight: 600 }}>
+                    {unreadCount === 0 ? 'Exzellent — Alles im Plan' : 'Benachrichtigung ausstehend'}
                   </span>
                 </div>
 
                 {/* KPI 2: Kranke Lehrkräfte */}
                 <div style={{
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                  color: 'white', borderRadius: '20px', padding: '20px',
+                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.95) 0%, rgba(217, 119, 6, 0.95) 100%)',
+                  color: 'white', borderRadius: '24px', padding: '22px',
                   display: 'flex', flexDirection: 'column', gap: '8px',
-                  boxShadow: '0 10px 25px -5px rgba(245,158,11,0.3)',
-                  border: '1px solid rgba(255,255,255,0.15)',
+                  boxShadow: '0 12px 30px -5px rgba(245,158,11,0.35)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  backdropFilter: 'blur(20px)',
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.85 }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.85 }}>
                       Kranke Lehrkräfte
                     </span>
-                    <div style={{ background: 'rgba(255,255,255,0.2)', padding: '5px', borderRadius: '8px' }}>
-                      <UserX size={13} color="white" />
+                    <div style={{ background: 'rgba(255,255,255,0.2)', padding: '6px', borderRadius: '10px' }}>
+                      <UserX size={15} color="white" />
                     </div>
                   </div>
-                  <div style={{ fontSize: '2rem', fontWeight: 950, letterSpacing: '-0.02em', lineHeight: 1 }}>
+                  <div style={{ fontSize: '2.2rem', fontWeight: 950, letterSpacing: '-0.02em', lineHeight: 1, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                     {sickTeachers.length}
                   </div>
-                  <span style={{ fontSize: '0.68rem', opacity: 0.8 }}>
-                    {sickTeachers.length === 1 ? '1 Lehrkraft im Ausfall' : `${sickTeachers.length} Lehrkräfte im Ausfall`}
+                  <span style={{ fontSize: '0.72rem', opacity: 0.85, fontWeight: 600 }}>
+                    {sickTeachers.length === 1 ? '1 Lehrkraft abwesend' : `${sickTeachers.length} Lehrkräfte abwesend`}
                   </span>
                 </div>
 
                 {/* KPI 3: Bereits informiert */}
                 <div style={{
-                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                  color: 'white', borderRadius: '20px', padding: '20px',
+                  background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.95) 0%, rgba(79, 70, 229, 0.95) 100%)',
+                  color: 'white', borderRadius: '24px', padding: '22px',
                   display: 'flex', flexDirection: 'column', gap: '8px',
-                  boxShadow: '0 10px 25px -5px rgba(99,102,241,0.3)',
-                  border: '1px solid rgba(255,255,255,0.15)',
+                  boxShadow: '0 12px 30px -5px rgba(99,102,241,0.35)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  backdropFilter: 'blur(20px)',
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.85 }}>
-                      Informiert
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.85 }}>
+                      Erfolgreich Informiert
                     </span>
-                    <div style={{ background: 'rgba(255,255,255,0.2)', padding: '5px', borderRadius: '8px' }}>
-                      <CheckCircle size={13} color="white" />
+                    <div style={{ background: 'rgba(255,255,255,0.2)', padding: '6px', borderRadius: '10px' }}>
+                      <CheckCircle size={15} color="white" />
                     </div>
                   </div>
-                  <div style={{ fontSize: '2rem', fontWeight: 950, letterSpacing: '-0.02em', lineHeight: 1 }}>
+                  <div style={{ fontSize: '2.2rem', fontWeight: 950, letterSpacing: '-0.02em', lineHeight: 1, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                     {readCount}
                   </div>
-                  <span style={{ fontSize: '0.68rem', opacity: 0.8 }}>Schüler benachrichtigt</span>
+                  <span style={{ fontSize: '0.72rem', opacity: 0.85, fontWeight: 600 }}>Terminänderung zugestellt</span>
                 </div>
 
                 {/* KPI 4: Archiviert */}
                 <div style={{
-                  background: 'linear-gradient(135deg, #64748b 0%, #475569 100%)',
-                  color: 'white', borderRadius: '20px', padding: '20px',
+                  background: 'linear-gradient(135deg, rgba(100, 116, 139, 0.95) 0%, rgba(71, 85, 105, 0.95) 100%)',
+                  color: 'white', borderRadius: '24px', padding: '22px',
                   display: 'flex', flexDirection: 'column', gap: '8px',
-                  boxShadow: '0 10px 25px -5px rgba(100,116,139,0.2)',
-                  border: '1px solid rgba(255,255,255,0.15)',
+                  boxShadow: '0 12px 30px -5px rgba(100,116,139,0.25)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  backdropFilter: 'blur(20px)',
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.85 }}>
-                      Archiv
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.85 }}>
+                      Archivierte Fälle
                     </span>
-                    <div style={{ background: 'rgba(255,255,255,0.2)', padding: '5px', borderRadius: '8px' }}>
-                      <Clock size={13} color="white" />
+                    <div style={{ background: 'rgba(255,255,255,0.2)', padding: '6px', borderRadius: '10px' }}>
+                      <Clock size={15} color="white" />
                     </div>
                   </div>
-                  <div style={{ fontSize: '2rem', fontWeight: 950, letterSpacing: '-0.02em', lineHeight: 1 }}>
+                  <div style={{ fontSize: '2.2rem', fontWeight: 950, letterSpacing: '-0.02em', lineHeight: 1, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                     {archivedCount}
                   </div>
-                  <span style={{ fontSize: '0.68rem', opacity: 0.8 }}>Abgeschlossene Fälle</span>
+                  <span style={{ fontSize: '0.72rem', opacity: 0.85, fontWeight: 600 }}>Protokollierte Historie</span>
                 </div>
               </div>
 
@@ -7178,46 +7344,56 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                   {/* Section header + tab toggle */}
                   <div style={{
-                    background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '20px',
-                    padding: '16px 20px', display: 'flex', alignItems: 'center',
-                    justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
+                    backdropFilter: 'blur(24px) saturate(1.8)',
+                    WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
+                    border: '1px solid rgba(255, 255, 255, 0.5)',
+                    borderRadius: '24px',
+                    padding: '18px 24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '16px',
+                    flexWrap: 'wrap',
+                    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <div style={{
                         background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-                        borderRadius: '12px', padding: '8px',
-                        boxShadow: '0 4px 12px rgba(239,68,68,0.25)',
+                        borderRadius: '14px', padding: '10px',
+                        boxShadow: '0 6px 20px rgba(239,68,68,0.25)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
                       }}>
-                        <ShieldAlert size={18} color="white" />
+                        <ShieldAlert size={20} color="white" />
                       </div>
                       <div>
-                        <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                        <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                           Operations-Cockpit
-                          {selectedCrisisTeacherId && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginLeft: '8px' }}>— gefiltert</span>}
+                          {selectedCrisisTeacherId && <span style={{ color: '#ef4444', fontSize: '0.78rem', marginLeft: '10px', background: '#fee2e2', padding: '2px 10px', borderRadius: '100px', fontWeight: 800 }}>Gefiltert</span>}
                         </h3>
-                        <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: '#94a3b8' }}>
-                          Lehrerausfall-Kaskade · Schülerbenachrichtigungen in Echtzeit
+                        <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                          Lehrerausfall-Kaskade &bull; Live-Abgleich mit Schülerbenachrichtigungen
                         </p>
                       </div>
                     </div>
 
                     {/* Live / Archiv toggle */}
                     <div style={{
-                      display: 'flex', background: '#f1f5f9', borderRadius: '12px',
-                      padding: '4px', gap: '2px', border: '1px solid #e2e8f0',
+                      display: 'flex', background: 'rgba(15, 23, 42, 0.04)', borderRadius: '14px',
+                      padding: '4px', gap: '4px', border: '1px solid rgba(0, 0, 0, 0.03)',
+                      backdropFilter: 'blur(8px)'
                     }}>
-                      {([['live', '⚡ Live'], ['history', '📁 Archiv']] as const).map(([mode, label]) => (
+                      {([['live', '⚡ Aktive Fälle'], ['history', '📁 Historie & Archiv']] as const).map(([mode, label]) => (
                         <button
                           key={mode}
                           onClick={() => setCrisisTabMode(mode)}
                           style={{
-                            padding: '7px 16px', borderRadius: '9px', border: 'none',
-                            fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer',
-                            fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'all 0.18s',
+                            padding: '8px 18px', borderRadius: '10px', border: 'none',
+                            fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer',
+                            fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                             background: crisisTabMode === mode ? 'white' : 'transparent',
                             color: crisisTabMode === mode ? '#0f172a' : '#64748b',
-                            boxShadow: crisisTabMode === mode ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
+                            boxShadow: crisisTabMode === mode ? '0 4px 12px rgba(15, 23, 42, 0.08)' : 'none',
                           }}
                         >{label}</button>
                       ))}
@@ -7227,57 +7403,61 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   {/* Empty state */}
                   {visibleTickets.length === 0 && (
                     <div style={{
-                      background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '20px',
-                      padding: '60px 40px', textAlign: 'center',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
+                      backdropFilter: 'blur(24px)',
+                      WebkitBackdropFilter: 'blur(24px)',
+                      border: '1px solid rgba(255, 255, 255, 0.5)',
+                      borderRadius: '24px',
+                      padding: '80px 40px', textAlign: 'center',
+                      boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
                     }}>
-                      <div style={{ fontSize: '3rem', marginBottom: '16px' }}>
-                        {crisisTabMode === 'live' ? '🎉' : '📁'}
+                      <div style={{ fontSize: '3.5rem', marginBottom: '20px' }}>
+                        {crisisTabMode === 'live' ? '✨' : '📁'}
                       </div>
-                      <strong style={{ display: 'block', fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", marginBottom: '8px' }}>
+                      <strong style={{ display: 'block', fontSize: '1.25rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", marginBottom: '8px' }}>
                         {crisisTabMode === 'live'
-                          ? (selectedCrisisTeacherId ? 'Keine Fälle für diese Lehrkraft' : 'Keine aktiven Ausfälle')
-                          : 'Archiv ist leer'}
+                          ? (selectedCrisisTeacherId ? 'Keine offenen Ausfälle für diese Lehrkraft' : 'Alle Systeme im grünen Bereich!')
+                          : 'Keine archivierten Einträge'}
                       </strong>
-                      <p style={{ margin: 0, fontSize: '0.85rem', color: '#94a3b8' }}>
+                      <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', fontWeight: 600, maxWidth: '460px', marginInline: 'auto', lineHeight: 1.4 }}>
                         {crisisTabMode === 'live'
-                          ? 'Alle Lehrkräfte sind im Dienst. Neue Krankmeldungen erscheinen hier automatisch.'
-                          : 'Abgeschlossene Fälle werden hier protokolliert.'}
+                          ? 'Aktuell liegen keine Krankheitsausfälle mit anstehenden Konflikten vor. Neue Krankmeldungen der Lehrer werden hier sofort erfasst.'
+                          : 'Gelöste und archivierte Unterrichtsausfälle werden hier zur Nachvollziehbarkeit protokolliert.'}
                       </p>
                     </div>
                   )}
 
                   {/* Ticket groups – LIVE mode */}
                   {crisisTabMode === 'live' && visibleTickets.length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                       {redTickets.length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '2px 4px' }}>
-                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', display: 'inline-block', boxShadow: '0 0 0 3px rgba(239,68,68,0.2)' }} />
-                            <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                              ⚠ Akute Eskalation — Unterricht beginnt in unter 2 Std.
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '2px 6px' }}>
+                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', display: 'inline-block', boxShadow: '0 0 10px rgba(239,68,68,0.5)', animation: 'pulse 1.5s infinite' }} />
+                            <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                              🚨 Akute Konflikte — Unterricht beginnt in weniger als 2 Std. (Sofort handeln)
                             </span>
                           </div>
                           {redTickets.map(t => <TicketCard key={t.id} t={t} />)}
                         </div>
                       )}
                       {yellowTickets.length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '2px 4px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '2px 6px' }}>
                             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }} />
-                            <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#78716c', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                              Ungelesen — Schüler noch nicht informiert
+                            <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#78716c', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                              Ausstehend — Schüler noch nicht informiert
                             </span>
                           </div>
                           {yellowTickets.map(t => <TicketCard key={t.id} t={t} />)}
                         </div>
                       )}
                       {greenTickets.length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '2px 4px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '2px 6px' }}>
                             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-                            <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#78716c', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                              Informiert — Schüler wurden kontaktiert
+                            <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#78716c', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                              Erledigt — Schüler wurden erfolgreich kontaktiert
                             </span>
                           </div>
                           {greenTickets.map(t => <TicketCard key={t.id} t={t} />)}
@@ -7288,40 +7468,50 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                   {/* Ticket list – ARCHIVE mode */}
                   {crisisTabMode === 'history' && visibleTickets.length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       {visibleTickets.map(t => <TicketCard key={t.id} t={t} />)}
                     </div>
                   )}
                 </div>
 
                 {/* RIGHT SIDEBAR */}
-                <div style={{ width: '260px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ width: '310px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
                   {/* Sick teacher list */}
                   <div style={{
-                    background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '20px',
-                    padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
+                    backdropFilter: 'blur(24px)',
+                    WebkitBackdropFilter: 'blur(24px)',
+                    border: '1px solid rgba(255, 255, 255, 0.5)',
+                    borderRadius: '24px',
+                    padding: '24px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '16px',
+                    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
-                      <div style={{ background: '#fff5f5', borderRadius: '10px', padding: '8px', border: '1px solid #fecaca' }}>
-                        <UserX size={15} color="#ef4444" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '14px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                      <div style={{
+                        background: '#fee2e2', borderRadius: '12px', padding: '8px', border: '1px solid #fecaca',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}>
+                        <UserX size={16} color="#ef4444" />
                       </div>
-                      <div>
-                        <strong style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0f172a', display: 'block', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <strong style={{ fontSize: '0.9rem', fontWeight: 950, color: '#0f172a', display: 'block', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                           Krankmeldungen
                         </strong>
-                        <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Klick = Filter</span>
+                        <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Wählen zum Filtern</span>
                       </div>
                     </div>
 
                     {sickTeachers.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: '16px 0' }}>
-                        <div style={{ fontSize: '1.5rem', marginBottom: '6px' }}>✅</div>
-                        <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8' }}>Alle Lehrkräfte im Dienst</p>
+                      <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                        <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🍏</div>
+                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', fontWeight: 700 }}>Alle Lehrkräfte aktiv im Dienst</p>
                       </div>
                     ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {sickTeachers.map((teacher: any) => {
                           const count = crisisNotifications.filter(n => n.teacher?.id === teacher.id).length;
                           const isSelected = selectedCrisisTeacherId === teacher.id;
@@ -7330,38 +7520,57 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               key={teacher.id}
                               onClick={() => setSelectedCrisisTeacherId(isSelected ? null : teacher.id)}
                               style={{
-                                display: 'flex', alignItems: 'center', gap: '10px',
-                                background: isSelected ? '#fff5f5' : '#f8fafc',
-                                border: `1.5px solid ${isSelected ? '#fecaca' : '#e2e8f0'}`,
-                                borderRadius: '14px', padding: '10px 12px',
+                                display: 'flex', alignItems: 'center', gap: '12px',
+                                background: isSelected ? '#fff5f5' : 'white',
+                                border: `1.5px solid ${isSelected ? '#ef4444' : '#e2e8f0'}`,
+                                borderRadius: '16px', padding: '12px 14px',
                                 cursor: 'pointer', transition: 'all 0.2s ease',
                                 transform: isSelected ? 'scale(1.02)' : 'scale(1)',
-                                boxShadow: isSelected ? '0 4px 12px rgba(239,68,68,0.1)' : 'none',
+                                boxShadow: isSelected ? '0 8px 20px rgba(239,68,68,0.08)' : '0 2px 4px rgba(0,0,0,0.01)',
                               }}
                             >
                               <div style={{
-                                width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
-                                background: isSelected ? '#fef2f2' : '#f1f5f9',
+                                width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
+                                background: isSelected ? 'linear-gradient(135deg, #fef2f2, #fee2e2)' : '#f1f5f9',
                                 border: `2px solid ${isSelected ? '#fecaca' : '#e2e8f0'}`,
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontSize: '0.85rem', fontWeight: 800,
+                                fontSize: '0.9rem', fontWeight: 900,
                                 color: isSelected ? '#ef4444' : '#475569',
                                 fontFamily: "'Plus Jakarta Sans', sans-serif",
                               }}>
                                 {teacher.first_name?.[0]?.toUpperCase() || 'L'}
                               </div>
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontWeight: 800, fontSize: '0.82rem', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                <div style={{ fontWeight: 900, fontSize: '0.85rem', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                                   {teacher.first_name} {teacher.last_name}
                                 </div>
-                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '2px' }}>
-                                  <span style={{ fontSize: '0.67rem', fontWeight: 700, color: '#ef4444' }}>
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '3px' }}>
+                                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ef4444' }}>
                                     {count} {count === 1 ? 'Fall' : 'Fälle'}
                                   </span>
-                                  <span style={{ color: '#cbd5e1', fontSize: '0.6rem' }}>•</span>
-                                  <span style={{ fontSize: '0.67rem', color: '#94a3b8' }}>{sickDurStr(teacher.sick_until)}</span>
+                                  <span style={{ color: '#cbd5e1', fontSize: '0.6rem' }}>&bull;</span>
+                                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>{sickDurStr(teacher.sick_until)}</span>
                                 </div>
                               </div>
+                              {/* Re-activate / Gesundmelden button */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEndSickOnBehalf(teacher.id, `${teacher.first_name} ${teacher.last_name}`);
+                                }}
+                                title="Lehrkraft als gesund melden (Stunden reaktivieren)"
+                                style={{
+                                  background: '#f0fdf4', border: '1px solid #bbf7d0',
+                                  borderRadius: '10px', width: '28px', height: '28px',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  cursor: 'pointer', color: '#16a34a', transition: 'all 0.15s',
+                                  flexShrink: 0
+                                }}
+                                onMouseEnter={e => { e.currentTarget.style.background = '#dcfce7'; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = '#f0fdf4'; }}
+                              >
+                                <Check size={15} />
+                              </button>
                             </div>
                           );
                         })}
@@ -7372,42 +7581,47 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       <button
                         onClick={() => setSelectedCrisisTeacherId(null)}
                         style={{
-                          background: 'transparent', border: '1px solid #e2e8f0',
-                          color: '#64748b', fontSize: '0.72rem', cursor: 'pointer',
-                          padding: '6px', borderRadius: '8px', fontWeight: 600,
+                          background: 'white', border: '1.5px solid #e2e8f0',
+                          color: '#0f172a', fontSize: '0.78rem', cursor: 'pointer',
+                          padding: '8px 12px', borderRadius: '12px', fontWeight: 800,
                           width: '100%', transition: 'all 0.15s',
+                          fontFamily: "'Plus Jakarta Sans', sans-serif"
                         }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#f8fafc'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'white'; }}
                       >Filter aufheben ✕</button>
                     )}
                   </div>
 
                   {/* Wie funktioniert das? Info box */}
                   <div style={{
-                    background: '#eff6ff', border: '1.5px solid #bfdbfe',
-                    borderRadius: '20px', padding: '16px',
-                    display: 'flex', flexDirection: 'column', gap: '10px',
+                    background: 'linear-gradient(135deg, rgba(239, 246, 255, 0.8) 0%, rgba(219, 234, 254, 0.5) 100%)',
+                    border: '1.5px solid rgba(59, 130, 246, 0.15)',
+                    borderRadius: '24px', padding: '20px',
+                    display: 'flex', flexDirection: 'column', gap: '12px',
+                    backdropFilter: 'blur(16px)',
                   }}>
-                    <strong style={{ fontSize: '0.78rem', fontWeight: 900, color: '#1d4ed8', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                      ℹ Wie funktioniert das?
+                    <strong style={{ fontSize: '0.85rem', fontWeight: 950, color: '#1d4ed8', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      ℹ️ Krisen-Operations-Modus
                     </strong>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       {[
-                        ['⚡', 'Rot', 'Unterricht in < 2 Std. – sofort handeln'],
-                        ['⏳', 'Gelb', 'Schüler noch nicht informiert'],
-                        ['✓', 'Grün', 'Schüler wurde benachrichtigt'],
+                        ['⚡', 'Rot (Akut)', 'Ausfall in unter 2 Std. — Telefonischer Sofort-Kontakt empfohlen!'],
+                        ['⏳', 'Gelb (Offen)', 'Unterrichtsausfall registriert. Schüler noch nicht kontaktiert.'],
+                        ['✓', 'Grün (Erledigt)', 'Schüler über Terminänderung oder Ausfall erfolgreich benachrichtigt.'],
                       ].map(([icon, color, desc]) => (
-                        <div key={color} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                          <span style={{ fontSize: '0.75rem', flexShrink: 0 }}>{icon}</span>
+                        <div key={color} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: '0.9rem', flexShrink: 0 }}>{icon}</span>
                           <div>
-                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#1e40af' }}>{color}: </span>
-                            <span style={{ fontSize: '0.68rem', color: '#3b82f6' }}>{desc}</span>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e40af', display: 'block' }}>{color}</span>
+                            <span style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 500, lineHeight: 1.3, display: 'block' }}>{desc}</span>
                           </div>
                         </div>
                       ))}
                     </div>
-                    <div style={{ borderTop: '1px solid #bfdbfe', paddingTop: '8px', marginTop: '2px' }}>
-                      <p style={{ margin: 0, fontSize: '0.67rem', color: '#3b82f6', lineHeight: 1.5 }}>
-                        Archivierte Fälle bleiben dauerhaft gespeichert und können unter <strong>📁 Archiv</strong> eingesehen werden.
+                    <div style={{ borderTop: '1px solid rgba(59, 130, 246, 0.2)', paddingTop: '10px', marginTop: '4px' }}>
+                      <p style={{ margin: 0, fontSize: '0.72rem', color: '#1d4ed8', lineHeight: 1.4, fontWeight: 500 }}>
+                        Durch Klicken auf das grüne Häkchen (✓) neben einer kranken Lehrkraft kann diese jederzeit gesund gemeldet werden. Alle betroffenen Stundenpläne werden automatisch reaktiviert.
                       </p>
                     </div>
                   </div>
@@ -12721,18 +12935,39 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 </div>
               </div>
 
-              <div>
+              <div style={{ marginBottom: '16px' }}>
                 <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '6px' }}>Logo URL</label>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <input
-                    type="text"
-                    placeholder="https://example.com/logo.png"
-                    value={logoUrl}
-                    onChange={(e) => setLogoUrl(e.target.value)}
-                    style={{ flex: 1, padding: '10px', borderRadius: '12px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.85rem' }}
-                  />
-                  <button onClick={() => alert('Logo erfolgreich aktualisiert!')} className="google-btn-secondary" style={{ padding: '8px 16px', fontSize: '0.78rem' }}>Hochladen</button>
-                </div>
+                <input
+                  type="text"
+                  placeholder="https://example.com/logo.png"
+                  value={logoUrl}
+                  onChange={(e) => setLogoUrl(e.target.value)}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '10px', borderRadius: '12px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.85rem' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '6px' }}>Abonnierter iCal Kalender-Link (ICS Feed)</label>
+                <input
+                  type="url"
+                  placeholder="https://example.com/calendar.ics"
+                  value={calendarUrl}
+                  onChange={(e) => setCalendarUrl(e.target.value)}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '10px', borderRadius: '12px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.85rem' }}
+                />
+                <span style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block', marginTop: '6px' }}>
+                  Gibt die URL eines externen Kalenders (.ics Format) an, um Schultermine in den Campus-Events zu synchronisieren.
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+                <button 
+                  onClick={handleSaveBrandingAndCalendar}
+                  className="google-btn-primary" 
+                  style={{ padding: '10px 24px', fontSize: '0.85rem' }}
+                >
+                  Einstellungen speichern
+                </button>
               </div>
             </div>
 

@@ -65,6 +65,7 @@ export function CampusSetupScreen({
   const [messagingActive, setMessagingActive] = useState(true);
   const [autoCancelAlerts, setAutoCancelAlerts] = useState(true);
   const [strictCheckin, setStrictCheckin] = useState(false);
+  const [calendarUrl, setCalendarUrl] = useState('');
 
   // Populate state on load
   useEffect(() => {
@@ -96,6 +97,7 @@ export function CampusSetupScreen({
       setMessagingActive(campusConfig.messaging_active !== false);
       setAutoCancelAlerts(campusConfig.auto_cancel_alerts !== false);
       setStrictCheckin(!!campusConfig.strict_checkin);
+      setCalendarUrl(effectiveSchool.calendar_url || '');
     }
   }, [effectiveSchool]);
 
@@ -131,7 +133,8 @@ export function CampusSetupScreen({
         .from('schools')
         .update({
           name: schoolName,
-          opening_hours: updatedOpeningHours
+          opening_hours: updatedOpeningHours,
+          calendar_url: calendarUrl || null
         })
         .eq('id', sId);
 
@@ -258,6 +261,18 @@ export function CampusSetupScreen({
                 style={{ padding: '16px', borderRadius: '16px', border: '1px solid #cbd5e1', fontWeight: 600, fontSize: '0.875rem', outline: 'none', background: '#f8fafc', minHeight: '120px', resize: 'vertical', lineHeight: 1.5 }}
               />
               <p style={{ margin: 0, fontSize: '0.75rem', color: '#94a3b8', fontWeight: 555 }}>Dieser Text wird auf der öffentlichen Anmeldeseite und in Einladungslinks deiner Schule angezeigt.</p>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Abonnierter iCal Kalender-Link (ICS Feed)</label>
+              <input 
+                type="url"
+                value={calendarUrl}
+                onChange={e => setCalendarUrl(e.target.value)}
+                placeholder="https://example.com/calendar.ics"
+                style={{ padding: '14px 16px', borderRadius: '14px', border: '1px solid #cbd5e1', fontWeight: 650, fontSize: '0.9rem', outline: 'none', background: '#f8fafc' }}
+              />
+              <p style={{ margin: 0, fontSize: '0.75rem', color: '#94a3b8', fontWeight: 555 }}>Gibt die URL eines externen Kalenders (z.B. Google Calendar, Apple iCloud, Outlook) im .ics Format an, um Schultermine automatisch in der Events-Spalte zu synchronisieren.</p>
             </div>
 
             {/* Opening Hours */}

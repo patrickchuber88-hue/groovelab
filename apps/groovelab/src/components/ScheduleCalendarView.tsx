@@ -74,6 +74,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
   } | null>(null);
 
   const [sickUntil, setSickUntil] = useState<string | null>(null);
+  const [sickStart, setSickStart] = useState<string | null>(null);
   const [rooms, setRooms] = useState<any[]>([]);
 
   useEffect(() => {
@@ -427,12 +428,14 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
     const fetchSickUntil = async () => {
       const { data } = await supabase
         .from('users')
-        .select('sick_until')
+        .select('sick_start, sick_until')
         .eq('id', userId)
         .single();
       if (data?.sick_until) {
+        setSickStart(data.sick_start ? data.sick_start.substring(0, 10) : null);
         setSickUntil(data.sick_until.substring(0, 10));
       } else {
+        setSickStart(null);
         setSickUntil(null);
       }
     };
@@ -445,6 +448,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
         { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${userId}` },
         (payload) => {
           if (payload.new && 'sick_until' in payload.new) {
+            setSickStart(payload.new.sick_start ? payload.new.sick_start.substring(0, 10) : null);
             setSickUntil(payload.new.sick_until ? payload.new.sick_until.substring(0, 10) : null);
           }
         }
@@ -1424,7 +1428,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                   const isSick = !isBreak && !isVacant && (
                     occ.status === 'teacher_sick' || 
                     occ.status === 'canceled_by_teacher_sick' ||
-                    (sickUntil && occ.date <= sickUntil)
+                    (sickUntil && (!sickStart || occ.date >= sickStart) && occ.date <= sickUntil)
                   );
 
                   const colors = isBreak 

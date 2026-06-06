@@ -5951,6 +5951,9 @@ function App() {
                 <button onClick={() => setActiveStudentTab('schedule')} className={`sidebar-item ${activeStudentTab === 'schedule' ? `active ${activePlatform}` : ''}`}>
                   <Calendar size={20} /> Stundenplan
                 </button>
+                <button onClick={() => setActiveStudentTab('events')} className={`sidebar-item ${activeStudentTab === 'events' ? `active ${activePlatform}` : ''}`}>
+                  <Calendar size={20} /> Events
+                </button>
                 <button onClick={() => setActiveStudentTab('messages')} className={`sidebar-item ${activeStudentTab === 'messages' ? `active ${activePlatform}` : ''}`} style={{ position: 'relative' }}>
                   <Mail size={20} /> Nachrichten
                   {campusUnreadCount > 0 && (
@@ -7912,7 +7915,7 @@ function App() {
       )}
 
         {/* Admin/Teacher Section Tabs (Unified) */}
-        {((user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'teacher')) && activePlatform !== 'ensembles' && ['live', 'schedule', 'students', 'team', 'rooms', 'songs', 'stats', 'gallery', 'setup', 'bands', showMissionsFeature ? 'missions' : ''].includes(activeStudentTab) && (
+        {((user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'teacher')) && activePlatform !== 'ensembles' && ['live', 'schedule', 'students', 'team', 'rooms', 'songs', 'stats', 'gallery', 'setup', 'bands', 'events', showMissionsFeature ? 'missions' : ''].includes(activeStudentTab) && (
           <ErrorBoundary key={`${activePlatform}-${activeStudentTab}`}>
             <AdminDashboard 
               key={activePlatform}
