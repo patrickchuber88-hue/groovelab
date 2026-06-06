@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
@@ -4568,37 +4568,61 @@ export function TeacherDashboard({
                   {/* Holiday Banner */}
                   {isTodayHoliday && (
                     <div style={{
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                      color: '#ffffff',
-                      padding: '16px 24px',
+                      background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(255, 255, 255, 0.98) 100%)',
+                      backdropFilter: 'blur(12px)',
+                      WebkitBackdropFilter: 'blur(12px)',
+                      border: '1px solid rgba(16, 185, 129, 0.18)',
+                      padding: '18px 24px',
                       borderRadius: '16px',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '16px',
-                      boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.2)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: '0 8px 30px rgba(16, 185, 129, 0.04)',
                       position: 'relative',
                       overflow: 'hidden'
                     }}>
                       <div style={{
                         position: 'absolute',
-                        right: '-10px',
+                        right: '-20px',
                         bottom: '-20px',
-                        fontSize: '4rem',
-                        opacity: 0.15,
-                        transform: 'rotate(-15deg)',
-                        userSelect: 'none',
+                        width: '100px',
+                        height: '100px',
+                        background: 'radial-gradient(circle, rgba(16, 185, 129, 0.1) 0%, transparent 70%)',
                         pointerEvents: 'none'
+                      }} />
+                      <div style={{
+                        background: 'rgba(16, 185, 129, 0.08)',
+                        border: '1.5px solid rgba(16, 185, 129, 0.12)',
+                        color: '#059669',
+                        padding: '10px',
+                        borderRadius: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
                       }}>
-                        🌴
+                        <Palmtree size={20} strokeWidth={2.2} />
                       </div>
-                      <span style={{ fontSize: '1.5rem' }}>🌴</span>
                       <div style={{ flex: 1 }}>
-                        <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, letterSpacing: '-0.02em' }}>
-                          Schulfreie Zeit: {isTodayHoliday.name}
-                        </h4>
-                        <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', opacity: 0.9, fontWeight: 600 }}>
-                          Vom {new Date(isTodayHoliday.start).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})} bis zum {new Date(isTodayHoliday.end).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})} findet kein regulärer Unterricht statt. Genieße die Ferien!
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <span style={{
+                            fontSize: '0.62rem',
+                            fontWeight: 900,
+                            color: '#047857',
+                            background: 'rgba(16, 185, 129, 0.08)',
+                            padding: '2px 6px',
+                            borderRadius: '5px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em'
+                          }}>
+                            Schulfrei
+                          </span>
+                          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.01em' }}>
+                            {isTodayHoliday.name}
+                          </h4>
+                        </div>
+                        <p style={{ margin: '3px 0 0 0', fontSize: '0.8rem', color: '#475569', fontWeight: 600, lineHeight: 1.4 }}>
+                          Vom <strong style={{ color: '#059669', fontWeight: 800 }}>{new Date(isTodayHoliday.start).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})}</strong> bis zum <strong style={{ color: '#059669', fontWeight: 800 }}>{new Date(isTodayHoliday.end).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})}</strong> findet kein regulärer Unterricht statt. Genieße die Ferien!
                         </p>
                       </div>
                     </div>

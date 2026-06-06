@@ -18,7 +18,8 @@ import {
   Zap,
   Box,
   Lock,
-  Star
+  Star,
+  Palmtree
 } from 'lucide-react';
 
 interface CampusTeacherDashboardProps {
@@ -1526,15 +1527,28 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
       <main className="flex-1 flex flex-col min-w-0 bg-slate-950 overflow-y-auto">
         {/* Holiday Banner */}
         {isTodayHoliday && (
-          <div className="mx-8 mt-6 p-6 bg-gradient-to-r from-emerald-900/40 to-slate-900/40 border border-emerald-500/20 rounded-3xl flex items-center gap-4 shadow-xl backdrop-blur-md relative overflow-hidden animate-fade-in">
-            <div className="absolute right-0 bottom-0 text-7xl opacity-10 pointer-events-none select-none">🌴</div>
-            <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-2xl">
-              <span style={{ fontSize: '1.5rem' }}>🌴</span>
+          <div className="mx-8 mt-6 p-6 bg-gradient-to-r from-slate-900/95 to-slate-900/85 border border-emerald-500/15 rounded-3xl flex items-center gap-5 shadow-xl backdrop-blur-md relative overflow-hidden animate-fade-in hover:border-emerald-500/25 transition duration-300">
+            <div style={{
+              position: 'absolute',
+              right: '-20px',
+              bottom: '-20px',
+              width: '100px',
+              height: '100px',
+              background: 'radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 70%)',
+              pointerEvents: 'none'
+            }} />
+            <div className="p-3.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/10 rounded-2xl flex-shrink-0 shadow-lg shadow-emerald-500/5">
+              <Palmtree size={22} strokeWidth={2.2} />
             </div>
-            <div>
-              <h2 className="text-base font-black text-white">Schulfreie Zeit: {isTodayHoliday.name}</h2>
-              <p className="text-slate-400 text-xs mt-1 font-semibold">
-                Vom {new Date(isTodayHoliday.start).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})} bis zum {new Date(isTodayHoliday.end).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})} findet kein regulärer Unterricht statt. Genieße die Ferien!
+            <div className="flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/10">
+                  Schulfrei
+                </span>
+                <h2 className="text-base font-black text-white">{isTodayHoliday.name}</h2>
+              </div>
+              <p className="text-slate-400 text-xs mt-1.5 font-semibold leading-relaxed">
+                Vom <strong className="text-emerald-400 font-extrabold">{new Date(isTodayHoliday.start).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})}</strong> bis zum <strong className="text-emerald-400 font-extrabold">{new Date(isTodayHoliday.end).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})}</strong> findet kein regulärer Unterricht statt. Genieße die Ferien!
               </p>
             </div>
           </div>
