@@ -986,25 +986,27 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               const isMyEvent = ev.created_by === userId;
 
               // Color codes for categories
-              let catColor = '#3b82f6';
-              let catBg = '#eff6ff';
+              let catColor = '#64748b'; // Default gray
+              let catBg = '#f1f5f9';
 
               const isHolidayEvent = ev.category === 'Ferien' || ev.category === 'Feiertag' || (ev.title || '').toLowerCase().includes('ferien') || (ev.title || '').toLowerCase().includes('feiertag');
+              const isMusikschulfest = (ev.title || '').toLowerCase().includes('musikschulfest');
+              const isKlassenvorspiel = ev.category === 'Klassenvorspiel' || (ev.title || '').toLowerCase().includes('klassenvorspiel');
 
-              if (ev.category === 'Ferien') {
-                catColor = '#10b981';
-                catBg = '#d1fae5';
-              } else if (ev.category === 'Feiertag') {
-                catColor = '#d97706';
-                catBg = '#fef3c7';
+              if (isHolidayEvent) {
+                catColor = '#10b981'; // Green
+                catBg = '#ecfdf5';
+              } else if (isMusikschulfest) {
+                catColor = '#ef4444'; // Red
+                catBg = '#fef2f2';
+              } else if (isKlassenvorspiel) {
+                catColor = '#3b82f6'; // Blue
+                catBg = '#eff6ff';
               } else if (ev.category === 'Konzert') {
-                catColor = '#a855f7';
+                catColor = '#a855f7'; // Purple
                 catBg = '#f3e8ff';
-              } else if (ev.category === 'Klassenvorspiel') {
-                catColor = '#10b981';
-                catBg = '#d1fae5';
               } else if (ev.category === 'Probe') {
-                catColor = '#f59e0b';
+                catColor = '#f59e0b'; // Amber
                 catBg = '#fef3c7';
               } else if (isSubscribed) {
                 catColor = '#64748b';
@@ -1019,9 +1021,21 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     flexDirection: 'column',
                     padding: '16px',
                     borderRadius: '18px',
-                    background: isHolidayEvent ? 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)' : '#ffffff',
-                    border: isHolidayEvent ? '1px solid #a7f3d0' : '1px solid #e2e8f0',
-                    borderLeft: `4px solid ${isHolidayEvent ? '#10b981' : catColor}`,
+                    background: isHolidayEvent 
+                      ? 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)' 
+                      : isMusikschulfest
+                        ? 'linear-gradient(135deg, #fef2f2 0%, #ffffff 100%)'
+                        : isKlassenvorspiel
+                          ? 'linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%)'
+                          : '#ffffff',
+                    border: isHolidayEvent 
+                      ? '1px solid #a7f3d0' 
+                      : isMusikschulfest
+                        ? '1px solid #fca5a5'
+                        : isKlassenvorspiel
+                          ? '1px solid #bfdbfe'
+                          : '1px solid #e2e8f0',
+                    borderLeft: `4px solid ${catColor}`,
                     boxShadow: '0 4px 12px rgba(0,0,0,0.015)',
                     transition: 'all 0.2s ease',
                     position: 'relative'
@@ -1086,7 +1100,26 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
                   {/* Title & Date line */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
-                    <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: isHolidayEvent ? '#065f46' : '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '6px', flex: 1, textAlign: 'left', lineHeight: 1.3 }}>
+                    <h4 style={{ 
+                      margin: 0, 
+                      fontSize: '0.98rem', 
+                      fontWeight: 800, 
+                      color: isHolidayEvent 
+                        ? '#065f46' 
+                        : isMusikschulfest
+                          ? '#991b1b'
+                          : isKlassenvorspiel
+                            ? '#1e40af'
+                            : '#0f172a', 
+                      fontFamily: 'Urbanist', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'flex-start', 
+                      gap: '6px', 
+                      flex: 1, 
+                      textAlign: 'left', 
+                      lineHeight: 1.3 
+                    }}>
                       {isHolidayEvent && (
                         <span style={{ color: '#059669', display: 'inline-flex', alignItems: 'center' }}>
                           <Palmtree size={15} strokeWidth={2.5} />
@@ -1097,8 +1130,20 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     <span style={{
                       fontSize: '0.72rem',
                       fontWeight: 800,
-                      color: isHolidayEvent ? '#047857' : '#475569',
-                      background: isHolidayEvent ? '#d1fae5' : '#f1f5f9',
+                      color: isHolidayEvent 
+                        ? '#047857' 
+                        : isMusikschulfest
+                          ? '#b91c1c'
+                          : isKlassenvorspiel
+                            ? '#2563eb'
+                            : '#475569',
+                      background: isHolidayEvent 
+                        ? '#d1fae5' 
+                        : isMusikschulfest
+                          ? '#fee2e2'
+                          : isKlassenvorspiel
+                            ? '#dbeafe'
+                            : '#f1f5f9',
                       padding: '4px 8px',
                       borderRadius: '8px',
                       whiteSpace: 'nowrap',
