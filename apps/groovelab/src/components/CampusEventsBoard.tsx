@@ -1125,6 +1125,37 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             })
           )}
         </div>
+
+        {/* Subscribed Calendar Info */}
+        {calendarUrl && (
+          <div style={{
+            background: '#f8fafc',
+            border: '1px solid #cbd5e1',
+            borderRadius: '16px',
+            padding: '12px 14px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+            marginTop: '8px'
+          }}>
+            <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+              🔗 Synchronisierter iCal Kalender
+            </span>
+            <span 
+              title={calendarUrl}
+              style={{ 
+                fontSize: '0.72rem', 
+                color: '#475569', 
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+            >
+              {calendarUrl}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* COLUMN 3: SIDEBAR - CREATE OWN EVENTS */}
@@ -1342,37 +1373,6 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             {submittingForm ? 'Speichert...' : '+ Termin anlegen'}
           </button>
         </form>
-
-        {/* Subscribed Calendar Info */}
-        {calendarUrl && (
-          <div style={{
-            marginTop: 'auto',
-            background: '#f8fafc',
-            border: '1px solid #cbd5e1',
-            borderRadius: '16px',
-            padding: '12px 14px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '6px'
-          }}>
-            <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
-              🔗 Synchronisierter iCal Kalender
-            </span>
-            <span 
-              title={calendarUrl}
-              style={{ 
-                fontSize: '0.72rem', 
-                color: '#475569', 
-                fontWeight: 600,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}
-            >
-              {calendarUrl}
-            </span>
-          </div>
-        )}
       </div>
     </div>
   );
