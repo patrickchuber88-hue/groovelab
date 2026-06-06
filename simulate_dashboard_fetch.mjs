@@ -1,10 +1,17 @@
 import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 
-const env = fs.readFileSync('/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.env.local', 'utf-8');
+const env = fs.readFileSync('apps/groovelab/.env.local', 'utf-8');
 const url = env.match(/VITE_SUPABASE_URL=(.*)/)[1].trim();
 const key = env.match(/VITE_SUPABASE_ANON_KEY=(.*)/)[1].trim();
-const supabase = createClient(url, key);
+const supabase = createClient(url, key, {
+  global: {
+    headers: {
+      'x-user-id': '0f984a89-cf47-4405-bdc9-ead2acd0ba7e'
+    }
+  }
+});
+
 
 // Helper functions matching TeacherDashboard.tsx
 function normalizeInstrument(inst) {
@@ -19,8 +26,9 @@ function normalizeInstrument(inst) {
 }
 
 async function simulate() {
-  const userId = '55555555-5555-5555-5555-555555555555'; // Patrick (Admin)
+  const userId = '0f984a89-cf47-4405-bdc9-ead2acd0ba7e'; // pat (Teacher)
   console.log(`Simulating dashboard fetch for userId: ${userId}`);
+
 
   // 1. Info
   const { data: tData, error: tErr } = await supabase.from('users').select('*, schools(*)').eq('id', userId).single();
