@@ -1528,9 +1528,36 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                 borderRight: offset < 6 ? '1px solid #e2e8f0' : 'none'
               }}
             >
-              <div style={{ textAlign: 'center', paddingBottom: '8px', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+              <div style={{
+                textAlign: 'center',
+                paddingBottom: '8px',
+                borderBottom: '1px solid rgba(0,0,0,0.05)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '2px'
+              }}>
                 <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{dayName}</div>
                 <div style={{ fontSize: '1rem', fontWeight: 800, color: '#1d1d1f' }}>{dayDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}</div>
+                {activeHoliday && (
+                  <div style={{
+                    fontSize: '0.62rem',
+                    fontWeight: 900,
+                    color: '#047857',
+                    background: 'rgba(16, 185, 129, 0.08)',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    marginTop: '2px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <Palmtree size={10} strokeWidth={2.5} />
+                    {activeHoliday.name}
+                  </div>
+                )}
               </div>
 
               <div
@@ -1538,36 +1565,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
                 onDrop={(e) => handleDropOnDay(e, dateStr, dayBaselineMinutes)}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', height: `${columnHeight}px`, minHeight: `${columnHeight}px` }}
               >
-                {activeHoliday && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '0',
-                    left: '0',
-                    right: '0',
-                    bottom: '0',
-                    background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                    border: '1.5px dashed #cbd5e1',
-                    borderRadius: '16px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '12px',
-                    textAlign: 'center',
-                    gap: '6px',
-                    zIndex: 5
-                  }}>
-                    <div style={{ color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(16, 185, 129, 0.08)', border: '1.5px solid rgba(16, 185, 129, 0.12)', padding: '8px', borderRadius: '12px' }}>
-                      <Palmtree size={20} strokeWidth={2.2} />
-                    </div>
-                    <strong style={{ fontSize: '0.78rem', fontWeight: 900, color: '#475569', fontFamily: 'Urbanist', wordBreak: 'break-word' }}>
-                      {activeHoliday.name}
-                    </strong>
-                    <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 700 }}>
-                      Kein regulärer Unterricht
-                    </span>
-                  </div>
-                )}
+
                 {markers.map(m => (
                   <div 
                     key={m.hour} 
