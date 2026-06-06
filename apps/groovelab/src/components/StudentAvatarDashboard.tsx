@@ -3810,33 +3810,45 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
             {/* Fokus-Timer Box */}
             <div style={{
-              background: '#ffffff',
-              border: '1px solid #e2e8f0',
-              borderRadius: '24px',
-              padding: '30px 24px',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.01)',
+              background: 'rgba(255, 255, 255, 0.75)',
+              backdropFilter: 'blur(24px)',
+              WebkitBackdropFilter: 'blur(24px)',
+              border: '1px solid rgba(226, 232, 240, 0.8)',
+              borderRadius: '32px',
+              padding: '36px 30px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(255, 255, 255, 0.4) inset',
               display: 'flex',
               flexDirection: 'column',
-              gap: '24px',
+              gap: '28px',
               alignItems: 'center',
-              position: 'relative'
+              position: 'relative',
+              overflow: 'hidden'
             }}>
               {/* Header */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', borderBottom: '1px solid #f1f5f9', paddingBottom: '14px' }}>
-                <div style={{ background: '#eff6ff', color: '#3b82f6', padding: '8px', borderRadius: '12px' }}>
-                  <Clock size={18} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', width: '100%', borderBottom: '1px solid rgba(241, 245, 249, 0.6)', paddingBottom: '18px' }}>
+                <div style={{ 
+                  background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', 
+                  color: '#2563eb', 
+                  padding: '10px', 
+                  borderRadius: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.08)'
+                }}>
+                  <Clock size={20} />
                 </div>
                 <div>
-                  <h4 style={{ fontWeight: 850, fontSize: '22px', color: '#1e293b', margin: 0 }}>Fokus-Timer</h4>
-                  <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '2px 0 0 0', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <h4 style={{ fontWeight: 800, fontSize: '20px', color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>Fokus-Timer</h4>
+                  <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '4px 0 0 0', fontWeight: 550, display: 'flex', alignItems: 'center', gap: '6px' }}>
                     {isExtraTime ? (
                       <>
-                        <Award size={13} style={{ color: '#eab308', flexShrink: 0 }} />
-                        <span>Du bist in der Extra-Zeit!</span>
+                        <Award size={14} style={{ color: '#eab308', flexShrink: 0 }} />
+                        <span style={{ color: '#ca8a04', fontWeight: 600 }}>Du bist in der Extra-Zeit!</span>
                       </>
                     ) : (
                       <>
-                        <Smartphone size={13} style={{ color: '#3b82f6', flexShrink: 0 }} />
+                        <Smartphone size={14} style={{ color: '#2563eb', flexShrink: 0 }} />
                         <span>Handy mit dem Display nach unten hinlegen</span>
                       </>
                     )}
@@ -3846,42 +3858,63 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
               {!sessionActive ? (
                 /* Timer setup before starting */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '350px', width: '100%', alignItems: 'center' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', maxWidth: '350px', width: '100%', alignItems: 'center' }}>
                   
                   {/* Circular visual timer representation (static state) */}
-                  <div style={{ position: 'relative', width: '200px', height: '200px', margin: '10px 0' }}>
-                    <svg width="200" height="200" viewBox="0 0 200 200">
-                      <circle cx="100" cy="100" r="85" fill="none" stroke="#f1f5f9" strokeWidth="12" />
+                  <div style={{ 
+                    position: 'relative', 
+                    width: '210px', 
+                    height: '210px', 
+                    margin: '10px 0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <svg width="210" height="210" viewBox="0 0 210 210" style={{ transform: 'rotate(-90deg)' }}>
+                      <circle cx="105" cy="105" r="90" fill="none" stroke="#f1f5f9" strokeWidth="10" />
                       <circle 
-                        cx="100" 
-                        cy="100" 
-                        r="85" 
+                        cx="105" 
+                        cy="105" 
+                        r="90" 
                         fill="none" 
-                        stroke="#3b82f6" 
-                        strokeWidth="12" 
-                        strokeDasharray={2 * Math.PI * 85}
-                        strokeDashoffset={2 * Math.PI * 85}
+                        stroke="url(#blueGradient)" 
+                        strokeWidth="10" 
+                        strokeDasharray={2 * Math.PI * 90}
+                        strokeDashoffset={2 * Math.PI * 90}
                         strokeLinecap="round"
                       />
+                      <defs>
+                        <linearGradient id="blueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#3b82f6" />
+                          <stop offset="100%" stopColor="#1d4ed8" />
+                        </linearGradient>
+                      </defs>
                     </svg>
                     <div style={{
                       position: 'absolute',
-                      inset: 0,
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center'
                     }}>
-                      <span style={{ fontSize: '2.4rem', fontWeight: 900, color: '#1e293b' }}>
+                      <span style={{ fontSize: '2.8rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.03em', lineHeight: 1 }}>
                         {String(getTargetMinutes(avatar?.streak_flame || 0)).padStart(2, '0')}:00
                       </span>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '4px' }}>Ziel Fokuszeit</span>
+                      <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '6px' }}>Ziel Fokuszeit</span>
                     </div>
                   </div>
 
-                  <div style={{ textAlign: 'center', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px', width: '100%', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Tages-Herausforderung</div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#1e293b', marginTop: '3px' }}>
+                  <div style={{ 
+                    textAlign: 'center', 
+                    background: 'rgba(248, 250, 252, 0.6)', 
+                    padding: '14px 18px', 
+                    borderRadius: '20px', 
+                    width: '100%', 
+                    border: '1px solid rgba(226, 232, 240, 0.8)',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.01)'
+                  }}>
+                    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tages-Herausforderung</div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
                       {getFlameLevelName(avatar?.streak_flame || 0)} ({getTargetMinutes(avatar?.streak_flame || 0)} Min)
                     </div>
                   </div>
@@ -3909,17 +3942,18 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     }}
                     style={{
                       width: '100%',
-                      background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                      background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                       color: 'white',
                       border: 'none',
-                      padding: '16px',
-                      borderRadius: '16px',
-                      fontWeight: 900,
-                      fontSize: '0.92rem',
+                      padding: '16px 24px',
+                      borderRadius: '20px',
+                      fontWeight: 800,
+                      fontSize: '0.95rem',
                       cursor: 'pointer',
-                      boxShadow: '0 4px 15px rgba(59, 130, 246, 0.25)',
+                      boxShadow: '0 8px 25px rgba(37, 99, 235, 0.25), 0 2px 4px rgba(0,0,0,0.05)',
                       textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
+                      letterSpacing: '0.05em',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
                     }}
                     className="hover-scale"
                   >
@@ -3928,49 +3962,69 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 </div>
               ) : (
                 /* Timer running / Gyro orientation dashboard */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%', alignItems: 'center' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', width: '100%', alignItems: 'center' }}>
                   
                   {/* Circular animated SVG progress ring */}
-                  <div style={{ position: 'relative', width: '200px', height: '200px', filter: isExtraTime ? 'drop-shadow(0 0 10px rgba(16, 185, 129, 0.2))' : 'none' }}>
-                    <svg width="200" height="200" viewBox="0 0 200 200">
-                      <circle cx="100" cy="100" r="85" fill="none" stroke="#f1f5f9" strokeWidth="12" />
+                  <div style={{ 
+                    position: 'relative', 
+                    width: '210px', 
+                    height: '210px', 
+                    filter: isExtraTime ? 'drop-shadow(0 0 12px rgba(16, 185, 129, 0.25))' : (isPhoneFlat ? 'drop-shadow(0 0 12px rgba(37, 99, 235, 0.2))' : 'drop-shadow(0 0 12px rgba(239, 68, 68, 0.25))'),
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <svg width="210" height="210" viewBox="0 0 210 210" style={{ transform: 'rotate(-90deg)' }}>
+                      <circle cx="105" cy="105" r="90" fill="none" stroke="#f1f5f9" strokeWidth="10" />
                       <circle 
-                        cx="100" 
-                        cy="100" 
-                        r="85" 
+                        cx="105" 
+                        cy="105" 
+                        r="90" 
                         fill="none" 
-                        stroke={isExtraTime ? '#10b981' : (isPhoneFlat ? '#3b82f6' : '#ef4444')} 
-                        strokeWidth="12" 
-                        strokeDasharray={2 * Math.PI * 85}
+                        stroke={isExtraTime ? 'url(#greenGradient)' : (isPhoneFlat ? 'url(#blueGradientActive)' : 'url(#redGradient)')} 
+                        strokeWidth="10" 
+                        strokeDasharray={2 * Math.PI * 90}
                         strokeDashoffset={
                           isExtraTime 
                             ? 0 // Full circle in extra time
-                            : 2 * Math.PI * 85 - (2 * Math.PI * 85 * Math.min(1, secondsElapsed / (getTargetMinutes(avatar?.streak_flame || 0) * 60)))
+                            : 2 * Math.PI * 90 - (2 * Math.PI * 90 * Math.min(1, secondsElapsed / (getTargetMinutes(avatar?.streak_flame || 0) * 60)))
                         }
                         strokeLinecap="round"
-                        transform="rotate(-90 100 100)"
                         style={{ transition: isPhoneFlat ? 'stroke-dashoffset 1s linear, stroke 0.3s' : 'stroke 0.3s' }}
                       />
+                      <defs>
+                        <linearGradient id="blueGradientActive" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#3b82f6" />
+                          <stop offset="100%" stopColor="#1d4ed8" />
+                        </linearGradient>
+                        <linearGradient id="greenGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#10b981" />
+                          <stop offset="100%" stopColor="#059669" />
+                        </linearGradient>
+                        <linearGradient id="redGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#f87171" />
+                          <stop offset="100%" stopColor="#dc2626" />
+                        </linearGradient>
+                      </defs>
                     </svg>
                     <div style={{
                       position: 'absolute',
-                      inset: 0,
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center'
                     }}>
-                      <span style={{ fontSize: '2.6rem', fontWeight: 950, color: '#0f172a', fontFamily: 'monospace' }}>
+                      <span style={{ fontSize: '3rem', fontWeight: 800, color: '#0f172a', fontFamily: 'system-ui, -apple-system, sans-serif', letterSpacing: '-0.02em', lineHeight: 1 }}>
                         {String(Math.floor(secondsElapsed / 60)).padStart(2, '0')}:
                         {String(secondsElapsed % 60).padStart(2, '0')}
                       </span>
                       <span style={{ 
-                        fontSize: '0.65rem', 
-                        fontWeight: 900, 
-                        color: isExtraTime ? '#10b981' : (isPhoneFlat ? '#3b82f6' : '#ef4444'), 
+                        fontSize: '0.62rem', 
+                        fontWeight: 800, 
+                        color: isExtraTime ? '#10b981' : (isPhoneFlat ? '#2563eb' : '#dc2626'), 
                         textTransform: 'uppercase', 
-                        letterSpacing: '0.05em', 
-                        marginTop: '4px' 
+                        letterSpacing: '0.08em', 
+                        marginTop: '6px' 
                       }}>
                         {isExtraTime ? 'Extra-Zeit active 🚀' : (isPhoneFlat ? 'Üben Aktiv' : 'Unterbrochen')}
                       </span>
@@ -3981,29 +4035,32 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   <div style={{
                     width: '100%',
                     maxWidth: '450px',
-                    padding: '16px 20px',
-                    borderRadius: '16px',
-                    background: isPhoneFlat ? '#ecfdf5' : '#fef2f2',
-                    border: isPhoneFlat ? '1.5px solid #a7f3d0' : '1.5px solid #fca5a5',
+                    padding: '18px 22px',
+                    borderRadius: '20px',
+                    background: isPhoneFlat ? 'rgba(236, 253, 245, 0.8)' : 'rgba(254, 242, 242, 0.8)',
+                    backdropFilter: 'blur(8px)',
+                    WebkitBackdropFilter: 'blur(8px)',
+                    border: isPhoneFlat ? '1px solid rgba(167, 243, 208, 0.6)' : '1px solid rgba(252, 165, 165, 0.6)',
                     color: isPhoneFlat ? '#065f46' : '#991b1b',
-                    fontSize: '0.85rem',
-                    fontWeight: 700,
+                    fontSize: '0.88rem',
+                    fontWeight: 600,
                     textAlign: 'center',
-                    lineHeight: 1.4
+                    lineHeight: 1.45,
+                    boxShadow: '0 4px 15px rgba(0,0,0,0.02)'
                   }}>
                     {isPhoneFlat ? (
                       <div>
-                        <strong>Perfekte Lage! 📱</strong>
-                        <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', opacity: 0.9 }}>Das Handy liegt mit dem Display nach unten. Der Timer läuft im Hintergrund.</p>
+                        <strong style={{ fontSize: '0.95rem', fontWeight: 800, display: 'block', marginBottom: '3px' }}>Perfekte Lage! 📱</strong>
+                        <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>Das Handy liegt mit dem Display nach unten. Der Timer läuft im Hintergrund.</span>
                       </div>
                     ) : (
                       <div className={isExtraTime ? '' : 'animate-pulse'}>
-                        <strong>{isExtraTime ? '⏸️ Session pausiert' : '🚨 Fokus unterbrochen!'}</strong>
-                        <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', opacity: 0.9 }}>
+                        <strong style={{ fontSize: '0.95rem', fontWeight: 800, display: 'block', marginBottom: '3px' }}>{isExtraTime ? '⏸️ Session pausiert' : '🚨 Fokus unterbrochen!'}</strong>
+                        <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>
                           {isExtraTime 
                             ? 'Lege das Handy mit dem Display nach unten hin, um weiter Extra-Minuten zu sammeln.' 
                             : 'Lege das Handy mit dem Display nach unten hin! Sonst fällt dein Timer sofort auf 0 zurück.'}
-                        </p>
+                        </span>
                       </div>
                     )}
                   </div>
@@ -4034,7 +4091,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', gap: '12px', width: '100%', maxWidth: '350px' }}>
+                  <div style={{ display: 'flex', gap: '14px', width: '100%', maxWidth: '350px' }}>
                     <button
                       onClick={finishPracticeSession}
                       style={{
@@ -4042,14 +4099,17 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                         color: 'white',
                         border: 'none',
-                        padding: '14px',
-                        borderRadius: '14px',
-                        fontWeight: 900,
+                        padding: '16px',
+                        borderRadius: '20px',
+                        fontWeight: 800,
                         cursor: 'pointer',
-                        fontSize: '0.85rem',
-                        boxShadow: '0 4px 12px rgba(16,185,129,0.15)',
-                        textTransform: 'uppercase'
+                        fontSize: '0.9rem',
+                        boxShadow: '0 8px 25px rgba(16, 185, 129, 0.2), 0 2px 4px rgba(0,0,0,0.05)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
                       }}
+                      className="hover-scale"
                     >
                       🏁 Beenden
                     </button>
@@ -4061,15 +4121,18 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         }
                       }}
                       style={{
-                        padding: '14px',
-                        borderRadius: '14px',
-                        border: '1.5px solid #fca5a5',
-                        background: '#fef2f2',
+                        padding: '16px 20px',
+                        borderRadius: '20px',
+                        border: '1px solid rgba(252, 165, 165, 0.8)',
+                        background: 'rgba(254, 242, 242, 0.5)',
+                        backdropFilter: 'blur(4px)',
                         color: '#ef4444',
-                        fontWeight: 800,
+                        fontWeight: 700,
                         cursor: 'pointer',
-                        fontSize: '0.85rem'
+                        fontSize: '0.9rem',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
                       }}
+                      className="hover-scale"
                     >
                       Abbrechen
                     </button>
@@ -8561,30 +8624,68 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             </div>
           ) : (
             // Warning/Flat check mode when flipped face up
-            <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '24px', alignItems: 'center', maxWidth: '320px' }}>
-              <div style={{ width: '80px', height: '80px', borderRadius: '24px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Smartphone size={40} color="#ef4444" className="animate-bounce" />
+            <div style={{ 
+              textAlign: 'center', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '28px', 
+              alignItems: 'center', 
+              maxWidth: '340px',
+              background: 'rgba(255, 255, 255, 0.05)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '30px',
+              padding: '40px 30px',
+              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)'
+            }}>
+              <div style={{ 
+                width: '80px', 
+                height: '80px', 
+                borderRadius: '24px', 
+                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.05) 100%)', 
+                border: '1px solid rgba(239, 68, 68, 0.3)', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                boxShadow: '0 0 20px rgba(239, 68, 68, 0.15)'
+              }}>
+                <Smartphone size={38} color="#ef4444" className="animate-bounce" />
               </div>
               
-              <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#ef4444', letterSpacing: '-0.03em' }}>
-                Handy umdrehen!
-              </h2>
+              <div>
+                <h2 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#f87171', letterSpacing: '-0.02em', margin: '0 0 8px 0' }}>
+                  Handy umdrehen!
+                </h2>
+                <p style={{ color: '#a1a1aa', fontSize: '0.88rem', lineHeight: '1.5', fontWeight: 500, margin: 0 }}>
+                  Der Timer ist eingefroren. Lege das Smartphone mit dem Display nach unten hin, um den Fokusmodus fortzusetzen.
+                </p>
+              </div>
               
-              <p style={{ color: '#a1a1aa', fontSize: '0.9rem', lineHeight: '1.5', fontWeight: 500 }}>
-                Der Timer ist eingefroren. Lege das Smartphone mit dem Display nach unten hin, um den Fokusmodus fortzusetzen.
-              </p>
-              
-              <div style={{ fontSize: '3rem', fontWeight: 900, color: 'white', fontFamily: 'monospace', margin: '8px 0' }}>
+              <div style={{ fontSize: '3.6rem', fontWeight: 800, color: 'white', fontFamily: 'system-ui, -apple-system, sans-serif', letterSpacing: '-0.02em', margin: '10px 0', lineHeight: 1 }}>
                 {Math.floor(detoxSecondsLeft / 60)}:{String(detoxSecondsLeft % 60).padStart(2, '0')}
               </div>
 
-              <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+              <div style={{ width: '100%' }}>
                 <button 
                   onClick={() => {
                     setIsDetoxActive(false);
                     setShowDetox(false);
                   }}
-                  style={{ flex: 1, padding: '14px', background: '#27272a', border: '1px solid #3f3f46', color: 'white', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer' }}
+                  style={{ 
+                    width: '100%', 
+                    padding: '16px', 
+                    background: 'rgba(255, 255, 255, 0.1)', 
+                    border: '1px solid rgba(255, 255, 255, 0.05)', 
+                    color: 'white', 
+                    borderRadius: '20px', 
+                    fontSize: '0.9rem', 
+                    fontWeight: 700, 
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                  }}
+                  className="hover-scale"
                 >
                   Abbrechen
                 </button>
