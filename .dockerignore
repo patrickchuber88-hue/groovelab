@@ -1,0 +1,34 @@
+# Dependencies
+node_modules
+apps/groovelab/node_modules
+
+# Dev files & secrets
+apps/groovelab/.env.local
+apps/groovelab/.env
+
+# Build output (wird im Container neu gebaut)
+apps/groovelab/dist
+dist
+
+# Git & IDE
+.git
+.gitignore
+
+# macOS
+.DS_Store
+
+# Logs & temp
+*.log
+scratch
+*.zip
+*.tar.gz
+backups
+recovery_temp
+
+# Scratch scripts
+*.mjs
+*.ts
+!apps/groovelab/src/**/*.ts
+!apps/groovelab/src/**/*.tsx
+!apps/groovelab/tsconfig*.json
+!apps/groovelab/vite.config.ts
