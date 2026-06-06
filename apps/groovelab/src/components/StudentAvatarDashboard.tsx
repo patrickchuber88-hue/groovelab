@@ -1818,6 +1818,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   useEffect(() => {
     isExtraTimeRef.current = isExtraTime;
   }, [isExtraTime]);
+  const [expandedMonths, setExpandedMonths] = useState<Record<string, boolean>>({});
   const [hasCompletedTargetToday, setHasCompletedTargetToday] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<'logbook' | 'stats'>('logbook');
 
@@ -4393,7 +4394,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               })()
             ) : (
               /* List entries */
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '480px', overflowY: 'auto', paddingRight: '4px' }} className="animation-fade-in">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '480px', overflowY: 'auto', paddingRight: '4px' }} className="animation-fade-in">
                 {(() => {
                   const grouped = getGroupedLogs();
                   if (grouped.length === 0) {
@@ -4404,319 +4405,425 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     );
                   }
 
-                  return grouped.map((group, idx) => {
-                    const now = new Date();
-                    const todayDd = String(now.getDate()).padStart(2, '0');
-                    const todayMm = String(now.getMonth() + 1).padStart(2, '0');
-                    const todayYy = String(now.getFullYear()).substring(2);
-                    const todayDateStr = `${todayDd}.${todayMm}.${todayYy}`;
+                  // Group by month
+                  const groupedByMonth: Record<string, { label: string, key: string, entries: typeof grouped, practiceDays: number }> = {};
+                  const monthNames = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 
-                    const isToday = group.date === todayDateStr;
+                  grouped.forEach(entry => {
+                    const parts = entry.date.split('.');
+                    if (parts.length < 3) return;
+                    const monthIndex = parseInt(parts[1], 10) - 1;
+                    const yearFull = 2000 + parseInt(parts[2], 10);
+                    const key = `${monthIndex}-${yearFull}`;
+                    const label = `${monthNames[monthIndex]} ${yearFull}`;
+
+                    if (!groupedByMonth[key]) {
+                      groupedByMonth[key] = {
+                        label,
+                        key,
+                        entries: [],
+                        practiceDays: 0
+                      };
+                    }
+                    groupedByMonth[key].entries.push(entry);
                     
-                    const jokerDateStr = (() => {
-                      if (!studentUser?.joker_used_at) return null;
-                      const jd = new Date(studentUser.joker_used_at);
-                      const dd = String(jd.getDate()).padStart(2, '0');
-                      const mm = String(jd.getMonth() + 1).padStart(2, '0');
-                      const yy = String(jd.getFullYear()).substring(2);
-                      return `${dd}.${mm}.${yy}`;
-                    })();
-                    const isJokerDay = jokerDateStr === group.date;
-                    
-                    const getTargetSeconds = (flame: string) => {
-                      if (flame === 'Helden-Feuer') return 10 * 60;
-                      if (flame === 'Mittlere Flamme') return 5 * 60;
-                      return 3 * 60;
+                    // Count as practice day if they actually practiced
+                    const practiced = !entry.isPlaceholder || entry.focusSeconds > 0 || entry.extraSeconds > 0;
+                    if (practiced) {
+                      groupedByMonth[key].practiceDays += 1;
+                    }
+                  });
+
+                  const months = Object.values(groupedByMonth);
+
+                  // Sort months by year and month index descending
+                  months.sort((a, b) => {
+                    const [aMonth, aYear] = a.key.split('-').map(Number);
+                    const [bMonth, bYear] = b.key.split('-').map(Number);
+                    if (aYear !== bYear) return bYear - aYear;
+                    return bMonth - aMonth;
+                  });
+
+                  return months.map((month, mIdx) => {
+                    const isExpanded = expandedMonths[month.key] !== undefined 
+                      ? expandedMonths[month.key] 
+                      : mIdx === 0; // first month is expanded by default
+
+                    const toggleMonth = () => {
+                      setExpandedMonths(prev => ({
+                        ...prev,
+                        [month.key]: !isExpanded
+                      }));
                     };
-                    
-                    const getFlameIconSize = (flame: string) => {
-                      if (flame === 'Helden-Feuer') return 18;
-                      if (flame === 'Mittlere Flamme') return 15;
-                      return 12;
-                    };
-                    
-                    const targetSecs = getTargetSeconds(group.flameLevel);
-                    const iconSize = getFlameIconSize(group.flameLevel);
-                    const hasMastered = group.focusSeconds >= targetSecs && !group.isPlaceholder;
-                    
-                    let borderLeftColor = '#e2e8f0';
-                    if (hasMastered) {
-                      borderLeftColor = '#10b981'; // Green (Mastered)
-                    } else if (isJokerDay) {
-                      borderLeftColor = '#f97316'; // Same hue as Streak path KPI (Orange)
-                    } else if (isToday) {
-                      borderLeftColor = '#eab308'; // Yellow (Active)
-                    } else {
-                      borderLeftColor = '#ef4444'; // Red (Not practiced / target not reached)
-                    }
-
-                    if (group.isPlaceholder) {
-                      if (isToday) {
-                        return (
-                          <div 
-                            key={idx}
-                            style={{ 
-                              background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.03) 0%, rgba(234, 179, 8, 0.01) 100%)', 
-                              border: '1px dashed rgba(234, 179, 8, 0.25)', 
-                              borderRadius: '16px', 
-                              padding: '12px 14px',
-                              display: 'flex',
-                              flexDirection: 'row',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              gap: '12px',
-                              borderLeft: `4px solid ${borderLeftColor}`,
-                              boxShadow: '0 2px 8px rgba(234, 179, 8, 0.01)'
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1, flexWrap: 'wrap' }}>
-                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ca8a04', fontFamily: 'monospace' }}>
-                                {group.date}
-                              </span>
-                              <span style={{ 
-                                fontSize: '0.58rem', 
-                                fontWeight: 900, 
-                                background: 'rgba(234, 179, 8, 0.08)', 
-                                color: '#ca8a04', 
-                                padding: '1px 6px', 
-                                borderRadius: '100px', 
-                                letterSpacing: '0.04em', 
-                                textTransform: 'uppercase' 
-                              }}>
-                                Aktiv
-                              </span>
-                              <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>
-                                - Sichere dir deinen Übe-Streak!
-                              </span>
-                            </div>
-                            
-                            {timeUntilMidnight && (
-                              <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
-                                <span style={{ 
-                                  fontSize: '0.68rem', 
-                                  fontWeight: 800, 
-                                  color: '#a16207', 
-                                  background: '#fef9c3',
-                                  padding: '2px 6px',
-                                  borderRadius: '6px',
-                                  display: 'inline-flex', 
-                                  alignItems: 'center', 
-                                  gap: '3px', 
-                                  fontFamily: 'monospace' 
-                                }}>
-                                  ⏳ {timeUntilMidnight}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      } else if (isJokerDay) {
-                        return (
-                          <div 
-                            key={idx}
-                            style={{ 
-                              background: 'linear-gradient(135deg, #f97316 0%, #c2410c 100%)', 
-                              border: '1px solid #c2410c', 
-                              borderRadius: '16px', 
-                              padding: '12px 14px',
-                              display: 'flex',
-                              flexDirection: 'row',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              gap: '12px',
-                              boxShadow: '0 4px 12px rgba(194, 65, 12, 0.12)'
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
-                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ffffff', fontFamily: 'monospace' }}>
-                                {group.date}
-                              </span>
-                              <span style={{ 
-                                fontSize: '0.58rem', 
-                                fontWeight: 900, 
-                                background: 'rgba(255, 255, 255, 0.22)', 
-                                color: '#ffffff', 
-                                padding: '1px 6px', 
-                                borderRadius: '100px', 
-                                letterSpacing: '0.04em', 
-                                textTransform: 'uppercase' 
-                              }}>
-                                Joker eingesetzt
-                              </span>
-                              <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#ffedd5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                - Streak gerettet! 🎯
-                              </span>
-                            </div>
-                            
-                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
-                              <Flame size={iconSize} fill="#ffffff" color="#ffffff" />
-                              <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ffffff' }}>
-                                Joker
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      } else {
-                        const currentWeek = getISOWeek(new Date());
-                        const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
-                        const isJokerAvailable = !studentUser?.joker_used_at || lastJokerWeek !== currentWeek;
-
-                        return (
-                          <div 
-                            key={idx}
-                            style={{ 
-                              background: '#ffffff', 
-                              border: '1px dashed rgba(239, 68, 68, 0.25)', 
-                              borderRadius: '16px', 
-                              padding: '12px 14px',
-                              display: 'flex',
-                              flexDirection: 'row',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              gap: '12px',
-                              borderLeft: `4px solid ${borderLeftColor}`,
-                              boxShadow: '0 2px 8px rgba(239, 68, 68, 0.01)'
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
-                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ef4444', fontFamily: 'monospace' }}>
-                                {group.date}
-                              </span>
-                              <span style={{ 
-                                fontSize: '0.58rem', 
-                                fontWeight: 900, 
-                                background: 'rgba(239, 68, 68, 0.08)', 
-                                color: '#ef4444', 
-                                padding: '1px 6px', 
-                                borderRadius: '100px', 
-                                letterSpacing: '0.04em', 
-                                textTransform: 'uppercase' 
-                              }}>
-                                Nicht geübt
-                              </span>
-                            </div>
-                            
-                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
-                              {isJokerAvailable && (
-                                <button 
-                                  onClick={() => handleUseJoker(group.date)}
-                                  style={{
-                                    background: '#8b5cf6',
-                                    color: '#ffffff',
-                                    border: 'none',
-                                    padding: '4px 10px',
-                                    borderRadius: '8px',
-                                    fontSize: '0.65rem',
-                                    fontWeight: 800,
-                                    cursor: 'pointer',
-                                    boxShadow: '0 2px 4px rgba(139, 92, 246, 0.2)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '3px',
-                                    transition: 'all 0.2s'
-                                  }}
-                                  onMouseOver={(e) => e.currentTarget.style.background = '#7c3aed'}
-                                  onMouseOut={(e) => e.currentTarget.style.background = '#8b5cf6'}
-                                >
-                                  🎯 Joker einsetzen
-                                </button>
-                              )}
-                              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                <Flame size={iconSize} fill="#ef4444" color="#ef4444" />
-                                <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ef4444' }}>
-                                  Kleine Flamme
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      }
-                    }
-
-                    const focusMins = Math.round(group.focusSeconds / 60);
-                    const extraMins = Math.floor(group.extraSeconds / 60);
-                    const extraSecs = group.extraSeconds % 60;
-                    
-                    const textParts = [];
-                    if (group.focusSeconds > 0) {
-                      textParts.push(`Fokuszeit (+${focusMins}m)`);
-                    }
-                    if (group.extraSeconds > 0) {
-                      textParts.push(`+${extraMins}:${String(extraSecs).padStart(2, '0')} (extra)`);
-                    }
-                    const statusText = textParts.join(' - ');
-
-                    if (hasMastered) {
-                      return (
-                        <div 
-                          key={idx}
-                          style={{ 
-                            background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', 
-                            border: '1px solid #047857', 
-                            borderRadius: '16px', 
-                            padding: '12px 14px',
-                            display: 'flex',
-                            flexDirection: 'row',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            gap: '12px',
-                            boxShadow: '0 4px 12px rgba(4, 120, 87, 0.12)'
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
-                            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ffffff', whiteSpace: 'nowrap' }}>
-                              {group.date}
-                            </span>
-                            {statusText && (
-                              <span style={{ fontSize: '0.74rem', fontWeight: 650, color: '#d1fae5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                - {statusText}
-                              </span>
-                            )}
-                          </div>
-                          
-                          <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
-                            <Flame size={iconSize} fill="#ef4444" color="#ef4444" />
-                            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ffffff' }}>
-                              {group.flameLevel}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    }
 
                     return (
-                      <div 
-                        key={idx}
-                        style={{ 
-                          background: '#f8fafc', 
-                          border: '1px solid #e2e8f0', 
-                          borderRadius: '16px', 
-                          padding: '12px 14px',
-                          display: 'flex',
-                          flexDirection: 'row',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          gap: '12px',
-                          borderLeft: `4px solid ${borderLeftColor}`
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
-                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', whiteSpace: 'nowrap' }}>
-                            {group.date}
-                          </span>
-                          {statusText && (
-                            <span style={{ fontSize: '0.74rem', fontWeight: 650, color: '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              - {statusText}
+                      <div key={month.key} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {/* Month Header Accordion Toggle */}
+                        <div 
+                          onClick={toggleMonth}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '16px',
+                            padding: '12px 16px',
+                            cursor: 'pointer',
+                            userSelect: 'none',
+                            transition: 'all 0.2s ease-in-out'
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <ChevronRight 
+                              size={16} 
+                              style={{ 
+                                color: '#64748b', 
+                                transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', 
+                                transition: 'transform 0.2s ease-in-out' 
+                              }} 
+                            />
+                            <span style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b' }}>
+                              {month.label}
                             </span>
-                          )}
-                        </div>
-                        
-                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
-                          <Flame size={iconSize} fill={hasMastered ? '#10b981' : isToday ? '#eab308' : '#ef4444'} color={hasMastered ? '#10b981' : isToday ? '#eab308' : '#ef4444'} />
-                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: hasMastered ? '#10b981' : isToday ? '#eab308' : '#ef4444' }}>
-                            {group.flameLevel}
+                          </div>
+                          
+                          <span style={{ 
+                            fontSize: '0.7rem', 
+                            fontWeight: 800, 
+                            color: month.practiceDays > 0 ? '#10b981' : '#64748b',
+                            background: month.practiceDays > 0 ? '#dcfce7' : '#f1f5f9',
+                            padding: '4px 10px',
+                            borderRadius: '100px',
+                            letterSpacing: '0.02em'
+                          }}>
+                            {month.practiceDays} {month.practiceDays === 1 ? 'Übetag' : 'Übetage'}
                           </span>
                         </div>
+
+                        {/* Collapsible Content */}
+                        {isExpanded && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '8px' }}>
+                            {month.entries.map((group, idx) => {
+                              const now = new Date();
+                              const todayDd = String(now.getDate()).padStart(2, '0');
+                              const todayMm = String(now.getMonth() + 1).padStart(2, '0');
+                              const todayYy = String(now.getFullYear()).substring(2);
+                              const todayDateStr = `${todayDd}.${todayMm}.${todayYy}`;
+
+                              const isToday = group.date === todayDateStr;
+                              
+                              const jokerDateStr = (() => {
+                                if (!studentUser?.joker_used_at) return null;
+                                const jd = new Date(studentUser.joker_used_at);
+                                const dd = String(jd.getDate()).padStart(2, '0');
+                                const mm = String(jd.getMonth() + 1).padStart(2, '0');
+                                const yy = String(jd.getFullYear()).substring(2);
+                                return `${dd}.${mm}.${yy}`;
+                              })();
+                              const isJokerDay = jokerDateStr === group.date;
+                              
+                              const getTargetSeconds = (flame: string) => {
+                                if (flame === 'Helden-Feuer') return 10 * 60;
+                                if (flame === 'Mittlere Flamme') return 5 * 60;
+                                return 3 * 60;
+                              };
+                              
+                              const getFlameIconSize = (flame: string) => {
+                                if (flame === 'Helden-Feuer') return 18;
+                                if (flame === 'Mittlere Flamme') return 15;
+                                return 12;
+                              };
+                              
+                              const targetSecs = getTargetSeconds(group.flameLevel);
+                              const iconSize = getFlameIconSize(group.flameLevel);
+                              const hasMastered = group.focusSeconds >= targetSecs && !group.isPlaceholder;
+                              
+                              let borderLeftColor = '#e2e8f0';
+                              if (hasMastered) {
+                                borderLeftColor = '#10b981'; // Green (Mastered)
+                              } else if (isJokerDay) {
+                                borderLeftColor = '#f97316'; // Same hue as Streak path KPI (Orange)
+                              } else if (isToday) {
+                                borderLeftColor = '#eab308'; // Yellow (Active)
+                              } else {
+                                borderLeftColor = '#ef4444'; // Red (Not practiced / target not reached)
+                              }
+
+                              if (group.isPlaceholder) {
+                                if (isToday) {
+                                  return (
+                                    <div 
+                                      key={idx}
+                                      style={{ 
+                                        background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.03) 0%, rgba(234, 179, 8, 0.01) 100%)', 
+                                        border: '1px dashed rgba(234, 179, 8, 0.25)', 
+                                        borderRadius: '16px', 
+                                        padding: '12px 14px',
+                                        display: 'flex',
+                                        flexDirection: 'row',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        gap: '12px',
+                                        borderLeft: `4px solid ${borderLeftColor}`,
+                                        boxShadow: '0 2px 8px rgba(234, 179, 8, 0.01)'
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1, flexWrap: 'wrap' }}>
+                                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ca8a04', fontFamily: 'monospace' }}>
+                                          {group.date}
+                                        </span>
+                                        <span style={{ 
+                                          fontSize: '0.58rem', 
+                                          fontWeight: 900, 
+                                          background: 'rgba(234, 179, 8, 0.08)', 
+                                          color: '#ca8a04', 
+                                          padding: '1px 6px', 
+                                          borderRadius: '100px', 
+                                          letterSpacing: '0.04em', 
+                                          textTransform: 'uppercase' 
+                                        }}>
+                                          Aktiv
+                                        </span>
+                                        <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>
+                                          - Sichere dir deinen Übe-Streak!
+                                        </span>
+                                      </div>
+                                      
+                                      {timeUntilMidnight && (
+                                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
+                                          <span style={{ 
+                                            fontSize: '0.68rem', 
+                                            fontWeight: 800, 
+                                            color: '#a16207', 
+                                            background: '#fef9c3',
+                                            padding: '2px 6px',
+                                            borderRadius: '6px',
+                                            display: 'inline-flex', 
+                                            alignItems: 'center', 
+                                            gap: '3px', 
+                                            fontFamily: 'monospace' 
+                                          }}>
+                                            ⏳ {timeUntilMidnight}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                } else if (isJokerDay) {
+                                  return (
+                                    <div 
+                                      key={idx}
+                                      style={{ 
+                                        background: 'linear-gradient(135deg, #f97316 0%, #c2410c 100%)', 
+                                        border: '1px solid #c2410c', 
+                                        borderRadius: '16px', 
+                                        padding: '12px 14px',
+                                        display: 'flex',
+                                        flexDirection: 'row',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        gap: '12px',
+                                        boxShadow: '0 4px 12px rgba(194, 65, 12, 0.12)'
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
+                                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ffffff', fontFamily: 'monospace' }}>
+                                          {group.date}
+                                        </span>
+                                        <span style={{ 
+                                          fontSize: '0.58rem', 
+                                          fontWeight: 900, 
+                                          background: 'rgba(255, 255, 255, 0.22)', 
+                                          color: '#ffffff', 
+                                          padding: '1px 6px', 
+                                          borderRadius: '100px', 
+                                          letterSpacing: '0.04em', 
+                                          textTransform: 'uppercase' 
+                                        }}>
+                                          Joker eingesetzt
+                                        </span>
+                                        <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#ffedd5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                          - Streak gerettet! 🎯
+                                        </span>
+                                      </div>
+                                      
+                                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
+                                        <Flame size={iconSize} fill="#ffffff" color="#ffffff" />
+                                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ffffff' }}>
+                                          Joker
+                                        </span>
+                                      </div>
+                                    </div>
+                                  );
+                                } else {
+                                  const currentWeek = getISOWeek(new Date());
+                                  const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
+                                  const isJokerAvailable = !studentUser?.joker_used_at || lastJokerWeek !== currentWeek;
+
+                                  return (
+                                    <div 
+                                      key={idx}
+                                      style={{ 
+                                        background: '#ffffff', 
+                                        border: '1px dashed rgba(239, 68, 68, 0.25)', 
+                                        borderRadius: '16px', 
+                                        padding: '12px 14px',
+                                        display: 'flex',
+                                        flexDirection: 'row',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        gap: '12px',
+                                        borderLeft: `4px solid ${borderLeftColor}`,
+                                        boxShadow: '0 2px 8px rgba(239, 68, 68, 0.01)'
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
+                                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ef4444', fontFamily: 'monospace' }}>
+                                          {group.date}
+                                        </span>
+                                        <span style={{ 
+                                          fontSize: '0.58rem', 
+                                          fontWeight: 900, 
+                                          background: 'rgba(239, 68, 68, 0.08)', 
+                                          color: '#ef4444', 
+                                          padding: '1px 6px', 
+                                          borderRadius: '100px', 
+                                          letterSpacing: '0.04em', 
+                                          textTransform: 'uppercase' 
+                                        }}>
+                                          Nicht geübt
+                                        </span>
+                                      </div>
+                                      
+                                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+                                        {isJokerAvailable && (
+                                          <button 
+                                            onClick={() => handleUseJoker(group.date)}
+                                            style={{
+                                              background: '#8b5cf6',
+                                              color: '#ffffff',
+                                              border: 'none',
+                                              padding: '4px 10px',
+                                              borderRadius: '8px',
+                                              fontSize: '0.65rem',
+                                              fontWeight: 800,
+                                              cursor: 'pointer',
+                                              boxShadow: '0 2px 4px rgba(139, 92, 246, 0.2)',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '3px',
+                                              transition: 'all 0.2s'
+                                            }}
+                                            onMouseOver={(e) => e.currentTarget.style.background = '#7c3aed'}
+                                            onMouseOut={(e) => e.currentTarget.style.background = '#8b5cf6'}
+                                          >
+                                            🎯 Joker einsetzen
+                                          </button>
+                                        )}
+                                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                          <Flame size={iconSize} fill="#ef4444" color="#ef4444" />
+                                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ef4444' }}>
+                                            Kleine Flamme
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                              }
+
+                              const focusMins = Math.round(group.focusSeconds / 60);
+                              const extraMins = Math.floor(group.extraSeconds / 60);
+                              const extraSecs = group.extraSeconds % 60;
+                              
+                              const textParts = [];
+                              if (group.focusSeconds > 0) {
+                                textParts.push(`Fokuszeit (+${focusMins}m)`);
+                              }
+                              if (group.extraSeconds > 0) {
+                                textParts.push(`+${extraMins}:${String(extraSecs).padStart(2, '0')} (extra)`);
+                              }
+                              const statusText = textParts.join(' - ');
+
+                              if (hasMastered) {
+                                return (
+                                  <div 
+                                    key={idx}
+                                    style={{ 
+                                      background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', 
+                                      border: '1px solid #047857', 
+                                      borderRadius: '16px', 
+                                      padding: '12px 14px',
+                                      display: 'flex',
+                                      flexDirection: 'row',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'center',
+                                      gap: '12px',
+                                      boxShadow: '0 4px 12px rgba(4, 120, 87, 0.12)'
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
+                                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ffffff', whiteSpace: 'nowrap' }}>
+                                        {group.date}
+                                      </span>
+                                      {statusText && (
+                                        <span style={{ fontSize: '0.74rem', fontWeight: 650, color: '#d1fae5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                          - {statusText}
+                                        </span>
+                                      )}
+                                    </div>
+                                    
+                                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
+                                      <Flame size={iconSize} fill="#ef4444" color="#ef4444" />
+                                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ffffff' }}>
+                                        {group.flameLevel}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <div 
+                                  key={idx}
+                                  style={{ 
+                                    background: '#f8fafc', 
+                                    border: '1px solid #e2e8f0', 
+                                    borderRadius: '16px', 
+                                    padding: '12px 14px',
+                                    display: 'flex',
+                                    flexDirection: 'row',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    gap: '12px',
+                                    borderLeft: `4px solid ${borderLeftColor}`
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
+                                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', whiteSpace: 'nowrap' }}>
+                                      {group.date}
+                                    </span>
+                                    {statusText && (
+                                      <span style={{ fontSize: '0.74rem', fontWeight: 650, color: '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        - {statusText}
+                                      </span>
+                                    )}
+                                  </div>
+                                  
+                                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
+                                    <Flame size={iconSize} fill={hasMastered ? '#10b981' : isToday ? '#eab308' : '#ef4444'} color={hasMastered ? '#10b981' : isToday ? '#eab308' : '#ef4444'} />
+                                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: hasMastered ? '#10b981' : isToday ? '#eab308' : '#ef4444' }}>
+                                      {group.flameLevel}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     );
                   });
