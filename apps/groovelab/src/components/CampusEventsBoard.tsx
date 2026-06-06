@@ -1308,31 +1308,59 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               />
             </div>
           </div>
-
-          {/* Category */}
+          {/* Category Switch */}
           <div>
             <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
               Kategorie *
             </label>
-            <select
-              value={formCategory}
-              onChange={e => setFormCategory(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                borderRadius: '10px',
-                border: '1.5px solid #cbd5e1',
-                fontSize: '0.85rem',
-                fontWeight: 650,
-                outline: 'none',
-                background: '#ffffff',
-                boxSizing: 'border-box'
-              }}
-            >
-              <option value="Klassenvorspiel">Klassenvorspiel</option>
-            </select>
+            <div style={{
+              display: 'flex',
+              background: '#f1f5f9',
+              padding: '4px',
+              borderRadius: '12px',
+              gap: '4px',
+              border: '1px solid #e2e8f0'
+            }}>
+              <button
+                type="button"
+                onClick={() => setFormCategory('Klassenvorspiel')}
+                style={{
+                  flex: 1,
+                  border: 'none',
+                  background: formCategory === 'Klassenvorspiel' ? '#ffffff' : 'transparent',
+                  color: formCategory === 'Klassenvorspiel' ? '#0f172a' : '#64748b',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  fontWeight: 800,
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  boxShadow: formCategory === 'Klassenvorspiel' ? '0 2px 4px rgba(0,0,0,0.04)' : 'none'
+                }}
+              >
+                Klassenvorspiel
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormCategory('Schultermin')}
+                style={{
+                  flex: 1,
+                  border: 'none',
+                  background: formCategory === 'Schultermin' ? '#ffffff' : 'transparent',
+                  color: formCategory === 'Schultermin' ? '#0f172a' : '#64748b',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  fontWeight: 800,
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  boxShadow: formCategory === 'Schultermin' ? '0 2px 4px rgba(0,0,0,0.04)' : 'none'
+                }}
+              >
+                Schultermin
+              </button>
+            </div>
           </div>
-
           {/* Description */}
           <div>
             <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
