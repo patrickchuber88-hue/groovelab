@@ -1377,20 +1377,6 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             {cardHeightPx > 52 && (
                               <span style={{ fontSize: '0.62rem', fontWeight: 600, color: '#6ee7b7', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bs.instrument}</span>
                             )}
-                            {cardHeightPx > 72 && (
-                              <select
-                                value={bs.duration}
-                                onClick={e => e.stopPropagation()}
-                                onChange={(e) => { const val = parseInt(e.target.value); if (!isNaN(val)) handleUpdateDuration(bs.id, val); }}
-                                style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '5px', padding: '1px 4px', fontSize: '0.62rem', fontWeight: 700, color: '#047857', outline: 'none', cursor: 'pointer', width: 'fit-content', marginTop: '2px' }}
-                              >
-                                <option value={30}>30 Min</option>
-                                <option value={45}>45 Min</option>
-                                <option value={60}>60 Min</option>
-                                <option value={90}>90 Min</option>
-                                {![30,45,60,90].includes(bs.duration) && <option value={bs.duration}>{bs.duration} Min</option>}
-                              </select>
-                            )}
                           </div>
                         );
                       })}
