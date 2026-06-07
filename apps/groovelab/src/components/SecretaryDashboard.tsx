@@ -960,6 +960,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [manageTeacher, setManageTeacher] = useState<any | null>(null);
   const [selectedCrisisTeacherId, setSelectedCrisisTeacherId] = useState<string | null>(null);
   const [crisisTabMode, setCrisisTabMode] = useState<'live' | 'history'>('live');
+  const [selectedArchiveLog, setSelectedArchiveLog] = useState<any | null>(null);
   const [activeContextMenu, setActiveContextMenu] = useState<string | null>(null);
   const [copiedStudentId, setCopiedStudentId] = useState<string | null>(null);
   const [copiedSchoolLink, setCopiedSchoolLink] = useState<boolean>(false);
@@ -7075,14 +7076,22 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         {/* TAB 1.1: SECRETARY - CRISIS */}
         {activeTab === 'secretary' && secretarySubTab === 'crisis' && (() => {
           const now = new Date();
+          const todayStart = new Date();
+          todayStart.setHours(0,0,0,0);
 
           // ── Derived data ──
           const sickTeachersMap = new Map<string, any>();
           crisisNotifications.forEach(n => { if (n.teacher) sickTeachersMap.set(n.teacher.id, n.teacher); });
           const sickTeachers = Array.from(sickTeachersMap.values());
 
-          const liveTickets   = crisisNotifications.filter(n => n.status !== 'ARCHIVED');
-          const archiveTickets = crisisNotifications.filter(n => n.status === 'ARCHIVED');
+          const liveTickets   = crisisNotifications.filter(n => {
+            const isPast = new Date(n.slot_start_datetime).getTime() < todayStart.getTime();
+            return n.status !== 'ARCHIVED' && !isPast;
+          });
+          const archiveTickets = crisisNotifications.filter(n => {
+            const isPast = new Date(n.slot_start_datetime).getTime() < todayStart.getTime();
+            return n.status === 'ARCHIVED' || isPast;
+          });
           const poolTickets    = crisisTabMode === 'live' ? liveTickets : archiveTickets;
           const visibleTickets = selectedCrisisTeacherId
             ? poolTickets.filter(t => t.teacher?.id === selectedCrisisTeacherId)
@@ -7110,6 +7119,29 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           const redTickets    = visibleTickets.filter(t => getUrgency(t) === 'RED');
           const yellowTickets = visibleTickets.filter(t => getUrgency(t) === 'YELLOW');
           const greenTickets  = visibleTickets.filter(t => getUrgency(t) === 'GREEN');
+
+          // ── Grouped archive logbook data ──
+          const archiveGroups = (() => {
+            const groups: { [key: string]: { date: string, teacher: any, tickets: any[] } } = {};
+            archiveTickets.forEach(t => {
+              const dVal = new Date(t.slot_start_datetime);
+              const dateStr = dVal.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+              const key = `${dateStr}_${t.teacher_id}`;
+              if (!groups[key]) {
+                groups[key] = {
+                  date: dateStr,
+                  teacher: t.teacher,
+                  tickets: []
+                };
+              }
+              groups[key].tickets.push(t);
+            });
+            return Object.values(groups).sort((a, b) => {
+              const [aDay, aMonth, aYear] = a.date.split('.').map(Number);
+              const [bDay, bMonth, bYear] = b.date.split('.').map(Number);
+              return new Date(bYear, bMonth - 1, bDay).getTime() - new Date(aYear, aMonth - 1, aDay).getTime();
+            });
+          })();
 
           // ── Ticket Card Component ──
           const TicketCard = ({ t }: { t: any }) => {
@@ -7180,6 +7212,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       Lehrkraft: <strong style={{ color: '#0f172a', fontWeight: 700 }}>{teacherName}</strong>
                     </span>
                   </div>
+                  {urgency === 'RED' && (
+                    <div style={{ marginTop: '8px', fontSize: '0.72rem', fontWeight: 900, color: '#ef4444', background: '#fee2e2', padding: '6px 12px', borderRadius: '8px', width: 'fit-content' }}>
+                      ⚠️ Ausfall in unter 2h - telefonischer Sofort-Kontakt empfohlen!
+                    </div>
+                  )}
                 </div>
 
                 {/* Badge */}
@@ -7193,7 +7230,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 {/* Action buttons – only in live mode */}
                 {crisisTabMode === 'live' && (
                   <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                    {t.status !== 'READ' && (
+                    {urgency !== 'GREEN' && (
                       <button
                         onClick={() => handleMarkAsNotified(t.id)}
                         style={{
@@ -7208,24 +7245,26 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(16,185,129,0.3)'; }}
                         onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(16,185,129,0.2)'; }}
                       >
-                        <CheckCircle size={14} /> Informiert
+                        <CheckCircle size={14} /> Manuell grün melden
                       </button>
                     )}
-                    <button
-                      onClick={() => handleArchiveCrisisTicket(t.id)}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '6px',
-                        background: 'white', border: '1.5px solid #e2e8f0',
-                        color: '#64748b', borderRadius: '12px', padding: '8px 14px',
-                        fontSize: '0.75rem', fontWeight: 900, cursor: 'pointer',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-                        transition: 'all 0.2s', fontFamily: "'Plus Jakarta Sans', sans-serif",
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.color = '#0f172a'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.color = '#64748b'; }}
-                    >
-                      <X size={14} /> Archivieren
-                    </button>
+                    {urgency === 'GREEN' && (
+                      <button
+                        onClick={() => handleArchiveCrisisTicket(t.id)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '6px',
+                          background: 'white', border: '1.5px solid #e2e8f0',
+                          color: '#64748b', borderRadius: '12px', padding: '8px 14px',
+                          fontSize: '0.75rem', fontWeight: 900, cursor: 'pointer',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                          transition: 'all 0.2s', fontFamily: "'Plus Jakarta Sans', sans-serif",
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.color = '#0f172a'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.color = '#64748b'; }}
+                      >
+                        <X size={14} /> Archivieren
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -7237,16 +7276,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
               {/* ── TOP: KPI HEADER BAR ── */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }} className="animation-slide-up">
-                {/* KPI 1: Aktive Ausfälle */}
+                {/* KPI 1: Offene Ausfälle - Yellow */}
                 <div style={{
-                  background: unreadCount > 0
-                    ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(220, 38, 38, 0.95) 100%)'
-                    : 'linear-gradient(135deg, rgba(16, 185, 129, 0.95) 0%, rgba(5, 150, 105, 0.95) 100%)',
+                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.95) 0%, rgba(217, 119, 6, 0.95) 100%)',
                   color: 'white', borderRadius: '24px', padding: '22px',
                   display: 'flex', flexDirection: 'column', gap: '8px',
-                  boxShadow: unreadCount > 0
-                    ? '0 12px 30px -5px rgba(239,68,68,0.4)'
-                    : '0 12px 30px -5px rgba(16,185,129,0.3)',
+                  boxShadow: '0 12px 30px -5px rgba(245, 158, 11, 0.35)',
                   border: '1px solid rgba(255,255,255,0.2)',
                   backdropFilter: 'blur(20px)',
                 }}>
@@ -7266,12 +7301,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   </span>
                 </div>
 
-                {/* KPI 2: Kranke Lehrkräfte */}
+                {/* KPI 2: Kranke Lehrkräfte - Red */}
                 <div style={{
-                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.95) 0%, rgba(217, 119, 6, 0.95) 100%)',
+                  background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(220, 38, 38, 0.95) 100%)',
                   color: 'white', borderRadius: '24px', padding: '22px',
                   display: 'flex', flexDirection: 'column', gap: '8px',
-                  boxShadow: '0 12px 30px -5px rgba(245,158,11,0.35)',
+                  boxShadow: '0 12px 30px -5px rgba(239, 68, 68, 0.35)',
                   border: '1px solid rgba(255,255,255,0.2)',
                   backdropFilter: 'blur(20px)',
                 }}>
@@ -7291,12 +7326,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   </span>
                 </div>
 
-                {/* KPI 3: Bereits informiert */}
+                {/* KPI 3: Erfolgreich informiert - Green */}
                 <div style={{
-                  background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.95) 0%, rgba(79, 70, 229, 0.95) 100%)',
+                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.95) 0%, rgba(5, 150, 105, 0.95) 100%)',
                   color: 'white', borderRadius: '24px', padding: '22px',
                   display: 'flex', flexDirection: 'column', gap: '8px',
-                  boxShadow: '0 12px 30px -5px rgba(99,102,241,0.35)',
+                  boxShadow: '0 12px 30px -5px rgba(16, 185, 129, 0.3)',
                   border: '1px solid rgba(255,255,255,0.2)',
                   backdropFilter: 'blur(20px)',
                 }}>
@@ -7364,7 +7399,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         background: 'linear-gradient(135deg, #ef4444, #dc2626)',
                         borderRadius: '14px', padding: '10px',
                         boxShadow: '0 6px 20px rgba(239,68,68,0.25)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        display: 'flex', alignItems: 'center', justifyItems: 'center'
                       }}>
                         <ShieldAlert size={20} color="white" />
                       </div>
@@ -7429,88 +7464,256 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     </div>
                   )}
 
-                  {/* Ticket groups – LIVE mode */}
+                  {/* Ticket groups – LIVE mode (2 Columns Layout) */}
                   {crisisTabMode === 'live' && visibleTickets.length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                      {redTickets.length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '2px 6px' }}>
-                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', display: 'inline-block', boxShadow: '0 0 10px rgba(239,68,68,0.5)', animation: 'pulse 1.5s infinite' }} />
-                            <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                              🚨 Akute Konflikte — Unterricht beginnt in weniger als 2 Std. (Sofort handeln)
-                            </span>
-                          </div>
-                          {redTickets.map(t => <TicketCard key={t.id} t={t} />)}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                      {/* Spalte 1: Ausstehend / Akut (Rot & Gelb) */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div style={{ padding: '6px 4px', borderBottom: '2.5px solid #fca5a5', display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '8px' }}>
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', display: 'inline-block', boxShadow: '0 0 10px rgba(239,68,68,0.5)', animation: 'pulse 1.5s infinite' }} />
+                          <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                            🚨 Ausstehend / Akut ({redTickets.length + yellowTickets.length})
+                          </span>
                         </div>
-                      )}
-                      {yellowTickets.length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '2px 6px' }}>
-                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }} />
-                            <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#78716c', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                              Ausstehend — Schüler noch nicht informiert
-                            </span>
+                        {redTickets.map(t => <TicketCard key={t.id} t={t} />)}
+                        {yellowTickets.map(t => <TicketCard key={t.id} t={t} />)}
+                        {redTickets.length === 0 && yellowTickets.length === 0 && (
+                          <div style={{ padding: '40px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: '20px', border: '1.5px dashed #cbd5e1', color: '#64748b', fontSize: '0.82rem', fontWeight: 700 }}>
+                            Keine ausstehenden Fälle
                           </div>
-                          {yellowTickets.map(t => <TicketCard key={t.id} t={t} />)}
+                        )}
+                      </div>
+
+                      {/* Spalte 2: Erledigt (Grün) */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div style={{ padding: '6px 4px', borderBottom: '2.5px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '8px' }}>
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                          <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                            ✓ Erledigt ({greenTickets.length})
+                          </span>
                         </div>
-                      )}
-                      {greenTickets.length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '2px 6px' }}>
-                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-                            <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#78716c', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                              Erledigt — Schüler wurden erfolgreich kontaktiert
-                            </span>
+                        {greenTickets.map(t => <TicketCard key={t.id} t={t} />)}
+                        {greenTickets.length === 0 && (
+                          <div style={{ padding: '40px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: '20px', border: '1.5px dashed #cbd5e1', color: '#64748b', fontSize: '0.82rem', fontWeight: 700 }}>
+                            Keine erledigten Fälle
                           </div>
-                          {greenTickets.map(t => <TicketCard key={t.id} t={t} />)}
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Ticket list – ARCHIVE mode (Logbook Layout) */}
+                  {crisisTabMode === 'history' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {archiveGroups.length === 0 ? (
+                        <div style={{
+                          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
+                          backdropFilter: 'blur(24px)',
+                          border: '1px solid rgba(255, 255, 255, 0.5)',
+                          borderRadius: '24px',
+                          padding: '60px 40px', textAlign: 'center',
+                          boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
+                        }}>
+                          <div style={{ fontSize: '3rem', marginBottom: '20px' }}>📁</div>
+                          <strong style={{ display: 'block', fontSize: '1.25rem', color: '#0f172a', marginBottom: '8px' }}>
+                            Keine archivierten Einträge
+                          </strong>
                         </div>
+                      ) : (
+                        archiveGroups.map(group => {
+                          const total = group.tickets.length;
+                          const successCount = group.tickets.filter(t => t.status === 'READ' || t.notified_at).length;
+                          const failedCount = total - successCount;
+                          const teacherName = group.teacher ? `${group.teacher.first_name} ${group.teacher.last_name}` : 'Lehrkraft';
+
+                          return (
+                            <div 
+                              key={`${group.date}_${group.teacher?.id}`} 
+                              onClick={() => setSelectedArchiveLog(group)}
+                              style={{
+                                background: 'white',
+                                border: '1.5px solid #cbd5e1',
+                                borderRadius: '16px',
+                                padding: '16px 20px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                              }}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.borderColor = '#ea4335';
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                                e.currentTarget.style.boxShadow = '0 6px 18px rgba(15, 23, 42, 0.04)';
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.borderColor = '#cbd5e1';
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = 'none';
+                              }}
+                            >
+                              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                                <div style={{ background: '#f1f5f9', padding: '10px', borderRadius: '12px', fontSize: '1.2rem' }}>
+                                  📖
+                                </div>
+                                <div>
+                                  <strong style={{ display: 'block', fontSize: '0.95rem', color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                    {group.date} &bull; {teacherName}
+                                  </strong>
+                                  <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                                    Krankmeldung: {sickDurStr(group.teacher?.sick_until)}
+                                  </span>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.78rem', background: '#e6f4ea', color: '#137333', padding: '4px 10px', borderRadius: '100px', fontWeight: 800 }}>
+                                  {successCount} informiert
+                                </span>
+                                {failedCount > 0 && (
+                                  <span style={{ fontSize: '0.78rem', background: '#fce8e6', color: '#c5221f', padding: '4px 10px', borderRadius: '100px', fontWeight: 800 }}>
+                                    {failedCount} offen
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
                       )}
                     </div>
                   )}
 
-                  {/* Ticket list – ARCHIVE mode */}
-                  {crisisTabMode === 'history' && visibleTickets.length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {visibleTickets.map(t => <TicketCard key={t.id} t={t} />)}
+                  {/* Logbook Detail Modal popup */}
+                  {selectedArchiveLog && (
+                    <div style={{
+                      position: 'fixed',
+                      inset: 0,
+                      background: 'rgba(15, 23, 42, 0.3)',
+                      backdropFilter: 'blur(8px)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      zIndex: 1000
+                    }}>
+                      <div style={{
+                        background: 'white',
+                        borderRadius: '24px',
+                        width: '560px',
+                        maxWidth: '90%',
+                        padding: '24px',
+                        boxShadow: '0 20px 48px -12px rgba(15, 23, 42, 0.15)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '20px'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px' }}>
+                          <div>
+                            <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                              Protokoll & Details vom {selectedArchiveLog.date}
+                            </h4>
+                            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                              Lehrkraft: {selectedArchiveLog.teacher ? `${selectedArchiveLog.teacher.first_name} ${selectedArchiveLog.teacher.last_name}` : 'Unbekannt'}
+                            </span>
+                          </div>
+                          <button 
+                            onClick={() => setSelectedArchiveLog(null)}
+                            style={{
+                              background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '8px', borderRadius: '50%'
+                            }}
+                          >
+                            <X size={20} />
+                          </button>
+                        </div>
+
+                        <div style={{ maxHeight: '350px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }} className="custom-calendar-scrollbar">
+                          {selectedArchiveLog.tickets.map((t: any) => {
+                            const isSuccess = t.status === 'READ' || t.notified_at;
+                            const sName = t.student ? `${t.student.first_name} ${t.student.last_name}` : 'Unbekannter Schüler';
+                            const tStr = new Date(t.slot_start_datetime).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                            
+                            return (
+                              <div 
+                                key={t.id} 
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  background: isSuccess ? '#f0fdf4' : '#fef2f2',
+                                  border: `1px solid ${isSuccess ? '#bbf7d0' : '#fca5a5'}`,
+                                  borderRadius: '12px',
+                                  padding: '10px 14px'
+                                }}
+                              >
+                                <div>
+                                  <strong style={{ display: 'block', fontSize: '0.85rem', color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                    {sName}
+                                  </strong>
+                                  <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>
+                                    {t.student?.instrument || 'Musikunterricht'} &bull; {tStr} Uhr
+                                  </span>
+                                </div>
+                                <span style={{
+                                  fontSize: '0.72rem',
+                                  fontWeight: 800,
+                                  color: isSuccess ? '#16a34a' : '#dc2626',
+                                  background: isSuccess ? '#dcfce7' : '#fee2e2',
+                                  padding: '4px 10px',
+                                  borderRadius: '100px'
+                                }}>
+                                  {isSuccess ? '✓ Erfolgreich informiert' : '❌ Nicht rechtzeitig informiert'}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
+                          <button 
+                            onClick={() => setSelectedArchiveLog(null)}
+                            className="google-btn-secondary"
+                            style={{ padding: '8px 20px', borderRadius: '12px' }}
+                          >
+                            Schließen
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
+
                 </div>
 
                 {/* RIGHT SIDEBAR */}
                 <div style={{ width: '310px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-                  {/* Sick teacher list */}
+                  {/* Sick teacher list (Red Widget style) */}
                   <div style={{
-                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
-                    backdropFilter: 'blur(24px)',
-                    WebkitBackdropFilter: 'blur(24px)',
-                    border: '1px solid rgba(255, 255, 255, 0.5)',
+                    background: 'linear-gradient(135deg, rgba(254, 242, 242, 0.95) 0%, rgba(254, 226, 226, 0.95) 100%)',
+                    border: '1.5px solid #fca5a5',
                     borderRadius: '24px',
                     padding: '24px',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '16px',
-                    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
+                    boxShadow: '0 8px 32px rgba(239, 68, 68, 0.04)',
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '14px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '14px', borderBottom: '1px solid rgba(239, 68, 68, 0.15)' }}>
                       <div style={{
-                        background: '#fee2e2', borderRadius: '12px', padding: '8px', border: '1px solid #fecaca',
+                        background: '#fee2e2', borderRadius: '12px', padding: '8px', border: '1px solid #fca5a5',
                         display: 'flex', alignItems: 'center', justifyContent: 'center'
                       }}>
                         <UserX size={16} color="#ef4444" />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <strong style={{ fontSize: '0.9rem', fontWeight: 950, color: '#0f172a', display: 'block', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                        <strong style={{ fontSize: '0.9rem', fontWeight: 950, color: '#7f1d1d', display: 'block', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                           Krankmeldungen
                         </strong>
-                        <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Wählen zum Filtern</span>
+                        <span style={{ fontSize: '0.72rem', color: '#b91c1c', fontWeight: 600 }}>Wählen zum Filtern</span>
                       </div>
                     </div>
 
                     {sickTeachers.length === 0 ? (
                       <div style={{ textAlign: 'center', padding: '24px 0' }}>
-                        <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🍏</div>
-                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', fontWeight: 700 }}>Alle Lehrkräfte aktiv im Dienst</p>
+                        <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🍎</div>
+                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#7f1d1d', fontWeight: 700 }}>Alle Lehrkräfte aktiv im Dienst</p>
                       </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -7524,34 +7727,34 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               style={{
                                 display: 'flex', alignItems: 'center', gap: '12px',
                                 background: isSelected ? '#fff5f5' : 'white',
-                                border: `1.5px solid ${isSelected ? '#ef4444' : '#e2e8f0'}`,
+                                border: `1.5px solid ${isSelected ? '#ef4444' : '#fca5a5'}`,
                                 borderRadius: '16px', padding: '12px 14px',
                                 cursor: 'pointer', transition: 'all 0.2s ease',
                                 transform: isSelected ? 'scale(1.02)' : 'scale(1)',
-                                boxShadow: isSelected ? '0 8px 20px rgba(239,68,68,0.08)' : '0 2px 4px rgba(0,0,0,0.01)',
+                                boxShadow: isSelected ? '0 8px 20px rgba(239,68,68,0.08)' : '0 2px 4px rgba(239, 68, 68, 0.02)',
                               }}
                             >
                               <div style={{
                                 width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
-                                background: isSelected ? 'linear-gradient(135deg, #fef2f2, #fee2e2)' : '#f1f5f9',
-                                border: `2px solid ${isSelected ? '#fecaca' : '#e2e8f0'}`,
+                                background: 'linear-gradient(135deg, #fef2f2, #fee2e2)',
+                                border: '2px solid #fecaca',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 fontSize: '0.9rem', fontWeight: 900,
-                                color: isSelected ? '#ef4444' : '#475569',
+                                color: '#ef4444',
                                 fontFamily: "'Plus Jakarta Sans', sans-serif",
                               }}>
                                 {teacher.first_name?.[0]?.toUpperCase() || 'L'}
                               </div>
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontWeight: 900, fontSize: '0.85rem', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                <div style={{ fontWeight: 900, fontSize: '0.85rem', color: '#7f1d1d', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                                   {teacher.first_name} {teacher.last_name}
                                 </div>
                                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '3px' }}>
                                   <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ef4444' }}>
                                     {count} {count === 1 ? 'Fall' : 'Fälle'}
                                   </span>
-                                  <span style={{ color: '#cbd5e1', fontSize: '0.6rem' }}>&bull;</span>
-                                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>{sickDurStr(teacher.sick_until)}</span>
+                                  <span style={{ color: '#fca5a5', fontSize: '0.6rem' }}>&bull;</span>
+                                  <span style={{ fontSize: '0.72rem', color: '#b91c1c', fontWeight: 600 }}>{sickDurStr(teacher.sick_until)}</span>
                                 </div>
                               </div>
                               {/* Re-activate / Gesundmelden button */}
@@ -7562,16 +7765,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 }}
                                 title="Lehrkraft als gesund melden (Stunden reaktivieren)"
                                 style={{
-                                  background: '#f0fdf4', border: '1px solid #bbf7d0',
+                                  background: '#ef4444', border: 'none',
                                   borderRadius: '10px', width: '28px', height: '28px',
                                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  cursor: 'pointer', color: '#16a34a', transition: 'all 0.15s',
-                                  flexShrink: 0
+                                  cursor: 'pointer', color: 'white', transition: 'all 0.15s',
+                                  flexShrink: 0,
+                                  boxShadow: '0 2px 6px rgba(239, 68, 68, 0.2)'
                                 }}
-                                onMouseEnter={e => { e.currentTarget.style.background = '#dcfce7'; }}
-                                onMouseLeave={e => { e.currentTarget.style.background = '#f0fdf4'; }}
+                                onMouseEnter={e => { e.currentTarget.style.background = '#dc2626'; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = '#ef4444'; }}
                               >
-                                <Check size={15} />
+                                <UserCheck size={15} />
                               </button>
                             </div>
                           );
@@ -7583,19 +7787,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       <button
                         onClick={() => setSelectedCrisisTeacherId(null)}
                         style={{
-                          background: 'white', border: '1.5px solid #e2e8f0',
-                          color: '#0f172a', fontSize: '0.78rem', cursor: 'pointer',
+                          background: 'white', border: '1.5px solid #fca5a5',
+                          color: '#7f1d1d', fontSize: '0.78rem', cursor: 'pointer',
                           padding: '8px 12px', borderRadius: '12px', fontWeight: 800,
                           width: '100%', transition: 'all 0.15s',
                           fontFamily: "'Plus Jakarta Sans', sans-serif"
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.background = '#f8fafc'; }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#fee2e2'; }}
                         onMouseLeave={e => { e.currentTarget.style.background = 'white'; }}
                       >Filter aufheben ✕</button>
                     )}
                   </div>
 
-                  {/* Wie funktioniert das? Info box */}
+                  {/* Wie funktioniert das? Info box (Krisen-Operationscockpit) */}
                   <div style={{
                     background: 'linear-gradient(135deg, rgba(239, 246, 255, 0.8) 0%, rgba(219, 234, 254, 0.5) 100%)',
                     border: '1.5px solid rgba(59, 130, 246, 0.15)',
@@ -7604,13 +7808,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     backdropFilter: 'blur(16px)',
                   }}>
                     <strong style={{ fontSize: '0.85rem', fontWeight: 950, color: '#1d4ed8', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                      ℹ️ Krisen-Operations-Modus
+                      ℹ️ Krisen-Operationscockpit
                     </strong>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       {[
-                        ['⚡', 'Rot (Akut)', 'Ausfall in unter 2 Std. — Telefonischer Sofort-Kontakt empfohlen!'],
-                        ['⏳', 'Gelb (Offen)', 'Unterrichtsausfall registriert. Schüler noch nicht kontaktiert.'],
-                        ['✓', 'Grün (Erledigt)', 'Schüler über Terminänderung oder Ausfall erfolgreich benachrichtigt.'],
+                        ['⚡', 'Rot (Akut)', 'Ausfall in unter 2 Std. — Telefonischer Sofort-Kontakt dringend empfohlen!'],
+                        ['⏳', 'Gelb (Offen)', 'Schüler wurde digital benachrichtigt. Rückmeldung steht noch aus.'],
+                        ['✓', 'Grün (Erledigt)', 'Schüler wurde erfolgreich informiert (Kenntnisnahme bestätigt oder manuell gemeldet).'],
                       ].map(([icon, color, desc]) => (
                         <div key={color} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                           <span style={{ fontSize: '0.9rem', flexShrink: 0 }}>{icon}</span>
@@ -7623,7 +7827,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     </div>
                     <div style={{ borderTop: '1px solid rgba(59, 130, 246, 0.2)', paddingTop: '10px', marginTop: '4px' }}>
                       <p style={{ margin: 0, fontSize: '0.72rem', color: '#1d4ed8', lineHeight: 1.4, fontWeight: 500 }}>
-                        Durch Klicken auf das grüne Häkchen (✓) neben einer kranken Lehrkraft kann diese jederzeit gesund gemeldet werden. Alle betroffenen Stundenpläne werden automatisch reaktiviert.
+                        Das Operationscockpit hilft Ihnen bei Lehrerausfällen. Sie können Fälle per Klick manuell als grün markieren, sobald Sie den Schüler telefonisch kontaktiert haben. Am Folgetag werden beendete Fälle automatisch ins Archiv verschoben.
                       </p>
                     </div>
                   </div>
