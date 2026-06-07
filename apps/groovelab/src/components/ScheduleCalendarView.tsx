@@ -56,6 +56,12 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
   };
 
   const [currentDate, setCurrentDate] = useState(new Date());
+
+  // School year: September 1 – July 31 of the following year (August excluded)
+  const now = new Date();
+  const schoolStartYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+  const schoolYearStart = new Date(schoolStartYear, 8, 1);  // Sept 1
+  const schoolYearEnd   = new Date(schoolStartYear + 1, 6, 31); // July 31
   const [baseOccurrences, setBaseOccurrences] = useState<ScheduleOccurrence[]>([]);
   const [pendingChanges, setPendingChanges] = useState<Record<string, ScheduleOccurrence>>({});
   const [loading, setLoading] = useState(true);
@@ -477,12 +483,18 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
   const prevWeek = () => {
     const d = new Date(currentDate);
     d.setDate(d.getDate() - 7);
+    // Skip August entirely: jump back to July 31 if we'd land in August
+    if (d.getMonth() === 7) d.setMonth(6, 31);
+    if (d < schoolYearStart) return; // don't navigate before school year start
     setCurrentDate(d);
   };
 
   const nextWeek = () => {
     const d = new Date(currentDate);
     d.setDate(d.getDate() + 7);
+    // Skip August entirely: jump forward to September 1 if we'd land in August
+    if (d.getMonth() === 7) d.setMonth(8, 1);
+    if (d > schoolYearEnd) return; // don't navigate past school year end
     setCurrentDate(d);
   };
 
@@ -674,6 +686,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
 
       // Merge projected mock data with database entries so that every slot defined in the designer
       // template (boards) is always visible in the calendar, even if only one or a few are saved in the DB.
+      // School year runs September 1 – July 31 (August is excluded).
       const projectedData: ScheduleOccurrence[] = [];
       if (boards && boards.length > 0) {
         boards.forEach(board => {
@@ -681,6 +694,9 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
           const dayDate = new Date(weekStart);
           dayDate.setDate(dayDate.getDate() + offset);
           const dateStr = toLocalYYYYMMDD(dayDate);
+
+          // Skip projections for August (month 7) — it's outside the school year
+          if (dayDate.getMonth() === 7) return;
 
           board.students.forEach((student: any) => {
             const formattedTime = student.assignedTime ? `${student.assignedTime}:00` : '00:00:00';
@@ -773,13 +789,20 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
       }
       fetchedData = [...fetchedData, ...projectedData];
 
-      // Filter out regular schedule items if they fall during holidays,
-      // but keep explicitly saved/rescheduled database occurrences (not mock or vacant)
+      // Filter out regular schedule items if they fall during holidays.
+      // In the holidays, only Nachholtermine (rescheduled appointments from outside the holidays) are allowed.
       const filteredFromHolidays = fetchedData.filter(occ => {
         const isHoliday = holidays.some(h => occ.date >= h.start && occ.date <= h.end);
         if (isHoliday) {
           const isMockOrVacant = occ.id.startsWith('mock-') || occ.id.startsWith('vacant-');
-          return !isMockOrVacant;
+          if (isMockOrVacant) return false;
+
+          // Keep database occurrences only if they are Nachholtermine rescheduled from outside the holidays
+          const isRescheduledFromOutside = occ.original_date && 
+            occ.original_date !== occ.date && 
+            !holidays.some(h => occ.original_date >= h.start && occ.original_date <= h.end);
+
+          return !!isRescheduledFromOutside;
         }
         return true;
       });

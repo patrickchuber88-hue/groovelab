@@ -1285,7 +1285,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       const isHoliday = holidays.some(h => occ.date >= h.start && occ.date <= h.end);
       if (isHoliday) {
         const isMockOrVacant = occ.id.startsWith?.('mock-') || occ.id.startsWith?.('vacant-');
-        return !isMockOrVacant;
+        if (isMockOrVacant) return false;
+
+        const isRescheduledFromOutside = occ.original_date && 
+          occ.original_date !== occ.date && 
+          !holidays.some(h => occ.original_date >= h.start && occ.original_date <= h.end);
+
+        return !!isRescheduledFromOutside;
       }
       return true;
     });
@@ -1296,7 +1302,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       const isHoliday = holidays.some(h => occ.date >= h.start && occ.date <= h.end);
       if (isHoliday) {
         const isMockOrVacant = occ.id.startsWith?.('mock-') || occ.id.startsWith?.('vacant-');
-        return !isMockOrVacant;
+        if (isMockOrVacant) return false;
+
+        const isRescheduledFromOutside = occ.original_date && 
+          occ.original_date !== occ.date && 
+          !holidays.some(h => occ.original_date >= h.start && occ.original_date <= h.end);
+
+        return !!isRescheduledFromOutside;
       }
       return true;
     });
