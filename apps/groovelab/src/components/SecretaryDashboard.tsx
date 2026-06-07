@@ -4218,6 +4218,36 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 <span style={{ fontSize: '0.62rem', color: '#854d0e', fontWeight: 800, textTransform: 'uppercase', fontFamily: 'Urbanist' }}>GrooveLab Aktiv</span>
                 <strong style={{ fontSize: '1.4rem', color: '#713f12', fontWeight: 900, fontFamily: 'Urbanist' }}>{activeGroovelabCount}</strong>
               </div>
+              <div 
+                onClick={() => {
+                  const onboardingUrl = `${window.location.origin}/?onboarding=parent`;
+                  navigator.clipboard.writeText(onboardingUrl);
+                  setCopiedStudentId('general-onboarding');
+                  setTimeout(() => setCopiedStudentId(null), 2000);
+                }}
+                style={{ 
+                  background: copiedStudentId === 'general-onboarding' ? '#e2f6ea' : '#f8fafc', 
+                  border: copiedStudentId === 'general-onboarding' ? '1px solid #a7f3d0' : '1px solid #cbd5e1', 
+                  padding: '10px 14px', 
+                  borderRadius: '14px', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '2px',
+                  cursor: 'pointer',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease'
+                }}
+                className="hover-scale-mini"
+                title="Klicke, um den allgemeinen Eltern-Onboarding Link zu kopieren"
+              >
+                <span style={{ fontSize: '0.62rem', color: copiedStudentId === 'general-onboarding' ? '#137333' : '#475569', fontWeight: 800, textTransform: 'uppercase', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  {copiedStudentId === 'general-onboarding' ? <Check size={10} /> : <LinkIcon size={10} />}
+                  Onboarding Link
+                </span>
+                <span style={{ fontSize: '0.8rem', color: copiedStudentId === 'general-onboarding' ? '#137333' : '#0f172a', fontWeight: 800, fontFamily: 'Urbanist' }}>
+                  {copiedStudentId === 'general-onboarding' ? '✓ Kopiert' : 'Link kopieren'}
+                </span>
+              </div>
             </div>
 
             {/* FILTER & SEARCH */}
@@ -4546,47 +4576,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             PIN: {student.ausweis_nummer || 'Keine'}
                           </span>
                         )}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{
-                            fontSize: '0.7rem',
-                            fontWeight: 700,
-                            color: '#0f172a',
-                            background: '#e2e8f0',
-                            padding: '4px 8px',
-                            borderRadius: '8px',
-                            border: '1px solid #cbd5e1'
-                          }}>
-                            Tag: {student.day_of_birth || '1'}
-                          </span>
-                          <button
-                            onClick={() => {
-                              const onboardingUrl = `${window.location.origin}/?onboarding=parent&first_name=${encodeURIComponent(student.first_name || '')}&last_name=${encodeURIComponent(student.last_name || '')}&instrument=${encodeURIComponent(student.instrument || '')}&day=${student.day_of_birth || 1}`;
-                              navigator.clipboard.writeText(onboardingUrl);
-                              setCopiedStudentId(student.id);
-                              setTimeout(() => setCopiedStudentId(null), 2000);
-                            }}
-                            title="Onboarding-Link kopieren"
-                            style={{
-                              background: copiedStudentId === student.id ? '#e2f6ea' : '#f5f5f7',
-                              color: copiedStudentId === student.id ? '#137333' : '#64748b',
-                              border: 'none',
-                              borderRadius: '6px',
-                              padding: '4px 6px',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              transition: 'all 0.15s ease'
-                            }}
-                            className="hover-scale-mini"
-                          >
-                            {copiedStudentId === student.id ? (
-                              <Check size={12} />
-                            ) : (
-                              <LinkIcon size={12} />
-                            )}
-                          </button>
-                        </div>
+                        <span style={{
+                          fontSize: '0.7rem',
+                          fontWeight: 700,
+                          color: '#0f172a',
+                          background: '#e2e8f0',
+                          padding: '4px 8px',
+                          borderRadius: '8px',
+                          border: '1px solid #cbd5e1'
+                        }}>
+                          Tag: {student.day_of_birth || '1'}
+                        </span>
 
                         {/* Delete Button */}
                         <button
