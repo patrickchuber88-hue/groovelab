@@ -7081,7 +7081,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
           // ── Derived data ──
           const sickTeachersMap = new Map<string, any>();
-          crisisNotifications.forEach(n => { if (n.teacher) sickTeachersMap.set(n.teacher.id, n.teacher); });
+          crisisNotifications.forEach(n => {
+            if (n.teacher && n.teacher.sick_until) {
+              const sickUntilTime = new Date(n.teacher.sick_until).getTime();
+              if (sickUntilTime >= todayStart.getTime()) {
+                sickTeachersMap.set(n.teacher.id, n.teacher);
+              }
+            }
+          });
           const sickTeachers = Array.from(sickTeachersMap.values());
 
           const liveTickets   = crisisNotifications.filter(n => {
@@ -7282,32 +7289,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
               {/* ── TOP: KPI HEADER BAR ── */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }} className="animation-slide-up">
-                {/* KPI 1: Offene Ausfälle - Yellow */}
-                <div style={{
-                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.95) 0%, rgba(217, 119, 6, 0.95) 100%)',
-                  color: 'white', borderRadius: '24px', padding: '22px',
-                  display: 'flex', flexDirection: 'column', gap: '8px',
-                  boxShadow: '0 12px 30px -5px rgba(245, 158, 11, 0.35)',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  backdropFilter: 'blur(20px)',
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.85 }}>
-                      Offene Ausfälle
-                    </span>
-                    <div style={{ background: 'rgba(255,255,255,0.2)', padding: '6px', borderRadius: '10px' }}>
-                      <ShieldAlert size={15} color="white" />
-                    </div>
-                  </div>
-                  <div style={{ fontSize: '2.2rem', fontWeight: 950, letterSpacing: '-0.02em', lineHeight: 1, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                    {unreadCount}
-                  </div>
-                  <span style={{ fontSize: '0.72rem', opacity: 0.85, fontWeight: 600 }}>
-                    {unreadCount === 0 ? 'Exzellent — Alles im Plan' : 'Benachrichtigung ausstehend'}
-                  </span>
-                </div>
-
-                {/* KPI 2: Kranke Lehrkräfte - Red */}
+                {/* KPI 1: Kranke Lehrkräfte - Red */}
                 <div style={{
                   background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(220, 38, 38, 0.95) 100%)',
                   color: 'white', borderRadius: '24px', padding: '22px',
@@ -7329,6 +7311,31 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   </div>
                   <span style={{ fontSize: '0.72rem', opacity: 0.85, fontWeight: 600 }}>
                     {sickTeachers.length === 1 ? '1 Lehrkraft abwesend' : `${sickTeachers.length} Lehrkräfte abwesend`}
+                  </span>
+                </div>
+
+                {/* KPI 2: Offene Ausfälle - Yellow */}
+                <div style={{
+                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.95) 0%, rgba(217, 119, 6, 0.95) 100%)',
+                  color: 'white', borderRadius: '24px', padding: '22px',
+                  display: 'flex', flexDirection: 'column', gap: '8px',
+                  boxShadow: '0 12px 30px -5px rgba(245, 158, 11, 0.35)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  backdropFilter: 'blur(20px)',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.85 }}>
+                      Offene Ausfälle
+                    </span>
+                    <div style={{ background: 'rgba(255,255,255,0.2)', padding: '6px', borderRadius: '10px' }}>
+                      <ShieldAlert size={15} color="white" />
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '2.2rem', fontWeight: 950, letterSpacing: '-0.02em', lineHeight: 1, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                    {unreadCount}
+                  </div>
+                  <span style={{ fontSize: '0.72rem', opacity: 0.85, fontWeight: 600 }}>
+                    {unreadCount === 0 ? 'Exzellent — Alles im Plan' : 'Benachrichtigung ausstehend'}
                   </span>
                 </div>
 
