@@ -348,16 +348,37 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [onboardDpaAccepted, setOnboardDpaAccepted] = useState(false);
   const [onboardCreatedUser, setOnboardCreatedUser] = useState<any>(null);
   const [onboardIPAddress, setOnboardIPAddress] = useState('unknown');
-  const [expandedSection, setExpandedSection] = useState<'none' | 'pin' | 'kiosk' | 'parentOnboarding'>('none');
+  const [expandedSection, setExpandedSection] = useState<'none' | 'pin' | 'kiosk' | 'parentOnboarding'>(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('onboarding') === 'parent' || params.get('parent_onboarding') === 'true') {
+      return 'parentOnboarding';
+    }
+    return 'none';
+  });
   const [isGroovelabKiosk, setIsGroovelabKiosk] = useState(() => !!kioskStationId);
   const [selectedKioskStationId, setSelectedKioskStationId] = useState<string | null>(null);
 
   // Parents Onboarding & Magic Link States
-  const [parentFirstName, setParentFirstName] = useState('');
-  const [parentLastName, setParentLastName] = useState('');
-  const [parentInstrument, setParentInstrument] = useState('');
-  const [parentDayOfBirth, setParentDayOfBirth] = useState('');
-  const [parentEmail, setParentEmail] = useState('');
+  const [parentFirstName, setParentFirstName] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('first_name') || '';
+  });
+  const [parentLastName, setParentLastName] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('last_name') || '';
+  });
+  const [parentInstrument, setParentInstrument] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('instrument') || '';
+  });
+  const [parentDayOfBirth, setParentDayOfBirth] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('day') || '';
+  });
+  const [parentEmail, setParentEmail] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('email') || '';
+  });
   const [parentOnboardingStep, setParentOnboardingStep] = useState<'verify' | 'email' | 'success'>('verify');
   const [verifiedStudentId, setVerifiedStudentId] = useState<string | null>(null);
   const [verifiedStudentDetails, setVerifiedStudentDetails] = useState<any>(null);
@@ -367,22 +388,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [showMagicLinkModal, setShowMagicLinkModal] = useState(false);
   const [magicLinkMessage, setMagicLinkMessage] = useState<string | null>(null);
   const [magicLinkSuccess, setMagicLinkSuccess] = useState(false);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('onboarding') === 'parent' || params.get('parent_onboarding') === 'true') {
-      setParentFirstName(params.get('first_name') || '');
-      setParentLastName(params.get('last_name') || '');
-      setParentInstrument(params.get('instrument') || '');
-      setParentDayOfBirth(params.get('day') || '');
-      setParentEmail(params.get('email') || '');
-      setVerifiedStudentId(null);
-      setVerifiedStudentDetails(null);
-      setParentOnboardingError(null);
-      setParentOnboardingStep('verify');
-      setExpandedSection('parentOnboarding');
-    }
-  }, []);
 
   useEffect(() => {
     if (!kioskMapRef.current) return;
@@ -958,6 +963,24 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     }
   }, [schoolData]);
 
+  const [availableInstruments, setAvailableInstruments] = useState<string[]>([]);
+
+  useEffect(() => {
+    async function fetchSubjects() {
+      try {
+        const { data, error } = await supabase
+          .rpc('get_active_subjects', { target_school_id: schoolData?.id || null });
+        
+        if (data) {
+          setAvailableInstruments(data.map((s: any) => s.name));
+        }
+      } catch (err) {
+        console.error('Failed to fetch subjects:', err);
+      }
+    }
+    fetchSubjects();
+  }, [schoolData?.id]);
+
   let effectiveStationId = kioskStationId || localStorage.getItem('groovelab_station_id');
   if (effectiveStationId === 'skip') effectiveStationId = null;
   const loginStationId = isGroovelabKiosk ? (selectedKioskStationId || effectiveStationId) : null;
@@ -1517,10 +1540,17 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     }
   };
 
-  const handleParentEmailSubmission = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!parentEmail.trim() || !verifiedStudentId) {
+  const handleParentEmailSubmission = async (e?: React.FormEvent, skipEmail = false) => {
+    if (e) e.preventDefault();
+    
+    const emailToSubmit = skipEmail ? '' : parentEmail.trim();
+    if (!skipEmail && !emailToSubmit) {
       setParentOnboardingError('Bitte gib eine gültige E-Mail-Adresse ein.');
+      return;
+    }
+
+    if (!verifiedStudentId) {
+      setParentOnboardingError('Schüler-ID fehlt.');
       return;
     }
 
@@ -1530,19 +1560,15 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     try {
       const { data, error } = await supabase.rpc('complete_onboarding', {
         input_student_id: verifiedStudentId,
-        input_email: parentEmail.trim()
+        input_email: emailToSubmit
       });
 
       if (error) throw error;
 
-      // Onboarding complete! Now load the student's profile directly
-      const { data: studentUser, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', verifiedStudentId)
-        .single();
+      // Onboarding complete! The RPC returns the user profile row directly
+      const studentUser = Array.isArray(data) ? data[0] : data;
 
-      if (userError || !studentUser) {
+      if (!studentUser) {
         throw new Error('Fehler beim Abrufen des Schülerprofils nach Onboarding.');
       }
 
@@ -1550,7 +1576,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       setParentOnboardingStep('success');
     } catch (err: any) {
       console.error('Email submission error:', err);
-      setParentOnboardingError(err.message || 'E-Mail konnte nicht gespeichert werden.');
+      setParentOnboardingError(err.message || 'Aktivierung konnte nicht abgeschlossen werden.');
     } finally {
       setParentOnboardingLoading(false);
     }
@@ -3195,14 +3221,22 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid rgba(255,255,255,0.15)', background: 'rgba(15, 87, 46, 0.9)', color: '#ffffff', outline: 'none', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}
               >
                 <option value="">-- Instrument wählen --</option>
-                <option value="Klavier">Klavier</option>
-                <option value="E-Gitarre">E-Gitarre</option>
-                <option value="Akustikgitarre">Akustikgitarre</option>
-                <option value="Schlagzeug">Schlagzeug</option>
-                <option value="Bass">Bass</option>
-                <option value="Gesang">Gesang</option>
-                <option value="Keyboard">Keyboard</option>
-                <option value="Allgemein">Allgemein</option>
+                {availableInstruments.map(inst => (
+                  <option key={inst} value={inst}>{inst}</option>
+                ))}
+                {/* Fallback in case loading is not complete or empty */}
+                {availableInstruments.length === 0 && (
+                  <>
+                    <option value="Klavier">Klavier</option>
+                    <option value="E-Gitarre">E-Gitarre</option>
+                    <option value="Akustikgitarre">Akustikgitarre</option>
+                    <option value="Schlagzeug">Schlagzeug</option>
+                    <option value="Bass">Bass</option>
+                    <option value="Gesang">Gesang</option>
+                    <option value="Keyboard">Keyboard</option>
+                    <option value="Allgemein">Allgemein</option>
+                  </>
+                )}
               </select>
             </div>
 
@@ -3237,18 +3271,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             </button>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center', marginTop: '12px' }}>
-              <button 
-                type="button"
-                onClick={() => {
-                  setMagicLinkSuccess(false);
-                  setMagicLinkMessage(null);
-                  setMagicLinkEmail('');
-                  setShowMagicLinkModal(true);
-                }} 
-                style={{ background: 'none', border: 'none', color: '#a7f3d0', fontSize: '12px', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
-              >
-                QR-Code verloren? Magic Link anfordern
-              </button>
               
               <button 
                 type="button"
@@ -3262,20 +3284,36 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         )}
 
         {parentOnboardingStep === 'email' && (
-          <form onSubmit={handleParentEmailSubmission} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <form onSubmit={(e) => handleParentEmailSubmission(e)} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <p style={{ margin: 0, color: '#a7f3d0', fontSize: '13px', lineHeight: '1.5', fontWeight: 500 }}>
               <strong>Datensatz gefunden!</strong> Bitte gib jetzt die E-Mail-Adresse der Eltern an, um das Profil abzusichern.
             </p>
+
+            <div style={{ fontSize: '12.5px', color: 'rgba(255, 255, 255, 0.8)', lineHeight: '1.5', background: 'rgba(52, 168, 83, 0.06)', padding: '16px', borderRadius: '14px', border: '1px solid rgba(52, 168, 83, 0.2)' }}>
+              <div style={{ fontWeight: 900, color: '#4ade80', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                ✨ Deine Vorteile mit E-Mail-Adresse:
+              </div>
+              <ul style={{ margin: 0, paddingLeft: '18px', color: 'rgba(255,255,255,0.7)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <li>
+                  📅 <strong>Automatischer Kalender-Abgleich:</strong> Nie wieder Unterrichtstermine vergessen!
+                </li>
+                <li>
+                  🔔 <strong>Sorglos-Garantie bei Ausfall:</strong> Benachrichtigungen bei Unterrichtsänderungen oder Ausfällen direkt in Echtzeit.
+                </li>
+                <li>
+                  🔒 <strong>Backup &amp; Login:</strong> Passwortloser Login via Magic Link und einfache Wiederherstellung bei Verlust des Passes.
+                </li>
+              </ul>
+            </div>
 
             <div style={{ background: 'rgba(167, 243, 208, 0.08)', border: '1px solid rgba(167, 243, 208, 0.2)', padding: '12px', borderRadius: '12px', fontSize: '11.5px', color: '#a7f3d0', lineHeight: '1.4' }}>
               🔒 <strong>Datenschutz-Info:</strong> Die E-Mail-Adresse wird sofort beim Speichern in Präfix und Suffix zerlegt und in zwei getrennten Tabellen abgelegt. Niemand kann deine vollständige E-Mail-Adresse direkt in einer Tabelle auslesen.
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>E-Mail-Adresse der Eltern *</label>
+              <label style={{ display: 'block', fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>E-Mail-Adresse der Eltern (Optional)</label>
               <input
                 type="email"
-                required
                 value={parentEmail}
                 onChange={(e) => setParentEmail(e.target.value)}
                 placeholder="eltern@beispiel.de"
@@ -3283,18 +3321,34 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={parentOnboardingLoading}
-              style={{
-                width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
-                background: '#34a853',
-                color: '#ffffff',
-                fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s', marginTop: '8px'
-              }}
-            >
-              {parentOnboardingLoading ? 'Speichere E-Mail...' : 'Aktivierung abschließen'}
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+              <button
+                type="submit"
+                disabled={parentOnboardingLoading}
+                style={{
+                  width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
+                  background: '#34a853',
+                  color: '#ffffff',
+                  fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s'
+                }}
+              >
+                {parentOnboardingLoading ? 'Speichere E-Mail...' : 'Aktivierung abschließen'}
+              </button>
+
+              <button
+                type="button"
+                onClick={(e) => handleParentEmailSubmission(e, true)}
+                disabled={parentOnboardingLoading}
+                style={{
+                  width: '100%', padding: '12px', borderRadius: '16px', border: '1px dashed rgba(255,255,255,0.25)',
+                  background: 'none',
+                  color: 'rgba(255,255,255,0.85)',
+                  fontWeight: 800, fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s'
+                }}
+              >
+                Ohne E-Mail-Adresse fortfahren
+              </button>
+            </div>
 
             <button
               type="button"
@@ -3305,6 +3359,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             </button>
           </form>
         )}
+
 
         {parentOnboardingStep === 'success' && verifiedStudentDetails && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'center' }}>

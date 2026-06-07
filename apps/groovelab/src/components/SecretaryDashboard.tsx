@@ -1093,7 +1093,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [studentFilterStatus, setStudentFilterStatus] = useState<'all' | 'campus' | 'groovelab' | 'inactive'>('all');
   const [isStudentCsvExpanded, setIsStudentCsvExpanded] = useState<boolean>(false);
   const [studentCsvText, setStudentCsvText] = useState<string>('');
-  const [isAnonymizedImport, setIsAnonymizedImport] = useState<boolean>(false);
+  const [isAnonymizedImport, setIsAnonymizedImport] = useState<boolean>(true);
   const [studentCurrentPage, setStudentCurrentPage] = useState<number>(1);
   const [studentPageSize, setStudentPageSize] = useState<number>(50);
 
@@ -1119,6 +1119,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [showAddStudentModal, setShowAddStudentModal] = useState<boolean>(false);
   const [newStudentFirstName, setNewStudentFirstName] = useState<string>('');
   const [newStudentLastName, setNewStudentLastName] = useState<string>('');
+  const [newStudentBirthDate, setNewStudentBirthDate] = useState<string>('');
   const [newStudentNickname, setNewStudentNickname] = useState<string>('');
   const [newStudentInstrument, setNewStudentInstrument] = useState<string>('');
   const [newStudentDuration, setNewStudentDuration] = useState<number>(30); // 30m by default
@@ -1458,6 +1459,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
       if (usersErr) throw usersErr;
 
+      // Fetch pending students (only in anonymized tables)
+      const { data: pendingStudents } = await supabase
+        .from('students')
+        .select('id, school_id, teacher_id, instrument, status, created_at, student_names(first_name, last_name), activation_days(day_of_birth)')
+        .eq('school_id', schoolId)
+        .eq('status', 'ausstehend');
+
       // Fetch activation days for student onboarding verification
       const { data: actDays } = await supabase
         .from('activation_days')
@@ -1575,6 +1583,39 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           }
         }
       });
+
+      // Merge pending students into student list
+      if (pendingStudents) {
+        pendingStudents.forEach(ps => {
+          const names = Array.isArray(ps.student_names) ? ps.student_names[0] : (ps.student_names as any);
+          const actDay = Array.isArray(ps.activation_days) ? ps.activation_days[0] : (ps.activation_days as any);
+          const fName = names?.first_name || 'Ausstehendes';
+          const lName = names?.last_name || 'Onboarding';
+          const fullName = `${fName} ${lName}`;
+          
+          map[ps.id] = fullName;
+          userInstrumentMap[ps.id] = ps.instrument || '';
+
+          studentsList.push({
+            id: ps.id,
+            school_id: ps.school_id,
+            teacher_id: ps.teacher_id,
+            role: 'student',
+            first_name: fName,
+            last_name: lName,
+            email: '',
+            instrument: ps.instrument || 'Allgemein',
+            is_active: false,
+            is_campus_active: false,
+            is_groovelab_active: false,
+            status: 'inactive',
+            isPendingOnboarding: true,
+            day_of_birth: actDay?.day_of_birth || null,
+            ausweis_nummer: 'Ausstehend (Onboarding)',
+            created_at: ps.created_at || new Date().toISOString()
+          });
+        });
+      }
 
       setUserMap(map);
       setCoaches(coachesList);
@@ -2552,84 +2593,60 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
   const handleCreateStudentCampus = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newStudentFirstName || !newStudentLastName) {
-      alert('Bitte Vor- und Nachname ausfüllen.');
+    if (!newStudentFirstName || !newStudentLastName || !newStudentBirthDate) {
+      alert('Bitte Vorname, Nachname und Geburtsdatum ausfüllen.');
       return;
     }
 
     try {
-      const pin = 'GL-' + Math.floor(1000 + Math.random() * 9000);
-      const qrToken = crypto.randomUUID();
-      const defaultAvatarUrl = '/avatars/student_eguitar_1.png';
-
-      // Generate a highly unique email using initials or timestamps to avoid duplicates
-      const uniqueSuffix = Math.floor(100 + Math.random() * 900);
-      const finalEmail = `${newStudentFirstName.toLowerCase().trim().replace(/\s+/g, '')}.${newStudentLastName.toLowerCase().trim().replace(/\s+/g, '')}${uniqueSuffix}@campus.groovelab.de`;
-
       const teacherId = newStudentTeacherId || null;
 
-      // 1. Insert student user
-      const { data: insertedStudent, error: insertError } = await supabase
-        .from('users')
-        .insert({
-          school_id: schoolId,
-          teacher_id: teacherId,
-          role: 'student',
-          first_name: newStudentFirstName,
-          last_name: newStudentLastName,
-          nickname: newStudentNickname || null,
-          email: finalEmail,
-          instrument: newStudentInstrument || 'Allgemein',
-          avatar_url: defaultAvatarUrl,
-          is_active: true,
-          is_campus_active: newStudentIsCampusActive,
-          is_groovelab_active: newStudentIsGroovelabActive,
-          status: 'active',
-          ausweis_nummer: pin,
-          qr_token: qrToken,
-          lesson_duration: newStudentDuration // 30 by default
-        })
-        .select('id, first_name, last_name')
-        .single();
+      // 1. Call import_student RPC (5-Tabellen anonymisiertes Onboarding)
+      const { data: newStudentId, error: insertError } = await supabase.rpc('import_student', {
+        first_name: newStudentFirstName,
+        last_name: newStudentLastName,
+        birth_date: newStudentBirthDate.trim(),
+        instrument: newStudentInstrument || 'Allgemein',
+        school_id: schoolId,
+        teacher_id: teacherId
+      });
 
       if (insertError) throw insertError;
 
-      // 2. Initialize student avatar style
-      await supabase.from('avatars').insert({
-        user_id: insertedStudent.id,
-        avatar_style: 'Standard_Silhouette',
-        instrument_type: newStudentInstrument || 'Allgemein',
-        evolution_level: 1
-      });
-
-      alert(`Schüler ${newStudentFirstName} ${newStudentLastName} wurde erfolgreich angelegt.`);
+      alert(`Schüler ${newStudentFirstName} ${newStudentLastName} wurde erfolgreich angelegt (Onboarding ausstehend).`);
       
       // Reset form
       setNewStudentFirstName('');
       setNewStudentLastName('');
+      setNewStudentBirthDate('');
       setNewStudentNickname('');
       setNewStudentInstrument('');
       setNewStudentDuration(30);
       setNewStudentTeacherId('');
-      setNewStudentIsAppUser(false);
-      setNewStudentIsCampusActive(true);
-      setNewStudentIsGroovelabActive(false);
       setShowAddStudentModal(false);
-      
       fetchDashboardData();
     } catch (err: any) {
-      alert('Fehler beim Anlegen des Schülers: ' + err.message);
+      alert('Fehler beim Erstellen des Schülers: ' + err.message);
     }
   };
 
   const handleDeleteStudentCampus = async (studentId: string, name: string) => {
     if (!window.confirm(`Möchtest du den Schüler "${name}" wirklich unwiderruflich löschen?`)) return;
     try {
-      const { error } = await supabase
+      // 1. Delete from users table (if the student has completed onboarding)
+      const { error: userError } = await supabase
         .from('users')
         .delete()
         .eq('id', studentId);
-      if (error) throw error;
+      if (userError) throw userError;
+
+      // 2. Delete from students table (cascades to names, activation_days, prefixes, suffixes)
+      const { error: studentError } = await supabase
+        .from('students')
+        .delete()
+        .eq('id', studentId);
+      if (studentError) throw studentError;
+
       alert(`Schüler "${name}" wurde gelöscht.`);
       fetchDashboardData();
     } catch (err: any) {
@@ -2736,7 +2753,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
       setStudentCsvText('');
       setIsStudentCsvExpanded(false);
-      setIsAnonymizedImport(false);
+      setIsAnonymizedImport(true);
       fetchDashboardData();
       return;
     }
@@ -3917,9 +3934,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             schoolName.toLowerCase().includes('bad sackingen') || 
                             schoolName.toLowerCase().includes('musäk');
 
-    // Only show students who are active on Campus AND belong to Bad Säckingen
+    // Only show students who are active on Campus OR pending onboarding AND belong to Bad Säckingen
     const campusStudentsOnly = students.filter((s: any) => {
-      return s.is_campus_active && isBadSaeckingen;
+      return (s.is_campus_active || s.isPendingOnboarding) && isBadSaeckingen;
     });
 
     const uniqueInstruments = Array.from(new Set(campusStudentsOnly.map(s => s.instrument || 'Allgemein')));
@@ -4160,28 +4177,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     </div>
                   );
                 })()}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0 8px 0' }}>
-                  <input
-                    type="checkbox"
-                    id="anonymized-import-checkbox"
-                    checked={isAnonymizedImport}
-                    onChange={(e) => setIsAnonymizedImport(e.target.checked)}
-                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                  />
-                  <label htmlFor="anonymized-import-checkbox" style={{ fontSize: '0.76rem', fontWeight: 800, color: '#475569', cursor: 'pointer', fontFamily: 'Urbanist' }}>
-                    🔒 Anonymisiertes Onboarding aktivieren (5-Tabellen-Schema)
-                  </label>
-                </div>
                 <textarea
                   value={studentCsvText}
                   onChange={(e) => setStudentCsvText(e.target.value)}
-                  placeholder={
-                    isAnonymizedImport
-                      ? "Vorname; Nachname; Geburtsdatum (DD.MM.YYYY); Instrument; [Optional Lehrkraft Name]\nMax; Mustermann; 15.08.2012; E-Gitarre; Becker"
-                      : studentFilterTeacher && studentFilterTeacher !== 'All'
-                        ? "Max Mustermann\nLisa Schmidt"
-                        : "Max Mustermann; Klavier; max@familie.de; Weber\nLisa Schmidt; E-Gitarre; ; Becker"
-                  }
+                  placeholder="Vorname; Nachname; Geburtsdatum (DD.MM.YYYY); Instrument; [Optional Lehrkraft Name]&#10;Max; Mustermann; 15.08.2012; E-Gitarre; Becker"
                   style={{
                     width: '100%',
                     height: '100px',
@@ -4578,6 +4577,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         )}
                         <span style={{
                           fontSize: '0.7rem',
+                          fontWeight: 800,
+                          color: (student.is_campus_active || student.is_groovelab_active) ? '#166534' : '#64748b',
+                          background: (student.is_campus_active || student.is_groovelab_active) ? '#dcfce7' : '#f1f5f9',
+                          padding: '4px 8px',
+                          borderRadius: '8px',
+                          border: `1px solid ${(student.is_campus_active || student.is_groovelab_active) ? '#bbf7d0' : '#cbd5e1'}`
+                        }}>
+                          {(student.is_campus_active || student.is_groovelab_active) ? 'Aktiv' : 'Inaktiv'}
+                        </span>
+                        <span style={{
+                          fontSize: '0.7rem',
                           fontWeight: 700,
                           color: '#0f172a',
                           background: '#e2e8f0',
@@ -4763,6 +4773,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
                     />
                   </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Geburtsdatum * (Format: DD.MM.YYYY)</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={newStudentBirthDate}
+                    onChange={(e) => setNewStudentBirthDate(e.target.value)}
+                    placeholder="z.B. 15.08.2012"
+                    style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                  />
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
