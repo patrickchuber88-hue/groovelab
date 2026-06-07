@@ -1458,6 +1458,20 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
       if (usersErr) throw usersErr;
 
+      // Fetch activation days for student onboarding verification
+      const { data: actDays } = await supabase
+        .from('activation_days')
+        .select('student_id, day_of_birth');
+
+      const activationDaysMap: Record<string, number> = {};
+      if (actDays) {
+        actDays.forEach(ad => {
+          if (ad.student_id) {
+            activationDaysMap[ad.student_id] = ad.day_of_birth;
+          }
+        });
+      }
+
       // Fetch all schedules for dynamic student counting
       const { data: allScheds } = await supabase
         .from('schedules')
@@ -1494,7 +1508,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         }
 
         if (u.role === 'student') {
-          studentsList.push(u);
+          studentsList.push({
+            ...u,
+            day_of_birth: activationDaysMap[u.id] || null
+          });
         }
 
         if (u.role === 'teacher' || u.role === 'admin') {
@@ -4529,35 +4546,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             PIN: {student.ausweis_nummer || 'Keine'}
                           </span>
                         )}
-                        {(() => {
-                          const passLink = `${window.location.origin}/?campus_pass=${student.qr_token || 'no-token'}`;
-                          return (
-                            <button
-                              onClick={() => {
-                                navigator.clipboard.writeText(passLink);
-                                setCopiedStudentId(student.id);
-                                setTimeout(() => setCopiedStudentId(null), 2000);
-                              }}
-                              style={{
-                                background: copiedStudentId === student.id ? '#e2f6ea' : '#f5f5f7',
-                                color: copiedStudentId === student.id ? '#137333' : '#0066cc',
-                                border: 'none',
-                                borderRadius: '8px',
-                                padding: '5px 10px',
-                                fontSize: '0.7rem',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '3px',
-                                transition: 'all 0.15s ease'
-                              }}
-                              className="hover-scale-mini"
-                            >
-                              {copiedStudentId === student.id ? '✓ Kopiert' : 'Pass teilen'}
-                            </button>
-                          );
-                        })()}
+                        <span style={{
+                          fontSize: '0.7rem',
+                          fontWeight: 700,
+                          color: '#0f172a',
+                          background: '#e2e8f0',
+                          padding: '4px 8px',
+                          borderRadius: '8px',
+                          border: '1px solid #cbd5e1'
+                        }}>
+                          Tag: {student.day_of_birth || '1'}
+                        </span>
 
                         {/* Delete Button */}
                         <button

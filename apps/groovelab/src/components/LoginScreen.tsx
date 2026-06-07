@@ -369,6 +369,22 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [magicLinkSuccess, setMagicLinkSuccess] = useState(false);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('onboarding') === 'parent' || params.get('parent_onboarding') === 'true') {
+      setParentFirstName('');
+      setParentLastName('');
+      setParentInstrument('');
+      setParentDayOfBirth('');
+      setParentEmail('');
+      setVerifiedStudentId(null);
+      setVerifiedStudentDetails(null);
+      setParentOnboardingError(null);
+      setParentOnboardingStep('verify');
+      setExpandedSection('parentOnboarding');
+    }
+  }, []);
+
+  useEffect(() => {
     if (!kioskMapRef.current) return;
     const observer = new ResizeObserver((entries) => {
       for (let entry of entries) {
@@ -3048,43 +3064,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             Passwort Anmeldung
           </button>
 
-          <button 
-            onClick={() => {
-              setParentFirstName('');
-              setParentLastName('');
-              setParentInstrument('');
-              setParentDayOfBirth('');
-              setParentEmail('');
-              setVerifiedStudentId(null);
-              setVerifiedStudentDetails(null);
-              setParentOnboardingError(null);
-              setParentOnboardingStep('verify');
-              setExpandedSection('parentOnboarding');
-            }}
-            style={{ 
-              background: 'rgba(167, 243, 208, 0.08)', 
-              border: '1px solid rgba(167, 243, 208, 0.15)', 
-              padding: '10px 24px',
-              borderRadius: '100px',
-              color: '#a7f3d0', 
-              fontSize: '12px', 
-              fontWeight: 800, 
-              textTransform: 'uppercase', 
-              letterSpacing: '0.05em', 
-              cursor: 'pointer', 
-              transition: 'all 0.2s',
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-            onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(167, 243, 208, 0.16)'; }}
-            onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(167, 243, 208, 0.08)'; }}
-          >
-            <ShieldCheck size={14} color="#a7f3d0" />
-            Eltern-Onboarding (Aktivierung)
-          </button>
         </div>
       )}
 
