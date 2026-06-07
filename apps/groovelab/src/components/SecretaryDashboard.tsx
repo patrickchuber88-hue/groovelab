@@ -7590,15 +7590,23 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   </span>
                                 </div>
                               </div>
-                              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                                 <span style={{ fontSize: '0.78rem', background: '#e6f4ea', color: '#137333', padding: '4px 10px', borderRadius: '100px', fontWeight: 800 }}>
-                                  {successCount} informiert
+                                  ✓ {successCount} Schüler erreicht
                                 </span>
-                                {failedCount > 0 && (
-                                  <span style={{ fontSize: '0.78rem', background: '#fce8e6', color: '#c5221f', padding: '4px 10px', borderRadius: '100px', fontWeight: 800 }}>
-                                    {failedCount} offen
-                                  </span>
-                                )}
+                                <span style={{ fontSize: '0.78rem', background: failedCount > 0 ? '#fce8e6' : '#f1f5f9', color: failedCount > 0 ? '#c5221f' : '#64748b', padding: '4px 10px', borderRadius: '100px', fontWeight: 800 }}>
+                                  {failedCount > 0 ? `❌ ${failedCount} nicht erreicht` : 'Alle erreicht'}
+                                </span>
+                                {(() => {
+                                  const successRate = total > 0 ? Math.round((successCount / total) * 100) : 100;
+                                  const rateBg = successRate >= 80 ? '#d1fae5' : successRate >= 50 ? '#fef3c7' : '#fee2e2';
+                                  const rateColor = successRate >= 80 ? '#065f46' : successRate >= 50 ? '#92400e' : '#991b1b';
+                                  return (
+                                    <span style={{ fontSize: '0.78rem', background: rateBg, color: rateColor, padding: '4px 10px', borderRadius: '100px', fontWeight: 900 }}>
+                                      {successRate}% Erfolgsquote
+                                    </span>
+                                  );
+                                })()}
                               </div>
                             </div>
                           );
