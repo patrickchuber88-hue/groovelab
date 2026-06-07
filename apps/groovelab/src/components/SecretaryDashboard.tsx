@@ -5945,7 +5945,23 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           {/* If activeTab is Secretary */}
           {activeTab === 'secretary' && [
             { id: 'briefing', label: 'Briefing', icon: LayoutDashboard },
-            { id: 'crisis', label: 'Krisen-Dashboard', icon: ShieldAlert, count: crisisNotifications.filter(n => n.status === 'UNREAD').length },
+            { 
+              id: 'crisis', 
+              label: 'Krisen-Dashboard', 
+              icon: ShieldAlert, 
+              count: (() => {
+                const todayStart = new Date();
+                todayStart.setHours(0,0,0,0);
+                return crisisNotifications.filter(n => {
+                  if (n.status !== 'UNREAD') return false;
+                  if (!n.teacher || !n.teacher.sick_until) return false;
+                  const sickUntilTime = new Date(n.teacher.sick_until).getTime();
+                  if (sickUntilTime < todayStart.getTime()) return false;
+                  const isPast = new Date(n.slot_start_datetime).getTime() < todayStart.getTime();
+                  return !isPast;
+                }).length;
+              })()
+            },
             { id: 'rooms', label: 'Räume', icon: DoorOpen },
             { id: 'equipment', label: 'Instrumente & Ausstattung', icon: Settings },
             { id: 'employees', label: 'Mitarbeiter', icon: Users },
