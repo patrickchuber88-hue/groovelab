@@ -7109,7 +7109,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
           const liveTickets   = crisisNotifications.filter(n => {
             const isPast = new Date(n.slot_start_datetime).getTime() < todayStart.getTime();
-            return n.status !== 'ARCHIVED' && !isPast;
+            if (n.status === 'ARCHIVED' || isPast) return false;
+            if (!n.teacher || !n.teacher.sick_until) return false;
+            const sickUntilTime = new Date(n.teacher.sick_until).getTime();
+            return sickUntilTime >= todayStart.getTime();
           });
           const todayEnd = new Date(todayStart);
           todayEnd.setHours(23, 59, 59, 999);
@@ -7119,7 +7122,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           });
           const archiveTickets = crisisNotifications.filter(n => {
             const isPast = new Date(n.slot_start_datetime).getTime() < todayStart.getTime();
-            return n.status === 'ARCHIVED' || isPast;
+            const isHealthy = !n.teacher || !n.teacher.sick_until || new Date(n.teacher.sick_until).getTime() < todayStart.getTime();
+            return n.status === 'ARCHIVED' || isPast || isHealthy;
           });
           const poolTickets    = crisisTabMode === 'live' ? liveTickets : archiveTickets;
           const visibleTickets = selectedCrisisTeacherId
