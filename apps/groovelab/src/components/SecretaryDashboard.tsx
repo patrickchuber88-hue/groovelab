@@ -7216,10 +7216,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   </div>
                   <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600 }}>
-                      <span>📅</span> {dateStr}
+                      <Calendar size={13} style={{ color: '#475569' }} /> {dateStr}
                     </span>
                     <span style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600 }}>
-                      <span>🕒</span> {timeStr} Uhr
+                      <Clock size={13} style={{ color: '#475569' }} /> {timeStr} Uhr
                     </span>
                     <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
                       Lehrkraft: <strong style={{ color: '#0f172a', fontWeight: 700 }}>{teacherName}</strong>
@@ -7433,7 +7433,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       padding: '4px', gap: '4px', border: '1px solid rgba(0, 0, 0, 0.03)',
                       backdropFilter: 'blur(8px)'
                     }}>
-                      {([['live', '⚡ Aktive Fälle'], ['history', '📁 Historie & Archiv']] as const).map(([mode, label]) => (
+                      {([['live', 'Aktive Fälle'], ['history', 'Historie & Archiv']] as const).map(([mode, label]) => (
                         <button
                           key={mode}
                           onClick={() => setCrisisTabMode(mode)}
@@ -7463,7 +7463,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           padding: '80px 40px', textAlign: 'center',
                           boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
                         }}>
-                          <div style={{ fontSize: '3.5rem', marginBottom: '20px' }}>🍏</div>
+                          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+                            <CheckCircle size={56} color="#10b981" strokeWidth={1.5} />
+                          </div>
                           <strong style={{ display: 'block', fontSize: '1.25rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", marginBottom: '8px' }}>
                             Keine akuten Krankmeldungen
                           </strong>
@@ -7485,7 +7487,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           padding: '80px 40px', textAlign: 'center',
                           boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
                         }}>
-                          <div style={{ fontSize: '3.5rem', marginBottom: '20px' }}>✨</div>
+                          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+                            <Sparkles size={56} color="#f59e0b" strokeWidth={1.5} />
+                          </div>
                           <strong style={{ display: 'block', fontSize: '1.25rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", marginBottom: '8px' }}>
                             Keine Ausfälle am heutigen Tag
                           </strong>
@@ -7546,7 +7550,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           padding: '60px 40px', textAlign: 'center',
                           boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
                         }}>
-                          <div style={{ fontSize: '3rem', marginBottom: '20px' }}>📁</div>
+                          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+                            <ClipboardList size={56} color="#94a3b8" strokeWidth={1.5} />
+                          </div>
                           <strong style={{ display: 'block', fontSize: '1.25rem', color: '#0f172a', marginBottom: '8px' }}>
                             Keine archivierten Einträge
                           </strong>
@@ -7752,7 +7758,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                     {sickTeachers.length === 0 ? (
                       <div style={{ textAlign: 'center', padding: '24px 0' }}>
-                        <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🍎</div>
+                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
+                          <CheckCircle size={32} color="#16a34a" />
+                        </div>
                         <p style={{ margin: 0, fontSize: '0.82rem', color: '#7f1d1d', fontWeight: 700 }}>Alle Lehrkräfte aktiv im Dienst</p>
                       </div>
                     ) : (
@@ -7841,33 +7849,45 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                   {/* Wie funktioniert das? Info box (Krisen-Operationscockpit) */}
                   <div style={{
-                    background: 'linear-gradient(135deg, rgba(239, 246, 255, 0.8) 0%, rgba(219, 234, 254, 0.5) 100%)',
-                    border: '1.5px solid rgba(59, 130, 246, 0.15)',
-                    borderRadius: '24px', padding: '20px',
-                    display: 'flex', flexDirection: 'column', gap: '12px',
-                    backdropFilter: 'blur(16px)',
+                    background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '24px', 
+                    padding: '24px',
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '16px',
+                    boxShadow: '0 10px 25px rgba(15, 23, 42, 0.03)',
                   }}>
-                    <strong style={{ fontSize: '0.85rem', fontWeight: 950, color: '#1d4ed8', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                      ℹ️ Krisen-Operationscockpit
-                    </strong>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ background: '#dbeafe', borderRadius: '10px', padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <BookOpen size={16} color="#2563eb" />
+                      </div>
+                      <strong style={{ fontSize: '0.9rem', fontWeight: 900, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                        Anleitung: Operationscockpit
+                      </strong>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                       {[
-                        ['⚡', 'Rot (Akut)', 'Ausfall in unter 2 Std. — Telefonischer Sofort-Kontakt dringend empfohlen!'],
-                        ['⏳', 'Gelb (Offen)', 'Schüler wurde digital benachrichtigt. Rückmeldung steht noch aus.'],
-                        ['✓', 'Grün (Erledigt)', 'Schüler wurde erfolgreich informiert (Kenntnisnahme bestätigt oder manuell gemeldet).'],
-                      ].map(([icon, color, desc]) => (
-                        <div key={color} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                          <span style={{ fontSize: '0.9rem', flexShrink: 0 }}>{icon}</span>
+                        { icon: <AlertCircle size={14} color="#ef4444" />, title: 'Rot (Akut)', text: 'Ausfall in unter 2 Std. — Telefonischer Sofort-Kontakt dringend empfohlen!', bg: '#fee2e2' },
+                        { icon: <Clock size={14} color="#f59e0b" />, title: 'Gelb (Offen)', text: 'Schüler wurde digital benachrichtigt. Rückmeldung steht noch aus.', bg: '#fef3c7' },
+                        { icon: <CheckCircle size={14} color="#10b981" />, title: 'Grün (Erledigt)', text: 'Schüler wurde erfolgreich informiert (Kenntnisnahme bestätigt oder manuell gemeldet).', bg: '#dcfce7' },
+                      ].map((item) => (
+                        <div key={item.title} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                          <div style={{ background: item.bg, borderRadius: '8px', padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
+                            {item.icon}
+                          </div>
                           <div>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e40af', display: 'block' }}>{color}</span>
-                            <span style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 500, lineHeight: 1.3, display: 'block' }}>{desc}</span>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#334155', display: 'block', marginBottom: '2px' }}>{item.title}</span>
+                            <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 550, lineHeight: 1.35, display: 'block' }}>{item.text}</span>
                           </div>
                         </div>
                       ))}
                     </div>
-                    <div style={{ borderTop: '1px solid rgba(59, 130, 246, 0.2)', paddingTop: '10px', marginTop: '4px' }}>
-                      <p style={{ margin: 0, fontSize: '0.72rem', color: '#1d4ed8', lineHeight: 1.4, fontWeight: 500 }}>
-                        Das Operationscockpit hilft Ihnen bei Lehrerausfällen. Sie können Fälle per Klick manuell als grün markieren, sobald Sie den Schüler telefonisch kontaktiert haben. Am Folgetag werden beendete Fälle automatisch ins Archiv verschoben.
+
+                    <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '14px', marginTop: '4px' }}>
+                      <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', lineHeight: 1.4, fontWeight: 550 }}>
+                        Das Operationscockpit unterstützt Sie bei Lehrerausfällen. Sobald Sie einen Schüler telefonisch kontaktiert haben, können Sie den Fall per Klick manuell auf <strong>Grün</strong> setzen. Nach Ablauf eines Tages werden erledigte Fälle automatisch ins Archiv übertragen.
                       </p>
                     </div>
                   </div>
