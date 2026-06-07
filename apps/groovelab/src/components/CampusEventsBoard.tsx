@@ -1557,7 +1557,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     background: isHolidayEvent 
                       ? 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)' 
                       : isMusikschulfest
-                        ? 'linear-gradient(135deg, #fef2f2 0%, #ffffff 100%)'
+                        ? '#ffffff'
                         : isKlassenvorspiel
                           ? 'linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%)'
                           : '#ffffff',
