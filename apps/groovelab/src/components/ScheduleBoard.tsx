@@ -72,7 +72,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const [submitting, setSubmitting] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sidebarTab, setSidebarTab] = useState<'all' | 'unassigned' | 'assigned'>('unassigned');
+  const [sidebarTab, setSidebarTab] = useState<'all' | 'unassigned' | 'assigned'>('all');
   const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
   
   // Create Board form state
@@ -164,7 +164,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         .eq('school_id', schoolId)
         .eq('role', 'student')
         .eq('teacher_id', userId)
-        .eq(isCampus ? 'is_campus_active' : 'is_groovelab_active', true);
+        ;
       
       const loadedStudents: Student[] = (sData || []).map(s => ({
         id: s.id,
@@ -1167,7 +1167,22 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             }}>
               {boards.map((board, index) => {
                 const dayLabel = DAYS_OF_WEEK.find(d => d.value === board.dayOfWeek)?.name || '';
- 
+                const PX_PER_MIN = 2.5;
+                const [anchorH, anchorM] = (board.startAnchor || '14:00').split(':').map(Number);
+                const startMinutes = anchorH * 60 + anchorM;
+                const totalMinutes = board.students.reduce((acc, s) => acc + s.duration, 0);
+                const endMinutes = startMinutes + Math.max(totalMinutes, 60);
+                const columnHeightPx = (endMinutes - startMinutes) * PX_PER_MIN + 48;
+                const startHour = Math.floor(startMinutes / 60);
+                const endHour = Math.ceil(endMinutes / 60) + 1;
+                const hourMarkers: { hour: number; top: number }[] = [];
+                for (let h = startHour; h <= endHour; h++) {
+                  const top = (h * 60 - startMinutes) * PX_PER_MIN;
+                  if (top >= -2 && top <= columnHeightPx + 30) {
+                    hourMarkers.push({ hour: h % 24, top });
+                  }
+                }
+
                 return (
                   <div
                     key={board.id}
@@ -1178,11 +1193,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                       minWidth: '170px',
                       background: 'transparent', 
                       borderRight: index < boards.length - 1 ? '1px solid #e2e8f0' : 'none', 
-                      padding: '0 16px', 
+                      padding: '0 10px', 
                       display: 'flex', 
                       flexDirection: 'column', 
-                      gap: '8px', 
-                      minHeight: '400px',
+                      gap: '8px',
                       transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
                     }}
                   >
@@ -1227,233 +1241,171 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                       </div>
                     </div>
 
-                    {/* Day Column Student Pool List */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0px', minHeight: '320px', marginTop: '6px' }}>
-                      {board.students.map((bs, index) => {
-                        if (bs.isBreak) {
-                          return (
-                            <React.Fragment key={bs.id}>
-                              <div
-                                draggable
-                                onDragStart={() => handleDragStart(bs.id, 'board', board.id)}
-                                onDragOver={handleDragOver}
-                                onDrop={(e) => {
-                                  e.stopPropagation();
-                                  handleDropOnBoard(board.id, index);
-                                }}
-                                style={{ 
-                                  background: 'rgba(254, 243, 199, 0.5)', 
-                                  border: '1.5px dashed rgba(245, 158, 11, 0.25)', 
-                                  borderLeft: '4px solid #f59e0b', 
-                                  borderRadius: '10px', 
-                                  padding: '6px 8px', 
-                                  boxShadow: '0 2px 8px rgba(245, 158, 11, 0.02)', 
-                                  cursor: 'grab', 
-                                  display: 'flex', 
-                                  flexDirection: 'column', 
-                                  gap: '4px', 
-                                  position: 'relative' 
-                                }}
-                              >
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <span style={{ fontSize: '0.8rem' }}>☕</span>
-                                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#b45309', letterSpacing: '-0.01em' }}>
-                                      Pause
-                                    </span>
-                                  </div>
-                                  
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveStudentFromBoard(board.id, bs.id)}
-                                    style={{ background: 'transparent', border: 'none', color: '#d97706', height: '16px', width: '16px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
-                                    onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(254, 243, 199, 0.9)'; e.currentTarget.style.color = '#b45309'; }}
-                                    onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#d97706'; }}
-                                    title="Pause löschen"
-                                  >
-                                    <X size={11} strokeWidth={2.5} />
-                                  </button>
-                                </div>
+                    {/* ── PROPORTIONAL TIME-GRID ── */}
+                    <div
+                      onDragOver={handleDragOver}
+                      onDrop={() => handleDropOnBoard(board.id)}
+                      style={{ position: 'relative', height: `${columnHeightPx}px`, flexShrink: 0, marginTop: '4px' }}
+                    >
+                      {/* Hour marker lines */}
+                      {hourMarkers.map(m => (
+                        <div
+                          key={m.hour}
+                          style={{ position: 'absolute', left: 0, right: 0, top: `${m.top}px`, borderTop: '1px dashed rgba(0,0,0,0.08)', pointerEvents: 'none', zIndex: 0 }}
+                        >
+                          <span style={{ position: 'absolute', left: '2px', top: '-8px', fontSize: '0.58rem', color: 'rgba(0,0,0,0.25)', fontWeight: 700, userSelect: 'none' }}>
+                            {String(m.hour).padStart(2, '0')}:00
+                          </span>
+                        </div>
+                      ))}
 
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px', width: '100%' }}>
-                                  {/* Merged Uhrzeit: Clock Icon + Time picker */}
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'rgba(255, 255, 255, 0.6)', border: '1px solid rgba(245, 158, 11, 0.2)', borderRadius: '6px', padding: '2px 4px', flex: '0 0 66px', minWidth: '66px' }}>
-                                    <Clock size={9} strokeWidth={2.5} style={{ color: '#b45309', flexShrink: 0 }} />
-                                    <input
-                                      type="time"
-                                      value={bs.customStartTime || bs.assignedTime}
-                                      className="mini-time-input"
-                                      onChange={(e) => {
-                                        const newTime = e.target.value || undefined;
-                                        const resolvedTime = newTime === bs.assignedTime ? undefined : newTime;
-                                        setBoards(prev => prev.map(b => {
-                                          if (b.id !== board.id) return b;
-                                          const nextStudents = b.students.map(s => s.id === bs.id ? { ...s, customStartTime: resolvedTime } : s);
-                                          return recalculateBoardTimes({ ...b, students: nextStudents });
-                                        }));
-                                      }}
-                                      style={{ width: '40px', background: 'transparent', border: 'none', fontSize: '0.68rem', fontWeight: 700, color: '#b45309', outline: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' }}
-                                      title="Startzeit bearbeiten"
-                                    />
-                                  </div>
-
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
-                                    {[5, 10, 15, 20, 30, 45, 60].includes(bs.duration) ? (
-                                      <select
-                                        value={bs.duration}
-                                        onChange={(e) => {
-                                          const val = e.target.value;
-                                          if (val === 'custom') {
-                                            const newDur = 12;
-                                            setBoards(prev => prev.map(b => {
-                                              if (b.id !== board.id) return b;
-                                              const nextStudents = b.students.map(s => s.id === bs.id ? { ...s, duration: newDur } : s);
-                                              return recalculateBoardTimes({ ...b, students: nextStudents });
-                                            }));
-                                          } else {
-                                            const newDur = parseInt(val);
-                                            setBoards(prev => prev.map(b => {
-                                              if (b.id !== board.id) return b;
-                                              const nextStudents = b.students.map(s => s.id === bs.id ? { ...s, duration: newDur } : s);
-                                              return recalculateBoardTimes({ ...b, students: nextStudents });
-                                            }));
-                                          }
-                                        }}
-                                        style={{ background: 'rgba(255, 255, 255, 0.6)', border: '1px solid rgba(245, 158, 11, 0.2)', borderRadius: '6px', padding: '2px 4px', fontSize: '0.68rem', fontWeight: 700, color: '#b45309', outline: 'none', cursor: 'pointer' }}
-                                      >
-                                        <option value={5}>5m</option>
-                                        <option value={10}>10m</option>
-                                        <option value={15}>15m</option>
-                                        <option value={20}>20m</option>
-                                        <option value={30}>30m</option>
-                                        <option value={45}>45m</option>
-                                        <option value={60}>60m</option>
-                                        <option value="custom">...</option>
-                                      </select>
-                                    ) : (
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '1px', background: 'rgba(255, 255, 255, 0.6)', border: '1px solid rgba(245, 158, 11, 0.2)', borderRadius: '6px', padding: '1px 3px' }}>
-                                        <input
-                                          type="number"
-                                          min={1}
-                                          max={240}
-                                          value={bs.duration}
-                                          onChange={(e) => {
-                                            const newDur = parseInt(e.target.value) || 0;
-                                            setBoards(prev => prev.map(b => {
-                                              if (b.id !== board.id) return b;
-                                              const nextStudents = b.students.map(s => s.id === bs.id ? { ...s, duration: newDur } : s);
-                                              return recalculateBoardTimes({ ...b, students: nextStudents });
-                                            }));
-                                          }}
-                                          style={{ width: '22px', background: 'transparent', border: 'none', fontSize: '0.68rem', fontWeight: 700, color: '#b45309', outline: 'none', textAlign: 'center', padding: 0 }}
-                                        />
-                                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#b45309' }}>m</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                              
-                              {index < board.students.length - 1 && (
-                                <div style={{ display: 'flex', justifyContent: 'center', height: '10px', alignItems: 'center' }}>
-                                  <div style={{ borderRight: '1px solid rgba(0, 0, 0, 0.08)', height: '100%', width: '0px' }}></div>
-                                </div>
-                              )}
-                            </React.Fragment>
-                          );
-                        }
-
-                        let borderLeftColor = '#10b981';
-                        if (bs.duration === 30) borderLeftColor = '#10b981';
-                        else if (bs.duration === 45) borderLeftColor = '#007aff';
-                        else if (bs.duration === 60) borderLeftColor = '#34d399';
-                        else if (bs.duration === 90) borderLeftColor = '#ff3b30';
-
-                        return (
-                          <React.Fragment key={bs.id}>
-                            <div
-                              draggable
-                              onDragStart={() => handleDragStart(bs.id, 'board', board.id)}
-                              onDragOver={handleDragOver}
-                              onDrop={(e) => {
-                                  e.stopPropagation();
-                                  handleDropOnBoard(board.id, index);
-                              }}
-                              style={{ 
-                                background: 'rgba(220, 252, 231, 0.45)', 
-                                border: '1px solid rgba(16, 185, 129, 0.15)',
-                                borderLeft: '3px solid #10b981', 
-                                borderRadius: '10px', 
-                                padding: '8px 10px', 
-                                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)', 
-                                cursor: 'grab', 
-                                display: 'flex', 
-                                flexDirection: 'column', 
-                                gap: '6px', 
-                                position: 'relative' 
-                              }}
-                            >
-                              {/* 1st Line: Time (in black) + Duration + Remove Button */}
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#065f46' }}>
-                                    {bs.assignedTime}
-                                  </span>
-                                  <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#047857' }}>
-                                    {bs.duration} Min
-                                  </span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveStudentFromBoard(board.id, bs.id)}
-                                  style={{ background: 'transparent', border: 'none', color: '#047857', height: '16px', width: '16px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
-                                  onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(254, 226, 226, 0.8)'; e.currentTarget.style.color = '#ef4444'; }}
-                                  onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#047857'; }}
-                                  title="Entfernen"
-                                >
-                                  <X size={11} strokeWidth={2.5} />
-                                </button>
-                              </div>
-
-                              {/* 2nd Line: Student's Name */}
-                              <div style={{ display: 'flex', alignItems: 'center' }}>
-                                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#065f46', display: 'block', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {bs.first_name} {bs.last_name}
-                                </span>
-                              </div>
-                            </div>
-                            
-                            {/* Visual Timeline connector link */}
-                            {index < board.students.length - 1 && (
-                              <div style={{ display: 'flex', justifyContent: 'center', height: '10px', alignItems: 'center' }}>
-                                <div style={{ borderRight: '1px solid rgba(0, 0, 0, 0.08)', height: '100%', width: '0px' }}></div>
-                              </div>
-                            )}
-                          </React.Fragment>
-                        );
-                      })}
-
+                      {/* Empty drop hint */}
                       {board.students.length === 0 && (
-                        <div style={{ flex: 1, border: '1.5px dashed rgba(0, 0, 0, 0.08)', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px', textAlign: 'center', color: '#86868b', minHeight: '120px' }}>
+                        <div style={{ position: 'absolute', inset: '8px 0', border: '1.5px dashed rgba(0,0,0,0.08)', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#86868b', pointerEvents: 'none', zIndex: 1 }}>
                           <Users size={18} style={{ color: '#c7c7cc', marginBottom: '4px' }} />
                           <span style={{ fontSize: '0.7rem', fontWeight: 600 }}>Schüler hierhin</span>
                         </div>
                       )}
+
+                      {/* Cards: absolutely positioned by assignedTime */}
+                      {board.students.map((bs, cardIndex) => {
+                        const [sh, sm] = (bs.assignedTime || board.startAnchor || '14:00').split(':').map(Number);
+                        const cardTopPx = (sh * 60 + sm - startMinutes) * PX_PER_MIN;
+                        const cardHeightPx = bs.duration * PX_PER_MIN - 4;
+
+                        if (bs.isBreak) {
+                          return (
+                            <div
+                              key={bs.id}
+                              draggable
+                              onDragStart={() => handleDragStart(bs.id, 'board', board.id)}
+                              onDragOver={handleDragOver}
+                              onDrop={(e) => { e.stopPropagation(); handleDropOnBoard(board.id, cardIndex); }}
+                              style={{
+                                position: 'absolute', left: 0, right: 0,
+                                top: `${Math.max(cardTopPx, 0)}px`,
+                                height: `${Math.max(cardHeightPx, 24)}px`,
+                                background: 'rgba(254, 243, 199, 0.55)',
+                                border: '1.5px dashed rgba(245, 158, 11, 0.3)',
+                                borderLeft: '4px solid #f59e0b',
+                                borderRadius: '8px', padding: '4px 8px', boxSizing: 'border-box',
+                                cursor: 'grab', display: 'flex', alignItems: 'center',
+                                justifyContent: 'space-between', gap: '4px', zIndex: 2, overflow: 'hidden',
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
+                                <span style={{ fontSize: '0.75rem', flexShrink: 0 }}>☕</span>
+                                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#b45309', whiteSpace: 'nowrap' }}>Pause</span>
+                                <span style={{ fontSize: '0.6rem', color: '#d97706', fontWeight: 600 }}>{bs.assignedTime}</span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '2px', background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '5px', padding: '1px 3px' }}>
+                                  <Clock size={8} strokeWidth={2.5} style={{ color: '#b45309' }} />
+                                  <input
+                                    type="time" value={bs.customStartTime || bs.assignedTime} className="mini-time-input"
+                                    onChange={(e) => {
+                                      const newTime = e.target.value || undefined;
+                                      const resolvedTime = newTime === bs.assignedTime ? undefined : newTime;
+                                      setBoards(prev => prev.map(b => {
+                                        if (b.id !== board.id) return b;
+                                        const nextStudents = b.students.map(s => s.id === bs.id ? { ...s, customStartTime: resolvedTime } : s);
+                                        return recalculateBoardTimes({ ...b, students: nextStudents });
+                                      }));
+                                    }}
+                                    style={{ width: '38px', background: 'transparent', border: 'none', fontSize: '0.62rem', fontWeight: 700, color: '#b45309', outline: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' }}
+                                  />
+                                </div>
+                                <select
+                                  value={bs.duration}
+                                  onChange={(e) => {
+                                    const newDur = parseInt(e.target.value) || 15;
+                                    setBoards(prev => prev.map(b => {
+                                      if (b.id !== board.id) return b;
+                                      const nextStudents = b.students.map(s => s.id === bs.id ? { ...s, duration: newDur } : s);
+                                      return recalculateBoardTimes({ ...b, students: nextStudents });
+                                    }));
+                                  }}
+                                  style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '5px', padding: '1px 3px', fontSize: '0.62rem', fontWeight: 700, color: '#b45309', outline: 'none', cursor: 'pointer' }}
+                                >
+                                  {[5,10,15,20,30,45,60].map(v => <option key={v} value={v}>{v}m</option>)}
+                                </select>
+                                <button type="button" onClick={() => handleRemoveStudentFromBoard(board.id, bs.id)}
+                                  style={{ background: 'transparent', border: 'none', color: '#d97706', display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '1px' }} title="Pause löschen">
+                                  <X size={11} strokeWidth={2.5} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div
+                            key={bs.id}
+                            draggable
+                            onDragStart={() => handleDragStart(bs.id, 'board', board.id)}
+                            onDragOver={handleDragOver}
+                            onDrop={(e) => { e.stopPropagation(); handleDropOnBoard(board.id, cardIndex); }}
+                            style={{
+                              position: 'absolute', left: 0, right: 0,
+                              top: `${Math.max(cardTopPx, 0)}px`,
+                              height: `${Math.max(cardHeightPx, 32)}px`,
+                              background: 'rgba(220, 252, 231, 0.5)',
+                              border: '1px solid rgba(16, 185, 129, 0.18)',
+                              borderLeft: '4px solid #10b981',
+                              borderRadius: '8px', padding: '5px 8px', boxSizing: 'border-box',
+                              cursor: 'grab', display: 'flex', flexDirection: 'column',
+                              justifyContent: 'center', gap: '2px', zIndex: 2, overflow: 'hidden',
+                              boxShadow: '0 2px 6px rgba(16,185,129,0.06)', transition: 'box-shadow 0.15s',
+                            }}
+                            onMouseOver={e => (e.currentTarget.style.boxShadow = '0 4px 14px rgba(16,185,129,0.14)')}
+                            onMouseOut={e => (e.currentTarget.style.boxShadow = '0 2px 6px rgba(16,185,129,0.06)')}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#065f46' }}>{bs.assignedTime}</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                <span style={{ fontSize: '0.62rem', fontWeight: 600, color: '#047857', background: 'rgba(16,185,129,0.08)', padding: '1px 5px', borderRadius: '4px' }}>{bs.duration}m</span>
+                                <button type="button" onClick={() => handleRemoveStudentFromBoard(board.id, bs.id)}
+                                  style={{ background: 'transparent', border: 'none', color: '#047857', display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '1px', opacity: 0.7 }}
+                                  onMouseOver={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; (e.currentTarget as HTMLElement).style.color = '#ef4444'; }}
+                                  onMouseOut={e => { (e.currentTarget as HTMLElement).style.opacity = '0.7'; (e.currentTarget as HTMLElement).style.color = '#047857'; }}
+                                  title="Entfernen"><X size={11} strokeWidth={2.5} /></button>
+                              </div>
+                            </div>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#065f46', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }}>
+                              {bs.first_name} {bs.last_name}
+                            </span>
+                            {cardHeightPx > 52 && (
+                              <span style={{ fontSize: '0.62rem', fontWeight: 600, color: '#6ee7b7', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bs.instrument}</span>
+                            )}
+                            {cardHeightPx > 72 && (
+                              <select
+                                value={bs.duration}
+                                onClick={e => e.stopPropagation()}
+                                onChange={(e) => { const val = parseInt(e.target.value); if (!isNaN(val)) handleUpdateDuration(bs.id, val); }}
+                                style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '5px', padding: '1px 4px', fontSize: '0.62rem', fontWeight: 700, color: '#047857', outline: 'none', cursor: 'pointer', width: 'fit-content', marginTop: '2px' }}
+                              >
+                                <option value={30}>30 Min</option>
+                                <option value={45}>45 Min</option>
+                                <option value={60}>60 Min</option>
+                                <option value={90}>90 Min</option>
+                                {![30,45,60,90].includes(bs.duration) && <option value={bs.duration}>{bs.duration} Min</option>}
+                              </select>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
 
-                    {/* Board column summary */}
+                    {/* Column summary */}
                     {board.students.length > 0 && (
-                      <div style={{ borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: '6px', marginTop: 'auto', display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', color: '#86868b' }}>
+                      <div style={{ borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: '6px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', color: '#86868b' }}>
                         <span>Dauer:</span>
                         <span style={{ color: '#1d1d1f', fontWeight: 800 }}>
                           {(() => {
                             const total = board.students.reduce((acc, curr) => acc + curr.duration, 0);
                             const hrs = Math.floor(total / 60);
                             const mins = total % 60;
-                            if (hrs > 0) {
-                              return `${hrs} h ${mins} m`;
-                            }
-                            return `${mins} m`;
+                            return hrs > 0 ? `${hrs} h ${mins} m` : `${mins} m`;
                           })()}
                         </span>
                       </div>

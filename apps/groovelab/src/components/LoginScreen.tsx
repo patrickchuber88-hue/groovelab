@@ -379,7 +379,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     const params = new URLSearchParams(window.location.search);
     return params.get('email') || '';
   });
-  const [parentOnboardingStep, setParentOnboardingStep] = useState<'verify' | 'email' | 'success'>('verify');
+  const [parentOnboardingStep, setParentOnboardingStep] = useState<'verify' | 'email' | 'preferences' | 'success'>('verify');
+  const [selectedSlots, setSelectedSlots] = useState<{[key: string]: 'wunsch' | 'gesperrt'}>({});
+  const [preferenceMode, setPreferenceMode] = useState<'wunsch' | 'gesperrt'>('wunsch');
+  const [showSaturday, setShowSaturday] = useState(false);
   const [verifiedStudentId, setVerifiedStudentId] = useState<string | null>(null);
   const [verifiedStudentDetails, setVerifiedStudentDetails] = useState<any>(null);
   const [parentOnboardingError, setParentOnboardingError] = useState<string | null>(null);
@@ -1573,10 +1576,79 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       }
 
       setVerifiedStudentDetails(studentUser);
-      setParentOnboardingStep('success');
+      setParentOnboardingStep('preferences');
     } catch (err: any) {
       console.error('Email submission error:', err);
       setParentOnboardingError(err.message || 'Aktivierung konnte nicht abgeschlossen werden.');
+    } finally {
+      setParentOnboardingLoading(false);
+    }
+  };
+
+  const handleSavePreferences = async () => {
+    if (!verifiedStudentId) {
+      setParentOnboardingError('Schüler-ID fehlt.');
+      return;
+    }
+
+    // Convert selectedSlots object to array of slot objects
+    const slotsArray = Object.entries(selectedSlots).map(([key, val]) => {
+      // Key format: "day_of_week-start_time" (e.g. "1-14:00")
+      const [dayStr, startTime] = key.split('-');
+      const day = parseInt(dayStr);
+      
+      // Calculate end_time by adding 30 minutes to start_time
+      const [hourStr, minStr] = startTime.split(':');
+      let hour = parseInt(hourStr);
+      let min = parseInt(minStr) + 30;
+      if (min >= 60) {
+        hour += 1;
+        min -= 60;
+      }
+      const endTime = `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
+
+      return {
+        day_of_week: day,
+        start_time: startTime,
+        end_time: endTime,
+        preference_type: val
+      };
+    });
+
+    // Validate on frontend first
+    const wunschSlots = slotsArray.filter(s => s.preference_type === 'wunsch');
+    if (wunschSlots.length < 2) {
+      setParentOnboardingError('Bitte wähle mindestens zwei Wunschzeit-Slots (grün) aus.');
+      return;
+    }
+
+    const totalDurationMinutes = wunschSlots.length * 30;
+    if (totalDurationMinutes < 120) {
+      setParentOnboardingError('Die Gesamtdauer der Wunschzeiten muss mindestens 2 Stunden (4 Slots) betragen.');
+      return;
+    }
+
+    setParentOnboardingLoading(true);
+    setParentOnboardingError(null);
+
+    try {
+      const { data, error } = await supabase.rpc('save_schedule_preferences', {
+        input_student_id: verifiedStudentId,
+        slots: slotsArray
+      });
+
+      if (error) throw error;
+
+      const result = Array.isArray(data) ? data[0] : data;
+
+      if (result && result.success) {
+        setParentOnboardingStep('success');
+      } else {
+        setParentOnboardingError(result?.message || 'Fehler beim Speichern der Präferenzen.');
+      }
+    } catch (err: any) {
+      console.error('Save preferences error:', err);
+      setParentOnboardingError(err.message || 'Die Termine konnten nicht gespeichert werden.');
     } finally {
       setParentOnboardingLoading(false);
     }
@@ -3360,6 +3432,234 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           </form>
         )}
 
+        {parentOnboardingStep === 'preferences' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+            <p style={{ margin: 0, color: '#a7f3d0', fontSize: '13px', lineHeight: '1.5', fontWeight: 650, textAlign: 'center' }}>
+              Wann möchtest du kommen? (Wunschtermine) und Wann geht es absolut gar nicht? (Sperrzeiten)
+            </p>
+
+            {/* Apple style segmented control */}
+            <div style={{
+              display: 'flex',
+              background: 'rgba(255, 255, 255, 0.06)',
+              padding: '3px',
+              borderRadius: '14px',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              position: 'relative'
+            }}>
+              <button
+                type="button"
+                onClick={() => setPreferenceMode('wunsch')}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: '11px',
+                  border: 'none',
+                  background: preferenceMode === 'wunsch' ? '#22c55e' : 'transparent',
+                  color: preferenceMode === 'wunsch' ? '#ffffff' : 'rgba(255, 255, 255, 0.7)',
+                  fontWeight: 800,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+              >
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffffff' }} />
+                Wunschzeit 🟢
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreferenceMode('gesperrt')}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: '11px',
+                  border: 'none',
+                  background: preferenceMode === 'gesperrt' ? '#ef4444' : 'transparent',
+                  color: preferenceMode === 'gesperrt' ? '#ffffff' : 'rgba(255, 255, 255, 0.7)',
+                  fontWeight: 800,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+              >
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffffff' }} />
+                Sperrzeit 🔴
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12.5px' }}>
+              <span style={{ color: 'rgba(255, 255, 255, 0.6)', fontWeight: 600 }}>Samstag als Option anzeigen?</span>
+              <button
+                type="button"
+                onClick={() => setShowSaturday(!showSaturday)}
+                style={{
+                  background: showSaturday ? '#34a853' : 'rgba(255,255,255,0.1)',
+                  border: 'none',
+                  padding: '6px 14px',
+                  borderRadius: '100px',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  fontSize: '11px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {showSaturday ? 'Ja' : 'Nein'}
+              </button>
+            </div>
+
+            {/* Visual Calendar Grid Weekspective */}
+            <div style={{
+              background: 'rgba(0,0,0,0.25)',
+              borderRadius: '20px',
+              border: '1px solid rgba(255,255,255,0.08)',
+              padding: '10px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              maxHeight: '320px',
+              overflowY: 'auto'
+            }}>
+              {/* Header Row */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: `45px repeat(${showSaturday ? 6 : 5}, 1fr)`,
+                gap: '3px',
+                textAlign: 'center',
+                fontWeight: 800,
+                fontSize: '10px',
+                color: 'rgba(255, 255, 255, 0.5)',
+                paddingBottom: '6px',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                position: 'sticky',
+                top: 0,
+                background: 'rgba(24, 24, 27, 0.95)',
+                zIndex: 2
+              }}>
+                <div>Zeit</div>
+                <div>Mo</div>
+                <div>Di</div>
+                <div>Mi</div>
+                <div>Do</div>
+                <div>Fr</div>
+                {showSaturday && <div>Sa</div>}
+              </div>
+
+              {/* Rows */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                {['12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30'].map(time => (
+                  <div key={time} style={{
+                    display: 'grid',
+                    gridTemplateColumns: `45px repeat(${showSaturday ? 6 : 5}, 1fr)`,
+                    gap: '3px',
+                    alignItems: 'center'
+                  }}>
+                    <div style={{ fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.4)', textAlign: 'right', paddingRight: '4px' }}>
+                      {time}
+                    </div>
+                    {[1, 2, 3, 4, 5, 6].slice(0, showSaturday ? 6 : 5).map(dayNum => {
+                      const cellKey = `${dayNum}-${time}`;
+                      const selection = selectedSlots[cellKey];
+                      let bg = 'rgba(255, 255, 255, 0.03)';
+                      let border = '1px solid rgba(255, 255, 255, 0.06)';
+                      if (selection === 'wunsch') {
+                        bg = 'rgba(34, 197, 94, 0.85)';
+                        border = '1px solid #22c55e';
+                      } else if (selection === 'gesperrt') {
+                        bg = 'rgba(239, 68, 68, 0.85)';
+                        border = '1px solid #ef4444';
+                      }
+
+                      return (
+                        <button
+                          key={dayNum}
+                          type="button"
+                          onClick={() => {
+                            setSelectedSlots(prev => {
+                              const copy = { ...prev };
+                              if (copy[cellKey]) {
+                                if (copy[cellKey] === preferenceMode) {
+                                  delete copy[cellKey];
+                                } else {
+                                  copy[cellKey] = preferenceMode;
+                                }
+                              } else {
+                                copy[cellKey] = preferenceMode;
+                              }
+                              return copy;
+                            });
+                          }}
+                          style={{
+                            height: '24px',
+                            borderRadius: '5px',
+                            background: bg,
+                            border: border,
+                            cursor: 'pointer',
+                            transition: 'all 0.1s ease',
+                            outline: 'none'
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Validation & Stats Summary Card */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              fontSize: '11.5px',
+              color: 'rgba(255,255,270,0.7)',
+              background: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid rgba(255,255,255,0.06)',
+              padding: '10px 14px',
+              borderRadius: '14px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>🟢 Wunschzeit (mind. 2 Stunden):</span>
+                <strong style={{ color: Object.values(selectedSlots).filter(v => v === 'wunsch').length >= 4 ? '#4ade80' : '#fca5a5' }}>
+                  {Object.values(selectedSlots).filter(v => v === 'wunsch').length * 30 / 60} Std.
+                </strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>🔴 Sperrzeit blockiert:</span>
+                <strong style={{ color: '#ef4444' }}>
+                  {Object.values(selectedSlots).filter(v => v === 'gesperrt').length * 30 / 60} Std.
+                </strong>
+              </div>
+            </div>
+
+            {parentOnboardingError && (
+              <div style={{ background: 'rgba(239, 68, 68, 0.2)', border: '1px solid #ef4444', padding: '12px 16px', borderRadius: '16px', color: '#fca5a5', fontSize: '13px', fontWeight: 600 }}>
+                ⚠️ {parentOnboardingError}
+              </div>
+            )}
+
+            <button
+              onClick={handleSavePreferences}
+              disabled={parentOnboardingLoading}
+              style={{
+                width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
+                background: '#34a853',
+                color: '#ffffff',
+                fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s', marginTop: '4px'
+              }}
+            >
+              {parentOnboardingLoading ? 'Speichere Präferenzen...' : 'Wunschtermine speichern'}
+            </button>
+          </div>
+        )}
 
         {parentOnboardingStep === 'success' && verifiedStudentDetails && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'center' }}>

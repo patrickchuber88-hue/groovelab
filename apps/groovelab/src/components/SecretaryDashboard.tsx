@@ -3934,9 +3934,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             schoolName.toLowerCase().includes('bad sackingen') || 
                             schoolName.toLowerCase().includes('musäk');
 
-    // Only show students who are active on Campus OR pending onboarding AND belong to Bad Säckingen
+    // Show all students belonging to the school
     const campusStudentsOnly = students.filter((s: any) => {
-      return (s.is_campus_active || s.isPendingOnboarding) && isBadSaeckingen;
+      return isBadSaeckingen;
     });
 
     const uniqueInstruments = Array.from(new Set(campusStudentsOnly.map(s => s.instrument || 'Allgemein')));
