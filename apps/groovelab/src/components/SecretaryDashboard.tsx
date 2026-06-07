@@ -7730,29 +7730,43 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 {/* RIGHT SIDEBAR */}
                 <div style={{ width: '310px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-                  {/* Sick teacher list (Red Widget style) */}
+                  {/* Sick teacher list (Red Widget style when sick, neutral white when all active) */}
                   <div style={{
-                    background: 'linear-gradient(135deg, rgba(254, 242, 242, 0.95) 0%, rgba(254, 226, 226, 0.95) 100%)',
-                    border: '1.5px solid #fca5a5',
+                    background: sickTeachers.length === 0
+                      ? '#ffffff'
+                      : 'linear-gradient(135deg, rgba(254, 242, 242, 0.95) 0%, rgba(254, 226, 226, 0.95) 100%)',
+                    border: sickTeachers.length === 0
+                      ? '1.5px solid #e2e8f0'
+                      : '1.5px solid #fca5a5',
                     borderRadius: '24px',
                     padding: '24px',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '16px',
-                    boxShadow: '0 8px 32px rgba(239, 68, 68, 0.04)',
+                    boxShadow: sickTeachers.length === 0
+                      ? '0 8px 32px rgba(15, 23, 42, 0.03)'
+                      : '0 8px 32px rgba(239, 68, 68, 0.04)',
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '14px', borderBottom: '1px solid rgba(239, 68, 68, 0.15)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '14px', borderBottom: sickTeachers.length === 0 ? '1px solid #e2e8f0' : '1px solid rgba(239, 68, 68, 0.15)' }}>
                       <div style={{
-                        background: '#fee2e2', borderRadius: '12px', padding: '8px', border: '1px solid #fca5a5',
+                        background: sickTeachers.length === 0 ? '#e6f4ea' : '#fee2e2',
+                        borderRadius: '12px', padding: '8px',
+                        border: sickTeachers.length === 0 ? '1px solid #bbf7d0' : '1px solid #fca5a5',
                         display: 'flex', alignItems: 'center', justifyContent: 'center'
                       }}>
-                        <UserX size={16} color="#ef4444" />
+                        {sickTeachers.length === 0 ? (
+                          <UserCheck size={16} color="#16a34a" />
+                        ) : (
+                          <UserX size={16} color="#ef4444" />
+                        )}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <strong style={{ fontSize: '0.9rem', fontWeight: 950, color: '#7f1d1d', display: 'block', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                        <strong style={{ fontSize: '0.9rem', fontWeight: 950, color: sickTeachers.length === 0 ? '#1e293b' : '#7f1d1d', display: 'block', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                           Krankmeldungen
                         </strong>
-                        <span style={{ fontSize: '0.72rem', color: '#b91c1c', fontWeight: 600 }}>Wählen zum Filtern</span>
+                        <span style={{ fontSize: '0.72rem', color: sickTeachers.length === 0 ? '#64748b' : '#b91c1c', fontWeight: 600 }}>
+                          {sickTeachers.length === 0 ? 'Alle im Dienst' : 'Wählen zum Filtern'}
+                        </span>
                       </div>
                     </div>
 
