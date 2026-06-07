@@ -961,6 +961,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [selectedCrisisTeacherId, setSelectedCrisisTeacherId] = useState<string | null>(null);
   const [crisisTabMode, setCrisisTabMode] = useState<'live' | 'history'>('live');
   const [selectedArchiveLog, setSelectedArchiveLog] = useState<any | null>(null);
+  const [expandedLiveDayStr, setExpandedLiveDayStr] = useState<string | null>(null);
   const [activeContextMenu, setActiveContextMenu] = useState<string | null>(null);
   const [copiedStudentId, setCopiedStudentId] = useState<string | null>(null);
   const [copiedSchoolLink, setCopiedSchoolLink] = useState<boolean>(false);
@@ -1298,7 +1299,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
     const channel = supabase
       .channel('public:crisis_notifications')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'crisis_notifications' }, () => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'crisis_notifications' }, (payload) => {
+        const updatedRow = payload.new as any;
+        if (updatedRow) {
+          setCrisisNotifications(prev =>
+            prev.map(n => n.id === updatedRow.id ? { ...n, status: updatedRow.status, notified_at: updatedRow.notified_at } : n)
+          );
+        }
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'crisis_notifications' }, () => {
+        debouncedFetchCrisisNotifications();
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'crisis_notifications' }, () => {
         debouncedFetchCrisisNotifications();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'system_alerts' }, () => {
@@ -1306,6 +1318,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
         debouncedFetchDashboardData();
+        debouncedFetchCrisisNotifications();
       })
       .subscribe();
 
@@ -1821,6 +1834,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   };
 
   const handleMarkAsNotified = async (notificationId: string) => {
+    // Optimistic UI update
+    setCrisisNotifications(prev =>
+      prev.map(n => n.id === notificationId ? { ...n, status: 'READ', notified_at: new Date().toISOString() } : n)
+    );
     try {
       await supabase
         .from('crisis_notifications')
@@ -1832,6 +1849,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   };
 
   const handleArchiveCrisisTicket = async (notificationId: string) => {
+    // Optimistic UI update
+    setCrisisNotifications(prev =>
+      prev.map(n => n.id === notificationId ? { ...n, status: 'ARCHIVED' } : n)
+    );
     try {
       await supabase
         .from('crisis_notifications')
@@ -7496,7 +7517,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       );
                     }
 
-                    if (todayTickets.length === 0) {
+                    if (liveTickets.length === 0) {
                       return (
                         <div style={{
                           background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
@@ -7511,49 +7532,141 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             <Sparkles size={56} color="#f59e0b" strokeWidth={1.5} />
                           </div>
                           <strong style={{ display: 'block', fontSize: '1.25rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", marginBottom: '8px' }}>
-                            Keine Ausfälle am heutigen Tag
+                            Keine kommenden Ausfälle
                           </strong>
                           <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', fontWeight: 600, maxWidth: '460px', marginInline: 'auto', lineHeight: 1.4 }}>
-                            Am heutigen Tag stehen keine Unterrichtstermine zur Absage oder Benachrichtigung an.
+                            Es stehen derzeit keine zukünftigen Unterrichtsausfälle zur Absage an.
                           </p>
                         </div>
                       );
                     }
 
-                    return (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                        {/* Spalte 1: Ausstehend / Akut (Rot & Gelb) */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                          <div style={{ padding: '6px 4px', borderBottom: '2.5px solid #fca5a5', display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '8px' }}>
-                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', display: 'inline-block', boxShadow: '0 0 10px rgba(239,68,68,0.5)', animation: 'pulse 1.5s infinite' }} />
-                            <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                              🚨 Ausstehend / Akut ({redTickets.length + yellowTickets.length})
-                            </span>
-                          </div>
-                          {redTickets.map(t => <TicketCard key={t.id} t={t} />)}
-                          {yellowTickets.map(t => <TicketCard key={t.id} t={t} />)}
-                          {redTickets.length === 0 && yellowTickets.length === 0 && (
-                            <div style={{ padding: '40px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: '20px', border: '1.5px dashed #cbd5e1', color: '#64748b', fontSize: '0.82rem', fontWeight: 700 }}>
-                              Keine ausstehenden Fälle
-                            </div>
-                          )}
-                        </div>
+                    const todayDateStr = new Date().toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+                    
+                    const liveGroupsMap = new Map<string, any[]>();
+                    liveTickets.forEach(t => {
+                      const dVal = new Date(t.slot_start_datetime);
+                      const dateStr = dVal.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+                      if (!liveGroupsMap.has(dateStr)) {
+                        liveGroupsMap.set(dateStr, []);
+                      }
+                      liveGroupsMap.get(dateStr)!.push(t);
+                    });
 
-                        {/* Spalte 2: Erledigt (Grün) */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                          <div style={{ padding: '6px 4px', borderBottom: '2.5px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '8px' }}>
-                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-                            <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                              ✓ Erledigt ({greenTickets.length})
-                            </span>
-                          </div>
-                          {greenTickets.map(t => <TicketCard key={t.id} t={t} />)}
-                          {greenTickets.length === 0 && (
-                            <div style={{ padding: '40px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: '20px', border: '1.5px dashed #cbd5e1', color: '#64748b', fontSize: '0.82rem', fontWeight: 700 }}>
-                              Keine erledigten Fälle
+                    const liveGroups = Array.from(liveGroupsMap.entries()).map(([dateStr, tickets]) => {
+                      const firstTime = new Date(tickets[0].slot_start_datetime).getTime();
+                      return { dateStr, tickets, firstTime };
+                    }).sort((a, b) => a.firstTime - b.firstTime);
+
+                    const activeExpandedDay = expandedLiveDayStr || (liveGroups.some(g => g.dateStr === todayDateStr) ? todayDateStr : liveGroups[0]?.dateStr);
+
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        {liveGroups.map(group => {
+                          const isToday = group.dateStr === todayDateStr;
+                          const isExpanded = activeExpandedDay === group.dateStr;
+                          const total = group.tickets.length;
+                          const pendingCount = group.tickets.filter(t => t.status === 'UNREAD').length;
+                          const doneCount = total - pendingCount;
+
+                          const headerBg = isToday
+                            ? 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)'
+                            : '#ffffff';
+                          const headerBorder = isToday ? '1.5px solid #fde047' : '1.5px solid #cbd5e1';
+                          const headerColor = isToday ? '#78350f' : '#0f172a';
+                          
+                          return (
+                            <div key={group.dateStr} style={{ display: 'flex', flexDirection: 'column' }}>
+                              <div
+                                onClick={() => setExpandedLiveDayStr(isExpanded ? 'NONE' : group.dateStr)}
+                                style={{
+                                  background: headerBg,
+                                  border: headerBorder,
+                                  borderBottom: isExpanded ? 'none' : headerBorder,
+                                  borderRadius: isExpanded ? '16px 16px 0 0' : '16px',
+                                  padding: '16px 20px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s',
+                                  position: 'relative',
+                                  zIndex: 2,
+                                }}
+                                onMouseEnter={e => {
+                                  if (!isToday) {
+                                    e.currentTarget.style.borderColor = '#ea4335';
+                                  }
+                                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(15, 23, 42, 0.04)';
+                                }}
+                                onMouseLeave={e => {
+                                  e.currentTarget.style.borderColor = isToday ? '#fcd34d' : '#cbd5e1';
+                                  e.currentTarget.style.boxShadow = 'none';
+                                }}
+                              >
+                                <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                                  <div style={{
+                                    background: isToday ? '#fef3c7' : '#f1f5f9',
+                                    padding: '10px',
+                                    borderRadius: '12px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}>
+                                    <Calendar size={20} color={isToday ? '#d97706' : '#64748b'} />
+                                  </div>
+                                  <div>
+                                    <strong style={{ display: 'block', fontSize: '1rem', color: headerColor, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                      {group.dateStr} {isToday && '• Heute'}
+                                    </strong>
+                                    <span style={{ fontSize: '0.75rem', color: isToday ? '#92400e' : '#64748b', fontWeight: 600 }}>
+                                      {total} Ausfälle geplant
+                                    </span>
+                                  </div>
+                                </div>
+                                
+                                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '0.78rem', background: pendingCount > 0 ? (isToday ? '#fee2e2' : '#f1f5f9') : '#e6f4ea', color: pendingCount > 0 ? '#dc2626' : '#137333', padding: '4px 12px', borderRadius: '100px', fontWeight: 800 }}>
+                                    {pendingCount > 0 ? `${pendingCount} Ausstehend` : 'Alle informiert'}
+                                  </span>
+                                  {doneCount > 0 && (
+                                    <span style={{ fontSize: '0.78rem', background: '#dcfce7', color: '#15803d', padding: '4px 12px', borderRadius: '100px', fontWeight: 800 }}>
+                                      {doneCount} Erledigt
+                                    </span>
+                                  )}
+                                  <ChevronRight 
+                                    size={18} 
+                                    color={isToday ? '#92400e' : '#64748b'}
+                                    style={{ 
+                                      transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                                      transition: 'transform 0.2s ease',
+                                      marginLeft: '8px'
+                                    }} 
+                                  />
+                                </div>
+                              </div>
+
+                              {isExpanded && (
+                                <div style={{
+                                  background: '#f8fafc',
+                                  border: headerBorder,
+                                  borderTop: 'none',
+                                  borderRadius: '0 0 16px 16px',
+                                  padding: '20px',
+                                  zIndex: 1,
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '12px',
+                                  boxShadow: '0 4px 12px rgba(15, 23, 42, 0.02)'
+                                }}>
+                                  {group.tickets.map(t => (
+                                    <TicketCard key={t.id} t={t} />
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
+                          );
+                        })}
                       </div>
                     );
                   })()}
