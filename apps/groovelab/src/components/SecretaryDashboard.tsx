@@ -5987,7 +5987,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             { id: 'onboarding', label: 'Lehrer', icon: UserPlus },
             { id: 'students', label: 'Schüler', icon: Users },
             { id: 'cooperations', label: 'Kooperationen', icon: Users },
-            { id: 'events', label: 'Termine Board', icon: Calendar },
+            { id: 'events', label: 'Termine', icon: Calendar },
             { id: 'schedules', label: `Stundenpläne`, count: pendingSchedules.length, icon: Calendar },
             { id: 'status', label: 'Status & API', icon: Sliders }
           ].map((item) => {
@@ -8563,10 +8563,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
         {/* TAB 2: CAMPUS */}
         {activeTab === 'campus' && (
-          <div className="campus-grid">
+          <div className="campus-grid" style={campusSubTab === 'events' ? { gridTemplateColumns: '1fr', gap: 0 } : {}}>
             
             {/* Left Content Pane (Main Board Content) */}
-            <div style={{ flex: (campusSubTab === 'onboarding' || campusSubTab === 'students' || campusSubTab === 'cooperations') ? '1' : '1.6', display: 'flex', flexDirection: 'column', gap: '24px', width: (campusSubTab === 'onboarding' || campusSubTab === 'students' || campusSubTab === 'cooperations') ? '100%' : 'auto', minWidth: 0 }}>
+            <div style={{ flex: (campusSubTab === 'onboarding' || campusSubTab === 'students' || campusSubTab === 'cooperations' || campusSubTab === 'events') ? '1' : '1.6', display: 'flex', flexDirection: 'column', gap: '24px', width: (campusSubTab === 'onboarding' || campusSubTab === 'students' || campusSubTab === 'cooperations' || campusSubTab === 'events') ? '100%' : 'auto', minWidth: 0 }}>
               
               {/* Subtab: Startseite (Briefing) */}
               {campusSubTab === 'briefing' && (
@@ -9939,7 +9939,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             </div>
 
             {/* Right Sidebar Pane */}
-            <div style={{ width: '340px', display: 'flex', flexDirection: 'column', gap: '24px', flexShrink: 0 }}>
+            {campusSubTab !== 'events' && (
+              <div style={{ width: '340px', display: 'flex', flexDirection: 'column', gap: '24px', flexShrink: 0 }}>
               
               {/* Briefing/Startseite Sidebar */}
               {campusSubTab === 'briefing' && (
@@ -10831,7 +10832,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 </div>
               )}
 
-            </div>
+              </div>
+            )}
 
           </div>
         )}

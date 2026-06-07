@@ -22,7 +22,8 @@ import {
   Palmtree,
   Building2,
   ExternalLink,
-  Eye
+  Eye,
+  Edit3
 } from 'lucide-react';
 
 interface CampusEventsBoardProps {
@@ -71,6 +72,8 @@ interface CampusEvent {
   isSubscribed?: boolean;
   ensemble_id?: string;
   band_id?: string;
+  color?: string;
+  visibility?: 'all' | 'teachers' | 'students' | 'private';
 }
 
 export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor }: CampusEventsBoardProps) {
@@ -103,6 +106,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const [formCategory, setFormCategory] = useState('Sonstiges');
   const [formDescription, setFormDescription] = useState('');
   const [formIsPublic, setFormIsPublic] = useState(false);
+  const [formColor, setFormColor] = useState('');
+  const [formVisibility, setFormVisibility] = useState<'all' | 'teachers' | 'students' | 'private'>('all');
   const [submittingForm, setSubmittingForm] = useState(false);
 
   // Smart search state for Schüler / Ensembles & Bands
@@ -125,13 +130,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const [availableRooms, setAvailableRooms] = useState<{id: string; name: string; floor?: string}[]>([]);
   const [checkingRooms, setCheckingRooms] = useState(false);
 
-  // Event Detail Modal (Column 2)
+  // Event Detail Modal (Column 2) — read-only; only visibility can be changed by admin/secretary
   const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
-  const [modalSearchQuery, setModalSearchQuery] = useState('');
-  const [modalSearchResults, setModalSearchResults] = useState<any[]>([]);
-  const [modalSearchOpen, setModalSearchOpen] = useState(false);
-  const [modalLoading, setModalLoading] = useState(false);
-  const [modalSelectedStudents, setModalSelectedStudents] = useState<any[]>([]);
+  const [editVisibility, setEditVisibility] = useState<'all' | 'teachers' | 'students'>('all');
+  const [savingVisibility, setSavingVisibility] = useState(false);
 
 
 
@@ -147,7 +149,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   }, [userId, schoolId, role]);
 
 
-  // Re-check room availability when date, start time or end time changes
+  // Re-check room availability when date, start time or end time changes (Column 3 create form)
   useEffect(() => {
     if (formLocationType === 'intern' && formDate && formStartTime && formEndTime) {
       fetchAvailableRooms(formDate, formStartTime, formEndTime);
@@ -240,45 +242,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     return () => clearTimeout(timer);
   }, [participantQuery, schoolId, role, myStudentIds]);
 
-  // Search students for modal assignment (restricted to teacher's own students)
-  useEffect(() => {
-    if (!modalSearchQuery.trim()) {
-      setModalSearchResults([]);
-      setModalSearchOpen(false);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      setModalLoading(true);
-      try {
-        const q = modalSearchQuery.trim();
-        let query = supabase
-          .from('users')
-          .select('id, first_name, last_name, instrument')
-          .eq('school_id', schoolId)
-          .eq('role', 'student');
-        
-        if (role === 'teacher') {
-          if (myStudentIds.length > 0) {
-            query = query.in('id', myStudentIds);
-          } else {
-            query = query.eq('id', '00000000-0000-0000-0000-000000000000');
-          }
-        }
 
-        const { data } = await query
-          .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%`)
-          .limit(8);
-
-        setModalSearchResults(data || []);
-        setModalSearchOpen((data || []).length > 0);
-      } catch (err) {
-        console.warn('Modal search error:', err);
-      } finally {
-        setModalLoading(false);
-      }
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [modalSearchQuery, schoolId, role, myStudentIds]);
 
   const normalizeTitle = (t: string) => (t || '').trim().toLowerCase();
   const normalizeTime = (t: string) => {
@@ -287,9 +251,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     return match ? `${match[1]}:${match[2]}` : '00:00';
   };
 
-  const handleSelectEvent = async (ev: any) => {
-    const isSubscribed = ev.is_subscribed || ev.isSubscribed;
-    
+  const handleSelectEvent = (ev: any) => {
     // Resolve catColor/catBg
     let catColor = '#64748b';
     let catBg = '#f1f5f9';
@@ -302,131 +264,37 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     } else if (ev.category === 'Sonstiges') {
       catColor = '#3b82f6';
       catBg = '#eff6ff';
+    } else if (ev.category === 'Ferien' || ev.category === 'Feiertag') {
+      catColor = '#10b981';
+      catBg = '#ecfdf5';
     }
 
-    let linkedEvent = { ...ev };
-    if (isSubscribed) {
-      const existingCopy = customEvents.find(c => 
-        c.created_by === userId &&
-        normalizeTitle(c.title) === normalizeTitle(ev.title) &&
-        c.event_date === ev.event_date &&
-        normalizeTime(c.start_time) === normalizeTime(ev.start_time)
-      );
-      if (existingCopy) {
-        linkedEvent = {
-          ...linkedEvent,
-          id: existingCopy.id,
-          is_subscribed: false,
-          isSubscribed: false,
-          assigned_student_ids: existingCopy.assigned_student_ids || [],
-          location_type: existingCopy.location_type,
-          room_id: existingCopy.room_id,
-          location_extern: existingCopy.location_extern,
-          description: existingCopy.description || ev.description
-        };
-      }
-    }
-
-    const isMyEvent = linkedEvent.created_by === userId || !isSubscribed;
-
-    setSelectedEvent({ ...linkedEvent, isSubscribed: isSubscribed && !linkedEvent.id.toString().startsWith('subscribed-') && !linkedEvent.id.toString().startsWith('sub-') ? false : isSubscribed, isMyEvent, catColor, catBg });
-    setModalSearchQuery('');
-    setModalSearchOpen(false);
-
-    // If the logged-in user is a teacher and there are assigned student IDs, load their profiles!
-    const studentIdsToFetch = [...(linkedEvent.assigned_student_ids || [])];
-    if (linkedEvent.student_id && !studentIdsToFetch.includes(linkedEvent.student_id)) {
-      studentIdsToFetch.push(linkedEvent.student_id);
-    }
-
-    if ((role === 'teacher' || role === 'admin' || role === 'secretary') && studentIdsToFetch.length > 0) {
-      try {
-        const { data } = await supabase
-          .from('users')
-          .select('id, first_name, last_name, instrument')
-          .in('id', studentIdsToFetch);
-        if (data) {
-          setModalSelectedStudents(data);
-          return;
-        }
-      } catch (err) {
-        console.warn('Error loading assigned student profiles:', err);
-      }
-    }
-    setModalSelectedStudents([]);
+    const isMyEvent = ev.created_by === userId;
+    setSelectedEvent({ ...ev, isMyEvent, catColor, catBg });
+    // Pre-fill visibility editor for admin/secretary
+    setEditVisibility(ev.visibility || 'all');
   };
 
-  const saveEventAssignments = async () => {
-    if (!selectedEvent) return;
+  // Save ONLY visibility for a campus_event (admin/secretary only)
+  const saveVisibility = async () => {
+    if (!selectedEvent || selectedEvent.is_subscribed) return;
+    setSavingVisibility(true);
     try {
-      const isSubscribed = selectedEvent.is_subscribed || selectedEvent.isSubscribed;
-      const studentIds = modalSelectedStudents.map(s => s.id);
-
-      let result;
-      // Double check if a copy of this subscribed event already exists in customEvents (safety)
-      let existingCopy = null;
-      if (isSubscribed) {
-        existingCopy = customEvents.find(c => 
-          c.created_by === userId &&
-          normalizeTitle(c.title) === normalizeTitle(selectedEvent.title) &&
-          c.event_date === selectedEvent.event_date &&
-          normalizeTime(c.start_time) === normalizeTime(selectedEvent.start_time)
-        );
-      }
-
-      if (isSubscribed && !existingCopy) {
-        // Subscribed events must be copied into a new custom event row in campus_events
-        const eventPayload = {
-          school_id: schoolId,
-          title: selectedEvent.title,
-          description: selectedEvent.description || null,
-          event_date: selectedEvent.event_date,
-          start_time: normalizeTime(selectedEvent.start_time) + ':00',
-          end_time: selectedEvent.end_time ? normalizeTime(selectedEvent.end_time) + ':00' : null,
-          category: selectedEvent.category || 'Sonstiges',
-          created_by: userId,
-          is_public: false,
-          assigned_student_ids: studentIds,
-          location_type: selectedEvent.location_type || 'none',
-          room_id: selectedEvent.room_id || null,
-          location_extern: selectedEvent.location_extern || null
-        };
-        result = await supabase
-          .from('campus_events')
-          .insert(eventPayload)
-          .select('*, room:room_id(id, name)')
-          .single();
-      } else {
-        // Custom events or already copied events can be updated directly
-        const targetId = existingCopy ? existingCopy.id : selectedEvent.id;
-        result = await supabase
-          .from('campus_events')
-          .update({ assigned_student_ids: studentIds })
-          .eq('id', targetId)
-          .select('*, room:room_id(id, name)')
-          .single();
-      }
-
-      const { data, error } = result;
+      const { data, error } = await supabase
+        .from('campus_events')
+        .update({ visibility: editVisibility, is_public: editVisibility === 'all' })
+        .eq('id', selectedEvent.id)
+        .select('*, room:room_id(id, name)')
+        .single();
       if (error) throw error;
-
       if (data) {
-        setCustomEvents(prev => {
-          const exists = prev.some(x => x.id === data.id);
-          if (exists) {
-            return prev.map(x => x.id === data.id ? data : x);
-          } else {
-            return [...prev, data].sort((a, b) => {
-              if (a.event_date !== b.event_date) return a.event_date.localeCompare(b.event_date);
-              return a.start_time.localeCompare(b.start_time);
-            });
-          }
-        });
-        alert('Zuweisungen erfolgreich gespeichert! 🎉');
-        setSelectedEvent(null);
+        setCustomEvents(prev => prev.map(x => x.id === data.id ? data : x));
+        setSelectedEvent((prev: any) => ({ ...prev, visibility: data.visibility }));
       }
     } catch (err: any) {
       alert('Speichern fehlgeschlagen: ' + err.message);
+    } finally {
+      setSavingVisibility(false);
     }
   };
 
@@ -630,8 +498,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     setLoadingLessons(true);
     try {
       const todayStr = new Date().toISOString().substring(0, 10);
-      const startYear = new Date().getFullYear() - 1 + '-09-01';
-      const endYear = new Date().getFullYear() + 1 + '-08-31';
+      // School year: September 1 to July 31 of the following year (August is excluded)
+      const now = new Date();
+      const schoolStartYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+      const startYear = `${schoolStartYear}-09-01`;
+      const endYear = `${schoolStartYear + 1}-07-31`;
 
       // 1. Load regular schedules
       let scheduleQuery = supabase
@@ -701,7 +572,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             const targetDate = new Date(current);
             targetDate.setDate(current.getDate() + diff);
 
-            if (targetDate >= schoolYearStart && targetDate <= schoolYearEnd) {
+            // Skip dates in August (month index 7) — outside school year
+            if (targetDate >= schoolYearStart && targetDate <= schoolYearEnd && targetDate.getMonth() !== 7) {
               const dateStr = targetDate.toISOString().substring(0, 10);
 
               // Check if override exists
@@ -821,13 +693,14 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
 
 
-  // Check which rooms are available on a given date + time
+  // Check which rooms are available on a given date + time (for Column 3 create form)
   const fetchAvailableRooms = async (date: string, startTime: string, endTime: string) => {
     if (!date || !startTime || schoolRooms.length === 0) {
       setAvailableRooms(schoolRooms);
       return;
     }
     setCheckingRooms(true);
+
     try {
       const start = startTime; // 'HH:MM'
       const end = endTime || (() => {
@@ -910,8 +783,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         }
       });
 
-      setAvailableRooms(schoolRooms.filter(r => !bookedRoomIds.has(r.id)));
-      // Reset selected room if it's no longer available
+      const filteredRooms = schoolRooms.filter(r => !bookedRoomIds.has(r.id));
+      setAvailableRooms(filteredRooms);
+      // Reset selected room if it's no longer available in create form
       if (formRoomId && bookedRoomIds.has(formRoomId)) {
         setFormRoomId('');
       }
@@ -924,6 +798,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   };
 
   // Handle Event Creation (Column 3 Form Submission)
+
   const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formTitle.trim() || !formDate || !formStartTime || !formCategory) {
@@ -942,7 +817,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         end_time: formEndTime ? formEndTime + ':00' : null,
         category: formCategory,
         created_by: userId,
-        is_public: role === 'student' ? false : formIsPublic,
+        is_public: formVisibility === 'all',
+        color: formColor || null,
+        visibility: formVisibility,
         location_type: formLocationType,
         room_id: formLocationType === 'intern' && formRoomId ? formRoomId : null,
         location_extern: formLocationType === 'extern' && formLocationExtern.trim() ? formLocationExtern.trim() : null,
@@ -987,6 +864,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       setFormCategory('Sonstiges');
       setFormDescription('');
       setFormIsPublic(false);
+      setFormColor('');
+      setFormVisibility('all');
       setSelectedParticipants([]);
       setParticipantQuery('');
       setFormLocationType('none');
@@ -1022,24 +901,42 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const getMergedTimelineEvents = () => {
     const todayStr = new Date().toISOString().substring(0, 10);
     
+    // Filter out subscribed events that have a customized copy (which overrides the subscription visibility/details)
+    const filteredSubscribed = subscribedEvents.filter(sub => {
+      const hasCustomCopy = customEvents.some(c => 
+        c.visibility !== 'private' &&
+        normalizeTitle(c.title) === normalizeTitle(sub.title) && 
+        c.event_date === sub.event_date && 
+        normalizeTime(c.start_time) === normalizeTime(sub.start_time)
+      );
+      return !hasCustomCopy;
+    });
+
     // Filter custom events visible to this user
     const filteredCustom = customEvents.filter(ev => {
-      // Visible if public OR created by current user
-      if (!ev.is_public && ev.created_by === userId) {
-        // Exclude private copies of subscribed calendar events to prevent duplicates in Column 2
-        const isDuplicateOfSubscribed = subscribedEvents.some(sub => 
-          normalizeTitle(sub.title) === normalizeTitle(ev.title) && 
-          sub.event_date === ev.event_date && 
-          normalizeTime(sub.start_time) === normalizeTime(ev.start_time)
-        );
-        if (isDuplicateOfSubscribed) return false;
+      // Exclude private copies of subscribed calendar events from Column 2
+      if (ev.visibility === 'private') return false;
+
+      // Admins and Secretaries can see everything
+      if (role === 'admin' || role === 'secretary') return true;
+
+      // Teachers see events created by themselves, public events, or events specifically visible to teachers (or students)
+      if (role === 'teacher') {
+        return ev.created_by === userId || ev.is_public || ev.visibility === 'all' || ev.visibility === 'teachers' || ev.visibility === 'students';
       }
+
+      // Students see events created by themselves, public events, events specifically visible to students, OR if they are explicitly assigned to it
+      if (role === 'student') {
+        const isAssigned = (ev.assigned_student_ids || []).includes(userId) || ev.student_id === userId;
+        return ev.created_by === userId || ev.is_public || ev.visibility === 'all' || ev.visibility === 'students' || isAssigned;
+      }
+
       return ev.is_public || ev.created_by === userId;
     });
 
 
     const merged = [
-      ...subscribedEvents,
+      ...filteredSubscribed,
       ...filteredCustom.map(ev => ({
         id: ev.id,
         title: ev.title,
@@ -1047,9 +944,17 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         event_date: ev.event_date,
         event_end_date: ev.event_end_date || ev.event_date,
         start_time: ev.start_time.substring(0, 5),
+        end_time: ev.end_time ? ev.end_time.substring(0, 5) : undefined,
         category: ev.category,
         is_subscribed: false,
-        created_by: ev.created_by
+        created_by: ev.created_by,
+        color: ev.color,
+        visibility: ev.visibility,
+        location_type: ev.location_type,
+        room_id: ev.room_id,
+        location_extern: ev.location_extern,
+        room: ev.room,
+        assigned_student_ids: ev.assigned_student_ids || []
       }))
     ];
 
@@ -1523,7 +1428,18 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               const isHolidayEvent = ev.category === 'Ferien' || ev.category === 'Feiertag' || (ev.title || '').toLowerCase().includes('ferien') || (ev.title || '').toLowerCase().includes('feiertag');
               const isKlassenvorspiel = ev.category === 'Klassenvorspiel' || (ev.title || '').toLowerCase().includes('klassenvorspiel');
 
-              if (isHolidayEvent) {
+              const COLOR_MAP: Record<string, { color: string, bg: string }> = {
+                '#a855f7': { color: '#a855f7', bg: '#f3e8ff' }, // Lila
+                '#f59e0b': { color: '#f59e0b', bg: '#fef3c7' }, // Gelb
+                '#3b82f6': { color: '#3b82f6', bg: '#eff6ff' }, // Blau
+                '#ef4444': { color: '#ef4444', bg: '#fee2e2' }, // Rot
+                '#10b981': { color: '#10b981', bg: '#ecfdf5' }, // Grün
+              };
+
+              if (ev.color && COLOR_MAP[ev.color]) {
+                catColor = COLOR_MAP[ev.color].color;
+                catBg = COLOR_MAP[ev.color].bg;
+              } else if (isHolidayEvent) {
                 catColor = '#10b981'; // Green
                 catBg = '#ecfdf5';
               } else if (isKlassenvorspiel) {
@@ -2345,23 +2261,105 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             />
           </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
-              <input
-                type="checkbox"
-                id="isPublicEvent"
-                checked={formIsPublic}
-                onChange={e => setFormIsPublic(e.target.checked)}
-                style={{
-                  width: '16px',
-                  height: '16px',
-                  accentColor: brandColor,
-                  cursor: 'pointer'
-                }}
-              />
-              <label htmlFor="isPublicEvent" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155', cursor: 'pointer', userSelect: 'none' }}>
-                Schulweit veröffentlichen (Sichtbar für Schüler)
-              </label>
-            </div>
+            {(role === 'admin' || role === 'secretary') ? (
+              <>
+                {/* Visibility */}
+                <div>
+                  <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                    Wer darf diesen Termin sehen?
+                  </label>
+                  <select
+                    value={formVisibility}
+                    onChange={e => setFormVisibility(e.target.value as any)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '10px',
+                      border: '1.5px solid #cbd5e1',
+                      fontSize: '0.85rem',
+                      fontWeight: 650,
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      background: '#ffffff'
+                    }}
+                  >
+                    <option value="all">Alle (Schüler & Lehrer)</option>
+                    <option value="teachers">Nur Lehrer</option>
+                    <option value="students">Nur Schüler</option>
+                  </select>
+                </div>
+
+                {/* Color Dot Picker */}
+                <div>
+                  <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                    Terminfarbe
+                  </label>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    {[
+                      { hex: '', label: 'Standard', bg: '#f1f5f9', border: '#cbd5e1' },
+                      { hex: '#a855f7', label: 'Lila', bg: '#a855f7', border: '#a855f7' },
+                      { hex: '#f59e0b', label: 'Gelb', bg: '#f59e0b', border: '#f59e0b' },
+                      { hex: '#3b82f6', label: 'Blau', bg: '#3b82f6', border: '#3b82f6' },
+                      { hex: '#ef4444', label: 'Rot', bg: '#ef4444', border: '#ef4444' },
+                      { hex: '#10b981', label: 'Grün', bg: '#10b981', border: '#10b981' }
+                    ].map(col => {
+                      const isSelected = formColor === col.hex;
+                      return (
+                        <button
+                          key={col.hex}
+                          type="button"
+                          onClick={() => setFormColor(col.hex)}
+                          title={col.label}
+                          style={{
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '50%',
+                            background: col.bg,
+                            border: isSelected ? '3px solid #0f172a' : `1.5px solid ${col.border}`,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: isSelected ? '0 0 0 2px #ffffff, 0 4px 10px rgba(0,0,0,0.15)' : '0 2px 4px rgba(0,0,0,0.04)',
+                            transition: 'all 0.15s',
+                            padding: 0
+                          }}
+                        >
+                          {col.hex === '' && (
+                            <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#64748b' }}>A</span>
+                          )}
+                          {isSelected && col.hex !== '' && (
+                            <Check size={12} color="#ffffff" strokeWidth={3} />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
+                <input
+                  type="checkbox"
+                  id="isPublicEvent"
+                  checked={formIsPublic}
+                  onChange={e => {
+                    const val = e.target.checked;
+                    setFormIsPublic(val);
+                    setFormVisibility(val ? 'all' : 'teachers');
+                  }}
+                  style={{
+                    width: '16px',
+                    height: '16px',
+                    accentColor: brandColor,
+                    cursor: 'pointer'
+                  }}
+                />
+                <label htmlFor="isPublicEvent" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155', cursor: 'pointer', userSelect: 'none' }}>
+                  Schulweit veröffentlichen (Sichtbar für Schüler)
+                </label>
+              </div>
+            )}
 
 
           {/* Submit Button */}
@@ -2398,6 +2396,16 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         const ev = selectedEvent;
         const catColor = ev.catColor || '#64748b';
         const catBg = ev.catBg || '#f1f5f9';
+        const isSubscribed = ev.is_subscribed;
+        const canEditVisibility = (role === 'admin' || role === 'secretary') && !isSubscribed;
+        const currentVisibility = ev.visibility || 'all';
+
+        const visibilityLabel: Record<string, string> = {
+          all: '👥 Alle (Schüler & Lehrer)',
+          teachers: '🎓 Nur Lehrer',
+          students: '🎵 Nur Schüler'
+        };
+
         return (
           <div
             onClick={() => setSelectedEvent(null)}
@@ -2437,13 +2445,13 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   </span>
                   <span style={{
                     fontSize: '0.62rem', fontWeight: 800,
-                    color: ev.isSubscribed ? '#475569' : '#0369a1',
-                    background: ev.isSubscribed ? '#f1f5f9' : '#e0f2fe',
+                    color: isSubscribed ? '#475569' : '#0369a1',
+                    background: isSubscribed ? '#f1f5f9' : '#e0f2fe',
                     padding: '4px 10px', borderRadius: '8px',
                     display: 'flex', alignItems: 'center', gap: '4px'
                   }}>
-                    {ev.isSubscribed ? <Globe size={10} /> : <Lock size={10} />}
-                    {ev.isSubscribed ? 'iCal Kalender' : 'Eigener Termin'}
+                    {isSubscribed ? <Globe size={10} /> : <Lock size={10} />}
+                    {isSubscribed ? 'iCal Kalender' : 'Eigener Termin'}
                   </span>
                 </div>
                 <button
@@ -2459,7 +2467,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 </button>
               </div>
 
-              {/* Body */}
+              {/* Body — always read-only */}
               <div style={{ padding: '16px 22px 24px 22px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {/* Title */}
                 <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', lineHeight: 1.25 }}>
@@ -2514,181 +2522,88 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   </div>
                 )}
 
-                {/* Zuweisungs-Bereich (nur für Lehrer) */}
-                {(role === 'teacher' || role === 'admin' || role === 'secretary') && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid #f1f5f9', paddingTop: '14px', marginTop: '6px' }}>
+                {/* Current visibility badge — admin/secretary only */}
+                {(role === 'admin' || role === 'secretary') && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                    <Eye size={14} color="#64748b" />
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>
+                      Sichtbar für: {visibilityLabel[currentVisibility] || '👥 Alle'}
+                    </span>
+                  </div>
+                )}
+
+                {/* Visibility editor — admin/secretary only, for non-subscribed events */}
+                {canEditVisibility && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '14px', marginTop: '2px' }}>
                     <label style={{ fontSize: '0.68rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      Empfänger zuweisen (Mehrfachauswahl)
+                      Sichtbarkeit ändern
                     </label>
-                    
-                    {/* Chip box & Input combined */}
-                    <div style={{
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      alignItems: 'center',
-                      gap: '6px',
-                      padding: modalSelectedStudents.length > 0 ? '6px 8px' : '0',
-                      borderRadius: '10px',
-                      border: '1.5px solid #cbd5e1',
-                      background: '#ffffff',
-                      minHeight: '40px',
-                      position: 'relative',
-                      boxSizing: 'border-box'
-                    }}>
-                      {/* Selected Student Chips */}
-                      {modalSelectedStudents.map(student => (
-                        <span key={student.id} style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          padding: '3px 8px',
-                          borderRadius: '20px',
-                          fontSize: '0.72rem',
-                          fontWeight: 800,
-                          background: '#eff6ff',
-                          color: '#1e40af',
-                          border: '1px solid #bfdbfe'
-                        }}>
-                          {student.first_name} {student.last_name || ''}
+                    <div style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '12px', gap: '4px', border: '1px solid #e2e8f0' }}>
+                      {([
+                        { value: 'all', label: '👥 Alle' },
+                        { value: 'teachers', label: '🎓 Nur Lehrer' },
+                        { value: 'students', label: '🎵 Nur Schüler' }
+                      ] as const).map(opt => {
+                        const isSel = editVisibility === opt.value;
+                        return (
                           <button
+                            key={opt.value}
                             type="button"
-                            onClick={() => setModalSelectedStudents(prev => prev.filter(s => s.id !== student.id))}
+                            onClick={() => setEditVisibility(opt.value)}
                             style={{
-                              background: 'none', border: 'none', cursor: 'pointer',
-                              padding: '0', display: 'flex', alignItems: 'center',
-                              color: 'inherit', opacity: 0.6
+                              flex: 1,
+                              border: 'none',
+                              background: isSel ? '#ffffff' : 'transparent',
+                              color: isSel ? '#0f172a' : '#64748b',
+                              padding: '8px 4px',
+                              borderRadius: '8px',
+                              fontWeight: 800,
+                              fontSize: '0.68rem',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s',
+                              boxShadow: isSel ? '0 2px 6px rgba(0,0,0,0.06)' : 'none'
                             }}
                           >
-                            <X size={10} strokeWidth={2.5} />
+                            {opt.label}
                           </button>
-                        </span>
-                      ))}
-
-                      {/* Live search input field */}
-                      <input
-                        type="search"
-                        className="no-autofill-icon"
-                        placeholder={modalSelectedStudents.length === 0 ? "Schüler suchen..." : ""}
-                        value={modalSearchQuery}
-                        onChange={e => setModalSearchQuery(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === 'Backspace' && !modalSearchQuery) {
-                            setModalSelectedStudents(prev => prev.slice(0, -1));
-                          } else if (e.key === 'Enter') {
-                            e.preventDefault();
-                            const filteredResults = modalSearchResults.filter(
-                              s => !modalSelectedStudents.some(x => x.id === s.id)
-                            );
-                            if (filteredResults.length > 0) {
-                              const firstStudent = filteredResults[0];
-                              setModalSelectedStudents(prev => [...prev, firstStudent]);
-                              setModalSearchQuery('');
-                              setModalSearchOpen(false);
-                            }
-                          }
-                        }}
-                        autoComplete="new-password"
-                        autoCapitalize="off"
-                        autoCorrect="off"
-                        spellCheck={false}
-                        style={{
-                          border: 'none',
-                          outline: 'none',
-                          background: 'transparent',
-                          fontSize: '0.82rem',
-                          fontWeight: 650,
-                          color: '#0f172a',
-                          minWidth: '100px',
-                          flex: 1,
-                          padding: modalSelectedStudents.length > 0 ? '4px 0' : '10px 12px',
-                          height: '37px',
-                          boxSizing: 'border-box'
-                        }}
-                      />
-
-                      {/* Dropdown list (opens upwards) */}
-                      {modalSearchOpen && modalSearchResults.length > 0 && (
-                        <div style={{
-                          position: 'absolute', bottom: 'calc(100% + 5px)', left: 0, right: 0,
-                          background: '#ffffff', border: '1.5px solid #e2e8f0',
-                          borderRadius: '12px', boxShadow: '0 -12px 32px rgba(0,0,0,0.12)',
-                          zIndex: 1100, overflow: 'hidden', maxHeight: '180px', overflowY: 'auto'
-                        }}>
-                          {modalSearchResults
-                            .filter(s => !modalSelectedStudents.some(x => x.id === s.id))
-                            .map(student => (
-                              <div
-                                key={student.id}
-                                onMouseDown={() => {
-                                  setModalSelectedStudents(prev => [...prev, student]);
-                                  setModalSearchQuery('');
-                                  setModalSearchOpen(false);
-                                }}
-                                style={{
-                                  padding: '10px 14px',
-                                  cursor: 'pointer',
-                                  borderBottom: '1px solid #f8fafc',
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center'
-                                }}
-                                onMouseEnter={e => e.currentTarget.style.background = '#f0f7ff'}
-                                onMouseLeave={e => e.currentTarget.style.background = '#ffffff'}
-                              >
-                                <div>
-                                  <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a' }}>
-                                    {student.first_name} {student.last_name || ''}
-                                  </div>
-                                  {student.instrument && (
-                                    <div style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 600 }}>
-                                      {student.instrument}
-                                    </div>
-                                  )}
-                                </div>
-                                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: brandColor }}>
-                                  Hinzufügen
-                                </span>
-                              </div>
-                            ))}
-                        </div>
-                      )}
+                        );
+                      })}
                     </div>
-
-                    {/* Action buttons (Save Assignments) */}
                     <button
                       type="button"
-                      onClick={saveEventAssignments}
+                      onClick={saveVisibility}
+                      disabled={savingVisibility || editVisibility === (ev.visibility || 'all')}
                       style={{
-                        background: brandColor,
-                        color: '#ffffff',
+                        background: editVisibility === (ev.visibility || 'all') ? '#e2e8f0' : brandColor,
+                        color: editVisibility === (ev.visibility || 'all') ? '#94a3b8' : '#ffffff',
                         border: 'none',
                         padding: '10px',
                         borderRadius: '10px',
                         fontWeight: 800,
                         fontSize: '0.82rem',
-                        cursor: 'pointer',
+                        cursor: editVisibility === (ev.visibility || 'all') ? 'not-allowed' : 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '6px',
-                        marginTop: '4px',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+                        boxShadow: editVisibility === (ev.visibility || 'all') ? 'none' : '0 4px 12px rgba(0,0,0,0.08)',
+                        transition: 'all 0.2s'
                       }}
                     >
-                      <Check size={14} /> Zuweisungen speichern
+                      <Check size={14} /> {savingVisibility ? 'Wird gespeichert...' : 'Sichtbarkeit speichern'}
                     </button>
                   </div>
                 )}
 
-                {/* Delete button (own events only) */}
-                {!ev.isSubscribed && ev.isMyEvent && (
+                {/* Delete button — admin/secretary, non-subscribed, own events */}
+                {!isSubscribed && ev.isMyEvent && (role === 'admin' || role === 'secretary') && (
                   <button
                     onClick={() => { handleDeleteEvent(ev.id); setSelectedEvent(null); }}
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                       background: '#fef2f2', border: '1.5px solid #fee2e2', color: '#ef4444',
                       padding: '10px', borderRadius: '12px', cursor: 'pointer',
-                      fontWeight: 800, fontSize: '0.82rem', marginTop: '4px',
+                      fontWeight: 800, fontSize: '0.82rem',
                       transition: 'all 0.15s'
                     }}
                     onMouseOver={e => { e.currentTarget.style.background = '#fee2e2'; }}
@@ -2706,3 +2621,4 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     </div>
   );
 }
+

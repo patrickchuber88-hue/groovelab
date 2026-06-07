@@ -409,7 +409,7 @@ export function AdminDashboard({
       const sec = parseInt(cleanStr.substring(13, 15));
       return new Date(Date.UTC(year, month, day, hour, min, sec));
     }
-    return new Date(year, month, day);
+    return new Date(Date.UTC(year, month, day));
   };
 
   const parseICS = (icsText: string): any[] => {
@@ -438,6 +438,7 @@ export function AdminDashboard({
             currentEvent.description = value.replace(/\\n/g, '\n');
           } else if (key.startsWith('DTSTART')) {
             currentEvent.dtstart = parseICSDate(value);
+            currentEvent.isAllDay = !value.includes('T');
           } else if (key.startsWith('DTEND')) {
             currentEvent.dtend = parseICSDate(value);
           } else if (key.startsWith('LOCATION')) {
@@ -494,15 +495,24 @@ export function AdminDashboard({
         })
         .map(ev => {
           const toYYYYMMDD = (d: Date) => {
-            const y = d.getFullYear();
-            const m = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${y}-${m}-${day}`;
+            try {
+              return new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'Europe/Berlin',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+              }).format(d);
+            } catch (e) {
+              const y = d.getUTCFullYear();
+              const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+              const day = String(d.getUTCDate()).padStart(2, '0');
+              return `${y}-${m}-${day}`;
+            }
           };
           
           let end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
-          if (ev.dtend && !ev.dtend.toISOString().includes('T')) {
-            end.setDate(end.getDate() - 1);
+          if (ev.dtend && ev.isAllDay) {
+            end.setUTCDate(end.getUTCDate() - 1);
           }
           
           return {
@@ -5250,15 +5260,40 @@ export function AdminDashboard({
       return getIndex(a) - getIndex(b);
     });
 
+    const toBerlinYYYYMMDD = (d: Date): string => {
+      try {
+        return new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Europe/Berlin',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        }).format(d);
+      } catch (e) {
+        const y = d.getUTCFullYear();
+        const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(d.getUTCDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      }
+    };
+
+    const parseLocalDate = (dateStr: string): Date => {
+      if (!dateStr) return new Date();
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        return new Date(Date.UTC(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])));
+      }
+      return new Date(dateStr);
+    };
+
     const changeWeek = (weeks: number) => {
-      const d = new Date(bookingDate);
-      d.setDate(d.getDate() + weeks * 7);
-      setBookingDate(d.toISOString().split('T')[0]);
+      const d = parseLocalDate(bookingDate);
+      d.setUTCDate(d.getUTCDate() + weeks * 7);
+      setBookingDate(toBerlinYYYYMMDD(d));
     };
 
     const getCalendarWeek = (dateStr: string) => {
-      const date = new Date(dateStr);
-      const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+      const date = parseLocalDate(dateStr);
+      const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
       const dayNum = d.getUTCDay() || 7;
       d.setUTCDate(d.getUTCDate() + 4 - dayNum);
       const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
@@ -5266,44 +5301,50 @@ export function AdminDashboard({
     };
 
     const getWeekRange = (dateStr: string) => {
-      const d = new Date(dateStr);
-      const day = d.getDay();
-      const diff = d.getDate() - (day === 0 ? 6 : day - 1);
-      const mon = new Date(d.setDate(diff));
+      const d = parseLocalDate(dateStr);
+      const day = d.getUTCDay();
+      const diff = d.getUTCDate() - (day === 0 ? 6 : day - 1);
+      const mon = new Date(d.setUTCDate(diff));
       const sun = new Date(mon);
-      sun.setDate(mon.getDate() + 6);
-      const format = (dt: Date) => dt.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
-      return `${format(mon)} - ${format(sun)}.${d.getFullYear() !== mon.getFullYear() ? ' ' + sun.getFullYear() : ''}`;
+      sun.setUTCDate(mon.getUTCDate() + 6);
+      const format = (dt: Date) => dt.toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit' });
+      const yearFormat = (dt: Date) => dt.toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin', year: 'numeric' });
+      return `${format(mon)} - ${format(sun)}.${d.getUTCFullYear() !== mon.getUTCFullYear() ? ' ' + yearFormat(sun) : ''}`;
     };
 
     const getWeekdayDate = (dayIdx: number, baseDateStr: string) => {
-      const d = new Date(baseDateStr);
-      const day = d.getDay();
-      const diff = d.getDate() - (day === 0 ? 6 : day - 1) + dayIdx;
-      const targetDate = new Date(d.setDate(diff));
-      return targetDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+      const d = parseLocalDate(baseDateStr);
+      const day = d.getUTCDay();
+      const diff = d.getUTCDate() - (day === 0 ? 6 : day - 1) + dayIdx;
+      d.setUTCDate(diff);
+      return d.toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit' });
     };
 
     const isTodayInWeek = (baseDateStr: string) => {
       const today = new Date();
-      const d = new Date(baseDateStr);
-      const day = d.getDay();
-      const diff = d.getDate() - (day === 0 ? 6 : day - 1);
-      const mon = new Date(d.setDate(diff));
-      mon.setHours(0,0,0,0);
+      const todayBerlinStr = toBerlinYYYYMMDD(today);
+      const todayBerlin = parseLocalDate(todayBerlinStr);
+      
+      const d = parseLocalDate(baseDateStr);
+      const day = d.getUTCDay();
+      const diff = d.getUTCDate() - (day === 0 ? 6 : day - 1);
+      const mon = new Date(d.setUTCDate(diff));
       const sun = new Date(mon);
-      sun.setDate(mon.getDate() + 6);
-      sun.setHours(23,59,59,999);
-      return today >= mon && today <= sun;
+      sun.setUTCDate(mon.getUTCDate() + 6);
+      
+      return todayBerlin >= mon && todayBerlin <= sun;
     };
 
     const isDayToday = (dayIdx: number, baseDateStr: string) => {
       const today = new Date();
-      const d = new Date(baseDateStr);
-      const day = d.getDay();
-      const diff = d.getDate() - (day === 0 ? 6 : day - 1) + dayIdx;
-      const targetDate = new Date(d.setDate(diff));
-      return today.toDateString() === targetDate.toDateString();
+      const todayBerlinStr = toBerlinYYYYMMDD(today);
+      
+      const d = parseLocalDate(baseDateStr);
+      const day = d.getUTCDay();
+      const diff = d.getUTCDate() - (day === 0 ? 6 : day - 1) + dayIdx;
+      d.setUTCDate(diff);
+      
+      return todayBerlinStr === toBerlinYYYYMMDD(d);
     };
 
     const handleCancelBooking = async (bookingId: string | string[]) => {
@@ -5404,39 +5445,25 @@ export function AdminDashboard({
     const getBookingsForSlot = (dayIdx: number, hourStr: string) => {
       if (!selectedRoom) return [];
       
-      const dateParts = bookingDate.split('-');
-      const currentSelectedDate = dateParts.length === 3
-        ? new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]))
-        : new Date(bookingDate);
-      const dayOfWeek = currentSelectedDate.getDay();
-      const diffToMon = currentSelectedDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
-      const mondayOfSelectedWeek = new Date(currentSelectedDate.setDate(diffToMon));
-      mondayOfSelectedWeek.setHours(0,0,0,0);
+      const mondayOfSelectedWeek = parseLocalDate(bookingDate);
+      const dayOfWeek = mondayOfSelectedWeek.getUTCDay();
+      const diffToMon = mondayOfSelectedWeek.getUTCDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
+      mondayOfSelectedWeek.setUTCDate(diffToMon);
 
       const targetDate = new Date(mondayOfSelectedWeek);
-      targetDate.setDate(mondayOfSelectedWeek.getDate() + dayIdx);
-      const toYYYYMMDD = (d: Date) => {
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${y}-${m}-${day}`;
-      };
-      const targetDateStr = toYYYYMMDD(targetDate);
+      targetDate.setUTCDate(mondayOfSelectedWeek.getUTCDate() + dayIdx);
+      const targetDateStr = toBerlinYYYYMMDD(targetDate);
 
       // Check if day falls inside any holiday
       const activeHoliday = holidays.find(h => targetDateStr >= h.start && targetDateStr <= h.end);
-      if (activeHoliday) {
-        return []; // Remove all schedules and bookings during holidays
-      }
 
       const sundayOfSelectedWeek = new Date(mondayOfSelectedWeek);
-      sundayOfSelectedWeek.setDate(mondayOfSelectedWeek.getDate() + 6);
-      sundayOfSelectedWeek.setHours(23,59,59,999);
+      sundayOfSelectedWeek.setUTCDate(mondayOfSelectedWeek.getUTCDate() + 6);
 
       // 1. Manual bookings
       const manualForSlot = campusBookings.filter((b: any) => {
         if (b.roomId !== selectedRoom.id) return false;
-        const bDate = new Date(b.date);
+        const bDate = parseLocalDate(b.date);
         if (bDate < mondayOfSelectedWeek || bDate > sundayOfSelectedWeek) return false;
         
         const bDayIndex = getWeekdayIndex(b.date);
@@ -5613,7 +5640,8 @@ export function AdminDashboard({
           teacherName: teacherName,
           isSchedule: true,
           isApproved: occ.status === 'rescheduled_confirmed',
-          status: occ.status
+          status: occ.status,
+          original_date: occ.original_date
         };
       });
 
@@ -5649,14 +5677,28 @@ export function AdminDashboard({
         }
       }
 
+      if (activeHoliday) {
+        // Only keep dynamic reschedules (Nachholtermine) from outside the holidays
+        const allowedDynamics = mappedDynamics.filter((occ: any) => {
+          return occ.original_date && 
+                 occ.original_date !== occ.date && 
+                 !holidays.some((h: any) => occ.original_date >= h.start && occ.original_date <= h.end);
+        });
+        // We DO return manualForSlot (manual room bookings) during holidays!
+        return [...manualForSlot, ...allowedDynamics, ...draftPreviewBooking];
+      }
+
       return [...manualForSlot, ...mappedSchedules, ...mappedDynamics, ...draftPreviewBooking];
     };
 
     // Check if room is occupied during selected time slot
     const isRoomOccupied = (roomId: string) => {
+      const isHoliday = holidays.some(h => bookingDate >= h.start && bookingDate <= h.end);
       const dateBookings = campusBookings.filter((b: any) => b.date === bookingDate);
       const DAYS_MAP = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      const dayVal = new Date(bookingDate).getDay();
+      
+      const parsedBookingDate = parseLocalDate(bookingDate);
+      const dayVal = parsedBookingDate.getUTCDay();
       const targetDay = DAYS_MAP[dayVal];
       const targetDayInt = dayVal === 0 ? 7 : dayVal; // 1 = Monday, 7 = Sunday
 
@@ -5666,8 +5708,7 @@ export function AdminDashboard({
         return !(b.endTime <= bookingStartTime || b.startTime >= bookingEndTime);
       });
 
-
-      const hasSchedule = mergedSchedules.some((s: any) => {
+      const hasSchedule = isHoliday ? false : mergedSchedules.some((s: any) => {
         if (s.room_id !== roomId) return false;
         
         const startTimeStr = s.time_slot || s.start_time;
@@ -5713,8 +5754,8 @@ export function AdminDashboard({
         const templateTime = occ.schedules?.time_slot || '';
         const templateDay = occ.schedules?.day_of_week || 0;
 
-        const occDate = new Date(occ.date);
-        const rawDay = occDate.getDay();
+        const occDate = parseLocalDate(occ.date);
+        const rawDay = occDate.getUTCDay();
         const actualDayOfWeek = rawDay === 0 ? 7 : rawDay;
 
         const hasTimeMoved = templateTime && occ.start_time.substring(0, 5) !== templateTime.substring(0, 5);
@@ -5728,6 +5769,13 @@ export function AdminDashboard({
           : (hasFallbackDateMoved || hasFallbackTimeMoved);
 
         if (!hasMoved) return false;
+
+        if (isHoliday) {
+          const isRescheduledFromOutside = occ.original_date && 
+            occ.original_date !== occ.date && 
+            !holidays.some(h => occ.original_date >= h.start && occ.original_date <= h.end);
+          if (!isRescheduledFromOutside) return false;
+        }
 
         const durationMin = occ.duration || 45;
 
@@ -5762,6 +5810,32 @@ export function AdminDashboard({
       const dd = String(now.getDate()).padStart(2, '0');
       const todayStr = `${yyyy}-${mm}-${dd}`;
       const currentMin = now.getHours() * 60 + now.getMinutes();
+
+      const isHolidayNow = holidays.some(h => todayStr >= h.start && todayStr <= h.end);
+      if (isHolidayNow) {
+        // If it is a holiday right now, only check if there is an active Nachholtermin right now
+        const hasDynamicNow = scheduleOccurrences.some((occ: any) => {
+          const rId = occ.schedules?.room_id || null;
+          if (rId !== roomId) return false;
+          if (occ.date !== todayStr) return false;
+          if (occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick') {
+            return false;
+          }
+          const isRescheduledFromOutside = occ.original_date && 
+            occ.original_date !== occ.date && 
+            !holidays.some(h => occ.original_date >= h.start && occ.original_date <= h.end);
+          if (!isRescheduledFromOutside) return false;
+
+          const durationMin = occ.duration || 45;
+          const [shStr, smStr] = occ.start_time.split(':');
+          const sh = parseInt(shStr) || 0;
+          const sm = parseInt(smStr) || 0;
+          const occStartMin = sh * 60 + sm;
+          const occEndMin = occStartMin + durationMin;
+          return currentMin >= occStartMin && currentMin < occEndMin;
+        });
+        return hasDynamicNow;
+      }
 
       const todayBookings = campusBookings.filter((b: any) => b.roomId === roomId && b.date === todayStr);
       const hasBookingNow = todayBookings.some((b: any) => {
@@ -6237,14 +6311,8 @@ export function AdminDashboard({
     });
 
     const getWeekdayIndex = (dateStr: string) => {
-      const parts = dateStr.split('-');
-      if (parts.length === 3) {
-        const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-        const day = d.getDay();
-        return day === 0 ? 6 : day - 1;
-      }
-      const d = new Date(dateStr);
-      const day = d.getDay();
+      const d = parseLocalDate(dateStr);
+      const day = d.getUTCDay();
       return day === 0 ? 6 : day - 1;
     };
 
@@ -6834,27 +6902,59 @@ export function AdminDashboard({
                     <div style={{ padding: '12px 10px', fontSize: '0.72rem', fontWeight: 800, color: '#8e8e93', textAlign: 'center', borderRight: '1px solid #e5e5ea' }}>Zeit</div>
                     {DAYS_OF_WEEK.map((day, dayIdx) => {
                       const isToday = isTodayInWeek(bookingDate) && isDayToday(dayIdx, bookingDate);
+                      
+                      // Calculate target date string to check for holidays
+                      const d = parseLocalDate(bookingDate);
+                      const dayVal = d.getUTCDay();
+                      const diff = d.getUTCDate() - (dayVal === 0 ? 6 : dayVal - 1) + dayIdx;
+                      d.setUTCDate(diff);
+                      const targetDateStr = toBerlinYYYYMMDD(d);
+                      
+                      const activeHoliday = holidays.find(h => targetDateStr >= h.start && targetDateStr <= h.end);
+
                       return (
                         <div 
                           key={day.value} 
                           style={{ 
-                            padding: '12px 4px', 
+                            padding: activeHoliday ? '6px 4px' : '12px 4px', 
                             fontSize: '0.74rem', 
                             fontWeight: 800, 
                             color: isToday ? brandColor : '#1c1c1e', 
                             textAlign: 'center', 
                             borderRight: dayIdx < 6 ? '1px solid #e5e5ea' : 'none',
                             position: 'relative',
-                            background: isToday ? `${brandColor}04` : '#ffffff'
+                            background: isToday ? `${brandColor}04` : '#ffffff',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center'
                           }}
                         >
                           {isToday && (
                             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: brandColor }} />
                           )}
                           <div>{day.label}</div>
-                          <div style={{ fontSize: '0.65rem', color: isToday ? brandColor : '#8e8e93', marginTop: '3px', fontWeight: 700 }}>
+                          <div style={{ fontSize: '0.65rem', color: isToday ? brandColor : '#8e8e93', marginTop: '2px', fontWeight: 700 }}>
                             {getWeekdayDate(dayIdx, bookingDate)}
                           </div>
+                          {activeHoliday && (
+                            <div style={{ 
+                              marginTop: '4px', 
+                              fontSize: '0.55rem', 
+                              background: '#ffe2e2', 
+                              color: '#ff3b30', 
+                              padding: '2px 6px', 
+                              borderRadius: '4px', 
+                              fontWeight: 800,
+                              textTransform: 'uppercase',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              maxWidth: '90%'
+                            }} title={activeHoliday.name}>
+                              🌴 {activeHoliday.name}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -7055,6 +7155,45 @@ export function AdminDashboard({
                                       }}
                                     >
                                       
+                                      {/* Delete Button for Own Bookings */}
+                                      {isOwnBooking && !b.isPreview && (
+                                        <button
+                                          onClick={async (e) => {
+                                            e.stopPropagation();
+                                            await handleCancelBooking(b.id);
+                                          }}
+                                          style={{
+                                            position: 'absolute',
+                                            top: '4px',
+                                            right: '4px',
+                                            width: '16px',
+                                            height: '16px',
+                                            borderRadius: '6px',
+                                            background: isOwnSchedule && !b.isPreview ? 'rgba(255,255,255,0.2)' : 'rgba(255, 59, 48, 0.1)',
+                                            color: isOwnSchedule && !b.isPreview ? '#ffffff' : '#ff3b30',
+                                            border: 'none',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            cursor: 'pointer',
+                                            zIndex: 25,
+                                            padding: 0,
+                                            transition: 'all 0.2s'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = '#ff3b30';
+                                            e.currentTarget.style.color = '#ffffff';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = isOwnSchedule && !b.isPreview ? 'rgba(255,255,255,0.2)' : 'rgba(255, 59, 48, 0.1)';
+                                            e.currentTarget.style.color = isOwnSchedule && !b.isPreview ? '#ffffff' : '#ff3b30';
+                                          }}
+                                          title="Buchung stornieren/löschen"
+                                        >
+                                          <X size={10} strokeWidth={3} />
+                                        </button>
+                                      )}
+
                                       {/* Resize Handles */}
                                       {isOwnBooking && !isSchedule && !b.isPreview && (
                                         <>

@@ -258,7 +258,11 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
     return rawAllSchoolSchedules.filter((s: any) => {
       const dateStr = getSchedDateStr(s.day_of_week);
       const isHoliday = holidays.some(h => dateStr >= h.start && dateStr <= h.end);
-      return !isHoliday;
+      if (isHoliday) {
+        // In the holidays, only show dynamic reschedules (Nachholtermine)
+        return !!s.is_dynamic_reschedule;
+      }
+      return true;
     });
   }, [rawAllSchoolSchedules, holidays, currentWeekMonday]);
 
@@ -2484,11 +2488,24 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                         <thead>
                           <tr className="border-b border-slate-850 bg-slate-900/50 text-left">
                             <th className="p-4 text-xs font-black uppercase text-slate-500 tracking-wider">Uhrzeit</th>
-                            {weekDays.map(day => (
-                              <th key={day} className="p-4 text-xs font-black uppercase text-slate-300 tracking-wider">
-                                {daysOfWeekLabels[day]}
-                              </th>
-                            ))}
+                            {weekDays.map(day => {
+                              const dateStr = getSchedDateStr(day);
+                              const dateObj = new Date(dateStr);
+                              const formattedDate = dateObj.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+                              const activeHoliday = holidays.find(h => dateStr >= h.start && dateStr <= h.end);
+
+                              return (
+                                <th key={day} className="p-4 text-xs font-black uppercase tracking-wider text-center">
+                                  <div className="text-slate-300">{daysOfWeekLabels[day]}</div>
+                                  <div className="text-[10px] text-slate-500 font-bold mt-0.5">{formattedDate}</div>
+                                  {activeHoliday && (
+                                    <div className="text-[9px] font-black text-emerald-400 bg-emerald-950/40 border border-emerald-900/30 px-1.5 py-0.5 rounded mt-1.5 uppercase tracking-wide inline-block">
+                                      🌴 {activeHoliday.name}
+                                    </div>
+                                  )}
+                                </th>
+                              );
+                            })}
                           </tr>
                         </thead>
                         <tbody>
