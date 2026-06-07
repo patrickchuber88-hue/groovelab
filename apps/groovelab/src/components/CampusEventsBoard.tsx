@@ -1521,15 +1521,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               let catBg = '#f1f5f9';
 
               const isHolidayEvent = ev.category === 'Ferien' || ev.category === 'Feiertag' || (ev.title || '').toLowerCase().includes('ferien') || (ev.title || '').toLowerCase().includes('feiertag');
-              const isMusikschulfest = (ev.title || '').toLowerCase().includes('musikschulfest');
               const isKlassenvorspiel = ev.category === 'Klassenvorspiel' || (ev.title || '').toLowerCase().includes('klassenvorspiel');
 
               if (isHolidayEvent) {
                 catColor = '#10b981'; // Green
                 catBg = '#ecfdf5';
-              } else if (isMusikschulfest) {
-                catColor = '#ef4444'; // Red
-                catBg = '#fef2f2';
               } else if (isKlassenvorspiel) {
                 catColor = '#3b82f6'; // Blue
                 catBg = '#eff6ff';
@@ -1556,18 +1552,14 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     cursor: 'pointer',
                     background: isHolidayEvent 
                       ? 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)' 
-                      : isMusikschulfest
-                        ? '#ffffff'
-                        : isKlassenvorspiel
-                          ? 'linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%)'
-                          : '#ffffff',
+                      : isKlassenvorspiel
+                        ? 'linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%)'
+                        : '#ffffff',
                     border: isHolidayEvent 
                       ? '1px solid #a7f3d0' 
-                      : isMusikschulfest
-                        ? '1px solid #fca5a5'
-                        : isKlassenvorspiel
-                          ? '1px solid #bfdbfe'
-                          : '1px solid #e2e8f0',
+                      : isKlassenvorspiel
+                        ? '1px solid #bfdbfe'
+                        : '1px solid #e2e8f0',
                     borderLeft: `4px solid ${catColor}`,
                     boxShadow: '0 4px 12px rgba(0,0,0,0.015)',
                     transition: 'all 0.2s ease',
@@ -1641,11 +1633,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       fontWeight: 800, 
                       color: isHolidayEvent 
                         ? '#065f46' 
-                        : isMusikschulfest
-                          ? '#991b1b'
-                          : isKlassenvorspiel
-                            ? '#1e40af'
-                            : '#0f172a', 
+                        : isKlassenvorspiel
+                          ? '#1e40af'
+                          : '#0f172a', 
                       fontFamily: 'Urbanist', 
                       display: 'flex', 
                       alignItems: 'center', 
@@ -1667,18 +1657,14 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       fontWeight: 800,
                       color: isHolidayEvent 
                         ? '#047857' 
-                        : isMusikschulfest
-                          ? '#b91c1c'
-                          : isKlassenvorspiel
-                            ? '#2563eb'
-                            : '#475569',
+                        : isKlassenvorspiel
+                          ? '#2563eb'
+                          : '#475569',
                       background: isHolidayEvent 
                         ? '#d1fae5' 
-                        : isMusikschulfest
-                          ? '#fee2e2'
-                          : isKlassenvorspiel
-                            ? '#dbeafe'
-                            : '#f1f5f9',
+                        : isKlassenvorspiel
+                          ? '#dbeafe'
+                          : '#f1f5f9',
                       padding: '4px 8px',
                       borderRadius: '8px',
                       whiteSpace: 'nowrap',

@@ -12,6 +12,7 @@ import {
 import { TeacherDashboard } from './TeacherDashboard';
 import { StudentDetailModal } from './StudentDetailModal';
 import { TeacherDetailModal } from './TeacherDetailModal';
+import { CampusEventsBoard } from './CampusEventsBoard';
 import QRCode from 'react-qr-code';
 function generateStarterPin(role: string, isCampus: boolean, isGroovelab: boolean): string {
   let prefix = 'C';
@@ -936,7 +937,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     return 'secretary';
   });
   const [secretarySubTab, setSecretarySubTab] = useState<'briefing' | 'employees' | 'linking' | 'licenses' | 'setup' | 'rooms' | 'equipment' | 'crisis'>('briefing');
-  const [campusSubTab, setCampusSubTab] = useState<'briefing' | 'subjects' | 'onboarding' | 'students' | 'cooperations' | 'schedules' | 'status'>('briefing');
+  const [campusSubTab, setCampusSubTab] = useState<'briefing' | 'subjects' | 'onboarding' | 'students' | 'cooperations' | 'events' | 'schedules' | 'status'>('briefing');
   const [schedulesRoomsViewMode, setSchedulesRoomsViewMode] = useState<'designer' | 'live'>('live');
   const [liveViewDay, setLiveViewDay] = useState<number>(1);
   const [showAdHocBooking, setShowAdHocBooking] = useState<boolean>(false);
@@ -5986,6 +5987,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             { id: 'onboarding', label: 'Lehrer', icon: UserPlus },
             { id: 'students', label: 'Schüler', icon: Users },
             { id: 'cooperations', label: 'Kooperationen', icon: Users },
+            { id: 'events', label: 'Termine Board', icon: Calendar },
             { id: 'schedules', label: `Stundenpläne`, count: pendingSchedules.length, icon: Calendar },
             { id: 'status', label: 'Status & API', icon: Sliders }
           ].map((item) => {
@@ -9184,6 +9186,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
               {/* Subtab: Kooperationen */}
               {campusSubTab === 'cooperations' && renderCooperationsBoard()}
+
+              {/* Subtab: Termine Board */}
+              {campusSubTab === 'events' && (
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <CampusEventsBoard
+                    userId={userId || ''}
+                    role="secretary"
+                    schoolId={schoolId}
+                    supabase={supabase}
+                    brandColor="#34a853"
+                  />
+                </div>
+              )}
 
               {/* Subtab: Schedules – Hybride Raumplanungs-Zentrale */}
               {campusSubTab === 'schedules' && (
