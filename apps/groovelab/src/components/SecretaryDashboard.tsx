@@ -7088,6 +7088,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             const isPast = new Date(n.slot_start_datetime).getTime() < todayStart.getTime();
             return n.status !== 'ARCHIVED' && !isPast;
           });
+          const todayEnd = new Date(todayStart);
+          todayEnd.setHours(23, 59, 59, 999);
+          const todayTickets = liveTickets.filter(n => {
+            const time = new Date(n.slot_start_datetime).getTime();
+            return time >= todayStart.getTime() && time <= todayEnd.getTime();
+          });
           const archiveTickets = crisisNotifications.filter(n => {
             const isPast = new Date(n.slot_start_datetime).getTime() < todayStart.getTime();
             return n.status === 'ARCHIVED' || isPast;
@@ -7437,70 +7443,89 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     </div>
                   </div>
 
-                  {/* Empty state */}
-                  {visibleTickets.length === 0 && (
-                    <div style={{
-                      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
-                      backdropFilter: 'blur(24px)',
-                      WebkitBackdropFilter: 'blur(24px)',
-                      border: '1px solid rgba(255, 255, 255, 0.5)',
-                      borderRadius: '24px',
-                      padding: '80px 40px', textAlign: 'center',
-                      boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
-                    }}>
-                      <div style={{ fontSize: '3.5rem', marginBottom: '20px' }}>
-                        {crisisTabMode === 'live' ? '✨' : '📁'}
-                      </div>
-                      <strong style={{ display: 'block', fontSize: '1.25rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", marginBottom: '8px' }}>
-                        {crisisTabMode === 'live'
-                          ? (selectedCrisisTeacherId ? 'Keine offenen Ausfälle für diese Lehrkraft' : 'Alle Systeme im grünen Bereich!')
-                          : 'Keine archivierten Einträge'}
-                      </strong>
-                      <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', fontWeight: 600, maxWidth: '460px', marginInline: 'auto', lineHeight: 1.4 }}>
-                        {crisisTabMode === 'live'
-                          ? 'Aktuell liegen keine Krankheitsausfälle mit anstehenden Konflikten vor. Neue Krankmeldungen der Lehrer werden hier sofort erfasst.'
-                          : 'Gelöste und archivierte Unterrichtsausfälle werden hier zur Nachvollziehbarkeit protokolliert.'}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Ticket groups – LIVE mode (2 Columns Layout) */}
-                  {crisisTabMode === 'live' && visibleTickets.length > 0 && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                      {/* Spalte 1: Ausstehend / Akut (Rot & Gelb) */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        <div style={{ padding: '6px 4px', borderBottom: '2.5px solid #fca5a5', display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '8px' }}>
-                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', display: 'inline-block', boxShadow: '0 0 10px rgba(239,68,68,0.5)', animation: 'pulse 1.5s infinite' }} />
-                          <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                            🚨 Ausstehend / Akut ({redTickets.length + yellowTickets.length})
-                          </span>
+                  {/* Live mode view with conditions */}
+                  {crisisTabMode === 'live' && (() => {
+                    if (sickTeachers.length === 0) {
+                      return (
+                        <div style={{
+                          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
+                          backdropFilter: 'blur(24px)',
+                          WebkitBackdropFilter: 'blur(24px)',
+                          border: '1px solid rgba(255, 255, 255, 0.5)',
+                          borderRadius: '24px',
+                          padding: '80px 40px', textAlign: 'center',
+                          boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
+                        }}>
+                          <div style={{ fontSize: '3.5rem', marginBottom: '20px' }}>🍏</div>
+                          <strong style={{ display: 'block', fontSize: '1.25rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", marginBottom: '8px' }}>
+                            Keine akuten Krankmeldungen
+                          </strong>
+                          <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', fontWeight: 600, maxWidth: '460px', marginInline: 'auto', lineHeight: 1.4 }}>
+                            Derzeit sind alle Lehrkräfte aktiv im Dienst. Es liegen keine akuten Ausfälle vor.
+                          </p>
                         </div>
-                        {redTickets.map(t => <TicketCard key={t.id} t={t} />)}
-                        {yellowTickets.map(t => <TicketCard key={t.id} t={t} />)}
-                        {redTickets.length === 0 && yellowTickets.length === 0 && (
-                          <div style={{ padding: '40px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: '20px', border: '1.5px dashed #cbd5e1', color: '#64748b', fontSize: '0.82rem', fontWeight: 700 }}>
-                            Keine ausstehenden Fälle
-                          </div>
-                        )}
-                      </div>
+                      );
+                    }
 
-                      {/* Spalte 2: Erledigt (Grün) */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        <div style={{ padding: '6px 4px', borderBottom: '2.5px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '8px' }}>
-                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-                          <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                            ✓ Erledigt ({greenTickets.length})
-                          </span>
+                    if (todayTickets.length === 0) {
+                      return (
+                        <div style={{
+                          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
+                          backdropFilter: 'blur(24px)',
+                          WebkitBackdropFilter: 'blur(24px)',
+                          border: '1px solid rgba(255, 255, 255, 0.5)',
+                          borderRadius: '24px',
+                          padding: '80px 40px', textAlign: 'center',
+                          boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
+                        }}>
+                          <div style={{ fontSize: '3.5rem', marginBottom: '20px' }}>✨</div>
+                          <strong style={{ display: 'block', fontSize: '1.25rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", marginBottom: '8px' }}>
+                            Keine Ausfälle am heutigen Tag
+                          </strong>
+                          <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', fontWeight: 600, maxWidth: '460px', marginInline: 'auto', lineHeight: 1.4 }}>
+                            Am heutigen Tag stehen keine Unterrichtstermine zur Absage oder Benachrichtigung an.
+                          </p>
                         </div>
-                        {greenTickets.map(t => <TicketCard key={t.id} t={t} />)}
-                        {greenTickets.length === 0 && (
-                          <div style={{ padding: '40px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: '20px', border: '1.5px dashed #cbd5e1', color: '#64748b', fontSize: '0.82rem', fontWeight: 700 }}>
-                            Keine erledigten Fälle
+                      );
+                    }
+
+                    return (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                        {/* Spalte 1: Ausstehend / Akut (Rot & Gelb) */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          <div style={{ padding: '6px 4px', borderBottom: '2.5px solid #fca5a5', display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '8px' }}>
+                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', display: 'inline-block', boxShadow: '0 0 10px rgba(239,68,68,0.5)', animation: 'pulse 1.5s infinite' }} />
+                            <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                              🚨 Ausstehend / Akut ({redTickets.length + yellowTickets.length})
+                            </span>
                           </div>
-                        )}
+                          {redTickets.map(t => <TicketCard key={t.id} t={t} />)}
+                          {yellowTickets.map(t => <TicketCard key={t.id} t={t} />)}
+                          {redTickets.length === 0 && yellowTickets.length === 0 && (
+                            <div style={{ padding: '40px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: '20px', border: '1.5px dashed #cbd5e1', color: '#64748b', fontSize: '0.82rem', fontWeight: 700 }}>
+                              Keine ausstehenden Fälle
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Spalte 2: Erledigt (Grün) */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          <div style={{ padding: '6px 4px', borderBottom: '2.5px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '8px' }}>
+                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                            <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                              ✓ Erledigt ({greenTickets.length})
+                            </span>
+                          </div>
+                          {greenTickets.map(t => <TicketCard key={t.id} t={t} />)}
+                          {greenTickets.length === 0 && (
+                            <div style={{ padding: '40px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: '20px', border: '1.5px dashed #cbd5e1', color: '#64748b', fontSize: '0.82rem', fontWeight: 700 }}>
+                              Keine erledigten Fälle
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* Ticket list – ARCHIVE mode (Logbook Layout) */}
                   {crisisTabMode === 'history' && (
