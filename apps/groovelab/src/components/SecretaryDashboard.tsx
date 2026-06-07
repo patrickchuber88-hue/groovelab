@@ -4546,17 +4546,47 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             PIN: {student.ausweis_nummer || 'Keine'}
                           </span>
                         )}
-                        <span style={{
-                          fontSize: '0.7rem',
-                          fontWeight: 700,
-                          color: '#0f172a',
-                          background: '#e2e8f0',
-                          padding: '4px 8px',
-                          borderRadius: '8px',
-                          border: '1px solid #cbd5e1'
-                        }}>
-                          Tag: {student.day_of_birth || '1'}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{
+                            fontSize: '0.7rem',
+                            fontWeight: 700,
+                            color: '#0f172a',
+                            background: '#e2e8f0',
+                            padding: '4px 8px',
+                            borderRadius: '8px',
+                            border: '1px solid #cbd5e1'
+                          }}>
+                            Tag: {student.day_of_birth || '1'}
+                          </span>
+                          <button
+                            onClick={() => {
+                              const onboardingUrl = `${window.location.origin}/?onboarding=parent&first_name=${encodeURIComponent(student.first_name || '')}&last_name=${encodeURIComponent(student.last_name || '')}&instrument=${encodeURIComponent(student.instrument || '')}&day=${student.day_of_birth || 1}`;
+                              navigator.clipboard.writeText(onboardingUrl);
+                              setCopiedStudentId(student.id);
+                              setTimeout(() => setCopiedStudentId(null), 2000);
+                            }}
+                            title="Onboarding-Link kopieren"
+                            style={{
+                              background: copiedStudentId === student.id ? '#e2f6ea' : '#f5f5f7',
+                              color: copiedStudentId === student.id ? '#137333' : '#64748b',
+                              border: 'none',
+                              borderRadius: '6px',
+                              padding: '4px 6px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'all 0.15s ease'
+                            }}
+                            className="hover-scale-mini"
+                          >
+                            {copiedStudentId === student.id ? (
+                              <Check size={12} />
+                            ) : (
+                              <LinkIcon size={12} />
+                            )}
+                          </button>
+                        </div>
 
                         {/* Delete Button */}
                         <button

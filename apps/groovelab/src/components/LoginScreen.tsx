@@ -371,11 +371,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('onboarding') === 'parent' || params.get('parent_onboarding') === 'true') {
-      setParentFirstName('');
-      setParentLastName('');
-      setParentInstrument('');
-      setParentDayOfBirth('');
-      setParentEmail('');
+      setParentFirstName(params.get('first_name') || '');
+      setParentLastName(params.get('last_name') || '');
+      setParentInstrument(params.get('instrument') || '');
+      setParentDayOfBirth(params.get('day') || '');
+      setParentEmail(params.get('email') || '');
       setVerifiedStudentId(null);
       setVerifiedStudentDetails(null);
       setParentOnboardingError(null);
