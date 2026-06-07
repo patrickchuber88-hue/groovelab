@@ -82,6 +82,8 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
   const [bookingSlot, setBookingSlot] = useState<string>('');
   const [bookingType, setBookingType] = useState<'solo' | 'lesson'>('solo');
   const [bookingStudentId, setBookingStudentId] = useState<string>('');
+  // Campus Event room bookings (from campus_events with room_id)
+  const [campusEventBookings, setCampusEventBookings] = useState<any[]>([]);
 
   // Loading States
   const [loading, setLoading] = useState(true);
@@ -564,6 +566,21 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
     });
 
     setRawAllSchoolSchedules([...staticBookings, ...dynamicBookings]);
+
+    // Fetch campus_events with intern room bookings made by this teacher
+    try {
+      const { data: ceBookings } = await supabase
+        .from('campus_events')
+        .select('id, title, event_date, start_time, end_time, category, room_id, room:room_id(id, name)')
+        .eq('school_id', schoolId)
+        .eq('created_by', teacherId)
+        .not('room_id', 'is', null)
+        .order('event_date', { ascending: true });
+      setCampusEventBookings(ceBookings || []);
+    } catch (_) {
+      // location columns may not exist yet — safe to ignore
+      setCampusEventBookings([]);
+    }
 
     await fetchNotifications(teacherId);
   };
@@ -2562,6 +2579,43 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                 ) : (
                   <div className="py-20 text-center bg-slate-900/20 border border-slate-850 rounded-3xl">
                     <p className="text-slate-400 font-bold text-sm">Wähle einen Raum aus der Liste, um seinen Plan anzuzeigen.</p>
+                  </div>
+                )}
+
+                {/* ── Meine Termin-Buchungen (via Campus Events) ── */}
+                {campusEventBookings.length > 0 && (
+                  <div className="mt-8">
+                    <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-4 flex items-center gap-2">
+                      <Calendar size={13} />
+                      Meine Termin-Buchungen
+                    </h3>
+                    <div className="flex flex-col gap-3">
+                      {campusEventBookings.map((bk: any) => {
+                        const dateStr = bk.event_date
+                          ? new Date(bk.event_date + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
+                          : '—';
+                        const timeStr = bk.start_time
+                          ? bk.start_time.substring(0, 5) + (bk.end_time ? ` – ${bk.end_time.substring(0, 5)}` : '') + ' Uhr'
+                          : '';
+                        return (
+                          <div key={bk.id} className="flex items-center justify-between gap-4 bg-slate-900/40 border border-slate-800 rounded-2xl px-4 py-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-9 h-9 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center flex-shrink-0">
+                                <Box size={15} className="text-indigo-400" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-black text-white truncate">{bk.title}</p>
+                                <p className="text-[11px] text-slate-400 font-semibold truncate">{bk.room?.name || '—'}</p>
+                              </div>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <p className="text-xs font-bold text-slate-300">{dateStr}</p>
+                              {timeStr && <p className="text-[10px] font-semibold text-slate-500">{timeStr}</p>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
