@@ -7558,7 +7558,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     );
                   })()}
 
-                  {/* Ticket list – ARCHIVE mode (Logbook Layout) */}
+                  {/* Ticket list – ARCHIVE mode (Collapsible Accordion Layout) */}
                   {crisisTabMode === 'history' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {archiveGroups.length === 0 ? (
@@ -7583,165 +7583,139 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           const successCount = group.tickets.filter(t => t.status === 'READ' || t.notified_at).length;
                           const failedCount = total - successCount;
                           const teacherName = group.teacher ? `${group.teacher.first_name} ${group.teacher.last_name}` : 'Lehrkraft';
+                          const isExpanded = selectedArchiveLog?.date === group.date && selectedArchiveLog?.teacher?.id === group.teacher?.id;
 
                           return (
-                            <div 
-                              key={`${group.date}_${group.teacher?.id}`} 
-                              onClick={() => setSelectedArchiveLog(group)}
-                              style={{
-                                background: 'white',
-                                border: '1.5px solid #cbd5e1',
-                                borderRadius: '16px',
-                                padding: '16px 20px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                              }}
-                              onMouseEnter={e => {
-                                e.currentTarget.style.borderColor = '#ea4335';
-                                e.currentTarget.style.transform = 'translateY(-1px)';
-                                e.currentTarget.style.boxShadow = '0 6px 18px rgba(15, 23, 42, 0.04)';
-                              }}
-                              onMouseLeave={e => {
-                                e.currentTarget.style.borderColor = '#cbd5e1';
-                                e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.boxShadow = 'none';
-                              }}
-                            >
-                              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                                <div style={{ background: '#f1f5f9', padding: '10px', borderRadius: '12px', fontSize: '1.2rem' }}>
-                                  📖
-                                </div>
-                                <div>
-                                  <strong style={{ display: 'block', fontSize: '0.95rem', color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                    {group.date} &bull; {teacherName}
-                                  </strong>
-                                  <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
-                                    Krankmeldung: {sickDurStr(group.teacher?.sick_until)}
-                                  </span>
-                                </div>
-                              </div>
-                              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                <span style={{ fontSize: '0.78rem', background: '#e6f4ea', color: '#137333', padding: '4px 10px', borderRadius: '100px', fontWeight: 800 }}>
-                                  ✓ {successCount} Schüler erreicht
-                                </span>
-                                <span style={{ fontSize: '0.78rem', background: failedCount > 0 ? '#fce8e6' : '#f1f5f9', color: failedCount > 0 ? '#c5221f' : '#64748b', padding: '4px 10px', borderRadius: '100px', fontWeight: 800 }}>
-                                  {failedCount > 0 ? `❌ ${failedCount} nicht erreicht` : 'Alle erreicht'}
-                                </span>
-                                {(() => {
-                                  const successRate = total > 0 ? Math.round((successCount / total) * 100) : 100;
-                                  const rateBg = successRate >= 80 ? '#d1fae5' : successRate >= 50 ? '#fef3c7' : '#fee2e2';
-                                  const rateColor = successRate >= 80 ? '#065f46' : successRate >= 50 ? '#92400e' : '#991b1b';
-                                  return (
-                                    <span style={{ fontSize: '0.78rem', background: rateBg, color: rateColor, padding: '4px 10px', borderRadius: '100px', fontWeight: 900 }}>
-                                      {successRate}% Erfolgsquote
+                            <div key={`${group.date}_${group.teacher?.id}`} style={{ display: 'flex', flexDirection: 'column' }}>
+                              <div 
+                                onClick={() => setSelectedArchiveLog(isExpanded ? null : group)}
+                                style={{
+                                  background: 'white',
+                                  border: '1.5px solid #cbd5e1',
+                                  borderBottom: isExpanded ? 'none' : '1.5px solid #cbd5e1',
+                                  borderRadius: isExpanded ? '16px 16px 0 0' : '16px',
+                                  padding: '16px 20px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s',
+                                  position: 'relative',
+                                  zIndex: 2,
+                                }}
+                                onMouseEnter={e => {
+                                  e.currentTarget.style.borderColor = '#ea4335';
+                                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(15, 23, 42, 0.04)';
+                                }}
+                                onMouseLeave={e => {
+                                  e.currentTarget.style.borderColor = '#cbd5e1';
+                                  e.currentTarget.style.boxShadow = 'none';
+                                }}
+                              >
+                                <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                                  <div style={{ background: '#f1f5f9', padding: '10px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <BookOpen size={20} color="#ea4335" />
+                                  </div>
+                                  <div>
+                                    <strong style={{ display: 'block', fontSize: '0.95rem', color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                      {group.date} &bull; {teacherName}
+                                    </strong>
+                                    <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                                      Krankmeldung: {sickDurStr(group.teacher?.sick_until)}
                                     </span>
-                                  );
-                                })()}
+                                  </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                  <span style={{ fontSize: '0.78rem', background: '#e6f4ea', color: '#137333', padding: '4px 10px', borderRadius: '100px', fontWeight: 800 }}>
+                                    ✓ {successCount} Schüler erreicht
+                                  </span>
+                                  <span style={{ fontSize: '0.78rem', background: failedCount > 0 ? '#fce8e6' : '#f1f5f9', color: failedCount > 0 ? '#c5221f' : '#64748b', padding: '4px 10px', borderRadius: '100px', fontWeight: 800 }}>
+                                    {failedCount > 0 ? `❌ ${failedCount} nicht erreicht` : 'Alle erreicht'}
+                                  </span>
+                                  {(() => {
+                                    const successRate = total > 0 ? Math.round((successCount / total) * 100) : 100;
+                                    const rateBg = successRate >= 80 ? '#d1fae5' : successRate >= 50 ? '#fef3c7' : '#fee2e2';
+                                    const rateColor = successRate >= 80 ? '#065f46' : successRate >= 50 ? '#92400e' : '#991b1b';
+                                    return (
+                                      <span style={{ fontSize: '0.78rem', background: rateBg, color: rateColor, padding: '4px 10px', borderRadius: '100px', fontWeight: 900 }}>
+                                        {successRate}% Erfolgsquote
+                                      </span>
+                                    );
+                                  })()}
+                                  <ChevronRight 
+                                    size={18} 
+                                    color="#64748b" 
+                                    style={{ 
+                                      transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                                      transition: 'transform 0.2s ease',
+                                      marginLeft: '8px'
+                                    }} 
+                                  />
+                                </div>
                               </div>
+
+                              {/* Collapsible inline details panel */}
+                              {isExpanded && (
+                                <div style={{
+                                  background: '#f8fafc',
+                                  border: '1.5px solid #cbd5e1',
+                                  borderTop: 'none',
+                                  borderRadius: '0 0 16px 16px',
+                                  padding: '16px 20px',
+                                  zIndex: 1,
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '10px',
+                                  boxShadow: '0 4px 12px rgba(15, 23, 42, 0.02)'
+                                }}>
+                                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', paddingBottom: '6px', borderBottom: '1px solid #e2e8f0' }}>
+                                    Betroffene Unterrichtsstunden und Benachrichtigungsstatus:
+                                  </div>
+                                  {group.tickets.map((t: any) => {
+                                    const isSuccess = t.status === 'READ' || t.notified_at;
+                                    const sName = t.student ? `${t.student.first_name} ${t.student.last_name}` : 'Unbekannter Schüler';
+                                    const tStr = new Date(t.slot_start_datetime).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                                    
+                                    return (
+                                      <div 
+                                        key={t.id} 
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'space-between',
+                                          background: isSuccess ? '#f0fdf4' : '#fef2f2',
+                                          border: `1px solid ${isSuccess ? '#bbf7d0' : '#fca5a5'}`,
+                                          borderRadius: '12px',
+                                          padding: '10px 14px'
+                                        }}
+                                      >
+                                        <div>
+                                          <strong style={{ display: 'block', fontSize: '0.85rem', color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                            {sName}
+                                          </strong>
+                                          <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>
+                                            {t.student?.instrument || 'Musikunterricht'} &bull; {tStr} Uhr
+                                          </span>
+                                        </div>
+                                        <span style={{
+                                          fontSize: '0.72rem',
+                                          fontWeight: 800,
+                                          color: isSuccess ? '#16a34a' : '#dc2626',
+                                          background: isSuccess ? '#dcfce7' : '#fee2e2',
+                                          padding: '4px 10px',
+                                          borderRadius: '100px'
+                                        }}>
+                                          {isSuccess ? '✓ Erfolgreich informiert' : '❌ Nicht rechtzeitig informiert'}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
                             </div>
                           );
                         })
                       )}
-                    </div>
-                  )}
-
-                  {/* Logbook Detail Modal popup */}
-                  {selectedArchiveLog && (
-                    <div style={{
-                      position: 'fixed',
-                      inset: 0,
-                      background: 'rgba(15, 23, 42, 0.3)',
-                      backdropFilter: 'blur(8px)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      zIndex: 1000
-                    }}>
-                      <div style={{
-                        background: 'white',
-                        borderRadius: '24px',
-                        width: '560px',
-                        maxWidth: '90%',
-                        padding: '24px',
-                        boxShadow: '0 20px 48px -12px rgba(15, 23, 42, 0.15)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '20px'
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px' }}>
-                          <div>
-                            <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                              Protokoll & Details vom {selectedArchiveLog.date}
-                            </h4>
-                            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
-                              Lehrkraft: {selectedArchiveLog.teacher ? `${selectedArchiveLog.teacher.first_name} ${selectedArchiveLog.teacher.last_name}` : 'Unbekannt'}
-                            </span>
-                          </div>
-                          <button 
-                            onClick={() => setSelectedArchiveLog(null)}
-                            style={{
-                              background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '8px', borderRadius: '50%'
-                            }}
-                          >
-                            <X size={20} />
-                          </button>
-                        </div>
-
-                        <div style={{ maxHeight: '350px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }} className="custom-calendar-scrollbar">
-                          {selectedArchiveLog.tickets.map((t: any) => {
-                            const isSuccess = t.status === 'READ' || t.notified_at;
-                            const sName = t.student ? `${t.student.first_name} ${t.student.last_name}` : 'Unbekannter Schüler';
-                            const tStr = new Date(t.slot_start_datetime).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-                            
-                            return (
-                              <div 
-                                key={t.id} 
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  background: isSuccess ? '#f0fdf4' : '#fef2f2',
-                                  border: `1px solid ${isSuccess ? '#bbf7d0' : '#fca5a5'}`,
-                                  borderRadius: '12px',
-                                  padding: '10px 14px'
-                                }}
-                              >
-                                <div>
-                                  <strong style={{ display: 'block', fontSize: '0.85rem', color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                    {sName}
-                                  </strong>
-                                  <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>
-                                    {t.student?.instrument || 'Musikunterricht'} &bull; {tStr} Uhr
-                                  </span>
-                                </div>
-                                <span style={{
-                                  fontSize: '0.72rem',
-                                  fontWeight: 800,
-                                  color: isSuccess ? '#16a34a' : '#dc2626',
-                                  background: isSuccess ? '#dcfce7' : '#fee2e2',
-                                  padding: '4px 10px',
-                                  borderRadius: '100px'
-                                }}>
-                                  {isSuccess ? '✓ Erfolgreich informiert' : '❌ Nicht rechtzeitig informiert'}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
-                          <button 
-                            onClick={() => setSelectedArchiveLog(null)}
-                            className="google-btn-secondary"
-                            style={{ padding: '8px 20px', borderRadius: '12px' }}
-                          >
-                            Schließen
-                          </button>
-                        </div>
-                      </div>
                     </div>
                   )}
 
