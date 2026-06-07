@@ -1093,6 +1093,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [studentFilterStatus, setStudentFilterStatus] = useState<'all' | 'campus' | 'groovelab' | 'inactive'>('all');
   const [isStudentCsvExpanded, setIsStudentCsvExpanded] = useState<boolean>(false);
   const [studentCsvText, setStudentCsvText] = useState<string>('');
+  const [isAnonymizedImport, setIsAnonymizedImport] = useState<boolean>(false);
   const [studentCurrentPage, setStudentCurrentPage] = useState<number>(1);
   const [studentPageSize, setStudentPageSize] = useState<number>(50);
 
@@ -2640,6 +2641,91 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
     const errors: string[] = [];
 
+    if (isAnonymizedImport) {
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        
+        let parts = trimmed.split(';');
+        if (parts.length < 2) {
+          parts = trimmed.split(',');
+        }
+
+        if (parts.length < 3) {
+          failCount++;
+          errors.push(`Zeile "${line}": Benötigt mindestens Vorname; Nachname; Geburtsdatum (DD.MM.YYYY).`);
+          continue;
+        }
+
+        const firstName = parts[0]?.trim();
+        const lastName = parts[1]?.trim();
+        const birthDate = parts[2]?.trim(); // DD.MM.YYYY
+        let instrument = parts[3]?.trim() || 'Allgemein';
+        const teacherNamePart = parts[4]?.trim()?.toLowerCase() || '';
+
+        if (!firstName || !lastName || !birthDate) {
+          failCount++;
+          errors.push(`Zeile "${line}": Fehlende Pflichtfelder (Vorname, Nachname, Geburtsdatum).`);
+          continue;
+        }
+
+        // Match teacher
+        let teacherId: string | null = null;
+        if (studentFilterTeacher && studentFilterTeacher !== 'All') {
+          const foundSelected = allUniqueTeachers.find(t => t.id === studentFilterTeacher);
+          if (foundSelected) {
+            teacherId = foundSelected.id;
+            if (!parts[3]?.trim()) {
+              instrument = foundSelected.instrument || 'Allgemein';
+            }
+          }
+        }
+
+        if (!teacherId && teacherNamePart) {
+          const found = allUniqueTeachers.find(t => {
+            const fName = (t.firstName || t.first_name || '').toLowerCase();
+            const lName = (t.lastName || t.last_name || '').toLowerCase();
+            return `${fName} ${lName}`.includes(teacherNamePart) || lName.includes(teacherNamePart);
+          });
+          if (found) {
+            teacherId = found.id;
+          }
+        }
+
+        try {
+          const { data, error: rpcError } = await supabase.rpc('import_student', {
+            first_name: firstName,
+            last_name: lastName,
+            birth_date: birthDate,
+            instrument: instrument,
+            school_id: schoolId,
+            teacher_id: teacherId || null
+          });
+
+          if (rpcError) throw rpcError;
+          successCount++;
+        } catch (err: any) {
+          console.error('Import error for line:', line, err);
+          errors.push(`Zeile "${line}": ${err.message || err}`);
+          failCount++;
+        }
+      }
+
+      if (errors.length > 0) {
+        alert(`Anonymisierter Bulk-Import abgeschlossen: ${successCount} Schüler erfolgreich angelegt, ${failCount} Fehler.\n\nFehlerdetails:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? '\n...weitere Fehler in der Browser-Konsole.' : ''}`);
+      } else {
+        alert(`Anonymisierter Bulk-Import abgeschlossen: ${successCount} Schüler erfolgreich angelegt.`);
+      }
+
+      setStudentCsvText('');
+      setIsStudentCsvExpanded(false);
+      setIsAnonymizedImport(false);
+      fetchDashboardData();
+      return;
+    }
+
+
+
     for (const line of lines) {
       const trimmed = line.trim();
       if (!trimmed) continue;
@@ -4057,13 +4143,27 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     </div>
                   );
                 })()}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0 8px 0' }}>
+                  <input
+                    type="checkbox"
+                    id="anonymized-import-checkbox"
+                    checked={isAnonymizedImport}
+                    onChange={(e) => setIsAnonymizedImport(e.target.checked)}
+                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                  <label htmlFor="anonymized-import-checkbox" style={{ fontSize: '0.76rem', fontWeight: 800, color: '#475569', cursor: 'pointer', fontFamily: 'Urbanist' }}>
+                    🔒 Anonymisiertes Onboarding aktivieren (5-Tabellen-Schema)
+                  </label>
+                </div>
                 <textarea
                   value={studentCsvText}
                   onChange={(e) => setStudentCsvText(e.target.value)}
                   placeholder={
-                    studentFilterTeacher && studentFilterTeacher !== 'All'
-                      ? "Max Mustermann\nLisa Schmidt"
-                      : "Max Mustermann; Klavier; max@familie.de; Weber\nLisa Schmidt; E-Gitarre; ; Becker"
+                    isAnonymizedImport
+                      ? "Vorname; Nachname; Geburtsdatum (DD.MM.YYYY); Instrument; [Optional Lehrkraft Name]\nMax; Mustermann; 15.08.2012; E-Gitarre; Becker"
+                      : studentFilterTeacher && studentFilterTeacher !== 'All'
+                        ? "Max Mustermann\nLisa Schmidt"
+                        : "Max Mustermann; Klavier; max@familie.de; Weber\nLisa Schmidt; E-Gitarre; ; Becker"
                   }
                   style={{
                     width: '100%',

@@ -348,9 +348,25 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [onboardDpaAccepted, setOnboardDpaAccepted] = useState(false);
   const [onboardCreatedUser, setOnboardCreatedUser] = useState<any>(null);
   const [onboardIPAddress, setOnboardIPAddress] = useState('unknown');
-  const [expandedSection, setExpandedSection] = useState<'none' | 'pin' | 'kiosk'>('none');
+  const [expandedSection, setExpandedSection] = useState<'none' | 'pin' | 'kiosk' | 'parentOnboarding'>('none');
   const [isGroovelabKiosk, setIsGroovelabKiosk] = useState(() => !!kioskStationId);
   const [selectedKioskStationId, setSelectedKioskStationId] = useState<string | null>(null);
+
+  // Parents Onboarding & Magic Link States
+  const [parentFirstName, setParentFirstName] = useState('');
+  const [parentLastName, setParentLastName] = useState('');
+  const [parentInstrument, setParentInstrument] = useState('');
+  const [parentDayOfBirth, setParentDayOfBirth] = useState('');
+  const [parentEmail, setParentEmail] = useState('');
+  const [parentOnboardingStep, setParentOnboardingStep] = useState<'verify' | 'email' | 'success'>('verify');
+  const [verifiedStudentId, setVerifiedStudentId] = useState<string | null>(null);
+  const [verifiedStudentDetails, setVerifiedStudentDetails] = useState<any>(null);
+  const [parentOnboardingError, setParentOnboardingError] = useState<string | null>(null);
+  const [parentOnboardingLoading, setParentOnboardingLoading] = useState(false);
+  const [magicLinkEmail, setMagicLinkEmail] = useState('');
+  const [showMagicLinkModal, setShowMagicLinkModal] = useState(false);
+  const [magicLinkMessage, setMagicLinkMessage] = useState<string | null>(null);
+  const [magicLinkSuccess, setMagicLinkSuccess] = useState(false);
 
   useEffect(() => {
     if (!kioskMapRef.current) return;
@@ -1435,6 +1451,165 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         })}
       </div>
     );
+  };
+
+  const handleParentVerification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!parentFirstName.trim() || !parentLastName.trim() || !parentInstrument.trim() || !parentDayOfBirth.trim()) {
+      setParentOnboardingError('Bitte fülle alle Pflichtfelder aus.');
+      return;
+    }
+    
+    const dayNum = parseInt(parentDayOfBirth);
+    if (isNaN(dayNum) || dayNum < 1 || dayNum > 31) {
+      setParentOnboardingError('Der Geburtstagstag muss zwischen 1 und 31 liegen.');
+      return;
+    }
+
+    setParentOnboardingLoading(true);
+    setParentOnboardingError(null);
+
+    try {
+      const { data, error } = await supabase.rpc('verify_onboarding', {
+        input_first_name: parentFirstName.trim(),
+        input_last_name: parentLastName.trim(),
+        input_instrument: parentInstrument.trim(),
+        input_day: dayNum
+      });
+
+      if (error) throw error;
+
+      const result = Array.isArray(data) ? data[0] : data;
+
+      if (result && result.success) {
+        setVerifiedStudentId(result.student_id);
+        setVerifiedStudentDetails({
+          first_name: parentFirstName.trim(),
+          last_name: parentLastName.trim(),
+          instrument: parentInstrument.trim(),
+          id: result.student_id
+        });
+        setParentOnboardingStep('email');
+      } else {
+        setParentOnboardingError(result?.message || 'Eingabe überprüfen.');
+      }
+    } catch (err: any) {
+      console.error('Verification error:', err);
+      setParentOnboardingError(err.message || 'Ein unerwarteter Fehler ist aufgetreten.');
+    } finally {
+      setParentOnboardingLoading(false);
+    }
+  };
+
+  const handleParentEmailSubmission = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!parentEmail.trim() || !verifiedStudentId) {
+      setParentOnboardingError('Bitte gib eine gültige E-Mail-Adresse ein.');
+      return;
+    }
+
+    setParentOnboardingLoading(true);
+    setParentOnboardingError(null);
+
+    try {
+      const { data, error } = await supabase.rpc('complete_onboarding', {
+        input_student_id: verifiedStudentId,
+        input_email: parentEmail.trim()
+      });
+
+      if (error) throw error;
+
+      // Onboarding complete! Now load the student's profile directly
+      const { data: studentUser, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', verifiedStudentId)
+        .single();
+
+      if (userError || !studentUser) {
+        throw new Error('Fehler beim Abrufen des Schülerprofils nach Onboarding.');
+      }
+
+      setVerifiedStudentDetails(studentUser);
+      setParentOnboardingStep('success');
+    } catch (err: any) {
+      console.error('Email submission error:', err);
+      setParentOnboardingError(err.message || 'E-Mail konnte nicht gespeichert werden.');
+    } finally {
+      setParentOnboardingLoading(false);
+    }
+  };
+
+  const handleMagicLinkRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!magicLinkEmail.trim()) {
+      setMagicLinkMessage('Bitte gib eine E-Mail-Adresse ein.');
+      return;
+    }
+
+    setParentOnboardingLoading(true);
+    setMagicLinkMessage(null);
+
+    try {
+      const { data, error } = await supabase.rpc('request_magic_link', {
+        input_email: magicLinkEmail.trim()
+      });
+
+      if (error) throw error;
+      
+      const result = Array.isArray(data) ? data[0] : data;
+      setMagicLinkSuccess(true);
+      setMagicLinkMessage(result?.message || 'Wenn die E-Mail registriert ist, wurde ein Magic Link gesendet.');
+    } catch (err: any) {
+      console.error('Magic link error:', err);
+      setMagicLinkMessage(err.message || 'Fehler beim Anfordern des Magic Links.');
+    } finally {
+      setParentOnboardingLoading(false);
+    }
+  };
+
+  const downloadParentQrCode = async () => {
+    try {
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${verifiedStudentDetails?.qr_token || verifiedStudentId}`;
+      const response = await fetch(qrUrl);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `groovelab-login-${verifiedStudentDetails?.first_name || 'schueler'}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Download error:', err);
+      alert('Der QR-Code konnte nicht heruntergeladen werden. Bitte mache stattdessen einen Screenshot.');
+    }
+  };
+
+  const downloadWalletPass = () => {
+    const passContent = JSON.stringify({
+      passTypeIdentifier: "pass.de.groovelab.student",
+      serialNumber: verifiedStudentDetails?.qr_token || verifiedStudentId,
+      teamIdentifier: "GROOVELAB",
+      organizationName: "GrooveLab Music School",
+      description: "GrooveLab Student Access Pass",
+      logoText: "GrooveLab",
+      foregroundColor: "rgb(255, 255, 255)",
+      backgroundColor: "rgb(10, 54, 28)",
+      labelColor: "rgb(167, 243, 208)",
+      studentName: `${verifiedStudentDetails?.first_name} ${verifiedStudentDetails?.last_name}`,
+      instrument: verifiedStudentDetails?.instrument || "Allgemein",
+      qrToken: verifiedStudentDetails?.qr_token || verifiedStudentId
+    }, null, 2);
+
+    const blob = new Blob([passContent], { type: 'application/vnd.apple.pkpass' });
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = `groovelab-pass-${verifiedStudentDetails?.first_name || 'schueler'}.pkpass`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handlePinLogin = async (pin: string) => {
@@ -2843,9 +3018,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       )
 }
 
-      {/* Passwort Anmeldung button under the card if available */}
+      {/* Passwort Anmeldung & Eltern-Onboarding buttons under the card if available */}
       {expandedSection === 'none' && !isGroovelabKiosk && (
-        <div style={{ marginTop: '24px' }}>
+        <div style={{ marginTop: '24px', display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
           <button 
             onClick={() => setExpandedSection('pin')}
             style={{ 
@@ -2871,6 +3046,44 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           >
             <KeyRound size={14} color={isGroovelabKiosk ? '#062413' : '#a7f3d0'} />
             Passwort Anmeldung
+          </button>
+
+          <button 
+            onClick={() => {
+              setParentFirstName('');
+              setParentLastName('');
+              setParentInstrument('');
+              setParentDayOfBirth('');
+              setParentEmail('');
+              setVerifiedStudentId(null);
+              setVerifiedStudentDetails(null);
+              setParentOnboardingError(null);
+              setParentOnboardingStep('verify');
+              setExpandedSection('parentOnboarding');
+            }}
+            style={{ 
+              background: 'rgba(167, 243, 208, 0.08)', 
+              border: '1px solid rgba(167, 243, 208, 0.15)', 
+              padding: '10px 24px',
+              borderRadius: '100px',
+              color: '#a7f3d0', 
+              fontSize: '12px', 
+              fontWeight: 800, 
+              textTransform: 'uppercase', 
+              letterSpacing: '0.05em', 
+              cursor: 'pointer', 
+              transition: 'all 0.2s',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+            onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(167, 243, 208, 0.16)'; }}
+            onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(167, 243, 208, 0.08)'; }}
+          >
+            <ShieldCheck size={14} color="#a7f3d0" />
+            Eltern-Onboarding (Aktivierung)
           </button>
         </div>
       )}
@@ -2935,6 +3148,265 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         <button onClick={() => setExpandedSection('none')} style={{ background: 'none', border: 'none', color: 'rgba(255, 255, 255, 0.4)', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', marginTop: '12px', cursor: 'pointer', alignSelf: 'center' }}>
           Zurück
         </button>
+      </div>
+      )}
+
+      {/* Eltern Onboarding & Aktivierung */}
+      {expandedSection === 'parentOnboarding' && (
+      <div style={{
+        width: '100%',
+        maxWidth: '420px',
+        background: 'rgba(255, 255, 255, 0.08)',
+        borderRadius: '40px',
+        padding: '28px',
+        boxShadow: '0 40px 100px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15)',
+        border: '1px solid rgba(255, 255, 255, 0.12)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '20px',
+        backdropFilter: 'blur(30px)',
+        WebkitBackdropFilter: 'blur(30px)'
+      }}>
+        <div style={{ fontSize: '12px', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <ShieldCheck size={14} style={{ color: '#a7f3d0' }} /> Eltern-Onboarding & Aktivierung
+        </div>
+
+        {parentOnboardingError && (
+          <div style={{ background: 'rgba(239, 68, 68, 0.2)', border: '1px solid #ef4444', padding: '12px 16px', borderRadius: '16px', color: '#fca5a5', fontSize: '13px', fontWeight: 600 }}>
+            ⚠️ {parentOnboardingError}
+          </div>
+        )}
+
+        {parentOnboardingStep === 'verify' && (
+          <form onSubmit={handleParentVerification} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <p style={{ margin: 0, color: '#a7f3d0', fontSize: '13px', lineHeight: '1.5', fontWeight: 500 }}>
+              Bitte gib die Daten deines Kindes exakt so ein, wie sie auf der Anmeldung stehen.
+            </p>
+            
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Vorname des Kindes *</label>
+              <input
+                type="text"
+                required
+                value={parentFirstName}
+                onChange={(e) => setParentFirstName(e.target.value)}
+                placeholder="z.B. Max"
+                style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)', color: '#ffffff', outline: 'none', fontSize: '14px', fontWeight: 700 }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Nachname des Kindes *</label>
+              <input
+                type="text"
+                required
+                value={parentLastName}
+                onChange={(e) => setParentLastName(e.target.value)}
+                placeholder="z.B. Mustermann"
+                style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)', color: '#ffffff', outline: 'none', fontSize: '14px', fontWeight: 700 }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Instrument *</label>
+              <select
+                required
+                value={parentInstrument}
+                onChange={(e) => setParentInstrument(e.target.value)}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid rgba(255,255,255,0.15)', background: 'rgba(15, 87, 46, 0.9)', color: '#ffffff', outline: 'none', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}
+              >
+                <option value="">-- Instrument wählen --</option>
+                <option value="Klavier">Klavier</option>
+                <option value="E-Gitarre">E-Gitarre</option>
+                <option value="Akustikgitarre">Akustikgitarre</option>
+                <option value="Schlagzeug">Schlagzeug</option>
+                <option value="Bass">Bass</option>
+                <option value="Gesang">Gesang</option>
+                <option value="Keyboard">Keyboard</option>
+                <option value="Allgemein">Allgemein</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Geburtstagstag (Zahl 1-31) *</label>
+              <input
+                type="number"
+                required
+                min={1}
+                max={31}
+                value={parentDayOfBirth}
+                onChange={(e) => setParentDayOfBirth(e.target.value)}
+                placeholder="Nur den Tag eintragen, z.B. 15"
+                style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)', color: '#ffffff', outline: 'none', fontSize: '14px', fontWeight: 700 }}
+              />
+              <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginTop: '4px', display: 'block' }}>
+                Monat & Jahr werden aus Datenschutzgründen im System nicht erfasst.
+              </span>
+            </div>
+
+            <button
+              type="submit"
+              disabled={parentOnboardingLoading}
+              style={{
+                width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
+                background: schoolData?.primary_color || '#a7f3d0',
+                color: schoolData?.primary_color ? '#ffffff' : '#062413',
+                fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s', marginTop: '8px'
+              }}
+            >
+              {parentOnboardingLoading ? 'Prüfe Daten...' : 'Daten verifizieren'}
+            </button>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center', marginTop: '12px' }}>
+              <button 
+                type="button"
+                onClick={() => {
+                  setMagicLinkSuccess(false);
+                  setMagicLinkMessage(null);
+                  setMagicLinkEmail('');
+                  setShowMagicLinkModal(true);
+                }} 
+                style={{ background: 'none', border: 'none', color: '#a7f3d0', fontSize: '12px', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                QR-Code verloren? Magic Link anfordern
+              </button>
+              
+              <button 
+                type="button"
+                onClick={() => setExpandedSection('none')} 
+                style={{ background: 'none', border: 'none', color: 'rgba(255, 255, 255, 0.4)', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', cursor: 'pointer' }}
+              >
+                Abbrechen
+              </button>
+            </div>
+          </form>
+        )}
+
+        {parentOnboardingStep === 'email' && (
+          <form onSubmit={handleParentEmailSubmission} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <p style={{ margin: 0, color: '#a7f3d0', fontSize: '13px', lineHeight: '1.5', fontWeight: 500 }}>
+              <strong>Datensatz gefunden!</strong> Bitte gib jetzt die E-Mail-Adresse der Eltern an, um das Profil abzusichern.
+            </p>
+
+            <div style={{ background: 'rgba(167, 243, 208, 0.08)', border: '1px solid rgba(167, 243, 208, 0.2)', padding: '12px', borderRadius: '12px', fontSize: '11.5px', color: '#a7f3d0', lineHeight: '1.4' }}>
+              🔒 <strong>Datenschutz-Info:</strong> Die E-Mail-Adresse wird sofort beim Speichern in Präfix und Suffix zerlegt und in zwei getrennten Tabellen abgelegt. Niemand kann deine vollständige E-Mail-Adresse direkt in einer Tabelle auslesen.
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>E-Mail-Adresse der Eltern *</label>
+              <input
+                type="email"
+                required
+                value={parentEmail}
+                onChange={(e) => setParentEmail(e.target.value)}
+                placeholder="eltern@beispiel.de"
+                style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)', color: '#ffffff', outline: 'none', fontSize: '14px', fontWeight: 700 }}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={parentOnboardingLoading}
+              style={{
+                width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
+                background: '#34a853',
+                color: '#ffffff',
+                fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s', marginTop: '8px'
+              }}
+            >
+              {parentOnboardingLoading ? 'Speichere E-Mail...' : 'Aktivierung abschließen'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setParentOnboardingStep('verify')}
+              style={{ background: 'none', border: 'none', color: 'rgba(255, 255, 255, 0.4)', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', cursor: 'pointer', alignSelf: 'center', marginTop: '8px' }}
+            >
+              Zurück
+            </button>
+          </form>
+        )}
+
+        {parentOnboardingStep === 'success' && verifiedStudentDetails && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'center' }}>
+            <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(52, 168, 83, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#22c55e' }}>
+              <Check size={32} strokeWidth={3} />
+            </div>
+
+            <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#22c55e', textAlign: 'center', letterSpacing: '-0.02em' }}>
+              Profil erfolgreich aktiviert!
+            </h3>
+
+            <p style={{ margin: 0, color: 'rgba(255,255,255,0.7)', fontSize: '13px', textAlign: 'center', lineHeight: '1.4' }}>
+              Hier ist dein persönlicher QR-Code zum Login. Mache einen Screenshot oder lade ihn herunter!
+            </p>
+
+            {/* QR CODE DISPLAY */}
+            <div style={{ background: '#ffffff', padding: '14px', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${verifiedStudentDetails.qr_token || verifiedStudentDetails.id}`}
+                alt="Student Login QR Code"
+                style={{ width: '180px', height: '180px', display: 'block' }}
+              />
+            </div>
+
+            <div style={{ width: '100%', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '14px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                <span style={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700 }}>Schüler:</span>
+                <strong style={{ color: '#ffffff', fontWeight: 800 }}>{verifiedStudentDetails.first_name} {verifiedStudentDetails.last_name}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                <span style={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700 }}>Instrument:</span>
+                <strong style={{ color: '#ffffff', fontWeight: 800 }}>{verifiedStudentDetails.instrument}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                <span style={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700 }}>Ausweis-Nr:</span>
+                <strong style={{ color: '#a7f3d0', fontWeight: 800 }}>{verifiedStudentDetails.ausweis_nummer}</strong>
+              </div>
+            </div>
+
+            {/* ACTION OPTIONS */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
+              <button
+                onClick={downloadWalletPass}
+                style={{
+                  width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid rgba(255,255,255,0.15)',
+                  background: 'rgba(255,255,255,0.05)', color: '#ffffff', fontWeight: 800, fontSize: '13px',
+                  cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                }}
+              >
+                💳 In Apple/Google Wallet speichern
+              </button>
+              
+              <button
+                onClick={downloadParentQrCode}
+                style={{
+                  width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid rgba(255,255,255,0.15)',
+                  background: 'rgba(255,255,255,0.05)', color: '#ffffff', fontWeight: 800, fontSize: '13px',
+                  cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                }}
+              >
+                💾 Als Bild speichern
+              </button>
+            </div>
+
+            <div style={{ background: 'rgba(234, 179, 8, 0.08)', border: '1px solid rgba(234, 179, 8, 0.2)', padding: '12px', borderRadius: '12px', fontSize: '11px', color: '#fef08a', lineHeight: '1.4', width: '100%', boxSizing: 'border-box', textAlign: 'center' }}>
+              💡 <strong>Tipp:</strong> Mach einfach einen schnellen Screenshot von diesem QR-Code mit deinem Handy!
+            </div>
+
+            <button
+              onClick={() => onLogin(verifiedStudentDetails.id, false)}
+              style={{
+                width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
+                background: '#0b57d0',
+                color: '#ffffff',
+                fontWeight: 900, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 8px 24px rgba(11, 87, 208, 0.3)'
+              }}
+            >
+              Direkt zum Profil einloggen
+            </button>
+          </div>
+        )}
       </div>
       )}
 
@@ -3428,6 +3900,122 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             >
               Verstanden
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Magic Link Modal */}
+      {showMagicLinkModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(9, 9, 11, 0.70)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '24px',
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            background: 'rgba(24, 24, 27, 0.95)',
+            borderRadius: '32px',
+            boxShadow: '0 30px 80px rgba(0, 0, 0, 0.5)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            padding: '32px',
+            maxWidth: '440px',
+            width: '100%',
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px',
+            boxSizing: 'border-box',
+            color: '#ffffff'
+          }}>
+            <button 
+              onClick={() => setShowMagicLinkModal(false)} 
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                background: 'none',
+                border: 'none',
+                color: 'rgba(255, 255, 255, 0.4)',
+                cursor: 'pointer',
+                fontSize: '18px',
+                outline: 'none'
+              }}
+            >
+              ✕
+            </button>
+
+            <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#a7f3d0', letterSpacing: '-0.02em' }}>
+              🔑 Magic Link anfordern
+            </h3>
+
+            {magicLinkMessage && (
+              <div style={{
+                background: magicLinkSuccess ? 'rgba(52, 168, 83, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                border: magicLinkSuccess ? '1px solid #34a853' : '1px solid #ef4444',
+                padding: '12px 16px',
+                borderRadius: '16px',
+                color: magicLinkSuccess ? '#a7f3d0' : '#fca5a5',
+                fontSize: '13px',
+                fontWeight: 650
+              }}>
+                {magicLinkMessage}
+              </div>
+            )}
+
+            {!magicLinkSuccess ? (
+              <form onSubmit={handleMagicLinkRequest} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <p style={{ margin: 0, color: 'rgba(255,255,255,0.7)', fontSize: '13px', lineHeight: '1.5' }}>
+                  Gib die registrierte E-Mail-Adresse ein. Wir senden dir einen temporären Link, um dich ohne QR-Code einzuloggen.
+                </p>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>E-Mail-Adresse *</label>
+                  <input
+                    type="email"
+                    required
+                    value={magicLinkEmail}
+                    onChange={(e) => setMagicLinkEmail(e.target.value)}
+                    placeholder="eltern@beispiel.de"
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)', color: '#ffffff', outline: 'none', fontSize: '14px', fontWeight: 700 }}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={parentOnboardingLoading}
+                  style={{
+                    width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
+                    background: schoolData?.primary_color || '#a7f3d0',
+                    color: schoolData?.primary_color ? '#ffffff' : '#062413',
+                    fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s'
+                  }}
+                >
+                  {parentOnboardingLoading ? 'Prüfe E-Mail...' : 'Link senden'}
+                </button>
+              </form>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <p style={{ margin: 0, color: 'rgba(255,255,255,0.7)', fontSize: '13px', lineHeight: '1.5' }}>
+                  Bitte überprüfe dein E-Mail-Postfach. Wenn die Adresse im System hinterlegt ist, findest du dort in Kürze einen Link zum direkten Login.
+                </p>
+                <button
+                  onClick={() => setShowMagicLinkModal(false)}
+                  style={{
+                    width: '100%', padding: '12px', borderRadius: '16px', border: 'none',
+                    background: 'rgba(255,255,255,0.1)',
+                    color: '#ffffff',
+                    fontWeight: 800, fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s'
+                  }}
+                >
+                  Schließen
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
