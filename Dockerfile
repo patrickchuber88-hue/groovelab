@@ -5,13 +5,15 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files from the app subdirectory
-COPY apps/groovelab/package.json apps/groovelab/package-lock.json* ./
+# Copy root package files and app package files
+COPY package.json package-lock.json ./
+COPY apps/groovelab/package.json ./apps/groovelab/
 
 RUN npm ci
 
-# Copy the rest of the app source
-COPY apps/groovelab/ ./
+# Copy the rest of the app source and packages
+COPY apps/groovelab/ ./apps/groovelab/
+COPY packages/ ./packages/
 
 # Build args for Supabase (injected by Coolify as env vars at build time)
 ARG VITE_SUPABASE_URL
@@ -20,7 +22,7 @@ ARG VITE_SUPABASE_ANON_KEY
 ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
 ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
 
-RUN npm run build
+RUN npm run build:groovelab
 
 # ─────────────────────────────────────────────
 # Stage 2: Serve with nginx
@@ -31,7 +33,7 @@ FROM nginx:stable-alpine AS production
 RUN rm -rf /usr/share/nginx/html/*
 
 # Copy built assets from builder
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder /app/apps/groovelab/dist /usr/share/nginx/html
 
 # SPA routing: all unknown paths → index.html
 RUN printf 'server {\n\

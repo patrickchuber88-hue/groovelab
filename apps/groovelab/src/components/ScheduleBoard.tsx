@@ -99,6 +99,20 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const [lastSubmittedTime, setLastSubmittedTime] = useState<string | null>(null);
   const [scheduleStatus, setScheduleStatus] = useState<'none' | 'pending' | 'approved'>('none');
 
+  // RoentgenMatrixView interactive behavior states
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [selectedStudentPrefs, setSelectedStudentPrefs] = useState<any[]>([]);
+  const [shakingStudentId, setShakingStudentId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'warning' } | null>(null);
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+
   useEffect(() => {
     lastSavedStateRef.current = '';
     loadInitialData();
@@ -429,7 +443,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       }
 
       // Fallback: If no boards loaded from localStorage, reconstruct solely from database
-      if (reconstructedBoards.length === 0 && schedData && schedData.length > 0) {
+      if (!hasSavedDrafts && reconstructedBoards.length === 0 && schedData && schedData.length > 0) {
         // Group schedules by day_of_week and room_id
         const groups: Record<string, typeof schedData> = {};
         schedData.forEach(s => {
@@ -610,7 +624,30 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       return s;
     }));
 
-    setBoards(prev => prev.filter(b => b.id !== boardId));
+    setBoards(prev => prev.filter(b => b.id !== boardId));  };
+
+  // Select/deselect a student and load their preferences in real-time
+  const handleSelectStudent = async (studentId: string) => {
+    if (selectedStudentId === studentId) {
+      setSelectedStudentId(null);
+      setSelectedStudentPrefs([]);
+    } else {
+      setSelectedStudentId(studentId);
+      try {
+        const { data, error } = await supabase
+          .from('student_schedule_preferences')
+          .select('*')
+          .eq('student_id', studentId);
+        if (!error && data) {
+          setSelectedStudentPrefs(data);
+        } else {
+          setSelectedStudentPrefs([]);
+        }
+      } catch (err) {
+        console.error("Error loading student preferences:", err);
+        setSelectedStudentPrefs([]);
+      }
+    }
   };
 
   // Drag start handler for students (either from sidebar or day board)
@@ -626,12 +663,94 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   };
 
   // Handle drops on columns
-  const handleDropOnBoard = (targetBoardId: string, index?: number) => {
+  const handleDropOnBoard = async (targetBoardId: string, index?: number) => {
     if (!draggedStudentId) return;
 
     const isBreakDrag = draggedStudentId.startsWith('break-') || draggedStudentId === 'sidebar-pause';
     const student = students.find(s => s.id === draggedStudentId);
     if (!student && !isBreakDrag) return;
+
+    // Validate if the timeframe overlaps with a 'gesperrt' (blocked) preference for the student
+    if (!isBreakDrag && student) {
+      const targetBoard = boards.find(b => b.id === targetBoardId);
+      if (targetBoard) {
+        // Calculate proposed start/end times by simulating the drop
+        let targetNextStudents = [...targetBoard.students];
+        targetNextStudents = targetNextStudents.filter(s => s.id !== draggedStudentId);
+        
+        const studentToAssign = { ...student, assignedDay: targetBoard.dayOfWeek };
+        if (index !== undefined) {
+          targetNextStudents.splice(index, 0, studentToAssign);
+        } else {
+          targetNextStudents.push(studentToAssign);
+        }
+
+        const tempBoard = recalculateBoardTimes({ ...targetBoard, students: targetNextStudents });
+        const assignedStudent = tempBoard.students.find(s => s.id === draggedStudentId);
+
+        if (assignedStudent && assignedStudent.assignedTime) {
+          const [sh, sm] = assignedStudent.assignedTime.split(':').map(Number);
+          const startMin = sh * 60 + sm;
+          const endMin = startMin + student.duration;
+
+          console.log("[DND Debug] Student:", student.first_name, student.last_name);
+          console.log("[DND Debug] Proposed slot:", assignedStudent.assignedTime, "startMin:", startMin, "endMin:", endMin);
+          console.log("[DND Debug] targetBoard.dayOfWeek:", targetBoard.dayOfWeek, "type:", typeof targetBoard.dayOfWeek);
+
+          try {
+            // Fetch student's 'gesperrt' preferences from Supabase
+            const { data: prefs, error } = await supabase
+              .from('student_schedule_preferences')
+              .select('*')
+              .eq('student_id', draggedStudentId)
+              .eq('preference_type', 'gesperrt');
+
+            console.log("[DND Debug] Fetched prefs:", prefs);
+
+            if (!error && prefs && prefs.length > 0) {
+              let isBlocked = false;
+              for (const pref of prefs) {
+                console.log("[DND Debug] Comparing pref:", pref.day_of_week, "type:", typeof pref.day_of_week, "with target:", targetBoard.dayOfWeek);
+                if (Number(pref.day_of_week) === Number(targetBoard.dayOfWeek)) {
+                  const [psh, psm] = pref.start_time.split(':').map(Number);
+                  const [peh, pem] = pref.end_time.split(':').map(Number);
+                  const prefStart = psh * 60 + psm;
+                  const prefEnd = peh * 60 + pem;
+
+                  console.log("[DND Debug] Overlap check: startMin:", startMin, "< prefEnd:", prefEnd, "&& endMin:", endMin, "> prefStart:", prefStart);
+                  // Overlap check
+                  if (startMin < prefEnd && endMin > prefStart) {
+                    isBlocked = true;
+                    console.log("[DND Debug] BLOCKED!");
+                    break;
+                  }
+                }
+              }
+
+              if (isBlocked) {
+                // Shake the card (state updates to trigger card-shake animation class)
+                setShakingStudentId(draggedStudentId);
+                setTimeout(() => setShakingStudentId(null), 500);
+
+                // Show warnings toast
+                setToast({
+                  message: `Zeitkonflikt: Der Schüler ${student.first_name} ${student.last_name} ist in diesem Zeitraum gesperrt!`,
+                  type: 'warning'
+                });
+
+                // Reset drag tracking and stop execution
+                setDraggedStudentId(null);
+                setDragSource(null);
+                setDragSourceBoardId(null);
+                return;
+              }
+            }
+          } catch (err) {
+            console.error("Error checking student preferences:", err);
+          }
+        }
+      }
+    }
 
     setBoards(prev => {
       let sourceBoard = prev.find(b => b.id === dragSourceBoardId);
@@ -1206,7 +1325,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         <ScheduleCalendarView 
           schoolId={schoolId} 
           userId={selectedTeacherId} 
-          boards={boards} 
+          boards={drafts.find(d => d.id === submittedDraftId)?.boards || boards} 
           activeTab={activeTab} 
           setActiveTab={setActiveTab} 
           teachers={teachers}
@@ -1624,6 +1743,62 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         </div>
                       ))}
 
+                      {/* Interactive Preferences Overlays (Roentgen Matrix View) */}
+                      {selectedStudentId && (() => {
+                        const blocks = [];
+                        const blockCount = Math.floor((endMinutes - startMinutes) / 15);
+                        for (let i = 0; i < blockCount; i++) {
+                          const blockStart = startMinutes + i * 15;
+                          const blockEnd = blockStart + 15;
+                          
+                          let matchedPref: 'wunsch' | 'gesperrt' | null = null;
+                          
+                          selectedStudentPrefs.forEach(pref => {
+                            if (pref.day_of_week === board.dayOfWeek) {
+                              const [ph, pm] = pref.start_time.split(':').map(Number);
+                              const [peh, pem] = pref.end_time.split(':').map(Number);
+                              const prefStart = ph * 60 + pm;
+                              const prefEnd = peh * 60 + pem;
+                              
+                              // Check if 15m block falls within this preference timeframe
+                              if (blockStart < prefEnd && blockEnd > prefStart) {
+                                if (pref.preference_type === 'gesperrt') {
+                                  matchedPref = 'gesperrt';
+                                } else if (pref.preference_type === 'wunsch' && matchedPref !== 'gesperrt') {
+                                  matchedPref = 'wunsch';
+                                }
+                              }
+                            }
+                          });
+                          
+                          if (matchedPref) {
+                            const top = i * 15 * PX_PER_MIN;
+                            const height = 15 * PX_PER_MIN;
+                            const className = matchedPref === 'gesperrt' 
+                              ? 'roentgen-blocked opacity-40 pointer-events-none' 
+                              : 'roentgen-preferred';
+                            
+                            blocks.push(
+                              <div
+                                key={`pref-block-${board.id}-${i}`}
+                                className={className}
+                                style={{
+                                  position: 'absolute',
+                                  left: 0,
+                                  right: 0,
+                                  top: `${top}px`,
+                                  height: `${height}px`,
+                                  zIndex: 1,
+                                  boxSizing: 'border-box',
+                                  pointerEvents: 'none'
+                                }}
+                              />
+                            );
+                          }
+                        }
+                        return blocks;
+                      })()}
+
                       {/* Empty drop hint */}
                       {board.students.length === 0 && (
                         <div style={{ position: 'absolute', inset: '8px 0', border: '1.5px dashed rgba(0,0,0,0.08)', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#86868b', pointerEvents: 'none', zIndex: 1 }}>
@@ -1704,14 +1879,32 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         }
 
                         const isSubmitted = hasSubmittedSchedule && activeDraftId === submittedDraftId;
-                        const cardBg = isSubmitted ? 'rgba(220, 252, 231, 0.5)' : 'rgba(219, 234, 254, 0.65)';
-                        const cardBorder = isSubmitted ? '1px solid rgba(16, 185, 129, 0.18)' : '1px solid rgba(59, 130, 246, 0.2)';
-                        const cardBorderLeft = isSubmitted ? '4px solid #10b981' : '4px solid #3b82f6';
-                        const textColor = isSubmitted ? '#065f46' : '#1e3a8a';
-                        const badgeBg = isSubmitted ? 'rgba(16, 185, 129, 0.08)' : 'rgba(59, 130, 246, 0.08)';
-                        const badgeColor = isSubmitted ? '#047857' : '#1d4ed8';
+                        const isSelected = selectedStudentId === bs.id;
+                        const isShaking = shakingStudentId === bs.id;
+                        
+                        const cardBg = isSelected 
+                          ? 'rgba(0, 122, 255, 0.08)' 
+                          : (isSubmitted ? 'rgba(220, 252, 231, 0.5)' : 'rgba(219, 234, 254, 0.65)');
+                        const cardBorder = isSelected 
+                          ? '1.5px solid #007aff' 
+                          : (isSubmitted ? '1px solid rgba(16, 185, 129, 0.18)' : '1px solid rgba(59, 130, 246, 0.2)');
+                        const cardBorderLeft = isSelected 
+                          ? '4px solid #007aff' 
+                          : (isSubmitted ? '4px solid #10b981' : '4px solid #3b82f6');
+                        const textColor = isSelected 
+                          ? '#007aff' 
+                          : (isSubmitted ? '#065f46' : '#1e3a8a');
+                        const badgeBg = isSelected 
+                          ? 'rgba(0, 122, 255, 0.08)' 
+                          : (isSubmitted ? 'rgba(16, 185, 129, 0.08)' : 'rgba(59, 130, 246, 0.08)');
+                        const badgeColor = isSelected 
+                          ? '#007aff' 
+                          : (isSubmitted ? '#047857' : '#1d4ed8');
                         const shadowColor = isSubmitted ? 'rgba(16,185,129,0.06)' : 'rgba(59,130,246,0.06)';
                         const shadowHoverColor = isSubmitted ? 'rgba(16,185,129,0.14)' : 'rgba(59,130,246,0.14)';
+                        const cardShadow = isSelected 
+                          ? '0 0 10px rgba(0, 122, 255, 0.25)' 
+                          : `0 2px 6px ${shadowColor}`;
 
                         return (
                           <div
@@ -1720,6 +1913,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             onDragStart={() => handleDragStart(bs.id, 'board', board.id)}
                             onDragOver={handleDragOver}
                             onDrop={(e) => { e.stopPropagation(); handleDropOnBoard(board.id, cardIndex); }}
+                            onClick={(e) => { e.stopPropagation(); handleSelectStudent(bs.id); }}
+                            className={isShaking ? 'card-shake' : ''}
                             style={{
                             position: 'absolute', left: 0, right: 0,
                             top: `${Math.max(cardTopPx, 0)}px`,
@@ -1730,10 +1925,18 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             borderRadius: '8px', padding: '5px 8px', boxSizing: 'border-box',
                             cursor: 'grab', display: 'flex', flexDirection: 'column',
                             justifyContent: 'center', gap: '2px', zIndex: 2, overflow: 'hidden',
-                            boxShadow: `0 2px 6px ${shadowColor}`, transition: 'box-shadow 0.15s',
+                            boxShadow: cardShadow, transition: 'all 0.2s ease',
                           }}
-                          onMouseOver={e => (e.currentTarget.style.boxShadow = `0 4px 14px ${shadowHoverColor}`)}
-                          onMouseOut={e => (e.currentTarget.style.boxShadow = `0 2px 6px ${shadowColor}`)}
+                          onMouseOver={e => {
+                            if (!isSelected) {
+                              e.currentTarget.style.boxShadow = `0 4px 14px ${shadowHoverColor}`;
+                            }
+                          }}
+                          onMouseOut={e => {
+                            if (!isSelected) {
+                              e.currentTarget.style.boxShadow = `0 2px 6px ${shadowColor}`;
+                            }
+                          }}
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span style={{ fontSize: '0.72rem', fontWeight: 800, color: textColor }}>{bs.assignedTime}</span>
@@ -1892,26 +2095,39 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 {filteredStudents.map(s => {
                   const isAssigned = !!s.assignedDay;
                   const assignedDayLabel = isAssigned ? DAYS_OF_WEEK.find(d => d.value === s.assignedDay)?.name : '';
+                  const isSelected = selectedStudentId === s.id;
+                  const isShaking = shakingStudentId === s.id;
 
                   return (
                     <div
                       key={s.id}
                       draggable={!isAssigned}
                       onDragStart={() => handleDragStart(s.id, 'sidebar')}
+                      onClick={() => handleSelectStudent(s.id)}
+                      className={isShaking ? 'card-shake' : ''}
                       style={{ 
-                        background: isAssigned ? 'rgba(0, 0, 0, 0.02)' : 'rgba(255, 255, 255, 0.65)', 
+                        background: isSelected 
+                          ? 'rgba(0, 122, 255, 0.08)' 
+                          : (isAssigned ? 'rgba(0, 0, 0, 0.02)' : 'rgba(255, 255, 255, 0.65)'), 
                         backdropFilter: isAssigned ? 'none' : 'blur(12px)',
                         WebkitBackdropFilter: isAssigned ? 'none' : 'blur(12px)',
-                        border: '1px solid rgba(255, 255, 255, 0.6)', 
-                        borderLeft: isAssigned ? '3px solid #cbd5e1' : '3px solid #86868b', 
+                        border: isSelected 
+                          ? '1.5px solid #007aff' 
+                          : '1px solid rgba(255, 255, 255, 0.6)', 
+                        borderLeft: isSelected 
+                          ? '4px solid #007aff' 
+                          : (isAssigned ? '3px solid #cbd5e1' : '3px solid #86868b'), 
                         borderRadius: '8px', 
                         padding: '6px 8px', 
-                        cursor: isAssigned ? 'not-allowed' : 'grab', 
-                        opacity: isAssigned ? 0.5 : 1, 
+                        cursor: 'pointer', 
+                        opacity: isSelected ? 1 : (isAssigned ? 0.6 : 1), 
                         display: 'flex', 
                         flexDirection: 'column', 
                         gap: '4px',
-                        boxShadow: isAssigned ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.01)'
+                        boxShadow: isSelected 
+                          ? '0 0 10px rgba(0, 122, 255, 0.25)' 
+                          : (isAssigned ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.01)'),
+                        transition: 'all 0.25s ease'
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1950,6 +2166,33 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         </div>
       )}
         </>
+      )}
+
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          background: 'rgba(255, 255, 255, 0.92)',
+          backdropFilter: 'blur(20px) saturate(190%)',
+          WebkitBackdropFilter: 'blur(20px) saturate(190%)',
+          border: '1px solid rgba(239, 68, 68, 0.2)',
+          borderLeft: '4px solid #ef4444',
+          padding: '12px 18px',
+          borderRadius: '12px',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.06)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          zIndex: 99999,
+          animation: 'swissSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+        }}>
+          <AlertCircle size={16} style={{ color: '#ef4444', flexShrink: 0 }} />
+          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1f2937' }}>{toast.message}</span>
+          <button type="button" onClick={() => setToast(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', color: '#9ca3af', padding: 0, marginLeft: '6px' }}>
+            <X size={14} />
+          </button>
+        </div>
       )}
     </div>
   );
