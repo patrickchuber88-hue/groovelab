@@ -1193,6 +1193,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             currentEvent.description = value.replace(/\\n/g, '\n');
           } else if (key.startsWith('DTSTART')) {
             currentEvent.dtstart = parseICSDate(value);
+            currentEvent.isAllDay = !value.includes('T');
           } else if (key.startsWith('DTEND')) {
             currentEvent.dtend = parseICSDate(value);
           } else if (key.startsWith('LOCATION')) {
@@ -1256,7 +1257,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           };
           
           let end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
-          if (ev.dtend && !ev.dtend.toISOString().includes('T')) {
+          if (ev.dtend && ev.isAllDay) {
             end.setDate(end.getDate() - 1);
           }
           

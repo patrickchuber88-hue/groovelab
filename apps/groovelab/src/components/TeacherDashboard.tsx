@@ -1861,6 +1861,7 @@ export function TeacherDashboard({
             currentEvent.description = value.replace(/\\n/g, '\n');
           } else if (key.startsWith('DTSTART')) {
             currentEvent.dtstart = parseICSDate(value);
+            currentEvent.isAllDay = !value.includes('T');
           } else if (key.startsWith('DTEND')) {
             currentEvent.dtend = parseICSDate(value);
           } else if (key.startsWith('LOCATION')) {
@@ -1924,7 +1925,7 @@ export function TeacherDashboard({
           };
           
           let end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
-          if (ev.dtend && !ev.dtend.toISOString().includes('T')) {
+          if (ev.dtend && ev.isAllDay) {
             end.setDate(end.getDate() - 1);
           }
           
@@ -3082,11 +3083,6 @@ export function TeacherDashboard({
       if (tData?.school_id) {
         // Prepare Student Query depending on platform
         let studentQuery = supabase.from('users').select('*').eq('school_id', tData.school_id).eq('role', 'student').eq('teacher_id', userId);
-        if (activePlatform === 'campus') {
-          studentQuery = studentQuery.eq('is_campus_active', true);
-        } else {
-          studentQuery = studentQuery.eq('is_groovelab_active', true);
-        }
 
         // Prepare dynamic matching board songs query
         let wallSongsQuery = supabase.from('songs').select(`

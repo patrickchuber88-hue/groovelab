@@ -45,9 +45,23 @@ interface ScheduleCalendarViewProps {
   boards: any[];
   activeTab?: string;
   setActiveTab?: (tab: 'calendar' | 'designer') => void;
+  teachers?: any[];
+  selectedTeacherId?: string;
+  setSelectedTeacherId?: (id: string) => void;
+  currentUserRole?: string;
 }
 
-export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setActiveTab }: ScheduleCalendarViewProps) {
+export function ScheduleCalendarView({ 
+  schoolId, 
+  userId, 
+  boards, 
+  activeTab, 
+  setActiveTab,
+  teachers,
+  selectedTeacherId,
+  setSelectedTeacherId,
+  currentUserRole
+}: ScheduleCalendarViewProps) {
   const toLocalYYYYMMDD = (d: Date) => {
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -112,6 +126,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
             currentEvent.description = value.replace(/\\n/g, '\n');
           } else if (key.startsWith('DTSTART')) {
             currentEvent.dtstart = parseICSDate(value);
+            currentEvent.isAllDay = !value.includes('T');
           } else if (key.startsWith('DTEND')) {
             currentEvent.dtend = parseICSDate(value);
           } else if (key.startsWith('LOCATION')) {
@@ -175,7 +190,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
           };
           
           let end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
-          if (ev.dtend && !ev.dtend.toISOString().includes('T')) {
+          if (ev.dtend && ev.isAllDay) {
             end.setDate(end.getDate() - 1);
           }
           
@@ -872,8 +887,7 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
         .from('schedule_occurrences')
         .delete()
         .eq('teacher_id', userId)
-        .gte('date', weekStartStr)
-        .lte('date', weekEndStr);
+        .or(`and(date.gte.${weekStartStr},date.lte.${weekEndStr}),and(original_date.gte.${weekStartStr},original_date.lte.${weekEndStr})`);
       
       if (error) throw error;
 
@@ -1331,10 +1345,36 @@ export function ScheduleCalendarView({ schoolId, userId, boards, activeTab, setA
           <div style={{ height: '40px', width: '40px', borderRadius: '12px', background: 'rgba(22, 163, 74, 0.15)', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <CalendarIcon size={20} />
           </div>
-          <div style={{ minWidth: 0 }}>
+          <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <h2 style={{ fontSize: '28px', fontWeight: 900, color: '#1e293b', margin: 0, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
               KW {weekNumber}
             </h2>
+            {(currentUserRole === 'admin' || currentUserRole === 'secretary') && teachers && teachers.length > 0 && selectedTeacherId && setSelectedTeacherId && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#86868b' }}>Lehrkraft:</span>
+                <select
+                  value={selectedTeacherId}
+                  onChange={(e) => setSelectedTeacherId(e.target.value)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.75)',
+                    border: '1px solid rgba(0, 0, 0, 0.08)',
+                    borderRadius: '6px',
+                    padding: '2px 8px',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    color: '#1d1d1f',
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {teachers.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.first_name} {t.last_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
 

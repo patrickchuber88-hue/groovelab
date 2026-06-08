@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   Calendar, 
@@ -66,6 +66,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   // Main state
   const [activeTab, setActiveTab] = useState<'calendar' | 'designer'>('calendar');
   const [boards, setBoards] = useState<DayBoard[]>([]);
+  const [drafts, setDrafts] = useState<{ id: string; name: string; boards: DayBoard[] }[]>([]);
+  const [activeDraftId, setActiveDraftId] = useState<string>('default');
+  const [submittedDraftId, setSubmittedDraftId] = useState<string>('');
+  const lastSavedStateRef = useRef<string>('');
   const [students, setStudents] = useState<Student[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,6 +78,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarTab, setSidebarTab] = useState<'all' | 'unassigned' | 'assigned'>('all');
   const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
+
+  // Teacher selector states
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string>(userId);
+  const [teachers, setTeachers] = useState<any[]>([]);
+  const [currentUserRole, setCurrentUserRole] = useState<string>('');
   
   // Create Board form state
   const [newBoardDay, setNewBoardDay] = useState(1);
@@ -91,12 +100,13 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const [scheduleStatus, setScheduleStatus] = useState<'none' | 'pending' | 'approved'>('none');
 
   useEffect(() => {
+    lastSavedStateRef.current = '';
     loadInitialData();
-  }, [schoolId, userId]);
+  }, [schoolId, userId, selectedTeacherId]);
 
   useEffect(() => {
     if (!isInitialLoadDone) return;
-    if (userId) {
+    if (selectedTeacherId) {
       const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
       const columnName = activePlatform === 'campus' ? 'campus_räume' : 'groovelab_räume';
 
@@ -118,24 +128,49 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         }))
       }));
 
+      // Update our drafts list for the active draft ID
+      const updatedDrafts = drafts.map(d => {
+        if (d.id === activeDraftId) {
+          return { ...d, boards: boardDefinitions };
+        }
+        return d;
+      });
+
+      const draftStateToSave = {
+        activeDraftId,
+        submittedDraftId,
+        drafts: updatedDrafts
+      };
+
+      const payloadStr = JSON.stringify(draftStateToSave);
+      if (lastSavedStateRef.current === payloadStr) {
+        return;
+      }
+      lastSavedStateRef.current = payloadStr;
+
+      // Update local drafts state to keep it fully synchronized!
+      setDrafts(updatedDrafts);
+
+      localStorage.setItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, payloadStr);
+      // Legacy compatibility item
       if (boards.length > 0) {
-        localStorage.setItem(`groovelab_teacher_boards_${activePlatform}_${userId}`, JSON.stringify(boardDefinitions));
+        localStorage.setItem(`groovelab_teacher_boards_${activePlatform}_${selectedTeacherId}`, JSON.stringify(boardDefinitions));
       } else {
-        localStorage.removeItem(`groovelab_teacher_boards_${activePlatform}_${userId}`);
+        localStorage.removeItem(`groovelab_teacher_boards_${activePlatform}_${selectedTeacherId}`);
       }
 
       // Save to Supabase planned_boards column dynamically in real-time
       supabase
         .from('users')
-        .update({ [columnName]: boardDefinitions })
-        .eq('id', userId)
+        .update({ [columnName]: draftStateToSave })
+        .eq('id', selectedTeacherId)
         .then(({ error }) => {
           if (error) {
             console.error(`Error auto-saving ${columnName} to DB:`, error);
           }
         });
     }
-  }, [boards, userId]);
+  }, [boards, drafts, activeDraftId, submittedDraftId, selectedTeacherId, isInitialLoadDone]);
 
   const loadInitialData = async () => {
     try {
@@ -144,7 +179,40 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       const isCampus = activePlatform === 'campus';
       const columnName = isCampus ? 'campus_räume' : 'groovelab_räume';
       
-      // 1. Fetch all rooms
+      // 1. Fetch current user role and teachers list if not done yet
+      let role = currentUserRole;
+      let teachersList = teachers;
+      if (!role) {
+        const { data: userProfile } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', userId)
+          .maybeSingle();
+        role = userProfile?.role || 'teacher';
+        setCurrentUserRole(role);
+
+        if (role === 'admin' || role === 'secretary') {
+          const { data: tData } = await supabase
+            .from('users')
+            .select('id, first_name, last_name')
+            .eq('school_id', schoolId)
+            .in('role', ['teacher', 'admin', 'secretary'])
+            .order('first_name');
+          teachersList = tData || [];
+          setTeachers(teachersList);
+          
+          // Default to the first teacher if selectedTeacherId is still the admin's ID
+          if (selectedTeacherId === userId && teachersList.length > 0) {
+            const firstTeacher = teachersList.find(t => t.id !== userId) || teachersList[0];
+            if (firstTeacher) {
+              setSelectedTeacherId(firstTeacher.id);
+              return; // Exiting early as the state change will trigger this effect again
+            }
+          }
+        }
+      }
+
+      // Fetch all rooms
       const { data: rData } = await supabase
         .from('rooms')
         .select('id, name')
@@ -157,13 +225,13 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         setNewBoardRoom(loadedRooms[0].id);
       }
 
-      // 2. Fetch all students for this teacher who are active in the platform
+      // 2. Fetch all students for the selected teacher who are in the school
       const { data: sData } = await supabase
         .from('users')
         .select('id, first_name, last_name, instrument, lesson_duration')
         .eq('school_id', schoolId)
         .eq('role', 'student')
-        .eq('teacher_id', userId)
+        .eq('teacher_id', selectedTeacherId)
         ;
       
       const loadedStudents: Student[] = (sData || []).map(s => ({
@@ -178,19 +246,76 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       const { data: teacherProfile } = await supabase
         .from('users')
         .select('*')
-        .eq('id', userId)
+        .eq('id', selectedTeacherId)
         .maybeSingle();
 
-      const dbPlannedBoards = ((teacherProfile as any)?.[columnName] || teacherProfile?.planned_boards) as { id: string; dayOfWeek: number; startAnchor: string; roomId: string; students?: Student[] }[] || [];
+      const rawPlanned = (teacherProfile as any)?.[columnName] || teacherProfile?.planned_boards;
+      const storedDraftState = localStorage.getItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`);
+      const storedBoardsState = localStorage.getItem(`groovelab_teacher_boards_${activePlatform}_${selectedTeacherId}`) || localStorage.getItem(`groovelab_teacher_boards_${selectedTeacherId}`);
+      const hasSavedDrafts = !!(
+        (rawPlanned && (Array.isArray(rawPlanned) ? rawPlanned.length > 0 : ((rawPlanned as any).drafts && (rawPlanned as any).drafts.length > 0))) ||
+        storedDraftState ||
+        storedBoardsState
+      );
+      
+      let loadedDrafts: { id: string; name: string; boards: DayBoard[] }[] = [];
+      let loadedActiveDraftId = 'default';
+      let loadedSubmittedDraftId = '';
+
+      if (rawPlanned && typeof rawPlanned === 'object' && !Array.isArray(rawPlanned) && (rawPlanned as any).drafts) {
+        loadedDrafts = (rawPlanned as any).drafts;
+        loadedActiveDraftId = (rawPlanned as any).activeDraftId || 'default';
+        loadedSubmittedDraftId = (rawPlanned as any).submittedDraftId || '';
+      } else if (Array.isArray(rawPlanned) && rawPlanned.length > 0) {
+        // Legacy single draft format
+        loadedDrafts = [{ id: 'default', name: 'Standard-Entwurf', boards: rawPlanned as any }];
+        loadedActiveDraftId = 'default';
+      } else {
+        // Fallback to local storage
+        const stored = localStorage.getItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`);
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            if (parsed && parsed.drafts) {
+              loadedDrafts = parsed.drafts;
+              loadedActiveDraftId = parsed.activeDraftId || 'default';
+              loadedSubmittedDraftId = parsed.submittedDraftId || '';
+            }
+          } catch (e) {}
+        }
+      }
+
+      if (loadedDrafts.length === 0) {
+        // Fallback to old single boards localstorage item if present
+        const storedBoards = localStorage.getItem(`groovelab_teacher_boards_${activePlatform}_${selectedTeacherId}`) || localStorage.getItem(`groovelab_teacher_boards_${selectedTeacherId}`);
+        let parsedStored: any[] = [];
+        if (storedBoards) {
+          try {
+            parsedStored = JSON.parse(storedBoards);
+          } catch (e) {}
+        }
+        loadedDrafts = [{ id: 'default', name: 'Standard-Entwurf', boards: parsedStored }];
+        loadedActiveDraftId = 'default';
+      }
+
+      setDrafts(loadedDrafts);
+      setActiveDraftId(loadedActiveDraftId);
+
+      const currentActiveDraft = loadedDrafts.find(d => d.id === loadedActiveDraftId) || loadedDrafts[0];
+      const dbPlannedBoards = currentActiveDraft ? currentActiveDraft.boards : [];
 
       // 4. Fetch existing schedules to pre-populate boards
       const { data: schedData } = await supabase
         .from('schedules')
         .select('*, student:users!schedules_student_id_fkey(*)')
-        .eq('teacher_id', userId);
+        .eq('teacher_id', selectedTeacherId);
 
       if (schedData && schedData.length > 0) {
         setHasSubmittedSchedule(true);
+        // Default submittedDraftId to current active draft if none was saved in DB
+        const finalSubmittedId = loadedSubmittedDraftId || loadedActiveDraftId;
+        setSubmittedDraftId(finalSubmittedId);
+
         // Determine schedule review/approval status by looking at non-break schedules
         const nonBreakSchedules = schedData.filter(s => s.student_id !== null);
         if (nonBreakSchedules.length > 0) {
@@ -208,6 +333,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         }
       } else {
         setHasSubmittedSchedule(false);
+        setSubmittedDraftId('');
         setScheduleStatus('none');
       }
 
@@ -215,15 +341,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       let reconstructedBoards: DayBoard[] = [];
       const usedStudentIds = new Set<string>();
 
-      const storedBoards = localStorage.getItem(`groovelab_teacher_boards_${activePlatform}_${userId}`) || localStorage.getItem(`groovelab_teacher_boards_${userId}`);
-      let parsedStored: typeof dbPlannedBoards = [];
-      if (storedBoards) {
-        try {
-          parsedStored = JSON.parse(storedBoards);
-        } catch (e) {}
-      }
-
-      const activeBoardsDefinition = dbPlannedBoards.length > 0 ? dbPlannedBoards : parsedStored;
+      const activeBoardsDefinition = dbPlannedBoards;
 
       if (activeBoardsDefinition && activeBoardsDefinition.length > 0) {
         try {
@@ -240,7 +358,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           
           const totalAssignedInDraft = reconstructedBoards.reduce((acc, b) => acc + b.students.length, 0);
 
-          if (totalAssignedInDraft === 0 && schedData && schedData.length > 0) {
+          if (totalAssignedInDraft === 0 && !hasSavedDrafts && schedData && schedData.length > 0) {
             // Populate students from schedData into these boards
             schedData.forEach(slot => {
               const isBreak = !slot.student;
@@ -766,7 +884,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             students: b.students
           }));
           const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
-          localStorage.setItem(`groovelab_teacher_boards_${activePlatform}_${userId}`, JSON.stringify(boardDefinitions));
+          localStorage.setItem(`groovelab_teacher_boards_${activePlatform}_${selectedTeacherId}`, JSON.stringify(boardDefinitions));
           alert('Stundenplan erfolgreich aus dem Backup wiederhergestellt!');
         } else {
           alert('Ungültiges Backup-Format.');
@@ -780,6 +898,99 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     }
     
     e.target.value = '';
+  };
+
+  const syncStudentsWithBoards = (targetBoards: DayBoard[]) => {
+    setStudents(prev => {
+      const assignments = new Map<string, { dayOfWeek: number; timeSlot?: string }>();
+      targetBoards.forEach(b => {
+        b.students.forEach(s => {
+          if (!s.isBreak) {
+            assignments.set(s.id, { dayOfWeek: b.dayOfWeek, timeSlot: s.assignedTime });
+          }
+        });
+      });
+      
+      return prev.map(s => {
+        const assignment = assignments.get(s.id);
+        if (assignment) {
+          return {
+            ...s,
+            assignedDay: assignment.dayOfWeek,
+            assignedTime: assignment.timeSlot
+          };
+        } else {
+          return {
+            ...s,
+            assignedDay: undefined,
+            assignedTime: undefined
+          };
+        }
+      });
+    });
+  };
+
+  const handleSwitchDraft = (draftId: string) => {
+    const targetDraft = drafts.find(d => d.id === draftId);
+    if (!targetDraft) return;
+    
+    setActiveDraftId(draftId);
+    const newBoards = targetDraft.boards || [];
+    setBoards(newBoards);
+    syncStudentsWithBoards(newBoards);
+  };
+
+  const handleCreateDraft = () => {
+    const newId = `draft-${crypto.randomUUID()}`;
+    const nextNumber = drafts.length + 1;
+    const draftName = `Entwurf ${nextNumber}`;
+    
+    const defaultRoomId = rooms.length > 0 ? rooms[0].id : '';
+    const initialBoards: DayBoard[] = [];
+    for (let i = 1; i <= 5; i++) {
+      initialBoards.push({
+        id: `board-${crypto.randomUUID()}`,
+        dayOfWeek: i,
+        startAnchor: '14:00',
+        roomId: defaultRoomId,
+        students: []
+      });
+    }
+
+    const newDraft = {
+      id: newId,
+      name: draftName,
+      boards: initialBoards
+    };
+    
+    setDrafts(prev => [...prev, newDraft]);
+    setActiveDraftId(newId);
+    setBoards(initialBoards);
+    syncStudentsWithBoards(initialBoards);
+  };
+
+  const handleDeleteDraft = (draftId: string) => {
+    if (drafts.length <= 1) {
+      alert('Der letzte verbleibende Entwurf kann nicht gelöscht werden.');
+      return;
+    }
+    if (!confirm('Möchtest du diesen Entwurf wirklich löschen?')) {
+      return;
+    }
+    const filtered = drafts.filter(d => d.id !== draftId);
+    const updatedDrafts = filtered.map((d, index) => ({
+      ...d,
+      name: `Entwurf ${index + 1}`
+    }));
+    
+    setDrafts(updatedDrafts);
+    if (activeDraftId === draftId) {
+      const fallback = updatedDrafts[0];
+      setActiveDraftId(fallback.id);
+      const newBoards = fallback.boards || [];
+      setBoards(newBoards);
+      syncStudentsWithBoards(newBoards);
+    }
   };
 
   // Lock in schedule and send to Secretariat
@@ -805,7 +1016,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       await supabase
         .from('schedules')
         .delete()
-        .eq('teacher_id', userId);
+        .eq('teacher_id', selectedTeacherId);
 
       // Save the planned boards definitions to the teacher's profile in users table
       const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
@@ -815,13 +1026,40 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         id: b.id,
         dayOfWeek: b.dayOfWeek,
         startAnchor: b.startAnchor,
-        roomId: b.roomId
+        roomId: b.roomId,
+        students: b.students.map(s => ({
+          id: s.id,
+          first_name: s.first_name,
+          last_name: s.last_name,
+          instrument: s.instrument,
+          duration: s.duration,
+          assignedDay: s.assignedDay,
+          assignedTime: s.assignedTime,
+          isBreak: s.isBreak,
+          customStartTime: s.customStartTime
+        }))
       }));
+
+      const updatedDrafts = drafts.map(d => {
+        if (d.id === activeDraftId) {
+          return { ...d, boards: boardDefinitions };
+        }
+        return d;
+      });
+
+      const draftStateToSave = {
+        activeDraftId,
+        submittedDraftId: activeDraftId,
+        drafts: updatedDrafts
+      };
 
       await supabase
         .from('users')
-        .update({ [columnName]: boardDefinitions })
-        .eq('id', userId);
+        .update({ [columnName]: draftStateToSave })
+        .eq('id', selectedTeacherId);
+
+      setSubmittedDraftId(activeDraftId);
+      setDrafts(updatedDrafts);
 
       // 2. Insert all new schedule slots from the day boards
       const inserts = [];
@@ -829,7 +1067,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         for (const s of board.students) {
           inserts.push({
             school_id: schoolId,
-            teacher_id: userId,
+            teacher_id: selectedTeacherId,
             student_id: s.isBreak ? null : s.id,
             day_of_week: board.dayOfWeek,
             time_slot: s.assignedTime,
@@ -888,7 +1126,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         await supabase
           .from('schedule_occurrences')
           .delete()
-          .eq('teacher_id', userId)
+          .eq('teacher_id', selectedTeacherId)
           .gte('date', todayStr);
 
         if (occurrences.length > 0) {
@@ -905,14 +1143,14 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       const { data: teacherProfile } = await supabase
         .from('users')
         .select('first_name, last_name')
-        .eq('id', userId)
+        .eq('id', selectedTeacherId)
         .single();
       
       const teacherName = teacherProfile ? `${teacherProfile.first_name} ${teacherProfile.last_name}` : 'Patrick';
 
       await supabase.from('system_alerts').insert({
         school_id: schoolId,
-        teacher_id: userId,
+        teacher_id: selectedTeacherId,
         type: 'Stundenplan Freigabe',
         message: `🗓️ Stundenplan-Review: Lehrkraft ${teacherName} hat den neuen Stundenplan erstellt und zur Freigabe an die Verwaltung gesendet.`
       });
@@ -965,7 +1203,17 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', maxWidth: '100%', margin: '0', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
       
       {activeTab === 'calendar' ? (
-        <ScheduleCalendarView schoolId={schoolId} userId={userId} boards={boards} activeTab={activeTab} setActiveTab={setActiveTab} />
+        <ScheduleCalendarView 
+          schoolId={schoolId} 
+          userId={selectedTeacherId} 
+          boards={boards} 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab} 
+          teachers={teachers}
+          selectedTeacherId={selectedTeacherId}
+          setSelectedTeacherId={setSelectedTeacherId}
+          currentUserRole={currentUserRole}
+        />
       ) : (
         <>
           {showCelebration ? (
@@ -1010,10 +1258,36 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               <div style={{ height: '40px', width: '40px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.15)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Calendar size={20} />
               </div>
-              <div style={{ minWidth: 0 }}>
+              <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
                   Stundenplan-Designer
                 </h2>
+                {(currentUserRole === 'admin' || currentUserRole === 'secretary') && teachers.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#86868b' }}>Lehrkraft:</span>
+                    <select
+                      value={selectedTeacherId}
+                      onChange={(e) => setSelectedTeacherId(e.target.value)}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.75)',
+                        border: '1px solid rgba(0, 0, 0, 0.08)',
+                        borderRadius: '6px',
+                        padding: '2px 8px',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        color: '#1d1d1f',
+                        outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {teachers.map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.first_name} {t.last_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1022,7 +1296,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 onClick={() => setActiveTab('calendar')}
                 className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`}
               >
-                Stundenplan
+                {hasSubmittedSchedule ? 'Mein Stundenplan' : 'Entwurf'}
               </button>
               <button 
                 onClick={() => setActiveTab('designer')}
@@ -1081,6 +1355,97 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               >
                 <Send size={13} />
                 {submitting ? 'Wird gesendet...' : 'Einloggen & Senden'}
+              </button>
+            </div>
+          </div>
+
+          {/* Draft Management Toolbar */}
+          <div style={{ 
+            background: 'rgba(255, 255, 255, 0.55)', 
+            backdropFilter: 'blur(20px) saturate(190%)', 
+            WebkitBackdropFilter: 'blur(20px) saturate(190%)',
+            borderRadius: '16px', 
+            padding: '10px 16px', 
+            border: '1px solid rgba(255, 255, 255, 0.5)', 
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)',
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between',
+            gap: '12px',
+            marginTop: '-4px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#86868b', marginRight: '4px' }}>Entwürfe:</span>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                {drafts.map(d => {
+                  const isActive = d.id === activeDraftId;
+                  const totalLessons = d.boards?.reduce((acc, b) => acc + (b.students?.length || 0), 0) || 0;
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => handleSwitchDraft(d.id)}
+                      style={{
+                        background: isActive 
+                          ? 'linear-gradient(135deg, #eab308 0%, #d97706 100%)' 
+                          : 'rgba(255, 255, 255, 0.65)',
+                        color: isActive ? 'white' : '#1d1d1f',
+                        border: '1px solid rgba(0, 0, 0, 0.08)',
+                        borderRadius: '8px',
+                        padding: '6px 12px',
+                        fontSize: '0.76rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        boxShadow: isActive ? '0 4px 12px rgba(217, 119, 6, 0.15)' : '0 2px 4px rgba(0,0,0,0.01)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                      onMouseOver={e => {
+                        if (!isActive) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
+                      }}
+                      onMouseOut={e => {
+                        if (!isActive) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.65)';
+                      }}
+                    >
+                      <span>{d.id === submittedDraftId ? 'Mein Stundenplan' : d.name}</span>
+                      <span style={{ 
+                        background: isActive ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.05)', 
+                        padding: '1px 5px', 
+                        borderRadius: '4px', 
+                        fontSize: '0.65rem',
+                        color: isActive ? 'white' : '#86868b'
+                      }}>
+                        {totalLessons}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => handleCreateDraft()}
+                style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#2563eb', border: '1px solid rgba(59, 130, 246, 0.15)', fontWeight: 600, padding: '5px 12px', borderRadius: '8px', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', transition: 'all 0.15s' }}
+                onMouseOver={e => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'}
+                onMouseOut={e => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'}
+              >
+                <Plus size={12} />
+                Neuer leerer Entwurf
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteDraft(activeDraftId)}
+                disabled={drafts.length <= 1}
+                style={{ background: 'rgba(239, 68, 68, 0.08)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.12)', fontWeight: 600, padding: '5px 12px', borderRadius: '8px', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', transition: 'all 0.15s', opacity: drafts.length <= 1 ? 0.5 : 1, pointerEvents: drafts.length <= 1 ? 'none' : 'auto' }}
+                onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
+                onMouseOut={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
+              >
+                <Trash2 size={12} />
+                Löschen
               </button>
             </div>
           </div>
@@ -1338,6 +1703,16 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           );
                         }
 
+                        const isSubmitted = hasSubmittedSchedule && activeDraftId === submittedDraftId;
+                        const cardBg = isSubmitted ? 'rgba(220, 252, 231, 0.5)' : 'rgba(219, 234, 254, 0.65)';
+                        const cardBorder = isSubmitted ? '1px solid rgba(16, 185, 129, 0.18)' : '1px solid rgba(59, 130, 246, 0.2)';
+                        const cardBorderLeft = isSubmitted ? '4px solid #10b981' : '4px solid #3b82f6';
+                        const textColor = isSubmitted ? '#065f46' : '#1e3a8a';
+                        const badgeBg = isSubmitted ? 'rgba(16, 185, 129, 0.08)' : 'rgba(59, 130, 246, 0.08)';
+                        const badgeColor = isSubmitted ? '#047857' : '#1d4ed8';
+                        const shadowColor = isSubmitted ? 'rgba(16,185,129,0.06)' : 'rgba(59,130,246,0.06)';
+                        const shadowHoverColor = isSubmitted ? 'rgba(16,185,129,0.14)' : 'rgba(59,130,246,0.14)';
+
                         return (
                           <div
                             key={bs.id}
@@ -1346,37 +1721,37 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             onDragOver={handleDragOver}
                             onDrop={(e) => { e.stopPropagation(); handleDropOnBoard(board.id, cardIndex); }}
                             style={{
-                              position: 'absolute', left: 0, right: 0,
-                              top: `${Math.max(cardTopPx, 0)}px`,
-                              height: `${Math.max(cardHeightPx, 32)}px`,
-                              background: 'rgba(220, 252, 231, 0.5)',
-                              border: '1px solid rgba(16, 185, 129, 0.18)',
-                              borderLeft: '4px solid #10b981',
-                              borderRadius: '8px', padding: '5px 8px', boxSizing: 'border-box',
-                              cursor: 'grab', display: 'flex', flexDirection: 'column',
-                              justifyContent: 'center', gap: '2px', zIndex: 2, overflow: 'hidden',
-                              boxShadow: '0 2px 6px rgba(16,185,129,0.06)', transition: 'box-shadow 0.15s',
-                            }}
-                            onMouseOver={e => (e.currentTarget.style.boxShadow = '0 4px 14px rgba(16,185,129,0.14)')}
-                            onMouseOut={e => (e.currentTarget.style.boxShadow = '0 2px 6px rgba(16,185,129,0.06)')}
-                          >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#065f46' }}>{bs.assignedTime}</span>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                <span style={{ fontSize: '0.62rem', fontWeight: 600, color: '#047857', background: 'rgba(16,185,129,0.08)', padding: '1px 5px', borderRadius: '4px' }}>{bs.duration}m</span>
-                                <button type="button" onClick={() => handleRemoveStudentFromBoard(board.id, bs.id)}
-                                  style={{ background: 'transparent', border: 'none', color: '#047857', display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '1px', opacity: 0.7 }}
-                                  onMouseOver={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; (e.currentTarget as HTMLElement).style.color = '#ef4444'; }}
-                                  onMouseOut={e => { (e.currentTarget as HTMLElement).style.opacity = '0.7'; (e.currentTarget as HTMLElement).style.color = '#047857'; }}
-                                  title="Entfernen"><X size={11} strokeWidth={2.5} /></button>
-                              </div>
+                            position: 'absolute', left: 0, right: 0,
+                            top: `${Math.max(cardTopPx, 0)}px`,
+                            height: `${Math.max(cardHeightPx, 32)}px`,
+                            background: cardBg,
+                            border: cardBorder,
+                            borderLeft: cardBorderLeft,
+                            borderRadius: '8px', padding: '5px 8px', boxSizing: 'border-box',
+                            cursor: 'grab', display: 'flex', flexDirection: 'column',
+                            justifyContent: 'center', gap: '2px', zIndex: 2, overflow: 'hidden',
+                            boxShadow: `0 2px 6px ${shadowColor}`, transition: 'box-shadow 0.15s',
+                          }}
+                          onMouseOver={e => (e.currentTarget.style.boxShadow = `0 4px 14px ${shadowHoverColor}`)}
+                          onMouseOut={e => (e.currentTarget.style.boxShadow = `0 2px 6px ${shadowColor}`)}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: textColor }}>{bs.assignedTime}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              <span style={{ fontSize: '0.62rem', fontWeight: 600, color: badgeColor, background: badgeBg, padding: '1px 5px', borderRadius: '4px' }}>{bs.duration}m</span>
+                              <button type="button" onClick={() => handleRemoveStudentFromBoard(board.id, bs.id)}
+                                style={{ background: 'transparent', border: 'none', color: badgeColor, display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '1px', opacity: 0.7 }}
+                                onMouseOver={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; (e.currentTarget as HTMLElement).style.color = '#ef4444'; }}
+                                onMouseOut={e => { (e.currentTarget as HTMLElement).style.opacity = '0.7'; (e.currentTarget as HTMLElement).style.color = textColor; }}
+                                title="Entfernen"><X size={11} strokeWidth={2.5} /></button>
                             </div>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#065f46', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }}>
-                              {bs.first_name} {bs.last_name}
-                            </span>
-                            {cardHeightPx > 52 && (
-                              <span style={{ fontSize: '0.62rem', fontWeight: 600, color: '#6ee7b7', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bs.instrument}</span>
-                            )}
+                          </div>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }}>
+                            {bs.first_name} {bs.last_name}
+                          </span>
+                          {cardHeightPx > 52 && (
+                            <span style={{ fontSize: '0.62rem', fontWeight: 600, color: isSubmitted ? '#047857' : '#2563eb', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bs.instrument}</span>
+                          )}
                           </div>
                         );
                       })}
