@@ -10816,7 +10816,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               fontFamily: 'Urbanist',
                               whiteSpace: 'nowrap'
                             }}>
-                              {students.filter(s => s.is_campus_active).length} Schüler
+                              {students.length} Schüler
                             </span>
                           </div>
                         );
@@ -10824,7 +10824,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                       {/* Fixed "Allgemein" entry for students without a teacher */}
                       {(() => {
-                        const unassignedCount = students.filter(s => !s.teacher_id && s.is_campus_active).length;
+                        const unassignedCount = students.filter(s => !s.teacher_id).length;
                         const isSelected = studentFilterTeacher === 'none';
                         const isHovered = dragHoveredTeacher === 'none';
                         return (
@@ -10911,7 +10911,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                       {allUniqueTeachers.map((t: any) => {
                         const teacherName = `${t.firstName || t.first_name || ''} ${t.lastName || t.last_name || ''}`.trim();
-                        const assignedCount = students.filter(s => s.teacher_id === t.id && s.is_campus_active).length;
+                        const assignedCount = students.filter(s => s.teacher_id === t.id).length;
                         const initials = `${t.firstName?.[0] || t.first_name?.[0] || ''}${t.lastName?.[0] || t.last_name?.[0] || ''}`.toUpperCase() || 'D';
                         const isSelected = studentFilterTeacher === t.id;
                         const isHovered = dragHoveredTeacher === t.id;

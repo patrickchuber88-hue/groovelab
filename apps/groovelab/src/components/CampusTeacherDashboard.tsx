@@ -421,8 +421,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
       .select('*, premium_status(is_premium_active)')
       .eq('school_id', schoolId)
       .eq('role', 'student')
-      .eq('teacher_id', teacherId)
-      .eq('is_campus_active', true);
+      .eq('teacher_id', teacherId);
     setStudents(sData || []);
 
     // 2. Fetch Rooms

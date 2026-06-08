@@ -1915,8 +1915,8 @@ export function AdminDashboard({
         setActiveSessions(sData || []);
       } else if (activeTab === 'students') {
         let sq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
-        if (activePlatform === 'campus') sq = sq.eq('is_campus_active', true);
-        else sq = sq.eq('is_groovelab_active', true);
+        if (activePlatform === 'campus' && adminData.role !== 'teacher') sq = sq.eq('is_campus_active', true);
+        else if (activePlatform !== 'campus') sq = sq.eq('is_groovelab_active', true);
         if (adminData.role === 'teacher') sq = sq.eq('teacher_id', adminData.id);
         const { data: studentsData } = await sq.order('first_name');
         if (studentsData) {
@@ -2109,8 +2109,8 @@ export function AdminDashboard({
 
         // Fetch students for assignments in songs/lehrwerke detail modal
         let studSq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
-        if (activePlatform === 'campus') studSq = studSq.eq('is_campus_active', true);
-        else studSq = studSq.eq('is_groovelab_active', true);
+        if (activePlatform === 'campus' && adminData.role !== 'teacher') studSq = studSq.eq('is_campus_active', true);
+        else if (activePlatform !== 'campus') studSq = studSq.eq('is_groovelab_active', true);
         if (adminData.role === 'teacher') studSq = studSq.eq('teacher_id', adminData.id);
         const { data: studentsData } = await studSq.order('first_name');
         if (studentsData) setStudents(studentsData);
@@ -2142,8 +2142,8 @@ export function AdminDashboard({
         }
         // Also fetch students for the search function in band edit
         let bsq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
-        if (activePlatform === 'campus') bsq = bsq.eq('is_campus_active', true);
-        else bsq = bsq.eq('is_groovelab_active', true);
+        if (activePlatform === 'campus' && adminData.role !== 'teacher') bsq = bsq.eq('is_campus_active', true);
+        else if (activePlatform !== 'campus') bsq = bsq.eq('is_groovelab_active', true);
         const { data: studentsData } = await bsq.order('first_name');
         if (studentsData) setStudents(studentsData);
         
@@ -2170,8 +2170,8 @@ export function AdminDashboard({
         if (teachersData) setTeachers(teachersData);
       } else if (activeTab === 'gallery') {
         let usq = supabase.from('users').select('*').eq('school_id', adminData.school_id);
-        if (activePlatform === 'campus') usq = usq.eq('is_campus_active', true);
-        else usq = usq.eq('is_groovelab_active', true);
+        if (activePlatform === 'campus' && adminData.role !== 'teacher') usq = usq.eq('is_campus_active', true);
+        else if (activePlatform !== 'campus') usq = usq.eq('is_groovelab_active', true);
         const { data: allUsers } = await usq.order('first_name');
         if (allUsers) {
           setStudents(allUsers.filter(u => u.role === 'student'));
@@ -2346,13 +2346,13 @@ export function AdminDashboard({
 
   const fetchStats = async (schoolId: string, customOpeningHours?: any) => {
     let studentSq = supabase.from('users').select('*', { count: 'exact', head: true }).eq('school_id', schoolId).eq('role', 'student');
-    if (activePlatform === 'campus') studentSq = studentSq.eq('is_campus_active', true);
-    else studentSq = studentSq.eq('is_groovelab_active', true);
+    if (activePlatform === 'campus' && admin?.role !== 'teacher') studentSq = studentSq.eq('is_campus_active', true);
+    else if (activePlatform !== 'campus') studentSq = studentSq.eq('is_groovelab_active', true);
     const { count: studentCount } = await studentSq;
 
     let studentListSq = supabase.from('users').select('*').eq('school_id', schoolId).eq('role', 'student');
-    if (activePlatform === 'campus') studentListSq = studentListSq.eq('is_campus_active', true);
-    else studentListSq = studentListSq.eq('is_groovelab_active', true);
+    if (activePlatform === 'campus' && admin?.role !== 'teacher') studentListSq = studentListSq.eq('is_campus_active', true);
+    else if (activePlatform !== 'campus') studentListSq = studentListSq.eq('is_groovelab_active', true);
     const { data: schoolStudents } = await studentListSq;
     if (schoolStudents) {
       setStudents(schoolStudents);
@@ -2369,8 +2369,8 @@ export function AdminDashboard({
       .select('check_in_time, check_out_time, station_id, user_id, users!inner(school_id, is_campus_active, is_groovelab_active)')
       .eq('users.school_id', schoolId)
       .not('check_out_time', 'is', null);
-    if (activePlatform === 'campus') sessionsSq = sessionsSq.eq('users.is_campus_active', true);
-    else sessionsSq = sessionsSq.eq('users.is_groovelab_active', true);
+    if (activePlatform === 'campus' && admin?.role !== 'teacher') sessionsSq = sessionsSq.eq('users.is_campus_active', true);
+    else if (activePlatform !== 'campus') sessionsSq = sessionsSq.eq('users.is_groovelab_active', true);
     const { data: sessions } = await sessionsSq;
 
     // Fetch focus logs filtered by active students
@@ -2378,8 +2378,8 @@ export function AdminDashboard({
       .from('fokus_logs')
       .select('user_id, duration_minutes, duration_seconds, created_at, users!inner(school_id, is_campus_active, is_groovelab_active)')
       .eq('users.school_id', schoolId);
-    if (activePlatform === 'campus') focusLogsSq = focusLogsSq.eq('users.is_campus_active', true);
-    else focusLogsSq = focusLogsSq.eq('users.is_groovelab_active', true);
+    if (activePlatform === 'campus' && admin?.role !== 'teacher') focusLogsSq = focusLogsSq.eq('users.is_campus_active', true);
+    else if (activePlatform !== 'campus') focusLogsSq = focusLogsSq.eq('users.is_groovelab_active', true);
     const { data: focusLogs } = await focusLogsSq;
 
     // Fetch skills filtered by active students and active songs
@@ -2388,7 +2388,11 @@ export function AdminDashboard({
       .select('user_id, progress_percent, instrument, is_stage_ready, last_practiced_at, student:users!user_song_skills_user_id_fkey!inner(school_id, is_campus_active, is_groovelab_active), songs!inner(title, artist, is_campus_active, is_groovelab_active)')
       .eq('student.school_id', schoolId);
     if (activePlatform === 'campus') {
-      skillsSq = skillsSq.eq('student.is_campus_active', true).eq('songs.is_campus_active', true);
+      if (admin?.role !== 'teacher') {
+        skillsSq = skillsSq.eq('student.is_campus_active', true).eq('songs.is_campus_active', true);
+      } else {
+        skillsSq = skillsSq.eq('songs.is_campus_active', true);
+      }
     } else {
       skillsSq = skillsSq.eq('student.is_groovelab_active', true).eq('songs.is_groovelab_active', true);
     }
@@ -2471,8 +2475,8 @@ export function AdminDashboard({
       .select('*, skills:user_song_skills!user_song_skills_user_id_fkey(progress_percent, is_stage_ready, songs(is_campus_active, is_groovelab_active))')
       .eq('school_id', schoolId)
       .eq('role', 'student');
-    if (activePlatform === 'campus') leaderboardSq = leaderboardSq.eq('is_campus_active', true);
-    else leaderboardSq = leaderboardSq.eq('is_groovelab_active', true);
+    if (activePlatform === 'campus' && admin?.role !== 'teacher') leaderboardSq = leaderboardSq.eq('is_campus_active', true);
+    else if (activePlatform !== 'campus') leaderboardSq = leaderboardSq.eq('is_groovelab_active', true);
     const { data: studentsWithSkills } = await leaderboardSq;
 
     const leaderboard = (studentsWithSkills || []).map((student: any) => {

@@ -23,7 +23,8 @@ import {
   Building2,
   ExternalLink,
   Eye,
-  Edit3
+  Edit3,
+  CalendarPlus
 } from 'lucide-react';
 
 interface CampusEventsBoardProps {
@@ -135,7 +136,46 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const [editVisibility, setEditVisibility] = useState<'all' | 'teachers' | 'students'>('all');
   const [savingVisibility, setSavingVisibility] = useState(false);
 
+  // iCal Subscription States
+  const [showIcalModal, setShowIcalModal] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [userQrToken, setUserQrToken] = useState<string>('');
+  const [generatingToken, setGeneratingToken] = useState<boolean>(false);
 
+  // Fetch or generate QR token for secure iCal URL
+  useEffect(() => {
+    const fetchOrCreateToken = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('qr_token')
+          .eq('id', userId)
+          .single();
+        if (error) throw error;
+        if (data && data.qr_token) {
+          setUserQrToken(data.qr_token);
+        } else {
+          setGeneratingToken(true);
+          const newToken = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
+          const { error: updateErr } = await supabase
+            .from('users')
+            .update({ qr_token: newToken })
+            .eq('id', userId);
+          if (updateErr) throw updateErr;
+          setUserQrToken(newToken);
+        }
+      } catch (err) {
+        console.warn('Error fetching or creating user QR token for iCal:', err);
+      } finally {
+        setGeneratingToken(false);
+      }
+    };
+    if (userId) {
+      fetchOrCreateToken();
+    }
+  }, [userId]);
 
   // Fetch all initial data
   useEffect(() => {
@@ -897,6 +937,49 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     }
   };
 
+  // Undo cancellation handler for students/teachers
+  const handleUndoCancel = async (occ: any) => {
+    if (!confirm('Möchtest du diese Absage wirklich rückgängig machen?')) return;
+    try {
+      if (!occ.id) return;
+
+      if (occ.id.toString().startsWith('virtual-')) {
+        if (occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick') {
+          const { error: updErr } = await supabase
+            .from('schedules')
+            .update({ status: 'approved' })
+            .eq('id', occ.schedule_id)
+            .eq('status', 'canceled_by_teacher_sick');
+          if (updErr) throw updErr;
+          await fetchLessons();
+        }
+        return;
+      }
+
+      if (occ.schedule_id) {
+        // Recurring template-derived slot: delete the cancellation override row to restore template default
+        const { error: delErr } = await supabase
+          .from('schedule_occurrences')
+          .delete()
+          .eq('id', occ.id);
+        if (delErr) throw delErr;
+      } else {
+        // One-off slot: update status back to 'scheduled'
+        const { error: updErr } = await supabase
+          .from('schedule_occurrences')
+          .update({ status: 'scheduled' })
+          .eq('id', occ.id);
+        if (updErr) throw updErr;
+      }
+
+      // Refresh local schedule state
+      await fetchLessons();
+    } catch (err: any) {
+      console.error('Error undoing cancellation:', err);
+      alert('Fehler beim Rückgängigmachen der Absage: ' + err.message);
+    }
+  };
+
   // Timeline Events merger (Column 2 merges custom + subscribed)
   const getMergedTimelineEvents = () => {
     const todayStr = new Date().toISOString().substring(0, 10);
@@ -1055,14 +1138,48 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         height: 'calc(100vh - 120px)',
         overflow: 'hidden'
       }}>
-        {/* Title */}
-        <div>
-          <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <CalendarDays size={18} color={brandColor} /> Unterrichtstermine
-          </h3>
-          <p style={{ color: '#64748b', fontSize: '0.78rem', margin: '4px 0 0 0', fontWeight: 550 }}>
-            Deine persönlichen Stundenplandaten
-          </p>
+        {/* Title & Right-Aligned Subscribe Button */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CalendarDays size={18} color={brandColor} /> Unterrichtstermine
+            </h3>
+            <p style={{ color: '#64748b', fontSize: '0.78rem', margin: '4px 0 0 0', fontWeight: 550 }}>
+              Deine persönlichen Stundenplandaten
+            </p>
+          </div>
+
+          {/* iCal Subscription Button (Noticeable Apple Red) */}
+          <button
+            onClick={() => setShowIcalModal(true)}
+            className="hover-scale"
+            title="Unterrichtstermine abonnieren (iCal)"
+            style={{
+              border: 'none',
+              background: '#ef4444',
+              color: '#ffffff',
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.35)',
+              flexShrink: 0
+            }}
+            onMouseEnter={e => { 
+              e.currentTarget.style.background = '#dc2626'; 
+              e.currentTarget.style.boxShadow = '0 6px 16px rgba(220, 38, 38, 0.45)'; 
+            }}
+            onMouseLeave={e => { 
+              e.currentTarget.style.background = '#ef4444'; 
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.35)'; 
+            }}
+          >
+            <CalendarPlus size={18} />
+          </button>
         </div>
 
         {/* Tabs switcher */}
@@ -1249,12 +1366,52 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                 </span>
                               </div>
 
-                              {/* Lesson Details */}
-                              <div style={{ minWidth: 0, flex: 1 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    {opponentName}
-                                  </span>
+                               <div style={{ minWidth: 0, flex: 1 }}>
+                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'nowrap', minWidth: 0 }}>
+                                   <span style={{ fontSize: '0.85rem', fontWeight: 800, color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 1, minWidth: 0 }}>
+                                     {opponentName}
+                                   </span>
+                                  {isCanceled && (
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                      <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', color: '#ef4444', background: '#fee2e2', padding: '2px 6px', borderRadius: '6px' }}>
+                                        Ausfall
+                                      </span>
+                                      {((occ.status === 'canceled_by_student' && userId === occ.student_id) ||
+                                        ((occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick' || occ.status === 'cancelled') && userId === occ.teacher_id)) && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleUndoCancel(occ);
+                                          }}
+                                          title="Absage rückgängig machen"
+                                          style={{
+                                            border: 'none',
+                                            background: '#f1f5f9',
+                                            color: '#475569',
+                                            fontSize: '0.62rem',
+                                            fontWeight: 800,
+                                            padding: '2px 8px',
+                                            borderRadius: '6px',
+                                            cursor: 'pointer',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '2px',
+                                            transition: 'all 0.15s ease'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = '#e2e8f0';
+                                            e.currentTarget.style.color = '#0f172a';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = '#f1f5f9';
+                                            e.currentTarget.style.color = '#475569';
+                                          }}
+                                        >
+                                          Rückgängig
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                                 
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.72rem', color: subColor, fontWeight: 700, marginTop: '1px' }}>
@@ -1294,9 +1451,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                   }} 
                                 />
                               ) : isCanceled ? (
-                                <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', color: '#ef4444', background: '#fee2e2', padding: '2px 6px', borderRadius: '6px' }}>
-                                  Ausfall
-                                </span>
+                                null
                               ) : (
                                 <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', color: '#d97706', background: '#fef3c7', padding: '2px 6px', borderRadius: '6px' }}>
                                   Verschoben
@@ -2613,6 +2768,252 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     Termin löschen
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* iCal Subscription Modal */}
+      {showIcalModal && (() => {
+        const supabaseUrlStr = import.meta.env.VITE_SUPABASE_URL || supabase?.supabaseUrl || 'https://supabase.178.105.10.2.sslip.io';
+        const cleanSupabaseUrl = supabaseUrlStr.replace('https://', '');
+        const token = userQrToken || userId;
+
+        return (
+          <div
+            onClick={() => setShowIcalModal(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 1100, // Make sure it sits above standard modals
+              background: 'rgba(15,23,42,0.65)',
+              backdropFilter: 'blur(8px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '24px',
+              animation: 'fadeIn 0.15s ease'
+            }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                background: '#ffffff',
+                borderRadius: '24px',
+                width: '100%',
+                maxWidth: '520px',
+                boxShadow: '0 32px 80px rgba(0,0,0,0.25)',
+                overflow: 'hidden',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                position: 'relative'
+              }}
+            >
+              {/* Top close button */}
+              <button
+                onClick={() => setShowIcalModal(false)}
+                style={{
+                  position: 'absolute',
+                  top: '20px',
+                  right: '20px',
+                  border: 'none',
+                  background: '#f1f5f9',
+                  borderRadius: '50%',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  transition: 'all 0.2s',
+                  zIndex: 10
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#0f172a'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#64748b'; }}
+              >
+                <X size={16} />
+              </button>
+
+              {/* Banner Header styled like Apple Calendar Month Strip (Red) */}
+              <div style={{
+                background: 'linear-gradient(135deg, #ff3b30 0%, #e02e24 100%)',
+                padding: '32px 24px',
+                color: '#ffffff',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}>
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  backdropFilter: 'blur(4px)',
+                  borderRadius: '16px',
+                  width: '48px',
+                  height: '48px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <CalendarDays size={24} color="#ffffff" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 950, letterSpacing: '-0.025em' }}>
+                    Kalender abonnieren
+                  </h3>
+                  <p style={{ margin: '4px 0 0 0', color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.82rem', fontWeight: 550, lineHeight: 1.4 }}>
+                    Synchronisiere deine Unterrichtstermine live mit deinem Smartphone (iPhone, Google Kalender, Outlook). Termine aktualisieren sich automatisch.
+                  </p>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                
+                {/* Option 1: One-Click Webcal Subscription */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Option 1: Direkt abonnieren
+                  </label>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <a
+                      href={`webcal://${cleanSupabaseUrl}/functions/v1/ical-feed?token=${token}`}
+                      style={{
+                        flex: 1,
+                        textDecoration: 'none',
+                        background: '#1e293b',
+                        color: '#ffffff',
+                        padding: '12px 16px',
+                        borderRadius: '14px',
+                        fontWeight: 800,
+                        fontSize: '0.85rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        boxShadow: '0 4px 14px rgba(30, 41, 59, 0.25)',
+                        transition: 'all 0.2s',
+                        textAlign: 'center'
+                      }}
+                      className="hover-scale"
+                    >
+                      <CalendarPlus size={16} /> Auf diesem Gerät abonnieren
+                    </a>
+                  </div>
+                </div>
+
+                {/* Option 2: Copy link or import into Google Calendar */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Option 2: Manuell oder Google Kalender
+                  </label>
+                  
+                  {/* Google Calendar Direct Import */}
+                  <a
+                    href={`https://calendar.google.com/calendar/render?cid=${encodeURIComponent(`webcal://${cleanSupabaseUrl}/functions/v1/ical-feed?token=${token}`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      textDecoration: 'none',
+                      background: '#f8fafc',
+                      border: '1.5px solid #e2e8f0',
+                      color: '#334155',
+                      padding: '12px 16px',
+                      borderRadius: '14px',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+                  >
+                    <Globe size={16} color="#4285F4" /> In Google Kalender importieren
+                  </a>
+
+                  {/* Copy Link Input */}
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                    <input
+                      type="text"
+                      readOnly
+                      value={`${supabaseUrlStr}/functions/v1/ical-feed?token=${token}`}
+                      style={{
+                        flex: 1,
+                        background: '#f8fafc',
+                        border: '1.5px solid #e2e8f0',
+                        borderRadius: '12px',
+                        padding: '10px 14px',
+                        fontSize: '0.75rem',
+                        fontFamily: 'monospace',
+                        color: '#475569',
+                        outline: 'none'
+                      }}
+                      onClick={e => (e.target as HTMLInputElement).select()}
+                    />
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${supabaseUrlStr}/functions/v1/ical-feed?token=${token}`);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                      style={{
+                        border: 'none',
+                        background: copied ? '#22c55e' : '#0f172a',
+                        color: '#ffffff',
+                        padding: '10px 16px',
+                        borderRadius: '12px',
+                        fontWeight: 800,
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: copied ? '0 4px 12px rgba(34, 197, 150, 0.2)' : 'none'
+                      }}
+                    >
+                      {copied ? <Check size={14} /> : null} {copied ? 'Kopiert' : 'Kopieren'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Instructions */}
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1.5px dashed #e2e8f0',
+                  borderRadius: '16px',
+                  padding: '16px',
+                  fontSize: '0.75rem',
+                  color: '#64748b',
+                  lineHeight: 1.5,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <span style={{ fontWeight: 800, color: '#334155' }}>💡 Kurzanleitung:</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span>• <b>iOS / macOS</b>: Klicke auf "Auf diesem Gerät abonnieren".</span>
+                    <span>• <b>Google / Android</b>: Klicke auf "In Google Kalender importieren".</span>
+                    <span>• <b>Andere</b>: Link kopieren und in deiner Kalender-App als Web-Kalender abonnieren.</span>
+                  </div>
+                  
+                  <div style={{ 
+                    marginTop: '8px', 
+                    padding: '10px 12px', 
+                    background: '#fffbeb', 
+                    borderRadius: '10px', 
+                    border: '1.5px solid #fef3c7', 
+                    fontSize: '0.7rem', 
+                    color: '#b45309',
+                    lineHeight: 1.4
+                  }}>
+                    <span style={{ fontWeight: 800, display: 'block', marginBottom: '2px' }}>⚠️ Lokale Entwicklung:</span>
+                    Bei einer lokalen Adresse (sslip.io) kann die Meldung „Unsichere Verbindung“ erscheinen. Klicke einfach auf „Fortfahren“. Auf dem Live-System entfällt dieser Schritt.
+                  </div>
+                </div>
+
               </div>
             </div>
           </div>
