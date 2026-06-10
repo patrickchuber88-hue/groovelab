@@ -1234,7 +1234,7 @@ export function ScheduleCalendarView({
                 } else {
                   const shortOrigDay = origDayLabel.substring(0, 2) + '.';
                   const shortOrigDate = `${String(origDate.getDate()).padStart(2, '0')}.${String(origDate.getMonth() + 1).padStart(2, '0')}.${String(origDate.getFullYear()).substring(2, 4)}`;
-                  notificationMessage = `Dein Unterrichtstermin wurde verschoben:\n${shortOrigDay} ${shortOrigDate} ${origTimeLabel} ➔ ${shortNewDay} ${shortNewDate} ${newTimeLabel} Uhr.\nBitte kurz bestätigen.`;
+                  notificationMessage = `Dein Termin wurde verschoben: ${shortOrigDay} ${shortOrigDate} ${origTimeLabel} Uhr -> ${shortNewDay} ${shortNewDate} ${newTimeLabel} Uhr. Bitte bestätige den neuen Termin.`;
                 }
               }
             }
@@ -1255,13 +1255,13 @@ export function ScheduleCalendarView({
                   .single();
 
                 if (studentProfile && studentProfile.is_campus_active) {
-                  let pushTitle = 'Terminänderung 📅';
+                  let pushTitle = 'Terminänderung 🔄';
                   if (change.status === 'cancelled') {
                     pushTitle = 'Unterricht fällt aus ☕';
                   } else if (change.date === origDateStr && change.start_time.substring(0, 5) === origTimeStr.substring(0, 5)) {
                     pushTitle = 'Termin zurückgesetzt 🔄';
                   } else {
-                    pushTitle = 'Terminverschiebung 📅';
+                    pushTitle = 'Terminänderung 🔄';
                   }
 
                   // Create a notification record in the DB

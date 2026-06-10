@@ -53,10 +53,9 @@ conn.on('ready', () => {
           console.log(`Found active container: ${containerName}`);
 
           const deployCommands = [
-            `docker cp /tmp/dist.tar.gz ${containerName}:/app/`,
-            `docker exec ${containerName} bash -c "rm -rf /app/dist/*"`,
-            `docker exec ${containerName} bash -c "tar -xzf /app/dist.tar.gz -C /app/dist/"`,
-            `docker exec ${containerName} rm /app/dist.tar.gz`,
+            `docker cp /tmp/dist.tar.gz ${containerName}:/usr/share/nginx/html/`,
+            `docker exec ${containerName} sh -c "tar -xzf /usr/share/nginx/html/dist.tar.gz -C /usr/share/nginx/html/"`,
+            `docker exec ${containerName} rm /usr/share/nginx/html/dist.tar.gz`,
             'rm /tmp/dist.tar.gz'
           ].join(' && ');
 
