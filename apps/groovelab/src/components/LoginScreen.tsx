@@ -1938,10 +1938,25 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
     let qrToken = scannedValue.trim();
     try {
-      if (scannedValue.includes('?') || scannedValue.startsWith('http://') || scannedValue.startsWith('https://')) {
-        // Handle case where it might be a query string or a full URL
-        const urlString = scannedValue.includes('?') ? scannedValue : `http://dummy.com/?${scannedValue}`;
-        const urlObj = new URL(urlString);
+      if (scannedValue.startsWith('http://') || scannedValue.startsWith('https://')) {
+        const urlObj = new URL(scannedValue);
+        if (urlObj.pathname.includes('/qr/')) {
+          const parts = urlObj.pathname.split('/qr/');
+          const tokenFromPath = parts[parts.length - 1];
+          if (tokenFromPath) {
+            qrToken = tokenFromPath.trim();
+          }
+        } else {
+          const parsedToken = urlObj.searchParams.get('qr_token') || 
+                              urlObj.searchParams.get('teacher_qr_token') || 
+                              urlObj.searchParams.get('token') || 
+                              urlObj.searchParams.get('campus_pass');
+          if (parsedToken) {
+            qrToken = parsedToken.trim();
+          }
+        }
+      } else if (scannedValue.includes('?')) {
+        const urlObj = new URL(`http://dummy.com/${scannedValue}`);
         const parsedToken = urlObj.searchParams.get('qr_token') || 
                             urlObj.searchParams.get('teacher_qr_token') || 
                             urlObj.searchParams.get('token') || 
