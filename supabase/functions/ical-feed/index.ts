@@ -52,12 +52,15 @@ Deno.serve(async (req) => {
       },
     })
 
-    // 1. Fetch user associated with this secure QR token
-    const { data: user, error: userErr } = await supabase
-      .from('users')
-      .select('id, first_name, last_name, role')
-      .eq('qr_token', token)
-      .maybeSingle()
+    // 1. Fetch user associated with this secure QR token or user ID (fallback)
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token || '');
+    let userQuery = supabase.from('users').select('id, first_name, last_name, role');
+    if (isUuid) {
+      userQuery = userQuery.or(`qr_token.eq.${token},id.eq.${token}`);
+    } else {
+      userQuery = userQuery.eq('qr_token', token);
+    }
+    const { data: user, error: userErr } = await userQuery.maybeSingle();
 
     if (userErr) {
       console.error('Error querying user by token:', userErr)
@@ -279,6 +282,25 @@ Deno.serve(async (req) => {
       icsContent.push(`DESCRIPTION:${escapeText(description)}`)
       icsContent.push(`LOCATION:${escapeText(occ.room_name)}`)
       icsContent.push(`STATUS:${statusText}`)
+
+      // Add alarms/reminders for active events
+      if (!isCanceled) {
+        const valarmDateStr = occ.date.replace(/-/g, '')
+        // Alarm 1: 08:00 AM morning check
+        icsContent.push('BEGIN:VALARM')
+        icsContent.push('ACTION:DISPLAY')
+        icsContent.push(`TRIGGER;VALUE=DATE-TIME;TZID=Europe/Berlin:${valarmDateStr}T080000`)
+        icsContent.push(`DESCRIPTION:Erinnerung: Heute ist dein Unterrichtstermin!`)
+        icsContent.push('END:VALARM')
+
+        // Alarm 2: 30 minutes transition warning
+        icsContent.push('BEGIN:VALARM')
+        icsContent.push('ACTION:DISPLAY')
+        icsContent.push('TRIGGER:-PT30M')
+        icsContent.push(`DESCRIPTION:Erinnerung: Dein Unterrichtstermin beginnt in 30 Minuten.`)
+        icsContent.push('END:VALARM')
+      }
+
       icsContent.push('END:VEVENT')
     }
 

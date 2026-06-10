@@ -1324,15 +1324,17 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               border: 'none',
               background: '#ef4444',
               color: '#ffffff',
-              width: '36px',
-              height: '36px',
-              borderRadius: '50%',
+              padding: '8px 14px',
+              borderRadius: '20px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              gap: '6px',
               cursor: 'pointer',
               transition: 'all 0.2s',
               boxShadow: '0 4px 12px rgba(239, 68, 68, 0.35)',
+              fontSize: '0.78rem',
+              fontWeight: 800,
               flexShrink: 0
             }}
             onMouseEnter={e => { 
@@ -1344,7 +1346,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.35)'; 
             }}
           >
-            <CalendarPlus size={18} />
+            <CalendarPlus size={15} />
+            <span>Abonnieren</span>
           </button>
         </div>
 
@@ -1649,19 +1652,22 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                >
                                  <MessageSquare size={15} />
                                </button>
-                              {!isCanceled && !isRescheduled && (
-                                <div 
-                                  title="Regulärer Termin"
-                                  style={{
-                                    width: '10px',
-                                    height: '10px',
-                                    borderRadius: '50%',
-                                    background: '#22c55e',
-                                    border: '2px solid #ffffff',
-                                    boxShadow: '0 0 6px rgba(34, 197, 94, 0.4)'
-                                  }} 
-                                />
-                              )}
+                               <div 
+                                 title={isCanceled ? "Ausfall-Termin" : isRescheduled ? "Verschobener Termin" : "Regulärer Termin"}
+                                 style={{
+                                   width: '10px',
+                                   height: '10px',
+                                   borderRadius: '50%',
+                                   background: isCanceled ? '#ef4444' : isRescheduled ? '#eab308' : '#22c55e',
+                                   border: '2px solid #ffffff',
+                                   boxShadow: isCanceled 
+                                     ? '0 0 6px rgba(239, 68, 68, 0.4)' 
+                                     : isRescheduled 
+                                       ? '0 0 6px rgba(234, 179, 8, 0.4)' 
+                                       : '0 0 6px rgba(34, 197, 94, 0.4)',
+                                   flexShrink: 0
+                                 }} 
+                               />
                             </div>
                           </div>
                         );

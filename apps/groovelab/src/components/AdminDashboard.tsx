@@ -8951,7 +8951,7 @@ export function AdminDashboard({
       const totalSchoolMins = myClassMins + otherClassMins;
 
       const classWeeklyMins = stats.classWeeklyMins || 0;
-      const weeklyTarget = stats.weeklyTarget || 300;
+      const weeklyTarget = stats.weeklyTargets?.[0]?.minutes || 300;
       const targetPercent = Math.min(100, Math.round((classWeeklyMins / weeklyTarget) * 100));
 
       // Pie chart data
