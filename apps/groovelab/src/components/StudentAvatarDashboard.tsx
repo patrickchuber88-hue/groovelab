@@ -1716,7 +1716,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       const studentName = userData ? `${userData.first_name} ${userData.last_name}` : 'Ein Schüler';
 
       await supabase.from('system_alerts').insert({
-        school_id: occ.schedule?.school_id || null,
+        school_id: occ.schedule?.school_id || studentUser?.school_id || null,
         teacher_id: occ.teacher_id,
         type: 'Termin abgesagt',
         message: `❌ Absage: ${studentName} hat den Termin am ${formattedDate} um ${occ.start_time?.substring(0,5)} Uhr abgesagt.`
@@ -1759,7 +1759,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       const formattedDate = new Date(occ.date).toLocaleDateString('de-DE');
 
       await supabase.from('system_alerts').insert({
-        school_id: occ.schedule?.school_id || null,
+        school_id: occ.schedule?.school_id || studentUser?.school_id || null,
         teacher_id: occ.teacher_id,
         type: 'Verschiebung abgelehnt',
         message: `❌ ${studentName} hat den Verschiebungstermin am ${formattedDate} abgelehnt. Der Termin wurde auf den Originaltermin zurückgesetzt und für diese Woche abgesagt.`
