@@ -6535,29 +6535,31 @@ function App() {
                           boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
                         }}>
                           <span style={{ fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                            <span style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                              <School size={12} color="#ef4444" />
-                              <span>
-                                {windowWidth <= 768 
-                                  ? getInitials(school?.name || 'Meine Musikschule') 
-                                  : (school?.name || 'Meine Musikschule')}
-                              </span>
-                            </span>
-                            <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
-                            <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <User size={14} color="#3b82f6" />
-                              <span>
-                                {(() => {
-                                  const teacherName = teachers.find(t => t.id === user.teacher_id) 
-                                    ? `${teachers.find(t => t.id === user.teacher_id).first_name} ${teachers.find(t => t.id === user.teacher_id).last_name}` 
-                                    : (teachers.length > 0 
-                                      ? `${teachers[0].first_name} ${teachers[0].last_name}` 
-                                      : 'Patrick Huber');
-                                  return windowWidth <= 768 ? getInitials(teacherName) : teacherName;
-                                })()}
-                              </span>
-                            </span>
-                            <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
+                            {windowWidth > 768 && (
+                              <>
+                                <span style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                  <School size={12} color="#ef4444" />
+                                  <span>
+                                    {school?.name || 'Meine Musikschule'}
+                                  </span>
+                                </span>
+                                <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
+                                <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <User size={14} color="#3b82f6" />
+                                  <span>
+                                    {(() => {
+                                      const teacherName = teachers.find(t => t.id === user.teacher_id) 
+                                        ? `${teachers.find(t => t.id === user.teacher_id).first_name} ${teachers.find(t => t.id === user.teacher_id).last_name}` 
+                                        : (teachers.length > 0 
+                                          ? `${teachers[0].first_name} ${teachers[0].last_name}` 
+                                          : 'Patrick Huber');
+                                      return teacherName;
+                                    })()}
+                                  </span>
+                                </span>
+                                <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
+                              </>
+                            )}
                             <span style={{ color: '#34a853', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <User size={14} color="#34a853" />
                               <span>
@@ -6756,7 +6758,8 @@ function App() {
         display: 'flex', 
         flexDirection: 'column', 
         height: activeStudentTab === 'live' ? '100%' : 'auto',
-        paddingRight: activePlatform === 'campus' ? '0px' : undefined,
+        paddingLeft: (activePlatform === 'campus' && windowWidth <= 768) ? '0px' : '20px',
+        paddingRight: (activePlatform === 'campus' && windowWidth <= 768) ? '0px' : (activePlatform === 'campus' ? '0px' : '20px'),
         minWidth: 0
       }}>
         {/* Ensemble & Bands Platform View */}

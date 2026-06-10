@@ -305,10 +305,10 @@ function MobileBriefingView({
   campusFeedAnnouncements
 }: MobileBriefingViewProps) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '4px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '12px 0px' }}>
       
       {/* TOP WELCOME CARD */}
-      <div style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', position: 'relative' }}>
+      <div style={{ background: '#ffffff', borderRadius: '0px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', position: 'relative', borderLeft: 'none', borderRight: 'none', borderTop: '1px solid rgba(0,0,0,0.04)', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 style={{ fontSize: '28px', fontWeight: 900, margin: 0, color: '#1e293b', fontFamily: "'Urbanist', sans-serif" }}>
             Briefing
@@ -391,7 +391,7 @@ function MobileBriefingView({
       </div>
 
       {/* RESPONSIVE GRID FOR KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px', padding: '0 12px' }}>
         {/* XP Kachel */}
         <div style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', borderRadius: '20px', color: 'white', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.08)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -437,7 +437,7 @@ function MobileBriefingView({
         alignItems: 'stretch'
       }}>
         {/* Widget 1: Hausaufgaben */}
-        <div style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1px solid rgba(0, 0, 0, 0.04)' }}>
+        <div style={{ background: '#ffffff', borderRadius: '0px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: 'none', borderTop: '1px solid rgba(0, 0, 0, 0.04)', borderBottom: '1px solid rgba(0, 0, 0, 0.04)' }}>
           {(() => {
             const activeHWs = progressItems.filter(item => item.is_current_homework && !item.topic_name.startsWith('Hausaufgabe KW '));
             const currentWeek = getISOWeek();
@@ -611,7 +611,7 @@ function MobileBriefingView({
         </div>
 
         {/* Widget 2: Tägliche Übezeit */}
-        <div style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '14px', border: '1px solid rgba(0, 0, 0, 0.04)' }}>
+        <div style={{ background: '#ffffff', borderRadius: '0px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '14px', border: 'none', borderTop: '1px solid rgba(0, 0, 0, 0.04)', borderBottom: '1px solid rgba(0, 0, 0, 0.04)' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{ background: 'rgba(251, 188, 5, 0.12)', color: '#d97706', width: '28px', height: '28px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -634,7 +634,7 @@ function MobileBriefingView({
         </div>
 
         {/* Widget 3: Flammen-Pfad */}
-        <div style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: '1px solid rgba(0, 0, 0, 0.04)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ background: '#ffffff', borderRadius: '0px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: 'none', borderTop: '1px solid rgba(0, 0, 0, 0.04)', borderBottom: '1px solid rgba(0, 0, 0, 0.04)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {(() => {
             const streak = avatar?.streak_flame || 0;
             return (
@@ -704,7 +704,7 @@ function MobileBriefingView({
       </div>
 
       {/* NÄCHSTE TERMINE TIMELINE */}
-      <div style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+      <div style={{ background: '#ffffff', borderRadius: '0px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', borderTop: '1px solid rgba(0,0,0,0.04)', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Calendar size={16} color="#10b981" />
@@ -937,7 +937,7 @@ function MobileBriefingView({
         if (appointmentChanges.length === 0) return null;
         
         return (
-          <div style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: '2px dashed #f59e0b' }}>
+          <div style={{ background: '#ffffff', borderRadius: '0px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: 'none', borderTop: '2px dashed #f59e0b', borderBottom: '2px dashed #f59e0b' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px' }}>
               <Calendar size={16} color="#f59e0b" />
               <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Terminänderungen</h3>
