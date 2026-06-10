@@ -1758,7 +1758,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                   color: '#e11d48',
                   borderRadius: '16px',
                   cursor: 'pointer',
-                  marginBottom: '20px',
+                  marginBottom: '10px',
                   boxShadow: '0 4px 12px rgba(225, 29, 72, 0.05)',
                   transition: 'all 0.2s',
                   zIndex: 10
