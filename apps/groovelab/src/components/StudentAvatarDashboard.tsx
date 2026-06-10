@@ -1783,7 +1783,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       let mapped = parentActiveTab;
       if (mapped === 'mediathek') mapped = 'songs';
       if (mapped === 'termine' || mapped === 'all_appointments') mapped = 'events';
-      if (['briefing', 'hero', 'songs', 'practice_board', 'campus_cup', 'events', 'profile'].includes(mapped)) {
+      if (['briefing', 'hero', 'songs', 'practice_board', 'campus_cup', 'events', 'profile', 'settings'].includes(mapped)) {
         setActiveTab(mapped as any);
       }
     }
