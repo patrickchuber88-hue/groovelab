@@ -6251,8 +6251,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             { id: 'employees', label: 'Mitarbeiter', icon: Users },
             { id: 'linking', label: 'Profil-Verknüpfung', icon: LinkIcon },
             { id: 'licenses', label: 'Lizenzen', icon: Award },
-            { id: 'setup', label: 'Setup & Design', icon: Settings },
-            { id: 'audit', label: 'Änderungsverlauf', icon: Clock }
+            { id: 'audit', label: 'Änderungsverlauf', icon: Clock },
+            { id: 'setup', label: 'Setup & Design', icon: Settings }
           ].map((item) => {
             const Icon = item.icon;
             const isSelected = secretarySubTab === item.id;
@@ -6628,7 +6628,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           {/* Active Tab Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              {!((activeTab as any) === 'campus') && !((activeTab as any) === 'campus' && (campusSubTab === 'onboarding' || campusSubTab === 'schedules')) && !(activeTab === 'secretary' && (secretarySubTab === 'crisis' || secretarySubTab === 'rooms' || secretarySubTab === 'briefing')) && (
+              {!((activeTab as any) === 'campus') && !((activeTab as any) === 'campus' && (campusSubTab === 'onboarding' || campusSubTab === 'schedules')) && !(activeTab === 'secretary' && (secretarySubTab === 'crisis' || secretarySubTab === 'rooms' || secretarySubTab === 'briefing' || secretarySubTab === 'audit')) && (
                 <>
                   <h2 className="swiss-h1" style={{ margin: 0, color: (activeTab as any) === 'campus' ? '#10b981' : '#f59e0b' }}>
                     {getTabTitle()}
