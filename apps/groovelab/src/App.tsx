@@ -5956,73 +5956,54 @@ function App() {
         <div style={{
           position: 'fixed',
           bottom: '24px',
-          left: '24px',
-          right: '24px',
+          left: '16px',
+          right: '16px',
           margin: '0 auto',
-          maxWidth: '500px',
+          maxWidth: '480px',
           background: 'rgba(255, 255, 255, 0.9)',
           backdropFilter: 'blur(20px) saturate(190%)',
           WebkitBackdropFilter: 'blur(20px) saturate(190%)',
           border: '1px solid rgba(255, 255, 255, 0.5)',
-          borderRadius: '24px',
-          padding: '16px 20px',
-          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.08)',
+          borderRadius: '16px',
+          padding: '8px 12px 8px 16px',
+          boxShadow: '0 12px 30px rgba(0, 0, 0, 0.08)',
           zIndex: 99999,
           display: 'flex',
           alignItems: 'center',
-          gap: '16px',
+          gap: '12px',
           justifyContent: 'space-between',
           animation: 'slideUpFade 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
-          pointerEvents: 'auto'
+          pointerEvents: 'auto',
+          boxSizing: 'border-box'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0 }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '12px',
-              background: '#e8f5e9',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              boxShadow: '0 4px 10px rgba(52, 168, 83, 0.15)',
-              border: '1px solid rgba(52, 168, 83, 0.08)'
-            }}>
-              <span style={{ fontSize: '1.5rem' }}>🎓</span>
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#1e293b' }}>Campus App installieren</h4>
-              <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 650, lineHeight: 1.3 }}>
-                {/iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream 
-                  ? 'Tippe unten auf das Teilen-Symbol und wähle "Zum Home-Bildschirm".'
-                  : 'Installiere Campus direkt auf deinem Startbildschirm für schnellen Zugriff.'}
-              </p>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+            <span style={{ fontSize: '1.2rem', flexShrink: 0 }}>🎓</span>
+            <span style={{ fontSize: '0.8rem', fontWeight: 650, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {/iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream 
+                ? 'Teilen-Symbol tippen & "Zum Home-Bildschirm"'
+                : 'Campus App auf Startbildschirm hinzufügen'}
+            </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-            {(!/iPad|iPhone|iPod/.test(navigator.userAgent) || (window as any).MSStream) && deferredPrompt ? (
+            {(!/iPad|iPhone|iPod/.test(navigator.userAgent) || (window as any).MSStream) && deferredPrompt && (
               <button 
                 onClick={handleInstallPWA}
                 style={{
                   background: '#16a34a',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '12px',
-                  padding: '8px 16px',
-                  fontSize: '0.78rem',
+                  borderRadius: '8px',
+                  padding: '6px 12px',
+                  fontSize: '0.75rem',
                   fontWeight: 800,
                   cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
-                  transition: 'transform 0.15s ease'
+                  boxShadow: '0 2px 6px rgba(22, 163, 74, 0.2)',
+                  minHeight: '32px'
                 }}
                 className="hover-scale"
               >
                 Hinzufügen
               </button>
-            ) : (
-              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#16a34a', background: 'rgba(22,163,74,0.08)', padding: '4px 10px', borderRadius: '8px' }}>
-                Info
-              </span>
             )}
             <button 
               onClick={handleDismissInstall}
@@ -6030,14 +6011,14 @@ function App() {
                 background: 'rgba(0,0,0,0.04)',
                 border: 'none',
                 color: '#64748b',
-                width: '28px',
-                height: '28px',
+                width: '32px',
+                height: '32px',
                 borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
-                fontSize: '0.8rem',
+                fontSize: '0.88rem',
                 fontWeight: 700
               }}
               title="Schließen"
