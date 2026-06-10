@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
+import { subscribeUserToPush, unsubscribeUserFromPush } from '../utils/webPush';
 import { 
   Clock, 
   Calendar, 
@@ -87,6 +88,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
 
   // Loading States
   const [loading, setLoading] = useState(true);
+  const [pushEnabled, setPushEnabled] = useState<boolean>(false);
 
   // Holidays state
   const [holidays, setHolidays] = useState<{ start: string, end: string, name: string }[]>([]);
@@ -387,6 +389,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
 
         if (tErr) throw tErr;
         setTeacher(tData);
+        setPushEnabled(tData.push_notifications_enabled ?? false);
         setSchool(tData.schools);
         setStartAnchor(tData.start_anchor || '13:00');
         setBreakTimes(tData.break_times || []);
@@ -1135,6 +1138,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
         .eq('id', userId)
         .single();
       setTeacher(updatedTeacher);
+      setPushEnabled(updatedTeacher.push_notifications_enabled ?? false);
       await refreshAllData(updatedTeacher.school_id, updatedTeacher.id);
     } catch (err) {
       console.error(err);
@@ -1282,6 +1286,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
         .eq('id', userId)
         .single();
       setTeacher(updatedTeacher);
+      setPushEnabled(updatedTeacher.push_notifications_enabled ?? false);
       await refreshAllData(updatedTeacher.school_id, updatedTeacher.id);
     } catch (err) {
       console.error(err);
@@ -2365,6 +2370,49 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                       </button>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              {/* Push Notifications Toggle */}
+              <div className="space-y-4 border-t border-slate-800 pt-6">
+                <div>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300">System & Benachrichtigungen</h3>
+                  <p className="text-xs text-slate-400 font-semibold leading-relaxed">Aktiviere Push-Nachrichten für sofortige Benachrichtigungen bei Stundenplan-Änderungen (Verschiebungen, Ausfälle) direkt auf deinem Handy.</p>
+                </div>
+                <div className="flex items-center justify-between p-4 bg-slate-950 rounded-2xl border border-slate-850">
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">🔔</span>
+                    <span className="text-xs font-bold text-slate-300">Push-Benachrichtigungen aktivieren</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={pushEnabled}
+                      onChange={async (e) => {
+                        const checked = e.target.checked;
+                        setPushEnabled(checked);
+                        if (checked) {
+                          const success = await subscribeUserToPush(userId);
+                          if (!success) {
+                            setPushEnabled(false);
+                            alert('Fehler beim Aktivieren der Push-Benachrichtigungen. Bitte überprüfe die Berechtigungen deines Browsers.');
+                          } else {
+                            alert('Push-Benachrichtigungen erfolgreich aktiviert! 🔔');
+                          }
+                        } else {
+                          const success = await unsubscribeUserFromPush(userId);
+                          if (!success) {
+                            setPushEnabled(true);
+                            alert('Fehler beim Deaktivieren der Push-Benachrichtigungen.');
+                          } else {
+                            alert('Push-Benachrichtigungen deaktiviert.');
+                          }
+                        }
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-slate-950"></div>
+                  </label>
                 </div>
               </div>
 

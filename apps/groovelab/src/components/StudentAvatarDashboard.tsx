@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
+import { subscribeUserToPush, unsubscribeUserFromPush } from '../utils/webPush';
 import { 
   Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, 
   ChevronRight, Coffee, Clock, Flame, BookOpen, Share2, Play, 
@@ -1094,6 +1095,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [editingProfile, setEditingProfile] = useState<any>(null);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
   const [studentSchedules, setStudentSchedules] = useState<any[]>([]);
   const [avatarCategoryFilter, setAvatarCategoryFilter] = useState<string>('Alle');
 
@@ -3004,6 +3006,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       setStudentUser(user);
       setIsAppUser(user.is_app_user ?? false);
       setIsPremiumUser(user.is_premium_user ?? false);
+      setPushEnabled(user.push_notifications_enabled ?? false);
 
       // 2. Fetch avatar records
       const { data: avatarRecord, error: avatarErr } = await supabase
@@ -8227,6 +8230,82 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       })}
                     </div>
                   </div>
+                </div>
+
+                {/* Push-Benachrichtigungen Sektion */}
+                <div style={{
+                  borderTop: '1px solid #e2e8f0',
+                  paddingTop: '20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <h4 style={{ fontSize: '0.75rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', margin: 0, letterSpacing: '0.03em' }}>
+                    System & Benachrichtigungen
+                  </h4>
+                  <p style={{ fontSize: '0.72rem', color: '#64748b', margin: 0, lineHeight: 1.4 }}>
+                    Lass dich in Echtzeit direkt auf dein Smartphone-Display benachrichtigen, wenn sich deine Unterrichtszeiten verschieben oder Unterricht ausfällt.
+                  </p>
+
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    background: '#f8fafc',
+                    padding: '12px 16px',
+                    borderRadius: '16px',
+                    border: '1px solid #e2e8f0',
+                    marginTop: '6px',
+                    opacity: isPremiumUser ? 1 : 0.6
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '1.2rem' }}>🔔</span>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e293b' }}>
+                        Push-Benachrichtigungen aktivieren
+                      </span>
+                    </div>
+
+                    {isPremiumUser ? (
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={pushEnabled}
+                          onChange={async (e) => {
+                            const checked = e.target.checked;
+                            setPushEnabled(checked);
+                            if (checked) {
+                              const success = await subscribeUserToPush(studentId);
+                              if (!success) {
+                                setPushEnabled(false);
+                                alert('Fehler beim Aktivieren der Push-Benachrichtigungen. Bitte überprüfe die Berechtigungen deines Browsers.');
+                              } else {
+                                alert('Push-Benachrichtigungen erfolgreich aktiviert! 🔔');
+                              }
+                            } else {
+                              const success = await unsubscribeUserFromPush(studentId);
+                              if (!success) {
+                                setPushEnabled(true);
+                                alert('Fehler beim Deaktivieren der Push-Benachrichtigungen.');
+                              } else {
+                                alert('Push-Benachrichtigungen deaktiviert.');
+                              }
+                            }
+                          }}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#34a853]"></div>
+                      </label>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#fee2e2', color: '#ef4444', padding: '4px 8px', borderRadius: '8px', fontSize: '0.68rem', fontWeight: 800 }}>
+                        <span>🔒 Nur für Premium</span>
+                      </div>
+                    )}
+                  </div>
+                  {!isPremiumUser && (
+                    <p style={{ fontSize: '0.65rem', color: '#ef4444', margin: '4px 0 0 0', fontWeight: 700 }}>
+                      * Schalte die GrooveLab-Premium-Mitgliedschaft frei, um diese Echtzeit-Funktion nutzen zu können.
+                    </p>
+                  )}
                 </div>
 
                 <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
