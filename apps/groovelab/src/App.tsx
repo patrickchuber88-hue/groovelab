@@ -2872,13 +2872,13 @@ function App() {
       const bandIds = (membershipsRes?.data || []).map((m: any) => m.bands?.id).filter(Boolean);
 
       // Stage 2: Fetch all detailed boards, library, school bands, teachers, active session metrics in a single parallel block
-      const [skillsRes, wallRes, membersRes, formingBandsRes, songsRes, userBandsRes, bandsRes, teachersRes, activeSessionsRes] = await Promise.all([
+      const [skillsRes, wallRes, membersRes, userBandsRes, bandsRes, teachersRes, activeSessionsRes] = await Promise.all([
         supabase.from('user_song_skills').select(`
           id, progress_percent, is_stage_ready, is_pending_approval, instrument, part_number, difficulty_level, is_favorite, verified_by_id,
           songs (*)
         `).eq('user_id', userId),
         supabase.from('songs').select(`
-          id, artist, title, media_link, instrumentation,
+          *,
           user_song_skills (
             id, song_id, instrument, part_number, difficulty_level, is_stage_ready, user_id, created_at, formation_group,
             profiles:users!user_song_skills_user_id_fkey(first_name, photo_url, school_id)
@@ -2891,10 +2891,8 @@ function App() {
               profiles:users!band_song_slots_user_id_fkey(first_name, photo_url)
             )
           )
-        `).eq('school_id', schoolId).eq('is_campus_active', false),
+        `).eq('school_id', schoolId).eq('is_campus_active', false).eq('user_song_skills.is_stage_ready', true).order('level').order('artist'),
         supabase.from('band_members').select('user_id, bands!inner(id, status, song_id, school_id, band_songs(song_id, status))').eq('bands.school_id', schoolId),
-        supabase.from('bands').select('*, band_members(*, profiles:users(id, first_name, photo_url)), band_songs(*, band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))))').eq('school_id', schoolId).in('status', ['forming', 'active']),
-        supabase.from('songs').select('*').eq('school_id', schoolId).eq('is_campus_active', false).order('level').order('artist'),
         bandIds.length > 0
           ? supabase.from('bands').select(`
               *,
@@ -2909,7 +2907,7 @@ function App() {
         supabase.from('sessions').select('user_id, station_id, users!inner(role, school_id, last_seen)').is('check_out_time', null).eq('users.school_id', schoolId)
       ]).catch(err => {
         console.error('[Dashboard] Critical Fetch Error Stage 2:', err);
-        return [ {error: err}, {error: err}, {error: err}, {error: err}, {error: err}, {error: err}, {error: err}, {error: err}, {error: err} ] as any;
+        return [ {error: err}, {error: err}, {error: err}, {error: err}, {error: err}, {error: err}, {error: err} ] as any;
       });
 
       if (skillsRes.error) console.error('[Dashboard] Skills Fetch Error:', skillsRes.error);
@@ -2942,8 +2940,8 @@ function App() {
       }
 
       // Populate global library songs in parallel
-      if (songsRes.data) {
-        setGlobalSongs(songsRes.data);
+      if (wallRes.data) {
+        setGlobalSongs(wallRes.data);
       }
 
       // Populate school teachers in parallel
@@ -2961,6 +2959,30 @@ function App() {
       }
 
       const safeSkills = skillsRes.data || [];
+
+      // Build a map of all school skills for easy lookup (defined early for bandsData enrichment)
+      const schoolSkillsMap: Record<string, any[]> = {};
+      (wallRes.data || []).forEach((song: any) => {
+        (song.user_song_skills || []).forEach((skill: any) => {
+          if (!schoolSkillsMap[skill.user_id]) schoolSkillsMap[skill.user_id] = [];
+          schoolSkillsMap[skill.user_id].push(skill);
+        });
+      });
+
+      // Align bandsData and m.profiles so they are enriched early
+      const bandsData = bandsRes?.data || [];
+      if (bandsRes?.error) console.error('[Dashboard] Error fetching all school bands:', bandsRes.error);
+      bandsData.forEach((band: any) => {
+        (band.band_members || []).forEach((m: any) => {
+          const u = m.users ? (Array.isArray(m.users) ? m.users[0] : m.users) : null;
+          if (u) {
+            u.user_song_skills = schoolSkillsMap[u.id] || [];
+            if (!m.profiles) {
+              m.profiles = u;
+            }
+          }
+        });
+      });
       const instrumentalSongs = safeSkills.map((p: any) => {
           const song = Array.isArray(p.songs) ? p.songs[0] : p.songs;
           if (!song) return null;
@@ -3128,15 +3150,6 @@ function App() {
 
       if (wallRes.data) console.log(`[Dashboard] wallRes returned ${wallRes.data.length} songs.`);
 
-      // Build a map of all school skills for easy lookup
-      const schoolSkillsMap: Record<string, any[]> = {};
-      (wallRes.data || []).forEach((song: any) => {
-        (song.user_song_skills || []).forEach((skill: any) => {
-          if (!schoolSkillsMap[skill.user_id]) schoolSkillsMap[skill.user_id] = [];
-          schoolSkillsMap[skill.user_id].push(skill);
-        });
-      });
-
       const wallData = wallRes.data || [];
       console.log('[Dashboard] Wall data fetched. Count:', wallData.length);
       const allMembers = membersRes.data || [];
@@ -3146,7 +3159,7 @@ function App() {
       // Students trigger founding manually via the "JETZT BAND GRÜNDEN" button on the board.
 
       // --- BAND PROJECT AUTO-FILLING (Optimized: ONLY runs on initial full load to save heavy redundant DB operations!) ---
-      const formingBands = formingBandsRes.data || [];
+      const formingBands = bandsData.filter((b: any) => b.status === 'forming' || b.status === 'active');
       if (isInitial && !isStudent && formingBands.length > 0) {
         // Run auto-fill asynchronously to not block the main dashboard load
         (async () => {
@@ -3573,7 +3586,6 @@ function App() {
 
 
       // Library songs and user bands are already loaded in Stage 2!
-      const songsData = songsRes?.data || [];
       const userBandsData = userBandsRes?.data || [];
       if (userBandsData) {
         const uniqueBands = userBandsData.map((band: any) => {
@@ -3621,16 +3633,7 @@ function App() {
       }
 
       // School bands and teachers are already loaded in Stage 2!
-      const bandsData = bandsRes?.data;
-      if (bandsRes?.error) console.error('[Dashboard] Error fetching all school bands:', bandsRes.error);
-      if (bandsData) {
-        // Enrich all members with skills
-        bandsData.forEach((band: any) => {
-          (band.band_members || []).forEach((m: any) => {
-            const u = m.users ? (Array.isArray(m.users) ? m.users[0] : m.users) : null;
-            if (u) u.user_song_skills = schoolSkillsMap[u.id] || [];
-          });
-        });
+      if (bandsData && bandsData.length > 0) {
 
         // We show all bands that have at least one song assigned, even if incomplete,
         // so that the Vocal-Finder and other joining tools can find them.
