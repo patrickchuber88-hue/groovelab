@@ -1386,6 +1386,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             last_name
           )
         `)
+        .eq('school_id', schoolId)
         .order('created_at', { ascending: false })
         .limit(200);
 
