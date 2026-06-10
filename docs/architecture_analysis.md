@@ -12,7 +12,7 @@ Dieses Dokument vergleicht die Vorschläge deines Freundes mit der aktuellen Gro
 
 ### Bewertung & Empfehlung
 > [!IMPORTANT]
-> **Ja, das verbessert unser System!** Wir sollten diese Härtungsmaßnahmen umsetzen, da sie Industriestandard zum Schutz sensibers Daten sind.
+> **Ja, das verbessert unser System!** Wir sollten diese Härtungsmaßnahmen umsetzen, da sie Industriestandard zum Schutz sensibler Daten sind.
 
 * **SSH-Root-Login verbieten (`PermitRootLogin no`):** Sehr sinnvoll. Wenn wir dies jedoch blind aktivieren, bricht unser [deploy.sh](../deploy.sh) ab.
   * **Lösung:** Wir erstellen einen dedizierten SSH-Benutzer (z. B. `deploy`) auf dem Server, der Schreibrechte für `/var/www/groovelab` besitzt, und passen unser Deployment-Skript an.
@@ -32,8 +32,8 @@ Dieses Dokument vergleicht die Vorschläge deines Freundes mit der aktuellen Gro
 > [!WARNING]
 > **Nein, dieser Vorschlag verschlechtert unser System!** Das Hosten der gesamten Infrastruktur (insbesondere der produktiven Datenbank) in Docker auf einem einzelnen Hetzner-Server bringt massive Nachteile:
 
-* **Hoher Wartungsaufwand (DevOps):** Wenn wir Postgres selbst in Docker hosten, müssen wir uns selbst um Point-in-Time-Backups, Replikation, Scaling, Connection Pooling (z. B. PgBouncer) und Sicherheitsupdates der DB kümmern. Supabase übernimmt all dies automatisch.
-* **Realtime-Funktionalität:** GrooveLab basiert stark auf Echtzeit-Interaktionen (z. B. Live-Status der Räume, Hilfe-Ruf-System). Supabase liefert ein fertiges Echtzeit-WebSocket-Framework mit. Ein eigens Backend in Docker müsste diese Funktionalität (z. B. über Node.js, Socket.io und Redis Pub/Sub) von Grund auf neu implementieren.
+* **Hoher Wartungsaufwand (DevOps):** Wenn wir Postgres selbst in Docker hosten, müssen wir sich selbst um Point-in-Time-Backups, Replikation, Scaling, Connection Pooling (z. B. PgBouncer) und Sicherheitsupdates der DB kümmern. Supabase übernimmt all dies automatisch.
+* **Realtime-Funktionalität:** GrooveLab basiert stark auf Echtzeit-Interaktionen (z. B. Live-Status der Räume, Hilfe-Ruf-System). Supabase liefert ein fertiges Echtzeit-WebSocket-Framework mit. Ein eigenes Backend in Docker müsste diese Funktionalität (z. B. über Node.js, Socket.io und Redis Pub/Sub) von Grund auf neu implementieren.
 * **Single Point of Failure (SPOF):** Stürzt der Hetzner-Server ab oder hat Hardwareprobleme, ist das gesamte System (inklusive aller Schülerdaten) offline. Bei Supabase läuft die Datenbank in einer hochverfügbaren Cloud-Infrastruktur auf AWS.
 * **Fazit:** Die Kombination aus **Hetzner (günstiges statisches Frontend-Hosting)** und **Supabase (sichere, skalierbare Cloud-Datenbank & Auth)** ist für uns der ideale Kompromiss aus Performance, Kosten und minimalem Wartungsaufwand.
 
@@ -67,3 +67,25 @@ Dieses Dokument vergleicht die Vorschläge deines Freundes mit der aktuellen Gro
 
 * **Das Problem bei ORM-Filtern (Backend):** Sie verlassen sich darauf, dass der Entwickler bei *jeder einzelnen Abfrage* im Code den Filter `.where('tenant_id', ...)` mitschreibt. Vergisst ein Entwickler das an einer Stelle, kommt es sofort zu einem mandantenübergreifenden Datenleck.
 * **Der Vorteil von Postgres RLS:** RLS fängt die Abfragen direkt in der Datenbank ab. Selbst wenn unser Frontend fehlerhaft programmiert ist und "alle Profile" anfordert, filtert die Datenbank die Ergebnisse automatisch vor der Auslieferung anhand des JWT-Tokens des Nutzers. Das ist maximale DSGVO-Konformität ("Security by Design").
+
+---
+
+## 5. Local-First Synchronisations-Engine (Vorschlag 1.5)
+
+### Vergleich
+* **Empfehlung des Freundes:** Offline-Fähigkeit durch lokale IndexedDB (RxDB/WatermelonDB), Service Worker für inkrementelle Synchronisation, kryptografische Last-Write-Wins Konfliktlösung und visuelles Feedback bei unbestätigten Daten.
+* **Aktueller Stand:** GrooveLab setzt auf Echtzeit-Online-Abfragen direkt gegen die Supabase-API. Wir puffern Authentifizierungsdaten und grundlegende UI-Zustände im `localStorage`, nutzen aber keine lokale relationale Client-Datenbank.
+
+### Bewertung & Empfehlung
+> [!WARNING]
+> **Das ist für uns ein massiver, unbezahlbarer Overhead!** Zudem liegt hier ein klarer Kontext-Fehler vor.
+
+* **Der Kontext-Fehler (Fremd-Spezifikation):**
+  Der Text deines Freundes spricht von *„Fahrtenwechseln“*, *„Fahrer offline auf dem Smartphone ändern“* und *„Oma wurde noch nicht benachrichtigt“*. 
+  **GrooveLab ist eine Musikschul-Plattform für Raumbelegung, Notizen und Stundenpläne!** Wir verwalten keine Fahrgemeinschaften oder Familien-Fahrpläne. Dein Freund hat hier offensichtlich ein Anforderungsdokument eines völlig anderen Projekts (z. B. einer Fahrdienst- oder Familien-App) kopiert und ungeprüft weitergeleitet.
+* **Architektonische Komplexität:**
+  * Supabase unterstützt standardmäßig keine bidirektionale Offline-Synchronisation (Offline-Schreibvorgänge mit späterer Konfliktlösung).
+  * Die Implementierung von RxDB/WatermelonDB mit Supabase-Replikation würde bedeuten, dass wir **nahezu 100 % unserer Datenzugriffs-Logik und unseres State-Managements neu schreiben müssten**. Das würde die Entwicklungszeit um Monate verlängern.
+* **Macht Local-First für uns Sinn?**
+  * Im Musikschulalltag (Unterricht, Raumprüfung) ist Internet (WLAN oder LTE) in 99 % der Fälle vorhanden. Wer checkt sich schon offline in einem Kellerraum in eine Live-Session ein?
+  * **Pragmatische Alternative:** Falls wir einfache Offline-Fähigkeit wollen (z. B. damit die App lädt, wenn das Netz kurz weg ist), richten wir einen **Standard Service Worker (PWA)** ein. Dieser cacht die App-Dateien (HTML, JS, CSS), sodass die App offline startet und z. B. eine nette Meldung anzeigt oder im `localStorage` gespeicherte Daten schreibgeschützt anzeigt. Das kostet uns 2 Tage statt 2 Monate Arbeit.
