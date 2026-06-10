@@ -1472,15 +1472,15 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
             <section style={{ 
               background: '#ffffff', 
               borderRadius: '24px', 
-              padding: '24px', 
+              padding: '16px 20px', 
               border: '1.5px solid #f1f5f9',
               boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)'
             }}>
-              <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sliders size={16} style={{ color: '#64748b' }} /> Module & Einstellungen
+              <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Sliders size={16} style={{ color: '#64748b' }} /> Module &amp; Einstellungen
               </h4>
               
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Campus-Modul</span>
