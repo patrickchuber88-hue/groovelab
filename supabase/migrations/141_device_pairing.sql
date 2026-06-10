@@ -27,13 +27,20 @@ DECLARE
   v_user_id UUID;
   v_paired BOOLEAN;
 BEGIN
-  -- Nutzer via QR-Token finden (UUID = student qr_token, anderes = teacher_qr_token)
-  SELECT id INTO v_user_id
-  FROM public.users
-  WHERE qr_token = p_qr_token OR teacher_qr_token = p_qr_token
-  LIMIT 1;
+  -- Cast p_qr_token to UUID if it matches format, otherwise fallback to teacher_qr_token text check
+  BEGIN
+    SELECT id INTO v_user_id
+    FROM public.users
+    WHERE qr_token = p_qr_token::UUID
+    LIMIT 1;
+  EXCEPTION WHEN OTHERS THEN
+    SELECT id INTO v_user_id
+    FROM public.users
+    WHERE teacher_qr_token = p_qr_token
+    LIMIT 1;
+  END;
 
-  IF NOT FOUND THEN
+  IF v_user_id IS NULL THEN
     RETURN jsonb_build_object('paired', false, 'error', 'user_not_found');
   END IF;
 
@@ -68,20 +75,26 @@ DECLARE
   v_expected_day TEXT;
 BEGIN
   -- Nutzer finden
-  SELECT id, first_name, birth_date
-  INTO v_user
-  FROM public.users
-  WHERE qr_token = p_qr_token OR teacher_qr_token = p_qr_token
-  LIMIT 1;
+  BEGIN
+    SELECT id, first_name, birth_date INTO v_user
+    FROM public.users
+    WHERE qr_token = p_qr_token::UUID
+    LIMIT 1;
+  EXCEPTION WHEN OTHERS THEN
+    SELECT id, first_name, birth_date INTO v_user
+    FROM public.users
+    WHERE teacher_qr_token = p_qr_token
+    LIMIT 1;
+  END;
 
-  IF NOT FOUND THEN
+  IF v_user.id IS NULL THEN
     RETURN jsonb_build_object('success', false, 'error', 'user_not_found');
   END IF;
 
   -- birth_date muss gesetzt sein
   IF v_user.birth_date IS NULL THEN
     RETURN jsonb_build_object('success', false, 'error', 'no_birth_date');
-  END IF;
+  END If;
 
   -- Tag aus Geburtsdatum extrahieren (z.B. '1990-03-15' -> '15')
   v_expected_day := EXTRACT(DAY FROM v_user.birth_date::DATE)::TEXT;
@@ -111,16 +124,24 @@ AS $$
 DECLARE
   v_user RECORD;
   v_school_name TEXT;
-  v_next_lesson RECORD;
 BEGIN
-  SELECT u.id, u.first_name, u.last_name, u.instrument, u.photo_url, u.role,
-         u.is_campus_active, u.is_groovelab_active, u.school_id
-  INTO v_user
-  FROM public.users u
-  WHERE u.qr_token = p_qr_token OR u.teacher_qr_token = p_qr_token
-  LIMIT 1;
+  BEGIN
+    SELECT u.id, u.first_name, u.last_name, u.instrument, u.photo_url, u.role,
+           u.is_campus_active, u.is_groovelab_active, u.school_id
+    INTO v_user
+    FROM public.users u
+    WHERE u.qr_token = p_qr_token::UUID
+    LIMIT 1;
+  EXCEPTION WHEN OTHERS THEN
+    SELECT u.id, u.first_name, u.last_name, u.instrument, u.photo_url, u.role,
+           u.is_campus_active, u.is_groovelab_active, u.school_id
+    INTO v_user
+    FROM public.users u
+    WHERE u.teacher_qr_token = p_qr_token
+    LIMIT 1;
+  END;
 
-  IF NOT FOUND THEN
+  IF v_user.id IS NULL THEN
     RETURN jsonb_build_object('error', 'user_not_found');
   END IF;
 
