@@ -1412,6 +1412,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                       )}
                                     </div>
                                   )}
+                                  {isRescheduled && (
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', color: '#d97706', background: '#fef3c7', padding: '2px 6px', borderRadius: '6px', flexShrink: 0 }}>
+                                      Verschoben
+                                    </span>
+                                  )}
                                 </div>
                                 
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.72rem', color: subColor, fontWeight: 700, marginTop: '1px' }}>
@@ -1438,7 +1443,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
                             {/* Right Status */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                              {!isCanceled && !isRescheduled ? (
+                              {!isCanceled && !isRescheduled && (
                                 <div 
                                   title="Regulärer Termin"
                                   style={{
@@ -1450,12 +1455,6 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                     boxShadow: '0 0 6px rgba(34, 197, 94, 0.4)'
                                   }} 
                                 />
-                              ) : isCanceled ? (
-                                null
-                              ) : (
-                                <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', color: '#d97706', background: '#fef3c7', padding: '2px 6px', borderRadius: '6px' }}>
-                                  Verschoben
-                                </span>
                               )}
                             </div>
                           </div>

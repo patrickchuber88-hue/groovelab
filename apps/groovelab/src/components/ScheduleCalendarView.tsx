@@ -868,10 +868,11 @@ export function ScheduleCalendarView({
           const origTimeStr = occ.original_start_time || occ.start_time;
           const origDate = new Date(origDateStr);
           const origDayLabel = DAYS_DE[origDate.getDay()];
-          const origDateLabel = origDate.toLocaleDateString('de-DE');
           const origTimeLabel = origTimeStr.substring(0, 5);
+          const shortOrigDay = origDayLabel.substring(0, 2) + '.';
+          const shortOrigDate = `${String(origDate.getDate()).padStart(2, '0')}.${String(origDate.getMonth() + 1).padStart(2, '0')}.${String(origDate.getFullYear()).substring(2, 4)}`;
 
-          const notificationMessage = `Hallo! Der verschobene oder abgesagte Termin wurde wieder auf deinen ursprünglichen regulären Termin zurückgesetzt: ${origDayLabel}, ${origDateLabel} um ${origTimeLabel} Uhr.`;
+          const notificationMessage = `Der verschobene oder abgesagte Termin wurde auf den regulären Termin zurückgesetzt:\n${shortOrigDay} ${shortOrigDate} um ${origTimeLabel} Uhr.`;
           
           await supabase.from('campus_direct_messages').insert({
             sender_id: userId,
@@ -1221,13 +1222,19 @@ export function ScheduleCalendarView({
 
             if (timeActuallyChanged) {
               if (change.status === 'cancelled') {
-                notificationMessage = `Hallo! Dein Unterrichtstermin am ${origDayLabel}, ${origDateLabel} um ${origTimeLabel} Uhr wurde abgesagt.`;
+                const shortOrigDay = origDayLabel.substring(0, 2) + '.';
+                const shortOrigDate = `${String(origDate.getDate()).padStart(2, '0')}.${String(origDate.getMonth() + 1).padStart(2, '0')}.${String(origDate.getFullYear()).substring(2, 4)}`;
+                notificationMessage = `Dein Unterrichtstermin am ${shortOrigDay} ${shortOrigDate} um ${origTimeLabel} Uhr fällt aus.`;
               } else {
                 const isReset = change.date === origDateStr && change.start_time.substring(0, 5) === origTimeStr.substring(0, 5);
+                const shortNewDay = newDayLabel.substring(0, 2) + '.';
+                const shortNewDate = `${String(newDate.getDate()).padStart(2, '0')}.${String(newDate.getMonth() + 1).padStart(2, '0')}.${String(newDate.getFullYear()).substring(2, 4)}`;
                 if (isReset) {
-                  notificationMessage = `Hallo! Der verschobene Termin wurde wieder auf deinen ursprünglichen regulären Termin zurückgesetzt: ${newDayLabel}, ${newDateLabel} um ${newTimeLabel} Uhr.`;
+                  notificationMessage = `Der verschobene Termin wurde auf den regulären Termin zurückgesetzt:\n${shortNewDay} ${shortNewDate} um ${newTimeLabel} Uhr.`;
                 } else {
-                  notificationMessage = `Hallo! Dein Unterrichtstermin wurde verschoben von: ${origDayLabel}, ${origDateLabel} ${origTimeLabel} Uhr auf den neuen Termin: ${newDayLabel}, ${newDateLabel} ${newTimeLabel} Uhr. Bitte bestätige den neuen Termin kurz bei mir.`;
+                  const shortOrigDay = origDayLabel.substring(0, 2) + '.';
+                  const shortOrigDate = `${String(origDate.getDate()).padStart(2, '0')}.${String(origDate.getMonth() + 1).padStart(2, '0')}.${String(origDate.getFullYear()).substring(2, 4)}`;
+                  notificationMessage = `Dein Unterrichtstermin wurde verschoben:\n${shortOrigDay} ${shortOrigDate} ${origTimeLabel} ➔ ${shortNewDay} ${shortNewDate} ${newTimeLabel} Uhr.\nBitte kurz bestätigen.`;
                 }
               }
             }
