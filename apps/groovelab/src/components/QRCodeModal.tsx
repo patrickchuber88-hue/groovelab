@@ -1,5 +1,5 @@
 import QRCode from 'react-qr-code';
-import { X, Download } from 'lucide-react';
+import { X, Download, RefreshCw } from 'lucide-react';
 import { useRef, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
@@ -77,15 +77,27 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
 
   useEffect(() => {
     const fetchUserRole = async () => {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (authUser) {
+      const loggedInUserId = sessionStorage.getItem('groovelab_user_id');
+      if (loggedInUserId) {
         const { data } = await supabase
           .from('users')
           .select('role')
-          .eq('id', authUser.id)
+          .eq('id', loggedInUserId)
           .single();
         if (data) {
           setCurrentUserRole(data.role);
+        }
+      } else {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser) {
+          const { data } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', authUser.id)
+            .single();
+          if (data) {
+            setCurrentUserRole(data.role);
+          }
         }
       }
     };
@@ -613,7 +625,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
               e.currentTarget.style.borderColor = '#fecdd3';
             }}
           >
-            🔄 QR-Code sperren &amp; neu generieren
+            <RefreshCw size={20} /> QR-Code sperren &amp; neu generieren
           </button>
         )}
       </div>

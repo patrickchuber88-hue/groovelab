@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap, BookOpen } from 'lucide-react';
+import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap, BookOpen, RefreshCw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import QRCode from 'react-qr-code';
 import { 
@@ -163,20 +163,35 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        supabase
+    const fetchCurrentUser = async () => {
+      const loggedInUserId = sessionStorage.getItem('groovelab_user_id');
+      if (loggedInUserId) {
+        setCurrentTeacherId(loggedInUserId);
+        const { data } = await supabase
           .from('users')
           .select('role')
-          .eq('id', user.id)
-          .single()
-          .then(({ data }) => {
-            if (data) {
-              setCurrentUserRole(data.role);
-            }
-          });
+          .eq('id', loggedInUserId)
+          .single();
+        if (data) {
+          setCurrentUserRole(data.role);
+        }
+      } else {
+        // Fallback to supabase auth user
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setCurrentTeacherId(user.id);
+          const { data } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+          if (data) {
+            setCurrentUserRole(data.role);
+          }
+        }
       }
-    });
+    };
+    fetchCurrentUser();
   }, []);
 
   useEffect(() => {
@@ -258,13 +273,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     fetchSchool();
   }, [student.id, student.school_id, student.schools]);
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        setCurrentTeacherId(user.id);
-      }
-    });
-  }, []);
+  // Removed redundant auth check
 
   const getLehrwerkColor = (title: string) => {
     const trimmed = (title || '').trim();
@@ -1959,7 +1968,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                   e.currentTarget.style.borderColor = '#fecdd3';
                 }}
               >
-                🔄 QR-Code sperren &amp; neu generieren
+                <RefreshCw size={14} /> QR-Code sperren &amp; neu generieren
               </button>
             )}
 
