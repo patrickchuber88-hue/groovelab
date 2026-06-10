@@ -2514,7 +2514,7 @@ function App() {
   // we immediately redirect/correct them to 'briefing' to keep the modules strictly isolated.
   useEffect(() => {
     if (user && user.role?.toLowerCase() === 'student') {
-      if (activePlatform === 'campus' && !['briefing', 'mediathek', 'practice_board', 'campus_cup', 'flashback', 'events', 'profile', 'all_appointments', 'messages'].includes(activeStudentTab)) {
+      if (activePlatform === 'campus' && !['briefing', 'mediathek', 'practice_board', 'campus_cup', 'flashback', 'events', 'profile', 'all_appointments', 'messages', 'settings'].includes(activeStudentTab)) {
         console.log('[Safety Hook] Enforcing student Campus Briefing Board redirect from invalid tab:', activeStudentTab);
         setActiveStudentTab('briefing');
         localStorage.setItem('campus_active_tab', 'briefing');
@@ -5975,6 +5975,9 @@ function App() {
                     }}>{campusUnreadCount}</div>
                   )}
                 </button>
+                <button onClick={() => setActiveStudentTab('settings')} className={`sidebar-item ${activeStudentTab === 'settings' ? `active ${activePlatform}` : ''}`}>
+                  <Settings size={20} /> Einstellungen
+                </button>
               </>
             ) : activePlatform === 'ensembles' ? (
               <>
@@ -6659,7 +6662,7 @@ function App() {
         {/* Student Campus Dashboard Tabs (Kept mounted for instant platform switching) */}
         {user.role?.toLowerCase() === 'student' && (
           <div style={{ 
-            display: (activePlatform === 'campus' && ['briefing', 'mediathek', 'practice_board', 'campus_cup', 'flashback', 'events', 'profile', 'all_appointments'].includes(activeStudentTab)) ? 'block' : 'none',
+            display: (activePlatform === 'campus' && ['briefing', 'mediathek', 'practice_board', 'campus_cup', 'flashback', 'events', 'profile', 'all_appointments', 'settings'].includes(activeStudentTab)) ? 'block' : 'none',
             width: '100%'
           }}>
             <ErrorBoundary>
