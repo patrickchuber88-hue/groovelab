@@ -140,6 +140,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const [activeChatOcc, setActiveChatOcc] = useState<LessonOccurrence | null>(null);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [chatTypedMessage, setChatTypedMessage] = useState('');
+  const [activeChatOccIds, setActiveChatOccIds] = useState<Set<string>>(new Set());
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
 
   // iCal Subscription States
@@ -251,6 +252,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         filter: `occurrence_id=eq.${activeChatOcc.id}` 
       }, () => {
         fetchChat(studentId, activeChatOcc.id);
+        setActiveChatOccIds(prev => {
+          const newSet = new Set(prev);
+          newSet.add(activeChatOcc.id);
+          return newSet;
+        });
       })
       .subscribe();
 
@@ -292,6 +298,12 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         occurrence_id: activeChatOcc.id
       });
       if (error) throw error;
+
+      setActiveChatOccIds(prev => {
+        const newSet = new Set(prev);
+        newSet.add(activeChatOcc.id);
+        return newSet;
+      });
 
       // Send push notification to recipient
       try {
@@ -726,6 +738,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
       if (schedules) {
         schedules.forEach((sch: any) => {
+          if (!sch.student_id) return; // Skip unassigned slots/breaks
           let current = new Date(schoolYearStart);
           while (current <= schoolYearEnd) {
             const currentDay = current.getDay() || 7;
@@ -744,11 +757,13 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               );
 
               if (actual) {
-                allMergedOccurrences.push({
-                  ...actual,
-                  schedule: sch
-                });
-                usedActualIds.add(actual.id);
+                if (actual.student_id) {
+                  allMergedOccurrences.push({
+                    ...actual,
+                    schedule: sch
+                  });
+                  usedActualIds.add(actual.id);
+                }
               } else {
                 allMergedOccurrences.push({
                   id: `virtual-${sch.id}-${dateStr}`,
@@ -773,6 +788,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
       if (occurrences) {
         occurrences.forEach((occ: any) => {
+          if (!occ.student_id) return; // Skip unassigned slots/breaks
           if (!usedActualIds.has(occ.id)) {
             allMergedOccurrences.push(occ);
           }
@@ -786,6 +802,16 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       });
 
       setLessons(allMergedOccurrences);
+
+      // Fetch active conversations (occurrence_ids that have messages)
+      const { data: activeChats } = await supabase
+        .from('campus_direct_messages')
+        .select('occurrence_id');
+
+      if (activeChats) {
+        const occIds = new Set<string>(activeChats.map((c: any) => c.occurrence_id).filter(Boolean));
+        setActiveChatOccIds(occIds);
+      }
     } catch (err) {
       console.error('Error fetching lessons schedule:', err);
     } finally {
@@ -1245,6 +1271,25 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       boxSizing: 'border-box',
       padding: '0px'
     }} className="animation-fade-in">
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes calendarPulse {
+          0% {
+            transform: scale(1);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
+          }
+          50% {
+            transform: scale(1.08);
+            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.55);
+          }
+          100% {
+            transform: scale(1);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
+          }
+        }
+        .pulse-calendar {
+          animation: calendarPulse 2s infinite ease-in-out;
+        }
+      `}} />
       
       {/* COLUMN 1: MY LESSONS (Unterrichtstermine) */}
       <div style={{
@@ -1273,7 +1318,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           {/* iCal Subscription Button (Noticeable Apple Red) */}
           <button
             onClick={() => setShowIcalModal(true)}
-            className="hover-scale"
+            className="hover-scale pulse-calendar"
             title="Unterrichtstermine abonnieren (iCal)"
             style={{
               border: 'none',
@@ -1564,39 +1609,46 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
                             {/* Right Status */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-                              {occ.student_id && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActiveChatOcc(occ);
-                                  }}
-                                  title="1:1 Termin-Shoutbox öffnen"
-                                  style={{
-                                    border: 'none',
-                                    background: activeChatOcc?.id === occ.id ? '#dcfce7' : '#f1f5f9',
-                                    color: activeChatOcc?.id === occ.id ? '#16a34a' : '#475569',
-                                    padding: '6px',
-                                    borderRadius: '8px',
-                                    cursor: 'pointer',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    transition: 'all 0.15s ease'
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = '#dcfce7';
-                                    e.currentTarget.style.color = '#16a34a';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    if (activeChatOcc?.id !== occ.id) {
-                                      e.currentTarget.style.background = '#f1f5f9';
-                                      e.currentTarget.style.color = '#475569';
-                                    }
-                                  }}
-                                >
-                                  <MessageSquare size={15} />
-                                </button>
-                              )}
+                               <button
+                                 onClick={(e) => {
+                                   e.stopPropagation();
+                                   setActiveChatOcc(occ);
+                                 }}
+                                 title="1:1 Termin-Shoutbox öffnen"
+                                 style={{
+                                   border: 'none',
+                                   background: activeChatOcc?.id === occ.id 
+                                     ? '#dcfce7' 
+                                     : activeChatOccIds.has(occ.id) 
+                                       ? '#fef3c7' 
+                                       : '#f1f5f9',
+                                   color: activeChatOcc?.id === occ.id 
+                                     ? '#16a34a' 
+                                     : activeChatOccIds.has(occ.id) 
+                                       ? '#d97706' 
+                                       : '#475569',
+                                   padding: '6px',
+                                   borderRadius: '8px',
+                                   cursor: 'pointer',
+                                   display: 'inline-flex',
+                                   alignItems: 'center',
+                                   justifyContent: 'center',
+                                   transition: 'all 0.15s ease'
+                                 }}
+                                 onMouseEnter={(e) => {
+                                   e.currentTarget.style.background = '#dcfce7';
+                                   e.currentTarget.style.color = '#16a34a';
+                                 }}
+                                 onMouseLeave={(e) => {
+                                   if (activeChatOcc?.id !== occ.id) {
+                                     const hasChat = activeChatOccIds.has(occ.id);
+                                     e.currentTarget.style.background = hasChat ? '#fef3c7' : '#f1f5f9';
+                                     e.currentTarget.style.color = hasChat ? '#d97706' : '#475569';
+                                   }
+                                 }}
+                               >
+                                 <MessageSquare size={15} />
+                               </button>
                               {!isCanceled && !isRescheduled && (
                                 <div 
                                   title="Regulärer Termin"
@@ -1688,7 +1740,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               fontSize: '0.72rem',
               cursor: 'pointer',
               transition: 'all 0.2s',
-              boxShadow: eventFilter === 'subscribed' ? '0 2px 4px rgba(0,0,0,0.04)' : 'none'
+              boxShadow: eventFilter === 'subscribed' ? '0 2px 4px rgba(0,0,0,0.04)' : 'none',
+              animation: 'pulse-slow 2s infinite'
             }}
           >
             Abonnierte Termine
@@ -2914,7 +2967,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       fontWeight: 800, fontSize: '0.82rem',
                       transition: 'all 0.15s'
                     }}
-                    onMouseOver={e => { e.currentTarget.style.background = '#fee2e2'; }}
+                    onMouseOver={e => { e.currentTarget.style.background = '#fee2f2'; }}
                     onMouseOut={e => { e.currentTarget.style.background = '#fef2f2'; }}
                   >
                     <Trash2 size={14} />
@@ -3269,7 +3322,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 maxHeight: '400px'
               }} className="custom-scrollbar">
                 {isFrozen && (
-                  <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#991b1b', padding: '8px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', textAlign: 'center' }}>
+                  <div style={{ background: '#fef2f2', border: '1px solid #fee2f2', color: '#991b1b', padding: '8px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', textAlign: 'center' }}>
                     🔒 Shoutbox eingefroren (Schreibschutz nach 48h aktiv)
                   </div>
                 )}
@@ -3313,52 +3366,62 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 <div ref={chatMessagesEndRef} />
               </div>
 
-              {/* Footer / Input Composer */}
-              <form onSubmit={handleSendChatMessage} style={{
-                padding: '16px 24px',
-                borderTop: '1px solid #f1f5f9',
-                background: '#f8fafc',
-                display: 'flex',
-                gap: '10px'
-              }}>
-                <input
-                  type="text"
-                  placeholder={isFrozen ? "Eingefroren..." : "Schreibe eine Nachricht..."}
-                  disabled={isFrozen}
-                  value={chatTypedMessage}
-                  onChange={e => setChatTypedMessage(e.target.value)}
-                  style={{
-                    flex: 1,
-                    padding: '10px 14px',
-                    borderRadius: '12px',
-                    border: '1px solid #e2e8f0',
-                    background: isFrozen ? '#f1f5f9' : '#ffffff',
-                    fontSize: '0.85rem',
-                    outline: 'none',
-                    fontWeight: 600
-                  }}
-                />
-                <button
-                  type="submit"
-                  disabled={isFrozen || !chatTypedMessage.trim()}
-                  style={{
-                    background: isFrozen ? '#cbd5e1' : 'linear-gradient(135deg, #16a34a, #15803d)',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '12px',
-                    padding: '10px 16px',
-                    fontSize: '0.85rem',
-                    fontWeight: 800,
-                    cursor: isFrozen ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  Senden
-                </button>
-              </form>
+               {(() => {
+                 const isNoRecipient = role === 'student' ? !activeChatOcc.teacher_id : !activeChatOcc.student_id;
+                 const isDisabled = isFrozen || isNoRecipient;
+                 const placeholderText = isFrozen 
+                   ? "Eingefroren..." 
+                   : isNoRecipient 
+                     ? "Kein Chat-Teilnehmer..." 
+                     : "Schreibe eine Nachricht...";
+                 return (
+                   <form onSubmit={handleSendChatMessage} style={{
+                     padding: '16px 24px',
+                     borderTop: '1px solid #f1f5f9',
+                     background: '#f8fafc',
+                     display: 'flex',
+                     gap: '10px'
+                   }}>
+                     <input
+                       type="text"
+                       placeholder={placeholderText}
+                       disabled={isDisabled}
+                       value={chatTypedMessage}
+                       onChange={e => setChatTypedMessage(e.target.value)}
+                       style={{
+                         flex: 1,
+                         padding: '10px 14px',
+                         borderRadius: '12px',
+                         border: '1px solid #e2e8f0',
+                         background: isDisabled ? '#f1f5f9' : '#ffffff',
+                         fontSize: '0.85rem',
+                         outline: 'none',
+                         fontWeight: 600
+                       }}
+                     />
+                     <button
+                       type="submit"
+                       disabled={isDisabled || !chatTypedMessage.trim()}
+                       style={{
+                         background: isDisabled ? '#cbd5e1' : 'linear-gradient(135deg, #16a34a, #15803d)',
+                         color: '#ffffff',
+                         border: 'none',
+                         borderRadius: '12px',
+                         padding: '10px 16px',
+                         fontSize: '0.85rem',
+                         fontWeight: 800,
+                         cursor: isDisabled ? 'not-allowed' : 'pointer',
+                         display: 'flex',
+                         alignItems: 'center',
+                         justifyContent: 'center',
+                         transition: 'all 0.2s'
+                       }}
+                     >
+                       Senden
+                     </button>
+                   </form>
+                 );
+               })()}
             </div>
           </div>
         );
