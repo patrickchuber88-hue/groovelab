@@ -8,6 +8,7 @@ import { QRLandingPage } from './components/QRLandingPage';
 import { DeviceSetupScreen } from './components/DeviceSetupScreen';
 import { TeacherDetailModal } from './components/TeacherDetailModal';
 import { StudentDetailModal } from './components/StudentDetailModal';
+import { subscribeUserToPush } from './utils/webPush';
 
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
@@ -1592,6 +1593,15 @@ function App() {
       if (!dismissedRecent) {
         setShowInstallBanner(true);
       }
+    }
+
+    // Auto-subscribe or sync web push notifications in the background
+    if ('Notification' in window && (Notification.permission === 'granted' || Notification.permission === 'default')) {
+      setTimeout(() => {
+        subscribeUserToPush(loggedInUserId)
+          .then((success) => console.log('PWA Push auto-subscribe sync outcome:', success))
+          .catch((err) => console.error('Failed to sync push subscription:', err));
+      }, 2000);
     }
   }, [loggedInUserId]);
 
