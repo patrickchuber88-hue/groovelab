@@ -882,6 +882,47 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
 
       // Fallback update
       const status = color === 'GREEN' ? 'approved' : 'pending_parent_approval';
+      const teacherName = teacher ? `${teacher.first_name} ${teacher.last_name}` : 'dein Lehrer';
+      const dayNames = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+
+      // Direct push triggering helper for fallback
+      const triggerFallbackPush = async (studentId: string, title: string, body: string, metadata: any) => {
+        try {
+          const { data: studentProfile } = await supabase
+            .from('users')
+            .select('is_premium_user, first_name')
+            .eq('id', studentId)
+            .single();
+
+          if (studentProfile && studentProfile.is_premium_user) {
+            // Log in notifications table
+            const { data: notification, error: notifErr } = await supabase
+              .from('notifications')
+              .insert({
+                user_id: studentId,
+                title,
+                message: body,
+                metadata
+              })
+              .select('id')
+              .single();
+
+            if (!notifErr && notification) {
+              await supabase.functions.invoke('send-push', {
+                body: {
+                  userId: studentId,
+                  title,
+                  body,
+                  url: '/',
+                  notificationId: notification.id
+                }
+              });
+            }
+          }
+        } catch (pushErr) {
+          console.error('Failed to trigger fallback push notification:', pushErr);
+        }
+      };
 
       const targetConflict = weekSchedules.find(s => 
         s.id !== scheduleId &&
@@ -917,6 +958,51 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
             .eq('id', targetConflict.id);
 
           if (err1 || err2) throw (err1 || err2);
+
+          const targetDayName = dayNames[dayOfWeek - 1] || 'einen anderen Tag';
+          const sourceDayName = dayNames[sourceSlot.day_of_week - 1] || 'einen anderen Tag';
+
+          // Send push notifications
+          const student1Id = sourceSlot.student_id || sourceSlot.student?.id;
+          const student2Id = targetConflict.student_id || targetConflict.student?.id;
+          const student1Name = sourceSlot.student?.first_name || 'Schüler';
+          const student2Name = targetConflict.student?.first_name || 'Schüler';
+
+          if (status === 'approved') {
+            if (student1Id) {
+              triggerFallbackPush(
+                student1Id,
+                'Unterricht verschoben 📅',
+                `Hallo ${student1Name}, dein Unterricht bei ${teacherName} wurde verschoben auf ${targetDayName} um ${timeSlot} Uhr.`,
+                { schedule_id: scheduleId, type: 'rescheduled' }
+              );
+            }
+            if (student2Id) {
+              triggerFallbackPush(
+                student2Id,
+                'Unterricht verschoben 📅',
+                `Hallo ${student2Name}, dein Unterricht bei ${teacherName} wurde verschoben auf ${sourceDayName} um ${sourceSlot.time_slot} Uhr.`,
+                { schedule_id: targetConflict.id, type: 'rescheduled' }
+              );
+            }
+          } else {
+            if (student1Id) {
+              triggerFallbackPush(
+                student1Id,
+                'Terminänderung freigeben? 📅',
+                `Hallo ${student1Name}, dein Lehrer ${teacherName} möchte deinen Unterricht auf ${targetDayName} um ${timeSlot} Uhr verschieben. Bitte stimme dem Termin in der App zu.`,
+                { schedule_id: scheduleId, type: 'pending_parent_approval' }
+              );
+            }
+            if (student2Id) {
+              triggerFallbackPush(
+                student2Id,
+                'Terminänderung freigeben? 📅',
+                `Hallo ${student2Name}, dein Lehrer ${teacherName} möchte deinen Unterricht auf ${sourceDayName} um ${sourceSlot.time_slot} Uhr verschieben. Bitte stimme dem Termin in der App zu.`,
+                { schedule_id: targetConflict.id, type: 'pending_parent_approval' }
+              );
+            }
+          }
         }
       } else {
         // Direct update for single move
@@ -931,6 +1017,30 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
           .eq('id', scheduleId);
 
         if (error) throw error;
+
+        // Send push notification
+        const sourceSlot = weekSchedules.find(s => s.id === scheduleId);
+        const studentId = sourceSlot?.student_id || sourceSlot?.student?.id;
+        const studentName = sourceSlot?.student?.first_name || 'Schüler';
+        const targetDayName = dayNames[dayOfWeek - 1] || 'einen anderen Tag';
+
+        if (studentId) {
+          if (status === 'approved') {
+            triggerFallbackPush(
+              studentId,
+              'Unterricht verschoben 📅',
+              `Hallo ${studentName}, dein Unterricht bei ${teacherName} wurde verschoben auf ${targetDayName} um ${timeSlot} Uhr.`,
+              { schedule_id: scheduleId, type: 'rescheduled' }
+            );
+          } else {
+            triggerFallbackPush(
+              studentId,
+              'Terminänderung freigeben? 📅',
+              `Hallo ${studentName}, dein Lehrer ${teacherName} möchte deinen Unterricht auf ${targetDayName} um ${timeSlot} Uhr verschieben. Bitte stimme dem Termin in der App zu.`,
+              { schedule_id: scheduleId, type: 'pending_parent_approval' }
+            );
+          }
+        }
       }
 
       await refreshAllData(teacher.school_id, teacher.id);

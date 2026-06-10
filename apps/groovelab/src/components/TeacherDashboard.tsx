@@ -1211,6 +1211,46 @@ export function TeacherDashboard({
 
       // Fallback: direct Supabase swap
       const status = color === 'GREEN' ? 'approved' : 'pending_parent_approval';
+      const teacherName = teacher ? `${teacher.first_name} ${teacher.last_name}` : 'dein Lehrer';
+
+      // Direct push triggering helper for fallback
+      const triggerFallbackPush = async (studentId: string, title: string, body: string, metadata: any) => {
+        try {
+          const { data: studentProfile } = await supabase
+            .from('users')
+            .select('is_premium_user, first_name')
+            .eq('id', studentId)
+            .single();
+
+          if (studentProfile && studentProfile.is_premium_user) {
+            // Log in notifications table
+            const { data: notification, error: notifErr } = await supabase
+              .from('notifications')
+              .insert({
+                user_id: studentId,
+                title,
+                message: body,
+                metadata
+              })
+              .select('id')
+              .single();
+
+            if (!notifErr && notification) {
+              await supabase.functions.invoke('send-push', {
+                body: {
+                  userId: studentId,
+                  title,
+                  body,
+                  url: '/',
+                  notificationId: notification.id
+                }
+              });
+            }
+          }
+        } catch (pushErr) {
+          console.error('Failed to trigger fallback push notification:', pushErr);
+        }
+      };
       
       const targetConflict = briefingData.timeline.find((s: any) => 
         s.scheduleId !== draggedSchedId && 
@@ -1241,6 +1281,35 @@ export function TeacherDashboard({
             .eq('id', targetConflict.scheduleId);
 
           if (err1 || err2) throw (err1 || err2);
+
+          // Send push notifications
+          if (status === 'approved') {
+            triggerFallbackPush(
+              sourceSlot.student.id,
+              'Unterricht verschoben 📅',
+              `Hallo ${sourceSlot.student.name.split(' ')[0]}, dein Unterricht bei ${teacherName} wurde verschoben auf heute um ${targetSlot.timeSlot} Uhr.`,
+              { schedule_id: draggedSchedId, type: 'rescheduled' }
+            );
+            triggerFallbackPush(
+              targetConflict.student.id,
+              'Unterricht verschoben 📅',
+              `Hallo ${targetConflict.student.name.split(' ')[0]}, dein Unterricht bei ${teacherName} wurde verschoben auf heute um ${sourceSlot.timeSlot} Uhr.`,
+              { schedule_id: targetConflict.scheduleId, type: 'rescheduled' }
+            );
+          } else {
+            triggerFallbackPush(
+              sourceSlot.student.id,
+              'Terminänderung freigeben? 📅',
+              `Hallo ${sourceSlot.student.name.split(' ')[0]}, dein Lehrer ${teacherName} möchte deinen Unterricht auf heute um ${targetSlot.timeSlot} Uhr verschieben. Bitte stimme dem Termin in der App zu.`,
+              { schedule_id: draggedSchedId, type: 'pending_parent_approval' }
+            );
+            triggerFallbackPush(
+              targetConflict.student.id,
+              'Terminänderung freigeben? 📅',
+              `Hallo ${targetConflict.student.name.split(' ')[0]}, dein Lehrer ${teacherName} möchte deinen Unterricht auf heute um ${sourceSlot.timeSlot} Uhr verschieben. Bitte stimme dem Termin in der App zu.`,
+              { schedule_id: targetConflict.scheduleId, type: 'pending_parent_approval' }
+            );
+          }
         }
       } else {
         // Direct update for single move
@@ -1253,6 +1322,26 @@ export function TeacherDashboard({
           .eq('id', draggedSchedId);
 
         if (error) throw error;
+
+        // Send push notification
+        const sourceSlot = briefingData.timeline.find((s: any) => s.scheduleId === draggedSchedId);
+        if (sourceSlot && sourceSlot.student) {
+          if (status === 'approved') {
+            triggerFallbackPush(
+              sourceSlot.student.id,
+              'Unterricht verschoben 📅',
+              `Hallo ${sourceSlot.student.name.split(' ')[0]}, dein Unterricht bei ${teacherName} wurde verschoben auf heute um ${targetSlot.timeSlot} Uhr.`,
+              { schedule_id: draggedSchedId, type: 'rescheduled' }
+            );
+          } else {
+            triggerFallbackPush(
+              sourceSlot.student.id,
+              'Terminänderung freigeben? 📅',
+              `Hallo ${sourceSlot.student.name.split(' ')[0]}, dein Lehrer ${teacherName} möchte deinen Unterricht auf heute um ${targetSlot.timeSlot} Uhr verschieben. Bitte stimme dem Termin in der App zu.`,
+              { schedule_id: draggedSchedId, type: 'pending_parent_approval' }
+            );
+          }
+        }
       }
       setTicker(t => t + 1);
     } catch (err) {

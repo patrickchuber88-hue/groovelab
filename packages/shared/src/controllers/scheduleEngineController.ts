@@ -537,6 +537,62 @@ export async function cancelScheduleByStudentHandler(req: Request, res: Response
 }
 
 /**
+ * Helper to send instant web push notifications by invoking the Supabase Edge Function directly
+ */
+async function sendInstantPushNotification(
+  userId: string,
+  isPremium: boolean,
+  title: string,
+  body: string,
+  url: string,
+  metadata: any
+): Promise<void> {
+  if (!isPremium) {
+    console.log(`[Push Notification] Skipping user ${userId} because they are not premium.`);
+    return;
+  }
+  try {
+    // 1. Insert into notifications table first to log the notification
+    const { data: notification, error: notifError } = await supabase
+      .from('notifications')
+      .insert({
+        user_id: userId,
+        title: title,
+        message: body,
+        metadata: metadata
+      })
+      .select('id')
+      .single();
+
+    if (notifError) {
+      console.error('Failed to insert notification in sendInstantPushNotification:', notifError.message);
+      return;
+    }
+
+    const notificationId = notification?.id;
+
+    // 2. Call the Edge Function directly using the service role client
+    const { error: invokeError } = await supabase.functions.invoke('send-push', {
+      body: {
+        userId,
+        title,
+        body,
+        url,
+        notificationId
+      }
+    });
+
+    if (invokeError) {
+      console.error('Failed to invoke send-push edge function:', invokeError.message);
+    } else {
+      console.log('Instant push notification dispatched successfully to user:', userId);
+    }
+  } catch (err: any) {
+    console.error('Error sending instant push notification:', err.message);
+  }
+}
+
+/**
  * Controller 4: DRAG-AND-DROP SWAP-ENGINE MIT AMPELPRINZIP
  * POST-Endpunkt: /api/schedule/swap
  * Prüft Verfügbarkeiten und die Instrumenten-Raum-Matrix. Führt entweder direkten Tausch (GRÜN) oder Push-Anfrage (GELB) aus, oder blockiert (ROT).
@@ -549,7 +605,7 @@ export async function swapScheduleHandler(req: Request, res: Response): Promise<
       return;
     }
 
-    // 1. Fetch current schedule and student details
+    // 1. Fetch current schedule, student details (including premium status), and teacher details
     const { data: schedule, error: schedError } = await supabase
       .from('schedules')
       .select(`
@@ -560,7 +616,8 @@ export async function swapScheduleHandler(req: Request, res: Response): Promise<
         day_of_week,
         time_slot,
         room_id,
-        student:users!schedules_student_id_fkey (id, instrument, first_name, last_name)
+        student:users!schedules_student_id_fkey (id, instrument, first_name, last_name, is_premium_user),
+        teacher:users!schedules_teacher_id_fkey (id, first_name, last_name)
       `)
       .eq('id', scheduleId)
       .single();
@@ -572,6 +629,8 @@ export async function swapScheduleHandler(req: Request, res: Response): Promise<
 
     const student = (schedule as any).student;
     const studentInstrument = student?.instrument || 'Klavier';
+    const teacher = (schedule as any).teacher;
+    const teacherName = teacher ? `${teacher.first_name} ${teacher.last_name}` : 'dein Lehrer';
 
     // 2. Room Matrix Validation (allowed_instruments)
     const { data: room, error: roomError } = await supabase
@@ -618,7 +677,8 @@ export async function swapScheduleHandler(req: Request, res: Response): Promise<
         time_slot,
         room_id,
         status,
-        student:users!schedules_student_id_fkey (id, instrument, first_name, last_name)
+        student:users!schedules_student_id_fkey (id, instrument, first_name, last_name, is_premium_user),
+        teacher:users!schedules_teacher_id_fkey (id, first_name, last_name)
       `)
       .eq('day_of_week', targetDayOfWeek)
       .eq('time_slot', targetTimeSlot)
@@ -631,6 +691,8 @@ export async function swapScheduleHandler(req: Request, res: Response): Promise<
       res.status(500).json({ error: 'Error querying target schedule.', details: targetError.message });
       return;
     }
+
+    const dayNames = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
 
     if (targetSchedule) {
       // 1. Validate room matrix for target schedule in dragged schedule's original room
@@ -709,6 +771,56 @@ export async function swapScheduleHandler(req: Request, res: Response): Promise<
       // Regenerate occurrences for the teacher
       await generateOccurrencesForTeacher(schedule.teacher_id);
 
+      // Trigger instant push notifications for both students
+      const targetDayName = dayNames[targetDayOfWeek - 1] || 'einen anderen Tag';
+      const sourceDayName = dayNames[schedule.day_of_week - 1] || 'einen anderen Tag';
+
+      if (isBothAvailable) {
+        // Send approved reschedules (instant)
+        if (student) {
+          sendInstantPushNotification(
+            student.id,
+            !!student.is_premium_user,
+            'Unterricht verschoben 📅',
+            `Hallo ${student.first_name}, dein Unterricht bei ${teacherName} wurde verschoben auf ${targetDayName} um ${targetTimeSlot} Uhr.`,
+            '/',
+            { schedule_id: scheduleId, type: 'rescheduled' }
+          );
+        }
+        if (targetStudent) {
+          sendInstantPushNotification(
+            targetStudent.id,
+            !!targetStudent.is_premium_user,
+            'Unterricht verschoben 📅',
+            `Hallo ${targetStudent.first_name}, dein Unterricht bei ${teacherName} wurde verschoben auf ${sourceDayName} um ${schedule.time_slot} Uhr.`,
+            '/',
+            { schedule_id: targetSchedule.id, type: 'rescheduled' }
+          );
+        }
+      } else {
+        // Send approval requests (instant)
+        if (student) {
+          sendInstantPushNotification(
+            student.id,
+            !!student.is_premium_user,
+            'Terminänderung freigeben? 📅',
+            `Hallo ${student.first_name}, dein Lehrer ${teacherName} möchte deinen Unterricht auf ${targetDayName} um ${targetTimeSlot} Uhr verschieben. Bitte stimme dem Termin in der App zu.`,
+            '/',
+            { schedule_id: scheduleId, type: 'pending_parent_approval' }
+          );
+        }
+        if (targetStudent) {
+          sendInstantPushNotification(
+            targetStudent.id,
+            !!targetStudent.is_premium_user,
+            'Terminänderung freigeben? 📅',
+            `Hallo ${targetStudent.first_name}, dein Lehrer ${teacherName} möchte deinen Unterricht auf ${sourceDayName} um ${schedule.time_slot} Uhr verschieben. Bitte stimme dem Termin in der App zu.`,
+            '/',
+            { schedule_id: targetSchedule.id, type: 'pending_parent_approval' }
+          );
+        }
+      }
+
       res.status(200).json({
         success: true,
         color: isBothAvailable ? 'GREEN' : 'YELLOW',
@@ -762,6 +874,7 @@ export async function swapScheduleHandler(req: Request, res: Response): Promise<
     }
 
     const isAvailable = !!availability;
+    const targetDayName = dayNames[targetDayOfWeek - 1] || 'einen anderen Tag';
 
     if (isAvailable) {
       // GREEN: direct swap
@@ -782,6 +895,18 @@ export async function swapScheduleHandler(req: Request, res: Response): Promise<
 
       // Regenerate occurrences for the teacher
       await generateOccurrencesForTeacher(schedule.teacher_id);
+
+      // Trigger instant push notification
+      if (student) {
+        sendInstantPushNotification(
+          student.id,
+          !!student.is_premium_user,
+          'Unterricht verschoben 📅',
+          `Hallo ${student.first_name}, dein Unterricht bei ${teacherName} wurde verschoben auf ${targetDayName} um ${targetTimeSlot} Uhr.`,
+          '/',
+          { schedule_id: scheduleId, type: 'rescheduled' }
+        );
+      }
 
       res.status(200).json({
         success: true,
@@ -809,8 +934,18 @@ export async function swapScheduleHandler(req: Request, res: Response): Promise<
       // Regenerate occurrences for the teacher
       await generateOccurrencesForTeacher(schedule.teacher_id);
 
-      // In production, trigger push notifications to parents.
-      // Mocked here by returning the status.
+      // Trigger instant push notification for parent approval
+      if (student) {
+        sendInstantPushNotification(
+          student.id,
+          !!student.is_premium_user,
+          'Terminänderung freigeben? 📅',
+          `Hallo ${student.first_name}, dein Lehrer ${teacherName} möchte deinen Unterricht auf ${targetDayName} um ${targetTimeSlot} Uhr verschieben. Bitte stimme dem Termin in der App zu.`,
+          '/',
+          { schedule_id: scheduleId, type: 'pending_parent_approval' }
+        );
+      }
+
       res.status(200).json({
         success: true,
         color: 'YELLOW',
