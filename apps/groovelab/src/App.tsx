@@ -6351,6 +6351,31 @@ function App() {
               )}
             </div>
 
+            {/* Help / Tip Box */}
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '16px',
+              padding: '12px',
+              fontSize: '0.8rem',
+              color: '#475569',
+              lineHeight: 1.4,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px'
+            }}>
+              <span style={{ fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                💡 App nicht auffindbar?
+              </span>
+              <span>
+                {/iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream ? (
+                  'Unter iOS landen neu hinzugefügte Apps manchmal nur in der App-Mediathek (ganz rechts). Du kannst das Symbol von dort einfach auf deinen Home-Bildschirm ziehen.'
+                ) : (
+                  'Einige Android-Launcher platzieren Apps direkt in der App-Übersicht (App Drawer). Suche dort nach "Campus", halte das Symbol gedrückt und ziehe es auf deinen Startbildschirm.'
+                )}
+              </span>
+            </div>
+
             {/* Close Button */}
             <button 
               onClick={() => setShowInstallGuide(false)}
