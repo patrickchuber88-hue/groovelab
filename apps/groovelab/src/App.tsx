@@ -1547,6 +1547,7 @@ function App() {
 
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [showInstallGuide, setShowInstallGuide] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -6009,7 +6010,26 @@ function App() {
 
           {/* Action & Close buttons */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-            {(!/iPad|iPhone|iPod/.test(navigator.userAgent) || (window as any).MSStream) && deferredPrompt && (
+            {(/iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream) ? (
+              <button 
+                onClick={() => setShowInstallGuide(true)}
+                style={{
+                  background: '#16a34a',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '100px',
+                  padding: '6px 14px',
+                  fontSize: '0.75rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(22, 163, 74, 0.15)',
+                  minHeight: '30px'
+                }}
+                className="hover-scale"
+              >
+                Anleitung
+              </button>
+            ) : deferredPrompt ? (
               <button 
                 onClick={handleInstallPWA}
                 style={{
@@ -6027,6 +6047,25 @@ function App() {
                 className="hover-scale"
               >
                 Laden
+              </button>
+            ) : (
+              <button 
+                onClick={() => setShowInstallGuide(true)}
+                style={{
+                  background: '#16a34a',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '100px',
+                  padding: '6px 14px',
+                  fontSize: '0.75rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(22, 163, 74, 0.15)',
+                  minHeight: '30px'
+                }}
+                className="hover-scale"
+              >
+                Anleitung
               </button>
             )}
             <button 
@@ -6053,6 +6092,289 @@ function App() {
         </div>
       )}
 
+      {showInstallGuide && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(15, 23, 42, 0.6)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            zIndex: 999999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            animation: 'fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+          }}
+          onClick={() => setShowInstallGuide(false)}
+        >
+          <div 
+            style={{
+              background: '#ffffff',
+              borderRadius: '24px',
+              width: '100%',
+              maxWidth: '380px',
+              padding: '24px',
+              boxShadow: '0 30px 60px rgba(0, 0, 0, 0.25), 0 0 1px rgba(0, 0, 0, 0.1)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px',
+              position: 'relative',
+              animation: 'scaleIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '11px',
+                background: 'linear-gradient(135deg, #22c55e 0%, #15803d 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '1.5rem',
+                boxShadow: '0 4px 12px rgba(34, 197, 94, 0.2)'
+              }}>
+                🎓
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#1e293b' }}>
+                  Campus installieren
+                </span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 550, color: '#64748b' }}>
+                  Für den Homescreen auf deinem Handy
+                </span>
+              </div>
+            </div>
+
+            {/* Instruction steps */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', margin: '8px 0' }}>
+              {/iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream ? (
+                // iOS Safari Instructions
+                <>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                    <div style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '50%',
+                      background: 'rgba(22, 163, 74, 0.08)',
+                      color: '#16a34a',
+                      fontSize: '0.85rem',
+                      fontWeight: 800,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      1
+                    </div>
+                    <div style={{ fontSize: '0.88rem', color: '#334155', lineHeight: 1.4, flex: 1 }}>
+                      Tippe unten (auf dem iPad oben) im Safari-Browser auf das <strong>Teilen-Symbol</strong>.
+                      <div style={{
+                        marginTop: '8px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: '#f1f5f9',
+                        padding: '6px 12px',
+                        borderRadius: '10px',
+                        color: '#007aff',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        gap: '6px'
+                      }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                          <polyline points="16 6 12 2 8 6" />
+                          <line x1="12" y1="2" x2="12" y2="15" />
+                        </svg>
+                        Teilen-Symbol
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                    <div style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '50%',
+                      background: 'rgba(22, 163, 74, 0.08)',
+                      color: '#16a34a',
+                      fontSize: '0.85rem',
+                      fontWeight: 800,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      2
+                    </div>
+                    <div style={{ fontSize: '0.88rem', color: '#334155', lineHeight: 1.4, flex: 1 }}>
+                      Scrolle nach unten und wähle <strong>Zum Home-Bildschirm</strong>.
+                      <div style={{
+                        marginTop: '8px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: '#f1f5f9',
+                        padding: '6px 12px',
+                        borderRadius: '10px',
+                        color: '#334155',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        gap: '8px'
+                      }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                          <line x1="12" y1="8" x2="12" y2="16" />
+                          <line x1="8" y1="12" x2="16" y2="12" />
+                        </svg>
+                        Zum Home-Bildschirm
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                    <div style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '50%',
+                      background: 'rgba(22, 163, 74, 0.08)',
+                      color: '#16a34a',
+                      fontSize: '0.85rem',
+                      fontWeight: 800,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      3
+                    </div>
+                    <div style={{ fontSize: '0.88rem', color: '#334155', lineHeight: 1.4, flex: 1 }}>
+                      Tippe oben rechts auf <strong>Hinzufügen</strong>.
+                    </div>
+                  </div>
+                </>
+              ) : (
+                // Android/Chrome Instructions
+                <>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                    <div style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '50%',
+                      background: 'rgba(22, 163, 74, 0.08)',
+                      color: '#16a34a',
+                      fontSize: '0.85rem',
+                      fontWeight: 800,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      1
+                    </div>
+                    <div style={{ fontSize: '0.88rem', color: '#334155', lineHeight: 1.4, flex: 1 }}>
+                      Tippe oben rechts im Browser auf das <strong>Menü-Symbol (3 Punkte)</strong>.
+                      <div style={{
+                        marginTop: '8px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: '#f1f5f9',
+                        padding: '6px 12px',
+                        borderRadius: '10px',
+                        color: '#334155',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        gap: '6px'
+                      }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="1" />
+                          <circle cx="12" cy="5" r="1" />
+                          <circle cx="12" cy="19" r="1" />
+                        </svg>
+                        Menü
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                    <div style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '50%',
+                      background: 'rgba(22, 163, 74, 0.08)',
+                      color: '#16a34a',
+                      fontSize: '0.85rem',
+                      fontWeight: 800,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      2
+                    </div>
+                    <div style={{ fontSize: '0.88rem', color: '#334155', lineHeight: 1.4, flex: 1 }}>
+                      Wähle <strong>App installieren</strong> oder <strong>Zum Startbildschirm hinzufügen</strong>.
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                    <div style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '50%',
+                      background: 'rgba(22, 163, 74, 0.08)',
+                      color: '#16a34a',
+                      fontSize: '0.85rem',
+                      fontWeight: 800,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      3
+                    </div>
+                    <div style={{ fontSize: '0.88rem', color: '#334155', lineHeight: 1.4, flex: 1 }}>
+                      Bestätige die Installation.
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Close Button */}
+            <button 
+              onClick={() => setShowInstallGuide(false)}
+              style={{
+                background: '#16a34a',
+                color: 'white',
+                border: 'none',
+                borderRadius: '14px',
+                padding: '12px',
+                fontSize: '0.9rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(22, 163, 74, 0.2)',
+                textAlign: 'center',
+                transition: 'all 0.2s ease'
+              }}
+              className="hover-scale"
+            >
+              Verstanden
+            </button>
+          </div>
+        </div>
+      )}
+
       <style>{`
         .sidebar-nav .hover-scale { transition: all 0.2s ease !important; }
         .sidebar-nav .hover-scale:hover { 
@@ -6069,6 +6391,14 @@ function App() {
             transform: translateY(0);
             opacity: 1;
           }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes scaleIn {
+          from { transform: scale(0.9) translateY(10px); opacity: 0; }
+          to { transform: scale(1) translateY(0); opacity: 1; }
         }
       `}</style>
       {/* Sidebar Navigation (iPad/Desktop) */}
