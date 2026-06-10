@@ -32,7 +32,7 @@ Dieses Dokument vergleicht die Vorschläge deines Freundes mit der aktuellen Gro
 > [!WARNING]
 > **Nein, dieser Vorschlag verschlechtert unser System!** Das Hosten der gesamten Infrastruktur (insbesondere der produktiven Datenbank) in Docker auf einem einzelnen Hetzner-Server bringt massive Nachteile:
 
-* **Hoher Wartungsaufwand (DevOps):** Wenn wir Postgres selbst in Docker hosten, müssen wir sich selbst um Point-in-Time-Backups, Replikation, Scaling, Connection Pooling (z. B. PgBouncer) und Sicherheitsupdates der DB kümmern. Supabase übernimmt all dies automatisch.
+* **Hoher Wartungsaufwand (DevOps):** Wenn wir Postgres selbst in Docker hosten, müssen wir uns selbst um Point-in-Time-Backups, Replikation, Scaling, Connection Pooling (z. B. PgBouncer) und Sicherheitsupdates der DB kümmern. Supabase übernimmt all dies automatisch.
 * **Realtime-Funktionalität:** GrooveLab basiert stark auf Echtzeit-Interaktionen (z. B. Live-Status der Räume, Hilfe-Ruf-System). Supabase liefert ein fertiges Echtzeit-WebSocket-Framework mit. Ein eigenes Backend in Docker müsste diese Funktionalität (z. B. über Node.js, Socket.io und Redis Pub/Sub) von Grund auf neu implementieren.
 * **Single Point of Failure (SPOF):** Stürzt der Hetzner-Server ab oder hat Hardwareprobleme, ist das gesamte System (inklusive aller Schülerdaten) offline. Bei Supabase läuft die Datenbank in einer hochverfügbaren Cloud-Infrastruktur auf AWS.
 * **Fazit:** Die Kombination aus **Hetzner (günstiges statisches Frontend-Hosting)** und **Supabase (sichere, skalierbare Cloud-Datenbank & Auth)** ist für uns der ideale Kompromiss aus Performance, Kosten und minimalem Wartungsaufwand.
@@ -89,3 +89,44 @@ Dieses Dokument vergleicht die Vorschläge deines Freundes mit der aktuellen Gro
 * **Macht Local-First für uns Sinn?**
   * Im Musikschulalltag (Unterricht, Raumprüfung) ist Internet (WLAN oder LTE) in 99 % der Fälle vorhanden. Wer checkt sich schon offline in einem Kellerraum in eine Live-Session ein?
   * **Pragmatische Alternative:** Falls wir einfache Offline-Fähigkeit wollen (z. B. damit die App lädt, wenn das Netz kurz weg ist), richten wir einen **Standard Service Worker (PWA)** ein. Dieser cacht die App-Dateien (HTML, JS, CSS), sodass die App offline startet und z. B. eine nette Meldung anzeigt oder im `localStorage` gespeicherte Daten schreibgeschützt anzeigt. Das kostet uns 2 Tage statt 2 Monate Arbeit.
+
+---
+
+## 6. Globales Sicherheits- & DSGVO-Konzept (Vorschlag 1.6)
+
+### Vergleich
+* **Empfehlung des Freundes:** Datenminimierung bei externen Mail-Gateways (Pseudonymisierung), "Zero-Mail-Workflow" als Fallback per `mailto:`, Brute-Force-Schutz für QR-Logins (Rate Limiting), verschlüsselte automatisierte Backups (AES-256-GCM via OpenSSL) und Audit Trails für administrative Zugriffe.
+* **Aktueller Stand:**
+  * Wir senden derzeit **keine** E-Mails an Dritte (wie Brevo/Resend) aus der App heraus.
+  * QR-Logins werden direkt über die Supabase-Datenbank validiert (die QR-Token sind sichere UUIDs).
+  * Auf dem Hetzner-Server existiert **kein automatisiertes Backup-System** (nur unregelmäßige manuelle Backups).
+
+### Bewertung & Empfehlung
+
+#### 6.1 Anonymisierte E-Mail-Pipeline (Brevo/Resend) & Zero-Mail
+> [!NOTE]
+> **Aktuell nicht notwendig, da kein Drittanbieter-Mailversand stattfindet.**
+* Da wir Schüler- und Lehrerdaten vollständig auf unserem selbstgehosteten Supabase-Server auf Hetzner isolieren und keine Mail-Dienstleister angebunden haben, besteht hier derzeit kein Risiko.
+* Sollten wir in Zukunft automatisierte E-Mails (z. B. Hausaufgaben-Erinnerungen) einführen, ist das Pseudonymisierungsprinzip (nur IDs/Initialen an Brevo übertragen) absolut sinnvoll und wird so umgesetzt.
+
+#### 6.2 Rate-Limiting für QR-/PIN-Logins
+> [!IMPORTANT]
+> **Sinnvolle Verbesserung!**
+* Die `qr_token` sind zwar kryptografische UUIDs (nicht erratbar), aber die kürzeren `ausweis_nummer`-PINs könnten theoretisch durch Brute-Force erraten werden.
+* **Lösung:** Da wir Supabase selbst hosten, können wir ein Rate-Limiting (z. B. max. 5 Anfragen pro Minute pro IP) direkt im eingebauten API-Gateway **Kong** oder im vorgeschalteten Proxy **Traefik** konfigurieren.
+
+#### 6.3 Verschlüsselte automatisierte Backups
+> [!CAUTION]
+> **Kritische Sicherheitslücke: Dringend umsetzen!**
+* Derzeit werden Backups nur unregelmäßig manuell erstellt. Ein Serverausfall bei Hetzner würde zu partiellem Datenverlust führen.
+* **Lösung:** Wir sollten ein einfaches, nächtliches Shell-Skript auf dem Server einrichten (`cron`), das:
+  1. Den Zustand der Postgres-Datenbank sichert (`pg_dump`).
+  2. Die Datei mit OpenSSL und AES-256-GCM verschlüsselt.
+  3. Die Datei auf einen externen Speicher (z. B. Hetzner Storage Box oder AWS S3) spiegelt.
+  4. Lokal eine Rotation von z. B. 7 Tagen pflegt.
+
+#### 6.4 Audit Trails & Log-Anonymisierung
+> [!TIP]
+> **Gute Ergänzung für städtische Musikschulen.**
+* Log-Rotations-Fristen für Nginx- und Docker-Logs auf dem Server auf 7 Tage zu begrenzen, ist datenschutzrechtlich sauber.
+* Administrative Änderungen an Nutzerprofilen protokollieren wir am einfachsten über einen einfachen PostgreSQL-Trigger in unserer Supabase-Datenbank.
