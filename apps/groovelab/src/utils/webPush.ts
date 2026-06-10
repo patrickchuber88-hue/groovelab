@@ -1,8 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import { supabase } from '../lib/supabase';
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || 'BAq9l0chUV4DOE58mzN74drPzhGrhE4xSmRcRCc4BRPyDACTIS3qUU-uCce237nw7Lq6CFgGqsIerlvbNAZJhA4'; // Fallback public key
 

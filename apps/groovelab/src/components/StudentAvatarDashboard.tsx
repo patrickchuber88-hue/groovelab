@@ -2108,7 +2108,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
   useEffect(() => {
     fetchStudentAndAvatar();
-  }, [studentId]);
+  }, [studentId, activeTab]);
 
   useEffect(() => {
     if (activeTab === 'profile' && studentId) {
