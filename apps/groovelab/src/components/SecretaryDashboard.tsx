@@ -1407,9 +1407,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
   const exportAuditLogsToCsv = () => {
     if (auditLogs.length === 0) return;
-    const headers = ['Zeitpunkt', 'Aktion', 'Tabelle', 'Record-ID', 'Geändert von', 'Details'];
+    const headers = ['Zeitpunkt', 'Aktion', 'Tabelle', 'Betroffener Nutzer', 'Record-ID', 'Geändert von', 'Details'];
     const rows = auditLogs.map(log => {
       const changer = log.users ? `${log.users.first_name} ${log.users.last_name}` : 'System';
+      const targetName = log.table_name === 'users' ? (userMap[log.record_id] || 'Unbekannt') : log.table_name;
       let details = '';
       if (log.action === 'UPDATE') {
         details = Object.entries(log.new_data || {}).map(([k, v]) => `${k}: ${JSON.stringify(log.old_data?.[k])} -> ${JSON.stringify(v)}`).join(' | ');
@@ -1422,6 +1423,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         new Date(log.created_at).toLocaleString('de-DE'),
         log.action,
         log.table_name,
+        targetName,
         log.record_id,
         changer,
         details
@@ -13846,7 +13848,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             <td style={{ padding: '14px 20px', fontSize: '0.75rem', color: '#1e293b', maxWidth: '450px' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                                 <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginBottom: '2px' }}>
-                                  Datensatz: <strong>{log.table_name}</strong> (#{log.record_id.substring(0, 8)})
+                                  {log.table_name === 'users' ? 'Betroffener Nutzer' : 'Datensatz'}:{' '}
+                                  <strong style={{ color: '#475569' }}>
+                                    {log.table_name === 'users' ? (userMap[log.record_id] || 'Unbekannt') : log.table_name}
+                                  </strong>{' '}
+                                  (#{log.record_id.substring(0, 8)})
                                 </div>
                                 {renderDiffContent(log)}
                               </div>
