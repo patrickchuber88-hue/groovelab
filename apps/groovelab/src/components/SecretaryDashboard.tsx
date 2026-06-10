@@ -7,7 +7,7 @@ import {
   Coffee, Sparkles, Clock, ClipboardList, Upload, Plus,
   Trash2, Shield, Calendar, BookOpen, Music, CheckSquare, XSquare, Check as CheckIcon,
   LayoutDashboard, Award, UserPlus, GraduationCap, ZoomIn, ZoomOut, ChevronLeft, X, AlertCircle, MoreVertical,
-  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3
+  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search
 } from 'lucide-react';
 import { TeacherDashboard } from './TeacherDashboard';
 import { StudentDetailModal } from './StudentDetailModal';
@@ -936,7 +936,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     if (saved === 'campus' || saved === 'groovelab' || saved === 'secretary') return saved as any;
     return 'secretary';
   });
-  const [secretarySubTab, setSecretarySubTab] = useState<'briefing' | 'employees' | 'linking' | 'licenses' | 'setup' | 'rooms' | 'equipment' | 'crisis'>('briefing');
+  const [secretarySubTab, setSecretarySubTab] = useState<'briefing' | 'employees' | 'linking' | 'licenses' | 'setup' | 'rooms' | 'equipment' | 'crisis' | 'audit'>('briefing');
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditLoading, setAuditLoading] = useState<boolean>(false);
+  const [auditSearchQuery, setAuditSearchQuery] = useState<string>('');
+  const [auditActionFilter, setAuditActionFilter] = useState<string>('All');
   const [campusSubTab, setCampusSubTab] = useState<'briefing' | 'subjects' | 'onboarding' | 'students' | 'cooperations' | 'events' | 'schedules' | 'status'>('briefing');
   const [schedulesRoomsViewMode, setSchedulesRoomsViewMode] = useState<'designer' | 'live'>('live');
   const [liveViewDay, setLiveViewDay] = useState<number>(1);
@@ -1362,6 +1366,114 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     }, 5000);
     return () => clearInterval(interval);
   }, [schoolId]);
+
+  const fetchAuditLogs = async () => {
+    setAuditLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .select(`
+          id,
+          changed_by,
+          table_name,
+          action,
+          record_id,
+          old_data,
+          new_data,
+          created_at,
+          users (
+            first_name,
+            last_name
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+      if (error) throw error;
+      setAuditLogs(data || []);
+    } catch (err: any) {
+      console.error('Error fetching audit logs:', err);
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'secretary' && secretarySubTab === 'audit') {
+      fetchAuditLogs();
+    }
+  }, [activeTab, secretarySubTab]);
+
+  const exportAuditLogsToCsv = () => {
+    if (auditLogs.length === 0) return;
+    const headers = ['Zeitpunkt', 'Aktion', 'Tabelle', 'Record-ID', 'Geändert von', 'Details'];
+    const rows = auditLogs.map(log => {
+      const changer = log.users ? `${log.users.first_name} ${log.users.last_name}` : 'System';
+      let details = '';
+      if (log.action === 'UPDATE') {
+        details = Object.entries(log.new_data || {}).map(([k, v]) => `${k}: ${JSON.stringify(log.old_data?.[k])} -> ${JSON.stringify(v)}`).join(' | ');
+      } else if (log.action === 'INSERT') {
+        details = Object.entries(log.new_data || {}).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(' | ');
+      } else {
+        details = Object.entries(log.old_data || {}).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(' | ');
+      }
+      return [
+        new Date(log.created_at).toLocaleString('de-DE'),
+        log.action,
+        log.table_name,
+        log.record_id,
+        changer,
+        details
+      ];
+    });
+    const csvContent = "\uFEFF" + [headers.join(';'), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(';'))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Aenderungsprotokoll_GrooveLab_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const renderDiffContent = (log: any) => {
+    if (log.action === 'INSERT') {
+      if (!log.new_data) return '-';
+      return Object.entries(log.new_data).map(([key, val]) => (
+        <div key={key} style={{ fontSize: '0.72rem', color: '#374151' }}>
+          <strong>{key}</strong>: {JSON.stringify(val)}
+        </div>
+      ));
+    }
+    if (log.action === 'DELETE') {
+      if (!log.old_data) return '-';
+      return Object.entries(log.old_data).map(([key, val]) => (
+        <div key={key} style={{ fontSize: '0.72rem', color: '#6b7280' }}>
+          <strong>{key}</strong>: {JSON.stringify(val)}
+        </div>
+      ));
+    }
+    if (log.action === 'UPDATE') {
+      if (!log.new_data || !log.old_data) return '-';
+      return Object.entries(log.new_data).map(([key, newVal]: [string, any]) => {
+        const oldVal = log.old_data[key];
+        return (
+          <div key={key} style={{ fontSize: '0.72rem', color: '#1f2937', marginBottom: '2px' }}>
+            <span style={{ fontWeight: 650, color: '#4b5563' }}>{key}</span>:{' '}
+            <span style={{ textDecoration: 'line-through', color: '#c5221f', backgroundColor: '#fce8e6', padding: '1px 3px', borderRadius: '4px' }}>
+              {oldVal !== undefined ? JSON.stringify(oldVal) : 'leer'}
+            </span>{' '}
+            ➔{' '}
+            <span style={{ color: '#137333', backgroundColor: '#e6f4ea', padding: '1px 3px', borderRadius: '4px', fontWeight: 600 }}>
+              {JSON.stringify(newVal)}
+            </span>
+          </div>
+        );
+      });
+    }
+    return '-';
+  };
 
   const fetchLiveStatusData = async () => {
     try {
@@ -6136,7 +6248,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             { id: 'employees', label: 'Mitarbeiter', icon: Users },
             { id: 'linking', label: 'Profil-Verknüpfung', icon: LinkIcon },
             { id: 'licenses', label: 'Lizenzen', icon: Award },
-            { id: 'setup', label: 'Setup & Design', icon: Settings }
+            { id: 'setup', label: 'Setup & Design', icon: Settings },
+            { id: 'audit', label: 'Änderungsverlauf', icon: Clock }
           ].map((item) => {
             const Icon = item.icon;
             const isSelected = secretarySubTab === item.id;
@@ -13587,6 +13700,170 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               </div>
             </div>
 
+          </div>
+        )}
+
+        {activeTab === 'secretary' && secretarySubTab === 'audit' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', fontFamily: 'Inter, sans-serif' }}>
+            <style>{`
+              @media print {
+                .no-print { display: none !important; }
+                body { background: white !important; color: black !important; padding: 0 !important; margin: 0 !important; }
+                .google-card, table { box-shadow: none !important; border: none !important; }
+                th, td { border-bottom: 1px solid #ddd !important; padding: 8px !important; }
+                tr { page-break-inside: avoid !important; }
+              }
+            `}</style>
+            
+            {/* Header */}
+            <div style={{ background: 'white', borderRadius: '24px', padding: '20px 24px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} className="no-print">
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Clock size={20} color="#ea4335" /> Änderungsprotokoll (Audit Trail)
+                </h3>
+                <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 550 }}>
+                  Protokolliert alle administrativen und systemischen Änderungen an den Benutzerprofilen dieser Musikschule.
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={exportAuditLogsToCsv}
+                  className="google-btn-secondary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', padding: '8px 14px', borderRadius: '10px', background: 'white', border: '1px solid #cbd5e1', cursor: 'pointer' }}
+                  disabled={auditLogs.length === 0}
+                >
+                  📥 Excel/CSV Export
+                </button>
+                <button
+                  onClick={() => window.print()}
+                  className="google-btn-primary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', padding: '8px 14px', borderRadius: '10px', background: '#ea4335', color: 'white', border: 'none', cursor: 'pointer' }}
+                  disabled={auditLogs.length === 0}
+                >
+                  🖨️ PDF / Drucken
+                </button>
+              </div>
+            </div>
+
+            {/* Filter-Bar */}
+            <div style={{ background: 'white', borderRadius: '20px', padding: '16px 20px', border: '1px solid rgba(0,0,0,0.05)', display: 'flex', gap: '12px', alignItems: 'center' }} className="no-print">
+              <div style={{ flex: 1, display: 'flex', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '8px 12px', alignItems: 'center', gap: '8px' }}>
+                <Search size={16} color="#94a3b8" />
+                <input
+                  type="text"
+                  value={auditSearchQuery}
+                  onChange={e => setAuditSearchQuery(e.target.value)}
+                  placeholder="Nach Name oder ID filtern..."
+                  style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.82rem', fontWeight: 600, color: '#1e293b', width: '100%' }}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Aktion:</span>
+                <select
+                  value={auditActionFilter}
+                  onChange={e => setAuditActionFilter(e.target.value)}
+                  style={{ padding: '8px 12px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: 'white', fontSize: '0.8rem', fontWeight: 700, outline: 'none', color: '#1e293b' }}
+                >
+                  <option value="All">Alle Aktionen</option>
+                  <option value="INSERT">Erstellung (INSERT)</option>
+                  <option value="UPDATE">Aktualisierung (UPDATE)</option>
+                  <option value="DELETE">Löschung (DELETE)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Logs Table */}
+            <div style={{ background: 'white', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', overflow: 'hidden', boxShadow: '0 4px 12px rgba(15,23,42,0.03)' }}>
+              {auditLoading ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#64748b', fontWeight: 650, fontSize: '0.85rem' }}>
+                  Lade Logs...
+                </div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
+                      <th style={{ padding: '14px 20px', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#64748b' }}>Zeitpunkt</th>
+                      <th style={{ padding: '14px 20px', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#64748b' }}>Aktion</th>
+                      <th style={{ padding: '14px 20px', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#64748b' }}>Geändert von</th>
+                      <th style={{ padding: '14px 20px', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#64748b' }}>Details der Änderung</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditLogs
+                      .filter(log => {
+                        const changer = log.users ? `${log.users.first_name} ${log.users.last_name}`.toLowerCase() : 'system';
+                        const matchesSearch = !auditSearchQuery.trim() || 
+                          changer.includes(auditSearchQuery.toLowerCase().trim()) || 
+                          log.record_id.toLowerCase().includes(auditSearchQuery.toLowerCase().trim());
+                        
+                        const matchesAction = auditActionFilter === 'All' || log.action === auditActionFilter;
+                        
+                        return matchesSearch && matchesAction;
+                      })
+                      .map((log) => {
+                        const dateFormatted = new Date(log.created_at).toLocaleString('de-DE', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit'
+                        });
+
+                        let badgeBg = '#e6f4ea';
+                        let badgeColor = '#137333';
+                        if (log.action === 'UPDATE') {
+                          badgeBg = '#fef7e0';
+                          badgeColor = '#b06000';
+                        } else if (log.action === 'DELETE') {
+                          badgeBg = '#fce8e6';
+                          badgeColor = '#c5221f';
+                        }
+
+                        return (
+                          <tr key={log.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '14px 20px', fontSize: '0.78rem', fontWeight: 700, color: '#1e293b', whiteSpace: 'nowrap' }}>
+                              {dateFormatted}
+                            </td>
+                            <td style={{ padding: '14px 20px' }}>
+                              <span style={{
+                                display: 'inline-block',
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                                fontSize: '0.65rem',
+                                fontWeight: 900,
+                                background: badgeBg,
+                                color: badgeColor,
+                                textTransform: 'uppercase'
+                              }}>
+                                {log.action}
+                              </span>
+                            </td>
+                            <td style={{ padding: '14px 20px', fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>
+                              {log.users ? `${log.users.first_name} ${log.users.last_name}` : 'System'}
+                            </td>
+                            <td style={{ padding: '14px 20px', fontSize: '0.75rem', color: '#1e293b', maxWidth: '450px' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginBottom: '2px' }}>
+                                  Datensatz: <strong>{log.table_name}</strong> (#{log.record_id.substring(0, 8)})
+                                </div>
+                                {renderDiffContent(log)}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    {auditLogs.length === 0 && (
+                      <tr>
+                        <td colSpan={4} style={{ textAlign: 'center', padding: '30px', color: '#cbd5e1', fontSize: '0.8rem', fontWeight: 700 }}>
+                          Keine Protokolleinträge gefunden.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
         )}
 
