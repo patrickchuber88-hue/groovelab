@@ -464,7 +464,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                 justifyContent: 'center',
                 border: '1.5px solid rgba(251, 191, 36, 0.3)'
               }}>
-                <QRCode value={localTeacherQrToken || localQrToken || ''} size={135} />
+                <QRCode value={`https://campus-groovelab.de/qr/${localTeacherQrToken || localQrToken || ''}`} size={135} />
               </div>
             </div>
           </div>
@@ -544,7 +544,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                 alignItems: 'center',
                 justifyContent: 'center'
               }}>
-                <QRCode value={localTeacherQrToken || localQrToken || ''} size={150} />
+                <QRCode value={`https://campus-groovelab.de/qr/${localTeacherQrToken || localQrToken || ''}`} size={150} />
               </div>
 
               <p style={{ 

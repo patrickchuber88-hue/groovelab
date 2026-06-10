@@ -1684,7 +1684,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
   const downloadParentQrCode = async () => {
     try {
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${verifiedStudentDetails?.qr_token || verifiedStudentId}`;
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`https://campus-groovelab.de/qr/${verifiedStudentDetails?.qr_token || verifiedStudentId}`)}`
       const response = await fetch(qrUrl);
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
@@ -2202,7 +2202,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}>
                 <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${registeredUser.qr_token}`} 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`https://campus-groovelab.de/qr/${registeredUser.qr_token}`)}`} 
                   alt="QR Code" 
                   style={{ width: '180px', height: '180px', display: 'block' }}
                 />
@@ -3678,7 +3678,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             {/* QR CODE DISPLAY */}
             <div style={{ background: '#ffffff', padding: '14px', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
               <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${verifiedStudentDetails.qr_token || verifiedStudentDetails.id}`}
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`https://campus-groovelab.de/qr/${verifiedStudentDetails.qr_token || verifiedStudentDetails.id}`)}`}
                 alt="Student Login QR Code"
                 style={{ width: '180px', height: '180px', display: 'block' }}
               />

@@ -1527,6 +1527,12 @@ function getInitials(name: string): string {
 }
 
 function App() {
+  // 0. QR LANDING PAGE — Weg 2: Nativer Kamera-Scan (Sofort abfangen vor allen States!)
+  const qrPathMatch = typeof window !== 'undefined' ? window.location.pathname.match(/^\/qr\/([^/?#]+)/) : null;
+  if (qrPathMatch) {
+    return <QRLandingPage token={qrPathMatch[1]} />;
+  }
+
   const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => sessionStorage.getItem('groovelab_user_id'));
   const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
 
