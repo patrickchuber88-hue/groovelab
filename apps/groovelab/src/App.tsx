@@ -11329,8 +11329,8 @@ function App() {
             whiteSpace: 'nowrap' as const,
             flexShrink: 0,
             boxShadow: 'none',
-            width: isCompact ? '42px' : 'auto',
-            height: isCompact ? '42px' : 'auto',
+            width: isCompact ? '46px' : 'auto',
+            height: isCompact ? '46px' : 'auto',
             boxSizing: 'border-box' as const
           };
         };
@@ -12914,15 +12914,11 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
                   max={duration || 100}
                   value={currentTime}
                   onChange={handleSeek}
+                  className="player-seek-slider"
                   style={{
                     flex: 1,
-                    height: '4px',
-                    borderRadius: '2px',
-                    background: 'rgba(255, 255, 255, 0.15)',
                     outline: 'none',
-                    cursor: 'pointer',
-                    accentColor: brandColor,
-                    WebkitAppearance: 'none'
+                    accentColor: brandColor
                   }}
                 />
               </div>

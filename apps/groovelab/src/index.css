@@ -1055,3 +1055,52 @@ button, a, [role="button"], [onClick] {
   border-radius: 8px !important;
   pointer-events: none !important;
 }
+
+/* Player Seek Slider touch target optimization */
+.player-seek-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 36px; /* Touch area height */
+  background: transparent;
+  cursor: pointer;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.player-seek-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+.player-seek-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  margin-top: -6px; /* centers the 18px thumb on the 6px track */
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  transition: transform 0.1s ease;
+}
+.player-seek-slider:active::-webkit-slider-thumb {
+  transform: scale(1.3);
+}
+
+.player-seek-slider::-moz-range-track {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+.player-seek-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: none;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  transition: transform 0.1s ease;
+}
+.player-seek-slider:active::-moz-range-thumb {
+  transform: scale(1.3);
+}
+

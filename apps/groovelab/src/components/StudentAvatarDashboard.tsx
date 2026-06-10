@@ -370,14 +370,14 @@ function MobileBriefingView({
                     justifyContent: 'center',
                     background: '#dbeafe', 
                     color: '#1e40af', 
-                    width: '28px',
-                    height: '28px',
+                    width: '44px',
+                    height: '44px',
                     borderRadius: '50%',
                     border: 'none',
                     cursor: 'pointer'
                   }}
                 >
-                  <MessageSquare size={13} />
+                  <MessageSquare size={18} />
                 </button>
               )}
             </div>
@@ -393,7 +393,7 @@ function MobileBriefingView({
       {/* RESPONSIVE GRID FOR KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
         {/* XP Kachel */}
-        <div style={{ background: 'linear-gradient(135deg, #0b57d0 0%, #3b82f6 100%)', borderRadius: '20px', color: 'white', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 4px 12px rgba(11, 87, 208, 0.08)' }}>
+        <div style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', borderRadius: '20px', color: 'white', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.08)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.03em' }}>XP</span>
             <Star size={15} fill="currentColor" />
@@ -402,7 +402,7 @@ function MobileBriefingView({
         </div>
         
         {/* Songs Kachel */}
-        <div style={{ background: 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)', borderRadius: '20px', color: 'white', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 4px 12px rgba(22, 163, 74, 0.08)' }}>
+        <div style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', borderRadius: '20px', color: 'white', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.08)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Songs</span>
             <Award size={15} />
@@ -411,7 +411,7 @@ function MobileBriefingView({
         </div>
 
         {/* Fokus Kachel */}
-        <div style={{ background: 'linear-gradient(135deg, #eab308 0%, #facc15 100%)', borderRadius: '20px', color: '#1f2937', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 4px 12px rgba(234, 179, 8, 0.08)' }}>
+        <div style={{ background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', borderRadius: '20px', color: 'white', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 4px 12px rgba(234, 179, 8, 0.08)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Fokus</span>
             <Clock size={15} />
@@ -420,7 +420,7 @@ function MobileBriefingView({
         </div>
 
         {/* Streak Kachel */}
-        <div style={{ background: 'linear-gradient(135deg, #ea580c 0%, #f97316 100%)', borderRadius: '20px', color: 'white', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 4px 12px rgba(234, 88, 12, 0.08)' }}>
+        <div style={{ background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', borderRadius: '20px', color: 'white', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.08)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Streak</span>
             <Flame size={15} />
@@ -843,8 +843,8 @@ function MobileBriefingView({
                             justifyContent: 'center',
                             background: 'rgba(120, 53, 15, 0.12)',
                             color: '#78350f',
-                            width: '32px',
-                            height: '32px',
+                            width: '44px',
+                            height: '44px',
                             borderRadius: '50%',
                             border: 'none',
                             cursor: 'pointer',
@@ -854,7 +854,7 @@ function MobileBriefingView({
                           onMouseOver={e => { e.currentTarget.style.background = 'rgba(120, 53, 15, 0.22)'; }}
                           onMouseOut={e => { e.currentTarget.style.background = 'rgba(120, 53, 15, 0.12)'; }}
                         >
-                          <MessageSquare size={14} />
+                          <MessageSquare size={18} />
                         </button>
                       </div>
                     </div>
@@ -895,8 +895,8 @@ function MobileBriefingView({
                         justifyContent: 'center',
                         background: '#f1f5f9',
                         color: '#475569',
-                        width: '32px',
-                        height: '32px',
+                        width: '44px',
+                        height: '44px',
                         borderRadius: '50%',
                         border: 'none',
                         cursor: 'pointer',
@@ -913,7 +913,7 @@ function MobileBriefingView({
                         e.currentTarget.style.color = '#475569';
                       }}
                     >
-                      <MessageSquare size={14} />
+                      <MessageSquare size={18} />
                     </button>
                   </div>
                 );
@@ -981,18 +981,18 @@ function MobileBriefingView({
                       </div>
                     </div>
                     
-                    <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '6px' }}>
                       {isReschedule ? (
                         <>
                           <button 
                             onClick={() => handleRejectReschedule(occ)}
-                            style={{ background: '#ef4444', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer' }}
+                            style={{ background: '#ef4444', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '10px', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '44px', minWidth: '70px', boxShadow: '0 2px 8px rgba(239, 68, 68, 0.15)' }}
                           >
                             Nein
                           </button>
                           <button 
                             onClick={() => handleConfirmReschedule(occ.id)}
-                            style={{ background: '#eab308', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer' }}
+                            style={{ background: '#eab308', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '10px', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '44px', minWidth: '70px', boxShadow: '0 2px 8px rgba(234, 179, 8, 0.15)' }}
                           >
                             Ja
                           </button>
@@ -1000,7 +1000,7 @@ function MobileBriefingView({
                       ) : (
                         <button 
                           onClick={() => handleAcknowledgeCancellation(occ.id)}
-                          style={{ background: isRegularReset ? '#10b981' : '#ef4444', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer' }}
+                          style={{ background: isRegularReset ? '#10b981' : '#ef4444', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '10px', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '44px', minWidth: '70px', boxShadow: isRegularReset ? '0 2px 8px rgba(16, 181, 129, 0.15)' : '0 2px 8px rgba(239, 68, 68, 0.15)' }}
                         >
                           Ok
                         </button>
@@ -3803,11 +3803,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
               {/* Card 2: Practice Minutes */}
               <div style={{ 
-                background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', 
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
                 borderRadius: '20px', 
                 color: 'white', 
                 padding: '16px', 
-                boxShadow: '0 4px 15px rgba(4, 120, 87, 0.15)',
+                boxShadow: '0 4px 15px rgba(16, 185, 129, 0.15)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '6px'
@@ -3821,11 +3821,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
               {/* Card 3: Focus Time Today */}
               <div style={{ 
-                background: 'linear-gradient(135deg, #eab308 0%, #a16207 100%)', 
+                background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', 
                 borderRadius: '20px', 
                 color: 'white', 
                 padding: '16px', 
-                boxShadow: '0 4px 15px rgba(161, 98, 7, 0.15)',
+                boxShadow: '0 4px 15px rgba(234, 179, 8, 0.15)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '6px'
@@ -3847,11 +3847,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
               {/* Card 4: Streak-Pfad & Joker */}
               <div style={{ 
-                background: 'linear-gradient(135deg, #f97316 0%, #c2410c 100%)', 
+                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', 
                 borderRadius: '20px', 
                 color: 'white', 
                 padding: '16px', 
-                boxShadow: '0 4px 15px rgba(194, 65, 12, 0.15)',
+                boxShadow: '0 4px 15px rgba(239, 68, 68, 0.15)',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
@@ -4818,15 +4818,17 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                               background: '#8b5cf6',
                                               color: '#ffffff',
                                               border: 'none',
-                                              padding: '4px 10px',
-                                              borderRadius: '8px',
-                                              fontSize: '0.65rem',
+                                              padding: '10px 16px',
+                                              borderRadius: '12px',
+                                              fontSize: '0.82rem',
                                               fontWeight: 800,
                                               cursor: 'pointer',
-                                              boxShadow: '0 2px 4px rgba(139, 92, 246, 0.2)',
+                                              boxShadow: '0 4px 10px rgba(139, 92, 246, 0.25)',
                                               display: 'flex',
                                               alignItems: 'center',
-                                              gap: '3px',
+                                              justifyContent: 'center',
+                                              minHeight: '44px',
+                                              gap: '4px',
                                               transition: 'all 0.2s'
                                             }}
                                             onMouseOver={(e) => e.currentTarget.style.background = '#7c3aed'}
@@ -8603,8 +8605,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   background: 'rgba(255, 255, 255, 0.7)',
                   border: 'none',
                   borderRadius: '50%',
-                  width: '32px',
-                  height: '32px',
+                  width: '44px',
+                  height: '44px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -8616,7 +8618,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 onMouseEnter={e => e.currentTarget.style.background = '#ffffff'}
                 onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.7)'}
               >
-                <X size={16} />
+                <X size={20} />
               </button>
 
               {/* Inside Pages of the Notebook (Left/Right Pages) */}
@@ -9102,7 +9104,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               <button 
                 onClick={() => setStorySlide(prev => Math.max(0, prev - 1))}
                 disabled={storySlide === 0}
-                style={{ flex: 1, background: '#18181b', border: '1px solid #27272a', color: 'white', padding: '12px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', opacity: storySlide === 0 ? 0.5 : 1 }}
+                style={{ flex: 1, background: '#18181b', border: '1px solid #27272a', color: 'white', padding: '12px 16px', borderRadius: '10px', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: storySlide === 0 ? 0.5 : 1 }}
               >
                 Zurück
               </button>
@@ -9115,7 +9117,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     setStorySlide(prev => Math.min(3, prev + 1));
                   }
                 }}
-                style={{ flex: 2, background: '#eab308', border: 'none', color: '#09090b', padding: '12px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 900, cursor: 'pointer' }}
+                style={{ flex: 2, background: '#eab308', border: 'none', color: '#09090b', padding: '12px 16px', borderRadius: '10px', fontSize: '0.82rem', fontWeight: 900, cursor: 'pointer', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
                 {storySlide === 3 ? 'Schließen' : 'Weiter'}
               </button>
@@ -9282,9 +9284,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 </div>
                 <button 
                   onClick={() => setShowAppointmentChat(false)}
-                  style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}
+                  style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}
                 >
-                  <X size={16} />
+                  <X size={20} />
                 </button>
               </div>
 
@@ -9345,17 +9347,17 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               </div>
 
               {/* Send Input Form */}
-              <form onSubmit={handleSendChatMessage} style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
+              <form onSubmit={handleSendChatMessage} style={{ display: 'flex', gap: '8px', marginTop: 'auto', width: '100%' }}>
                 <input 
                   type="text" 
                   placeholder={isFrozen ? "Shoutbox nach 48h eingefroren..." : "Nachricht senden..."}
                   disabled={isFrozen}
                   value={chatTypedMessage}
                   onChange={e => setChatTypedMessage(e.target.value)}
-                  style={{ flex: 1, padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: isFrozen ? '#f1f5f9' : '#ffffff' }}
+                  style={{ flex: 1, padding: '12px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.88rem', outline: 'none', background: isFrozen ? '#f1f5f9' : '#ffffff', minHeight: '44px', boxSizing: 'border-box' }}
                 />
-                <button type="submit" disabled={isFrozen} style={{ background: isFrozen ? '#cbd5e1' : '#4f46e5', color: 'white', border: 'none', borderRadius: '12px', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isFrozen ? 'not-allowed' : 'pointer', boxShadow: isFrozen ? 'none' : '0 4px 12px rgba(79, 70, 229, 0.15)' }}>
-                  <Send size={14} />
+                <button type="submit" disabled={isFrozen} style={{ background: isFrozen ? '#cbd5e1' : '#4f46e5', color: 'white', border: 'none', borderRadius: '12px', padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isFrozen ? 'not-allowed' : 'pointer', boxShadow: isFrozen ? 'none' : '0 4px 12px rgba(79, 70, 229, 0.15)', minHeight: '44px', flexShrink: 0 }}>
+                  <Send size={16} />
                 </button>
               </form>
             </div>
