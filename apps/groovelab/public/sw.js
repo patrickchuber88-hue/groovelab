@@ -14,6 +14,9 @@ self.addEventListener('push', function(event) {
         body: payload.body,
         icon: payload.icon || '/pwa-icon.png',
         badge: payload.badge || '/pwa-icon.png',
+        vibrate: [100, 50, 100],
+        tag: 'campus-notification',
+        renotify: true,
         data: {
           url: payload.url || '/',
           notificationId: payload.notificationId || null,
@@ -27,8 +30,11 @@ self.addEventListener('push', function(event) {
     } catch (e) {
       console.error('Error parsing push data:', e);
       event.waitUntil(
-        self.registration.showNotification('Campus Groovelab', {
-          body: event.data.text()
+        self.registration.showNotification('Campus', {
+          body: event.data.text(),
+          icon: '/pwa-icon.png',
+          badge: '/pwa-icon.png',
+          vibrate: [100, 50, 100]
         })
       );
     }
@@ -55,32 +61,31 @@ self.addEventListener('notificationclick', function(event) {
           },
           body: JSON.stringify({ is_read: true })
         }).catch(err => console.error('Error marking notification as read in sw:', err)),
-        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
-          for (let i = 0; i < clientList.length; i++) {
-            let client = clientList[i];
-            if (client.url === url && 'focus' in client) {
-              return client.focus();
-            }
-          }
-          if (clients.openWindow) {
-            return clients.openWindow(url);
-          }
-        })
+        focusOrOpenWindow(url)
       ])
     );
   } else {
-    event.waitUntil(
-      clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
-        for (let i = 0; i < clientList.length; i++) {
-          let client = clientList[i];
-          if (client.url === url && 'focus' in client) {
-            return client.focus();
-          }
-        }
-        if (clients.openWindow) {
-          return clients.openWindow(url);
-        }
-      })
-    );
+    event.waitUntil(focusOrOpenWindow(url));
   }
 });
+
+function focusOrOpenWindow(targetUrl) {
+  const absoluteUrl = new URL(targetUrl, self.location.origin).href;
+
+  return clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+    // 1. If we find an active window, navigate and focus it
+    for (let i = 0; i < clientList.length; i++) {
+      let client = clientList[i];
+      if ('focus' in client) {
+        if ('navigate' in client && client.url !== absoluteUrl) {
+          client.navigate(absoluteUrl);
+        }
+        return client.focus();
+      }
+    }
+    // 2. If no window is open, open a new one
+    if (clients.openWindow) {
+      return clients.openWindow(absoluteUrl);
+    }
+  });
+}
