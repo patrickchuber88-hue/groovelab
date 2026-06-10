@@ -1238,6 +1238,52 @@ export function ScheduleCalendarView({
                 recipient_id: change.student_id,
                 content: notificationMessage
               });
+
+              // Send instant real-time push notification if premium student
+              try {
+                const { data: studentProfile } = await supabase
+                  .from('users')
+                  .select('is_premium_user, first_name')
+                  .eq('id', change.student_id)
+                  .single();
+
+                if (studentProfile && studentProfile.is_premium_user) {
+                  let pushTitle = 'Terminänderung 📅';
+                  if (change.status === 'cancelled') {
+                    pushTitle = 'Unterricht fällt aus ☕';
+                  } else if (change.date === origDateStr && change.start_time.substring(0, 5) === origTimeStr.substring(0, 5)) {
+                    pushTitle = 'Termin zurückgesetzt 🔄';
+                  } else {
+                    pushTitle = 'Terminverschiebung 📅';
+                  }
+
+                  // Create a notification record in the DB
+                  const { data: dbNotif } = await supabase
+                    .from('notifications')
+                    .insert({
+                      user_id: change.student_id,
+                      title: pushTitle,
+                      message: notificationMessage,
+                      metadata: { occurrence_id: change.id, type: change.status === 'cancelled' ? 'cancelled' : 'rescheduled' }
+                    })
+                    .select('id')
+                    .single();
+
+                  // Invoke send-push Edge Function
+                  await supabase.functions.invoke('send-push', {
+                    body: {
+                      userId: change.student_id,
+                      title: pushTitle,
+                      body: notificationMessage,
+                      url: '/',
+                      notificationId: dbNotif ? dbNotif.id : null
+                    }
+                  });
+                  console.log('[Push] Sent real-time push to student:', change.student_id);
+                }
+              } catch (pushErr) {
+                console.error('Failed to send real-time push from Stundenplan-Designer:', pushErr);
+              }
             }
           }
         } catch (notifErr) {
