@@ -1551,6 +1551,13 @@ function App() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    // Register service worker immediately to ensure PWA installability
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' })
+        .then((reg) => console.log('Service Worker registered successfully on load:', reg.scope))
+        .catch((err) => console.error('Service Worker registration failed on load:', err));
+    }
+
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);

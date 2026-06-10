@@ -89,3 +89,19 @@ function focusOrOpenWindow(targetUrl) {
     }
   });
 }
+
+// Add fetch event listener to satisfy PWA installability requirements
+self.addEventListener('fetch', function(event) {
+  // Pass-through to network, can be extended to caching later
+  event.respondWith(
+    fetch(event.request).catch(function() {
+      // Fallback for document navigation when offline
+      if (event.request.mode === 'navigate') {
+        return new Response('Du bist offline. Bitte überprüfe deine Internetverbindung.', {
+          headers: { 'Content-Type': 'text/html; charset=utf-8' }
+        });
+      }
+    })
+  );
+});
+
