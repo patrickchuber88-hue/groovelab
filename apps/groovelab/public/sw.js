@@ -4,8 +4,8 @@ self.addEventListener('push', function(event) {
       const payload = event.data.json();
       const options = {
         body: payload.body,
-        icon: payload.icon || '/assets/icon-192.png',
-        badge: payload.badge || '/assets/icon-badge.png',
+        icon: payload.icon || '/pwa-icon.png',
+        badge: payload.badge || '/pwa-icon.png',
         data: {
           url: payload.url || '/',
           notificationId: payload.notificationId || null,
